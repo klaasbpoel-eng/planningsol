@@ -2,11 +2,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format, differenceInDays } from "date-fns";
-import { Calendar, Check, X, Clock, User, Loader2 } from "lucide-react";
+import { Calendar, Check, X, Clock, User, Loader2, Plus, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { RequestFormDialog } from "./RequestFormDialog";
 import type { Database } from "@/integrations/supabase/types";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
@@ -24,6 +42,24 @@ interface AdminRequestListProps {
 
 export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) {
   const [updating, setUpdating] = useState<string | null>(null);
+  const [employees, setEmployees] = useState<Profile[]>([]);
+  const [selectedRequest, setSelectedRequest] = useState<RequestWithProfile | null>(null);
+  const [formDialogOpen, setFormDialogOpen] = useState(false);
+  const [formMode, setFormMode] = useState<"create" | "edit">("create");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [requestToDelete, setRequestToDelete] = useState<RequestWithProfile | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("full_name", { ascending: true });
+      setEmployees(data || []);
+    };
+    fetchEmployees();
+  }, []);
 
   const handleStatusUpdate = async (id: string, status: RequestStatus) => {
     setUpdating(id);
@@ -40,6 +76,45 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
       toast.error(error.message);
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const handleCreateRequest = () => {
+    setSelectedRequest(null);
+    setFormMode("create");
+    setFormDialogOpen(true);
+  };
+
+  const handleEditRequest = (request: RequestWithProfile) => {
+    setSelectedRequest(request);
+    setFormMode("edit");
+    setFormDialogOpen(true);
+  };
+
+  const handleDeleteClick = (request: RequestWithProfile) => {
+    setRequestToDelete(request);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!requestToDelete) return;
+
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("time_off_requests")
+        .delete()
+        .eq("id", requestToDelete.id);
+
+      if (error) throw error;
+      toast.success("Request deleted");
+      onUpdate();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+      setRequestToDelete(null);
     }
   };
 
@@ -79,8 +154,41 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
   const pendingRequests = requests.filter(r => r.status === "pending");
   const processedRequests = requests.filter(r => r.status !== "pending");
 
+  const RequestActions = ({ request }: { request: RequestWithProfile }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="bg-popover z-50">
+        <DropdownMenuItem onClick={() => handleEditRequest(request)}>
+          <Edit className="h-4 w-4 mr-2" />
+          Edit
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem 
+          onClick={() => handleDeleteClick(request)}
+          className="text-destructive focus:text-destructive"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div className="space-y-6">
+      {/* Header with Add button */}
+      <div className="flex items-center justify-between">
+        <div />
+        <Button onClick={handleCreateRequest} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Create Request
+        </Button>
+      </div>
+
       {/* Pending Requests */}
       <Card className="shadow-lg border-0">
         <CardHeader className="pb-4">
@@ -141,7 +249,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                       )}
                     </div>
                     
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                       <Button
                         size="sm"
                         className="bg-success hover:bg-success/90 text-success-foreground"
@@ -173,6 +281,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                           </>
                         )}
                       </Button>
+                      <RequestActions request={request} />
                     </div>
                   </div>
                 </div>
@@ -237,6 +346,8 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                         </span>
                       </div>
                     </div>
+                    
+                    <RequestActions request={request} />
                   </div>
                 </div>
               );
@@ -244,6 +355,39 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
           )}
         </CardContent>
       </Card>
+
+      {/* Request Form Dialog */}
+      <RequestFormDialog
+        request={selectedRequest}
+        employees={employees}
+        open={formDialogOpen}
+        onOpenChange={setFormDialogOpen}
+        onUpdate={onUpdate}
+        mode={formMode}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Request</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this time-off request? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+            >
+              {deleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
