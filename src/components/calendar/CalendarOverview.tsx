@@ -182,6 +182,48 @@ export function CalendarOverview() {
     }
   };
 
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    if (!isAdmin) return;
+    e.dataTransfer.setData("taskId", taskId);
+    setDraggedTaskId(taskId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTaskId(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!isAdmin) return;
+    e.preventDefault();
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetDate: Date) => {
+    if (!isAdmin) return;
+    e.preventDefault();
+    const taskId = e.dataTransfer.getData("taskId");
+    if (!taskId) return;
+
+    try {
+      const newDueDate = format(targetDate, "yyyy-MM-dd");
+      const { error } = await supabase
+        .from("tasks")
+        .update({ due_date: newDueDate })
+        .eq("id", taskId);
+
+      if (error) throw error;
+      
+      toast.success(`Taak verplaatst naar ${format(targetDate, "d MMMM", { locale: nl })}`);
+      fetchData();
+    } catch (error) {
+      console.error("Error moving task:", error);
+      toast.error("Fout bij het verplaatsen van de taak");
+    } finally {
+      setDraggedTaskId(null);
+    }
+  };
+
   const leaveTypes = [
     { value: "vacation", label: "Vakantie", color: "bg-primary" },
     { value: "sick", label: "Ziekteverlof", color: "bg-destructive" },
@@ -611,9 +653,12 @@ export function CalendarOverview() {
                 className={cn(
                   "min-h-[140px] p-3 rounded-xl border transition-all duration-300 hover:shadow-md",
                   "bg-card/80 backdrop-blur-sm border-border/50",
-                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent shadow-lg shadow-primary/5"
+                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent shadow-lg shadow-primary/5",
+                  draggedTaskId && "ring-2 ring-dashed ring-primary/30"
                 )}
                 style={{ animationDelay: `${index * 30}ms` }}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, day)}
               >
                 <div className={cn(
                   "text-sm font-bold mb-3 flex items-center justify-center w-7 h-7 rounded-full",
@@ -632,10 +677,14 @@ export function CalendarOverview() {
                       <DropdownMenu key={task.id}>
                         <DropdownMenuTrigger asChild disabled={!isAdmin}>
                           <div
+                            draggable={isAdmin}
+                            onDragStart={(e) => handleDragStart(e, task.id)}
+                            onDragEnd={handleDragEnd}
                             className={cn(
                               "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 group/task",
-                              isAdmin && "cursor-pointer",
-                              task.status === "completed" && "opacity-60"
+                              isAdmin && "cursor-grab active:cursor-grabbing",
+                              task.status === "completed" && "opacity-60",
+                              draggedTaskId === task.id && "opacity-50 ring-2 ring-primary"
                             )}
                             style={{ 
                               borderLeft: `2px solid ${typeColor}`,
@@ -742,8 +791,11 @@ export function CalendarOverview() {
                   isCurrentMonth 
                     ? "bg-card/80 backdrop-blur-sm border-border/50 hover:bg-card hover:shadow-sm" 
                     : "bg-muted/20 border-transparent opacity-50",
-                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent"
+                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent",
+                  draggedTaskId && isCurrentMonth && "ring-2 ring-dashed ring-primary/30"
                 )}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, day)}
               >
                 <div className={cn(
                   "text-xs font-bold mb-1.5 flex items-center justify-center w-6 h-6 rounded-full transition-colors",
@@ -764,10 +816,14 @@ export function CalendarOverview() {
                       <DropdownMenu key={task.id}>
                         <DropdownMenuTrigger asChild disabled={!isAdmin}>
                           <div
+                            draggable={isAdmin}
+                            onDragStart={(e) => handleDragStart(e, task.id)}
+                            onDragEnd={handleDragEnd}
                             className={cn(
                               "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 group/task",
-                              isAdmin && "cursor-pointer",
-                              task.status === "completed" && "opacity-60"
+                              isAdmin && "cursor-grab active:cursor-grabbing",
+                              task.status === "completed" && "opacity-60",
+                              draggedTaskId === task.id && "opacity-50 ring-2 ring-primary"
                             )}
                             style={{ 
                               backgroundColor: `${typeColor}20`,
