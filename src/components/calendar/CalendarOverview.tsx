@@ -3,6 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   CalendarDays, 
   ChevronLeft, 
@@ -10,7 +17,8 @@ import {
   Calendar as CalendarIcon,
   List,
   Grid3X3,
-  LayoutGrid
+  LayoutGrid,
+  Users
 } from "lucide-react";
 import { 
   format, 
@@ -58,6 +66,7 @@ export function CalendarOverview() {
   const [viewType, setViewType] = useState<ViewType>("month");
   const [requests, setRequests] = useState<RequestWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
 
   useEffect(() => {
     fetchRequests();
@@ -97,8 +106,14 @@ export function CalendarOverview() {
     }
   };
 
+  // Filter requests based on selected employee
+  const filteredRequests = useMemo(() => {
+    if (selectedEmployee === "all") return requests;
+    return requests.filter((r) => r.user_id === selectedEmployee);
+  }, [requests, selectedEmployee]);
+
   const getRequestsForDay = (day: Date): RequestWithProfile[] => {
-    return requests.filter((request) => {
+    return filteredRequests.filter((request) => {
       if (request.status === "rejected") return false;
       const start = parseISO(request.start_date);
       const end = parseISO(request.end_date);
@@ -387,7 +402,7 @@ export function CalendarOverview() {
           const monthEnd = endOfMonth(month);
           const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
           
-          const monthRequests = requests.filter((request) => {
+          const monthRequests = filteredRequests.filter((request) => {
             if (request.status === "rejected") return false;
             const start = parseISO(request.start_date);
             const end = parseISO(request.end_date);
@@ -448,38 +463,71 @@ export function CalendarOverview() {
   return (
     <Card className="shadow-lg border-0">
       <CardHeader className="pb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <CalendarDays className="h-5 w-5 text-primary" />
-              Kalenderoverzicht
-            </CardTitle>
-            <CardDescription>Bekijk al uw verlofaanvragen</CardDescription>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <CalendarDays className="h-5 w-5 text-primary" />
+                Kalenderoverzicht
+              </CardTitle>
+              <CardDescription>Bekijk alle verlofaanvragen</CardDescription>
+            </div>
+            
+            <ToggleGroup 
+              type="single" 
+              value={viewType} 
+              onValueChange={(value) => value && setViewType(value as ViewType)}
+              className="justify-start"
+            >
+              <ToggleGroupItem value="day" aria-label="Dagweergave" className="text-xs px-3">
+                <List className="h-4 w-4 mr-1" />
+                Dag
+              </ToggleGroupItem>
+              <ToggleGroupItem value="week" aria-label="Weekweergave" className="text-xs px-3">
+                <Grid3X3 className="h-4 w-4 mr-1" />
+                Week
+              </ToggleGroupItem>
+              <ToggleGroupItem value="month" aria-label="Maandweergave" className="text-xs px-3">
+                <CalendarIcon className="h-4 w-4 mr-1" />
+                Maand
+              </ToggleGroupItem>
+              <ToggleGroupItem value="year" aria-label="Jaarweergave" className="text-xs px-3">
+                <LayoutGrid className="h-4 w-4 mr-1" />
+                Jaar
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
-          
-          <ToggleGroup 
-            type="single" 
-            value={viewType} 
-            onValueChange={(value) => value && setViewType(value as ViewType)}
-            className="justify-start"
-          >
-            <ToggleGroupItem value="day" aria-label="Dagweergave" className="text-xs px-3">
-              <List className="h-4 w-4 mr-1" />
-              Dag
-            </ToggleGroupItem>
-            <ToggleGroupItem value="week" aria-label="Weekweergave" className="text-xs px-3">
-              <Grid3X3 className="h-4 w-4 mr-1" />
-              Week
-            </ToggleGroupItem>
-            <ToggleGroupItem value="month" aria-label="Maandweergave" className="text-xs px-3">
-              <CalendarIcon className="h-4 w-4 mr-1" />
-              Maand
-            </ToggleGroupItem>
-            <ToggleGroupItem value="year" aria-label="Jaarweergave" className="text-xs px-3">
-              <LayoutGrid className="h-4 w-4 mr-1" />
-              Jaar
-            </ToggleGroupItem>
-          </ToggleGroup>
+
+          {/* Employee Filter */}
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+              <SelectTrigger className="w-[200px] bg-background">
+                <SelectValue placeholder="Filter op medewerker" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border shadow-lg z-50">
+                <SelectItem value="all">Alle medewerkers</SelectItem>
+                {uniqueEmployees.map((employee) => (
+                  <SelectItem key={employee.userId} value={employee.userId}>
+                    <div className="flex items-center gap-2">
+                      <div className={cn("w-2 h-2 rounded-full", employee.color)} />
+                      {employee.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedEmployee !== "all" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedEmployee("all")}
+                className="text-xs"
+              >
+                Reset
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-between mt-4">
