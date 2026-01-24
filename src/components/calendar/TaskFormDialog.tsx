@@ -280,7 +280,7 @@ export function TaskFormDialog({
             {taskTypes.length > 0 && (
               <div className="grid gap-2">
                 <Label>Type</Label>
-                <Select value={typeId} onValueChange={setTypeId}>
+                <Select value={typeId || undefined} onValueChange={setTypeId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecteer type" />
                   </SelectTrigger>
