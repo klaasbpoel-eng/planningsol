@@ -14,32 +14,120 @@ export type Database = {
   }
   public: {
     Tables: {
+      employee_leave_balances: {
+        Row: {
+          accrual_rate: number | null
+          annual_allowance: number
+          carried_over: number
+          created_at: string
+          id: string
+          type_id: string
+          updated_at: string
+          used_days: number
+          user_id: string
+          year: number
+        }
+        Insert: {
+          accrual_rate?: number | null
+          annual_allowance?: number
+          carried_over?: number
+          created_at?: string
+          id?: string
+          type_id: string
+          updated_at?: string
+          used_days?: number
+          user_id: string
+          year?: number
+        }
+        Update: {
+          accrual_rate?: number | null
+          annual_allowance?: number
+          carried_over?: number
+          created_at?: string
+          id?: string
+          type_id?: string
+          updated_at?: string
+          used_days?: number
+          user_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_leave_balances_type_id_fkey"
+            columns: ["type_id"]
+            isOneToOne: false
+            referencedRelation: "time_off_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          address: string | null
           created_at: string
+          date_of_birth: string | null
+          department: string | null
           email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          employment_type: string | null
           full_name: string | null
+          hire_date: string | null
           id: string
+          job_title: string | null
+          location: string | null
+          manager_id: string | null
+          phone: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          address?: string | null
           created_at?: string
+          date_of_birth?: string | null
+          department?: string | null
           email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          employment_type?: string | null
           full_name?: string | null
+          hire_date?: string | null
           id?: string
+          job_title?: string | null
+          location?: string | null
+          manager_id?: string | null
+          phone?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          address?: string | null
           created_at?: string
+          date_of_birth?: string | null
+          department?: string | null
           email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          employment_type?: string | null
           full_name?: string | null
+          hire_date?: string | null
           id?: string
+          job_title?: string | null
+          location?: string | null
+          manager_id?: string | null
+          phone?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       time_off_requests: {
         Row: {
