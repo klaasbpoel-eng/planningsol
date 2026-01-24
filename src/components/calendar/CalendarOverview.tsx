@@ -531,14 +531,24 @@ export function CalendarOverview() {
         </div>
 
         <div className="flex items-center justify-between mt-4">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => navigate("prev")}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => navigate("prev")}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentDate(new Date())}
+              className="text-xs"
+            >
+              Vandaag
+            </Button>
+          </div>
           <span className="text-sm font-medium capitalize">
             {getDateRangeLabel()}
           </span>
