@@ -1,0 +1,352 @@
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { CalendarIcon, Loader2 } from "lucide-react";
+import { format } from "date-fns";
+import { nl } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import type { Database } from "@/integrations/supabase/types";
+
+type Task = Database["public"]["Tables"]["tasks"]["Row"];
+type TaskType = Database["public"]["Tables"]["task_types"]["Row"];
+type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+
+interface TaskFormDialogProps {
+  task: Task | null;
+  employees: Profile[];
+  taskTypes: TaskType[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onUpdate: () => void;
+  mode: "create" | "edit";
+}
+
+const initialFormData = {
+  title: "",
+  description: "",
+  due_date: undefined as Date | undefined,
+  priority: "medium" as string,
+  status: "pending" as string,
+  assigned_to: "",
+  type_id: null as string | null,
+};
+
+export function TaskFormDialog({
+  task,
+  employees,
+  taskTypes,
+  open,
+  onOpenChange,
+  onUpdate,
+  mode,
+}: TaskFormDialogProps) {
+  const [formData, setFormData] = useState(initialFormData);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      if (mode === "create") {
+        setFormData(initialFormData);
+      } else if (task) {
+        setFormData({
+          title: task.title,
+          description: task.description || "",
+          due_date: task.due_date ? new Date(task.due_date) : undefined,
+          priority: task.priority,
+          status: task.status,
+          assigned_to: task.assigned_to,
+          type_id: task.type_id,
+        });
+      }
+    }
+  }, [open, task, mode]);
+
+  const handleSave = async () => {
+    // Validation
+    if (!formData.title.trim()) {
+      toast.error("Titel is verplicht");
+      return;
+    }
+    if (!formData.assigned_to) {
+      toast.error("Selecteer een medewerker");
+      return;
+    }
+    if (!formData.due_date) {
+      toast.error("Selecteer een deadline");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Je bent niet ingelogd");
+        return;
+      }
+
+      const taskData = {
+        title: formData.title.trim(),
+        description: formData.description.trim() || null,
+        due_date: format(formData.due_date, "yyyy-MM-dd"),
+        priority: formData.priority,
+        status: formData.status,
+        assigned_to: formData.assigned_to,
+        type_id: formData.type_id,
+      };
+
+      if (mode === "create") {
+        const { error } = await supabase.from("tasks").insert({
+          ...taskData,
+          created_by: user.id,
+        });
+
+        if (error) throw error;
+        toast.success("Taak aangemaakt");
+      } else if (task) {
+        const { error } = await supabase
+          .from("tasks")
+          .update(taskData)
+          .eq("id", task.id);
+
+        if (error) throw error;
+        toast.success("Taak bijgewerkt");
+      }
+
+      onUpdate();
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error saving task:", error);
+      toast.error("Er is een fout opgetreden");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const priorities = [
+    { value: "low", label: "Laag" },
+    { value: "medium", label: "Medium" },
+    { value: "high", label: "Hoog" },
+  ];
+
+  const statuses = [
+    { value: "pending", label: "In afwachting" },
+    { value: "in_progress", label: "In uitvoering" },
+    { value: "completed", label: "Voltooid" },
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>
+            {mode === "create" ? "Nieuwe Taak" : "Taak Bewerken"}
+          </DialogTitle>
+          <DialogDescription>
+            {mode === "create"
+              ? "Maak een nieuwe taak aan en wijs deze toe aan een medewerker."
+              : "Bewerk de taakgegevens."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4 py-4">
+          {/* Title */}
+          <div className="grid gap-2">
+            <Label htmlFor="title">Titel *</Label>
+            <Input
+              id="title"
+              value={formData.title}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
+              placeholder="Taaknaam..."
+            />
+          </div>
+
+          {/* Description */}
+          <div className="grid gap-2">
+            <Label htmlFor="description">Beschrijving</Label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
+              placeholder="Taakbeschrijving..."
+              rows={3}
+            />
+          </div>
+
+          {/* Assigned To */}
+          <div className="grid gap-2">
+            <Label>Toewijzen aan *</Label>
+            <Select
+              value={formData.assigned_to}
+              onValueChange={(value) =>
+                setFormData({ ...formData, assigned_to: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecteer medewerker" />
+              </SelectTrigger>
+              <SelectContent>
+                {employees.map((employee) => (
+                  <SelectItem key={employee.user_id || employee.id} value={employee.user_id || employee.id}>
+                    {employee.full_name || employee.email || "Onbekend"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Task Type */}
+          {taskTypes.length > 0 && (
+            <div className="grid gap-2">
+              <Label>Categorie</Label>
+              <Select
+                value={formData.type_id || "none"}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, type_id: value === "none" ? null : value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecteer categorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Geen categorie</SelectItem>
+                  {taskTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: type.color }}
+                        />
+                        {type.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Due Date */}
+          <div className="grid gap-2">
+            <Label>Deadline *</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "justify-start text-left font-normal",
+                    !formData.due_date && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {formData.due_date
+                    ? format(formData.due_date, "d MMMM yyyy", { locale: nl })
+                    : "Selecteer datum"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={formData.due_date}
+                  onSelect={(date) =>
+                    setFormData({ ...formData, due_date: date })
+                  }
+                  initialFocus
+                  locale={nl}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Priority & Status */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label>Prioriteit</Label>
+              <Select
+                value={formData.priority}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, priority: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {priorities.map((priority) => (
+                    <SelectItem key={priority.value} value={priority.value}>
+                      {priority.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, status: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {statuses.map((status) => (
+                    <SelectItem key={status.value} value={status.value}>
+                      {status.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
+            Annuleren
+          </Button>
+          <Button onClick={handleSave} disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {mode === "create" ? "Aanmaken" : "Opslaan"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
