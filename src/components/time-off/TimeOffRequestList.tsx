@@ -24,7 +24,7 @@ export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListPro
         .eq("id", id);
 
       if (error) throw error;
-      toast.success("Request deleted");
+      toast.success("Aanvraag verwijderd");
       onDelete();
     } catch (error: any) {
       toast.error(error.message);
@@ -57,10 +57,10 @@ export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListPro
 
   const getTypeLabel = (type: string) => {
     switch (type) {
-      case "vacation": return "Vacation";
-      case "sick": return "Sick Leave";
-      case "personal": return "Personal";
-      default: return "Other";
+      case "vacation": return "Vakantie";
+      case "sick": return "Ziekteverlof";
+      case "personal": return "Persoonlijk";
+      default: return "Overig";
     }
   };
 
@@ -69,9 +69,9 @@ export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListPro
       <Card className="shadow-lg border-0">
         <CardContent className="pt-10 pb-10 text-center">
           <FileText className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
-          <p className="text-muted-foreground">No time off requests yet</p>
+          <p className="text-muted-foreground">Nog geen verlofaanvragen</p>
           <p className="text-sm text-muted-foreground/70 mt-1">
-            Use the form above to submit your first request
+            Gebruik het formulier hierboven om uw eerste aanvraag in te dienen
           </p>
         </CardContent>
       </Card>
@@ -83,9 +83,9 @@ export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListPro
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-lg">
           <Clock className="h-5 w-5 text-primary" />
-          Your Requests
+          Uw Aanvragen
         </CardTitle>
-        <CardDescription>{requests.length} request{requests.length !== 1 ? 's' : ''} total</CardDescription>
+        <CardDescription>{requests.length} aanvra{requests.length !== 1 ? 'gen' : 'ag'} totaal</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {requests.map((request) => {
@@ -117,7 +117,7 @@ export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListPro
                         `, ${format(new Date(request.start_date), "yyyy")}`}
                     </span>
                     <span className="text-muted-foreground">
-                      ({days} day{days !== 1 ? 's' : ''})
+                      ({days} dag{days !== 1 ? 'en' : ''})
                     </span>
                   </div>
                   

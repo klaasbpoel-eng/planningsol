@@ -34,16 +34,16 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-primary-foreground tracking-tight">
-                Time Off Manager
+                Verlofbeheer
               </h1>
               {isAdmin && (
                 <Badge className="bg-accent text-accent-foreground text-xs">
-                  Admin
+                  Beheerder
                 </Badge>
               )}
             </div>
             <p className="text-xs text-primary-foreground/70 hidden sm:block">
-              {isAdmin ? "Manage employee requests" : "Schedule your time away"}
+              {isAdmin ? "Beheer medewerkeraanvragen" : "Plan uw vrije tijd"}
             </p>
           </div>
         </div>
@@ -57,7 +57,7 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
               className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
             >
               <ArrowLeftRight className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Employee View</span>
+              <span className="hidden sm:inline">Medewerkersweergave</span>
             </Button>
           )}
           {userEmail && (
@@ -73,7 +73,7 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
             className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
           >
             <LogOut className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Sign Out</span>
+            <span className="hidden sm:inline">Uitloggen</span>
           </Button>
         </div>
       </div>

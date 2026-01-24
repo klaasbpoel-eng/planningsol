@@ -151,7 +151,7 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{stats.total}</p>
-                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-sm text-muted-foreground">Totaal</p>
               </div>
             </CardContent>
           </Card>
@@ -163,7 +163,7 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{stats.pending}</p>
-                <p className="text-sm text-muted-foreground">Pending</p>
+                <p className="text-sm text-muted-foreground">In behandeling</p>
               </div>
             </CardContent>
           </Card>
@@ -175,7 +175,7 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{stats.approved}</p>
-                <p className="text-sm text-muted-foreground">Approved</p>
+                <p className="text-sm text-muted-foreground">Goedgekeurd</p>
               </div>
             </CardContent>
           </Card>
@@ -187,7 +187,7 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{stats.rejected}</p>
-                <p className="text-sm text-muted-foreground">Rejected</p>
+                <p className="text-sm text-muted-foreground">Afgewezen</p>
               </div>
             </CardContent>
           </Card>
@@ -198,15 +198,15 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
           <TabsList className="bg-muted/50">
             <TabsTrigger value="requests" className="gap-2">
               <ListChecks className="h-4 w-4" />
-              Requests
+              Aanvragen
             </TabsTrigger>
             <TabsTrigger value="calendar" className="gap-2">
               <CalendarDays className="h-4 w-4" />
-              Team Calendar
+              Teamkalender
             </TabsTrigger>
             <TabsTrigger value="employees" className="gap-2">
               <UserCog className="h-4 w-4" />
-              Employees
+              Medewerkers
             </TabsTrigger>
           </TabsList>
           

@@ -30,12 +30,12 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
     e.preventDefault();
     
     if (!startDate || !endDate) {
-      toast.error("Please select both start and end dates");
+      toast.error("Selecteer zowel begin- als einddatum");
       return;
     }
 
     if (endDate < startDate) {
-      toast.error("End date must be after start date");
+      toast.error("Einddatum moet na begindatum liggen");
       return;
     }
 
@@ -55,7 +55,7 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
 
       if (error) throw error;
 
-      toast.success("Time off request submitted!");
+      toast.success("Verlofaanvraag ingediend!");
       setStartDate(undefined);
       setEndDate(undefined);
       setType("vacation");
@@ -69,10 +69,10 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
   };
 
   const timeOffTypes: { value: TimeOffType; label: string; color: string }[] = [
-    { value: "vacation", label: "Vacation", color: "bg-primary" },
-    { value: "sick", label: "Sick Leave", color: "bg-destructive" },
-    { value: "personal", label: "Personal", color: "bg-accent" },
-    { value: "other", label: "Other", color: "bg-muted-foreground" },
+    { value: "vacation", label: "Vakantie", color: "bg-primary" },
+    { value: "sick", label: "Ziekteverlof", color: "bg-destructive" },
+    { value: "personal", label: "Persoonlijk", color: "bg-accent" },
+    { value: "other", label: "Overig", color: "bg-muted-foreground" },
   ];
 
   return (
@@ -80,15 +80,15 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-lg">
           <PlusCircle className="h-5 w-5 text-accent" />
-          Request Time Off
+          Verlof Aanvragen
         </CardTitle>
-        <CardDescription>Submit a new time off request</CardDescription>
+        <CardDescription>Dien een nieuwe verlofaanvraag in</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Start Date</Label>
+              <Label>Begindatum</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -99,7 +99,7 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, "PPP") : "Select date"}
+                    {startDate ? format(startDate, "PPP") : "Selecteer datum"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -115,7 +115,7 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label>End Date</Label>
+              <Label>Einddatum</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -126,7 +126,7 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {endDate ? format(endDate, "PPP") : "Select date"}
+                    {endDate ? format(endDate, "PPP") : "Selecteer datum"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -143,7 +143,7 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label>Type</Label>
+            <Label>Type verlof</Label>
             <Select value={type} onValueChange={(v) => setType(v as TimeOffType)}>
               <SelectTrigger className="h-11">
                 <SelectValue />
@@ -162,11 +162,11 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label>Reason (optional)</Label>
+            <Label>Reden (optioneel)</Label>
             <Textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Add any notes or details..."
+              placeholder="Voeg eventuele notities of details toe..."
               rows={3}
               className="resize-none"
             />
@@ -178,7 +178,7 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
             disabled={loading}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Submit Request
+            Aanvraag Indienen
           </Button>
         </form>
       </CardContent>

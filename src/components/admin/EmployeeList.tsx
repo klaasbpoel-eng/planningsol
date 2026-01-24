@@ -96,13 +96,13 @@ export function EmployeeList() {
   const getEmploymentTypeBadge = (type: string | null | undefined) => {
     switch (type) {
       case "full-time":
-        return <Badge variant="default" className="bg-success/10 text-success border-success/20">Full-time</Badge>;
+        return <Badge variant="default" className="bg-success/10 text-success border-success/20">Voltijd</Badge>;
       case "part-time":
-        return <Badge variant="secondary">Part-time</Badge>;
+        return <Badge variant="secondary">Deeltijd</Badge>;
       case "contract":
         return <Badge variant="outline">Contract</Badge>;
       case "intern":
-        return <Badge variant="outline" className="bg-primary/10 text-primary">Intern</Badge>;
+        return <Badge variant="outline" className="bg-primary/10 text-primary">Stagiair</Badge>;
       default:
         return null;
     }
@@ -141,7 +141,7 @@ export function EmployeeList() {
         .eq("id", employeeToDelete.id);
 
       if (error) throw error;
-      toast.success("Employee deleted");
+      toast.success("Medewerker verwijderd");
       fetchEmployees();
     } catch (error: any) {
       toast.error(error.message);
@@ -156,7 +156,7 @@ export function EmployeeList() {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <div className="animate-pulse text-muted-foreground">Loading employees...</div>
+          <div className="animate-pulse text-muted-foreground">Medewerkers laden...</div>
         </CardContent>
       </Card>
     );
@@ -169,17 +169,17 @@ export function EmployeeList() {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Employees ({filteredEmployees.length})
+              Medewerkers ({filteredEmployees.length})
             </CardTitle>
             <Button onClick={handleAddEmployee} className="gap-2">
               <UserPlus className="h-4 w-4" />
-              Add Employee
+              Medewerker Toevoegen
             </Button>
           </div>
           <div className="relative mt-4">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name, email, department, job title, or location..."
+              placeholder="Zoeken op naam, e-mail, afdeling, functie of locatie..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -189,19 +189,19 @@ export function EmployeeList() {
         <CardContent>
           {filteredEmployees.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              {searchTerm ? "No employees match your search" : "No employees found"}
+              {searchTerm ? "Geen medewerkers gevonden" : "Geen medewerkers gevonden"}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Location</TableHead>
+                    <TableHead>Medewerker</TableHead>
+                    <TableHead>Afdeling</TableHead>
+                    <TableHead>Locatie</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Hire Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>Datum in dienst</TableHead>
+                    <TableHead className="text-right">Acties</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -215,10 +215,10 @@ export function EmployeeList() {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="font-medium">{employee.full_name || "Unknown"}</div>
+                            <div className="font-medium">{employee.full_name || "Onbekend"}</div>
                             <div className="text-sm text-muted-foreground flex items-center gap-1">
                               <Mail className="h-3 w-3" />
-                              {employee.email || "No email"}
+                              {employee.email || "Geen e-mail"}
                             </div>
                             {employee.job_title && (
                               <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
@@ -266,7 +266,7 @@ export function EmployeeList() {
                             size="sm"
                             onClick={() => handleManageLeaveBalances(employee)}
                           >
-                            Leave Balances
+                            Verlofsaldi
                           </Button>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -277,7 +277,7 @@ export function EmployeeList() {
                             <DropdownMenuContent align="end" className="bg-popover z-50">
                               <DropdownMenuItem onClick={() => handleEditEmployee(employee)}>
                                 <Edit className="h-4 w-4 mr-2" />
-                                Edit Details
+                                Details Bewerken
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem 
@@ -285,7 +285,7 @@ export function EmployeeList() {
                                 className="text-destructive focus:text-destructive"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
-                                Delete Employee
+                                Medewerker Verwijderen
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -319,21 +319,21 @@ export function EmployeeList() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Employee</AlertDialogTitle>
+            <AlertDialogTitle>Medewerker Verwijderen</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {employeeToDelete?.full_name || employeeToDelete?.email}? 
-              This will also delete all associated time-off requests and leave balances. This action cannot be undone.
+              Weet u zeker dat u {employeeToDelete?.full_name || employeeToDelete?.email} wilt verwijderen? 
+              Dit verwijdert ook alle gekoppelde verlofaanvragen en saldi. Deze actie kan niet ongedaan worden gemaakt.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={deleting}
             >
               {deleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Delete
+              Verwijderen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

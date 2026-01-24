@@ -64,7 +64,7 @@ export function AdminFilters({ employees, filters, onFiltersChange }: AdminFilte
               <span className="text-sm font-medium">Filters</span>
               {activeFilterCount > 0 && (
                 <span className="bg-accent text-accent-foreground text-xs px-2 py-0.5 rounded-full font-medium">
-                  {activeFilterCount} active
+                  {activeFilterCount} actief
                 </span>
               )}
             </div>
@@ -76,7 +76,7 @@ export function AdminFilters({ employees, filters, onFiltersChange }: AdminFilte
                 className="h-8 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-4 w-4 mr-1" />
-                Clear all
+                Alles wissen
               </Button>
             )}
           </div>
@@ -85,19 +85,19 @@ export function AdminFilters({ employees, filters, onFiltersChange }: AdminFilte
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Employee Filter */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Employee</label>
+              <label className="text-xs font-medium text-muted-foreground">Medewerker</label>
               <Select
                 value={filters.employeeId || "all"}
                 onValueChange={(value) => updateFilter("employeeId", value === "all" ? null : value)}
               >
                 <SelectTrigger className="h-10 bg-background">
-                  <SelectValue placeholder="All employees" />
+                  <SelectValue placeholder="Alle medewerkers" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover z-50">
-                  <SelectItem value="all">All employees</SelectItem>
+                  <SelectItem value="all">Alle medewerkers</SelectItem>
                   {employees.map((emp) => (
                     <SelectItem key={emp.user_id} value={emp.user_id}>
-                      {emp.full_name || emp.email || "Unknown"}
+                      {emp.full_name || emp.email || "Onbekend"}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -112,26 +112,26 @@ export function AdminFilters({ employees, filters, onFiltersChange }: AdminFilte
                 onValueChange={(value) => updateFilter("status", value as RequestStatus | "all")}
               >
                 <SelectTrigger className="h-10 bg-background">
-                  <SelectValue placeholder="All statuses" />
+                  <SelectValue placeholder="Alle statussen" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover z-50">
-                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="all">Alle statussen</SelectItem>
                   <SelectItem value="pending">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-warning" />
-                      Pending
+                      In behandeling
                     </div>
                   </SelectItem>
                   <SelectItem value="approved">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-success" />
-                      Approved
+                      Goedgekeurd
                     </div>
                   </SelectItem>
                   <SelectItem value="rejected">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-destructive" />
-                      Rejected
+                      Afgewezen
                     </div>
                   </SelectItem>
                 </SelectContent>
@@ -140,7 +140,7 @@ export function AdminFilters({ employees, filters, onFiltersChange }: AdminFilte
 
             {/* Start Date Filter */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">From Date</label>
+              <label className="text-xs font-medium text-muted-foreground">Van datum</label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -151,7 +151,7 @@ export function AdminFilters({ employees, filters, onFiltersChange }: AdminFilte
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filters.startDate ? format(filters.startDate, "MMM d, yyyy") : "Any start date"}
+                    {filters.startDate ? format(filters.startDate, "d MMM yyyy") : "Elke startdatum"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start">
@@ -168,7 +168,7 @@ export function AdminFilters({ employees, filters, onFiltersChange }: AdminFilte
 
             {/* End Date Filter */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">To Date</label>
+              <label className="text-xs font-medium text-muted-foreground">Tot datum</label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -179,7 +179,7 @@ export function AdminFilters({ employees, filters, onFiltersChange }: AdminFilte
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filters.endDate ? format(filters.endDate, "MMM d, yyyy") : "Any end date"}
+                    {filters.endDate ? format(filters.endDate, "d MMM yyyy") : "Elke einddatum"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start">

@@ -59,7 +59,7 @@ export function TeamCalendar({ requests }: TeamCalendarProps) {
     }
   };
 
-  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const weekDays = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
 
   // Get unique employees with time off
   const employeesOnLeave = useMemo(() => {
@@ -83,9 +83,9 @@ export function TeamCalendar({ requests }: TeamCalendarProps) {
           <div>
             <CardTitle className="flex items-center gap-2 text-lg">
               <CalendarDays className="h-5 w-5 text-primary" />
-              Team Calendar
+              Teamkalender
             </CardTitle>
-            <CardDescription>Overview of all scheduled time off</CardDescription>
+            <CardDescription>Overzicht van alle geplande verloven</CardDescription>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -165,7 +165,7 @@ export function TeamCalendar({ requests }: TeamCalendarProps) {
                   ))}
                   {dayRequests.length > 3 && (
                     <div className="text-[10px] text-muted-foreground px-1">
-                      +{dayRequests.length - 3} more
+                      +{dayRequests.length - 3} meer
                     </div>
                   )}
                 </div>
@@ -178,19 +178,19 @@ export function TeamCalendar({ requests }: TeamCalendarProps) {
         <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t">
           <div className="flex items-center gap-2 text-xs">
             <div className="w-3 h-3 rounded bg-primary" />
-            <span className="text-muted-foreground">Vacation</span>
+            <span className="text-muted-foreground">Vakantie</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <div className="w-3 h-3 rounded bg-destructive" />
-            <span className="text-muted-foreground">Sick</span>
+            <span className="text-muted-foreground">Ziek</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <div className="w-3 h-3 rounded bg-accent" />
-            <span className="text-muted-foreground">Personal</span>
+            <span className="text-muted-foreground">Persoonlijk</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <div className="w-3 h-3 rounded bg-warning/80" />
-            <span className="text-muted-foreground">Pending</span>
+            <span className="text-muted-foreground">In behandeling</span>
           </div>
         </div>
 
@@ -199,7 +199,7 @@ export function TeamCalendar({ requests }: TeamCalendarProps) {
           <div className="mt-4 pt-4 border-t">
             <div className="flex items-center gap-2 mb-3">
               <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Employees with Scheduled Time Off</span>
+              <span className="text-sm font-medium">Medewerkers met Gepland Verlof</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {employeesOnLeave.map((emp, i) => (
