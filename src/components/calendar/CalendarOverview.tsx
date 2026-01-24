@@ -627,23 +627,60 @@ export function CalendarOverview() {
                   {/* Tasks */}
                   {dayTasks.slice(0, 2).map((task) => {
                     const typeColor = getTaskTypeColor(task);
+                    const StatusIcon = getStatusIcon(task.status);
                     return (
-                      <div
-                        key={task.id}
-                        className="text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 group/task cursor-pointer"
-                        style={{ 
-                          borderLeft: `2px solid ${typeColor}`,
-                          backgroundColor: `${typeColor}20`,
-                          color: typeColor
-                        }}
-                        onClick={isAdmin ? () => handleEditTask(task) : undefined}
-                      >
-                        <ClipboardList className="w-3 h-3 shrink-0" />
-                        <span className="truncate font-medium flex-1">{task.title}</span>
+                      <DropdownMenu key={task.id}>
+                        <DropdownMenuTrigger asChild disabled={!isAdmin}>
+                          <div
+                            className={cn(
+                              "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 group/task",
+                              isAdmin && "cursor-pointer",
+                              task.status === "completed" && "opacity-60"
+                            )}
+                            style={{ 
+                              borderLeft: `2px solid ${typeColor}`,
+                              backgroundColor: `${typeColor}20`,
+                              color: typeColor
+                            }}
+                          >
+                            <StatusIcon className="w-3 h-3 shrink-0" />
+                            <span className={cn("truncate font-medium flex-1", task.status === "completed" && "line-through")}>{task.title}</span>
+                            {isAdmin && (
+                              <MoreVertical className="w-3 h-3 shrink-0 opacity-0 group-hover/task:opacity-100 transition-opacity" />
+                            )}
+                          </div>
+                        </DropdownMenuTrigger>
                         {isAdmin && (
-                          <Pencil className="w-3 h-3 shrink-0 opacity-0 group-hover/task:opacity-100 transition-opacity" />
+                          <DropdownMenuContent align="start" className="bg-background border shadow-xl z-50">
+                            <DropdownMenuItem 
+                              onClick={() => handleUpdateTaskStatus(task.id, "pending")}
+                              disabled={task.status === "pending"}
+                            >
+                              <CircleDot className="h-4 w-4 mr-2 text-warning" />
+                              Te doen
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleUpdateTaskStatus(task.id, "in_progress")}
+                              disabled={task.status === "in_progress"}
+                            >
+                              <Clock className="h-4 w-4 mr-2 text-primary" />
+                              Bezig
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleUpdateTaskStatus(task.id, "completed")}
+                              disabled={task.status === "completed"}
+                            >
+                              <Check className="h-4 w-4 mr-2 text-success" />
+                              Voltooid
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleEditTask(task)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Bewerken
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
                         )}
-                      </div>
+                      </DropdownMenu>
                     );
                   })}
                   {/* Requests */}
@@ -722,22 +759,59 @@ export function CalendarOverview() {
                   {/* Tasks */}
                   {dayTasks.slice(0, 1).map((task) => {
                     const typeColor = getTaskTypeColor(task);
+                    const StatusIcon = getStatusIcon(task.status);
                     return (
-                      <div
-                        key={task.id}
-                        className="text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 group/task cursor-pointer"
-                        style={{ 
-                          backgroundColor: `${typeColor}20`,
-                          color: typeColor
-                        }}
-                        onClick={isAdmin ? () => handleEditTask(task) : undefined}
-                      >
-                        <ClipboardList className="w-2.5 h-2.5 shrink-0" />
-                        <span className="truncate font-medium flex-1">{task.title}</span>
+                      <DropdownMenu key={task.id}>
+                        <DropdownMenuTrigger asChild disabled={!isAdmin}>
+                          <div
+                            className={cn(
+                              "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 group/task",
+                              isAdmin && "cursor-pointer",
+                              task.status === "completed" && "opacity-60"
+                            )}
+                            style={{ 
+                              backgroundColor: `${typeColor}20`,
+                              color: typeColor
+                            }}
+                          >
+                            <StatusIcon className="w-2.5 h-2.5 shrink-0" />
+                            <span className={cn("truncate font-medium flex-1", task.status === "completed" && "line-through")}>{task.title}</span>
+                            {isAdmin && (
+                              <MoreVertical className="w-2 h-2 shrink-0 opacity-0 group-hover/task:opacity-100 transition-opacity" />
+                            )}
+                          </div>
+                        </DropdownMenuTrigger>
                         {isAdmin && (
-                          <Pencil className="w-2 h-2 shrink-0 opacity-0 group-hover/task:opacity-100 transition-opacity" />
+                          <DropdownMenuContent align="start" className="bg-background border shadow-xl z-50">
+                            <DropdownMenuItem 
+                              onClick={() => handleUpdateTaskStatus(task.id, "pending")}
+                              disabled={task.status === "pending"}
+                            >
+                              <CircleDot className="h-4 w-4 mr-2 text-warning" />
+                              Te doen
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleUpdateTaskStatus(task.id, "in_progress")}
+                              disabled={task.status === "in_progress"}
+                            >
+                              <Clock className="h-4 w-4 mr-2 text-primary" />
+                              Bezig
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleUpdateTaskStatus(task.id, "completed")}
+                              disabled={task.status === "completed"}
+                            >
+                              <Check className="h-4 w-4 mr-2 text-success" />
+                              Voltooid
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleEditTask(task)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Bewerken
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
                         )}
-                      </div>
+                      </DropdownMenu>
                     );
                   })}
                   {/* Requests */}
