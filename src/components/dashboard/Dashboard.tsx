@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { TimeOffRequestForm } from "@/components/time-off/TimeOffRequestForm";
 import { TimeOffRequestList } from "@/components/time-off/TimeOffRequestList";
 import { TimeOffCalendar } from "@/components/time-off/TimeOffCalendar";
+import { TaskProgressChart } from "@/components/dashboard/TaskProgressChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -135,58 +136,62 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin }: DashboardProp
           </Card>
         </div>
 
-        {/* Task Stats */}
-        <Card className="shadow-md border-0 mb-8">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <ListTodo className="h-5 w-5 text-primary" />
-              Mijn Taken
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <ListTodo className="h-5 w-5 text-primary" />
+        {/* Task Stats and Progress Chart */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card className="shadow-md border-0">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ListTodo className="h-5 w-5 text-primary" />
+                Mijn Taken
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <ListTodo className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-foreground">{taskStats.total}</p>
+                    <p className="text-xs text-muted-foreground">Totaal</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xl font-bold text-foreground">{taskStats.total}</p>
-                  <p className="text-xs text-muted-foreground">Totaal</p>
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  <div className="p-2 rounded-lg bg-warning/10">
+                    <CircleDot className="h-5 w-5 text-warning" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-foreground">{taskStats.pending}</p>
+                    <p className="text-xs text-muted-foreground">Te doen</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  <div className="p-2 rounded-lg bg-blue-500/10">
+                    <PlayCircle className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-foreground">{taskStats.in_progress}</p>
+                    <p className="text-xs text-muted-foreground">Bezig</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  <div className="p-2 rounded-lg bg-success/10">
+                    <CheckCircle2 className="h-5 w-5 text-success" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-foreground">{taskStats.completed}</p>
+                    <p className="text-xs text-muted-foreground">Afgerond</p>
+                  </div>
                 </div>
               </div>
-              
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <div className="p-2 rounded-lg bg-warning/10">
-                  <CircleDot className="h-5 w-5 text-warning" />
-                </div>
-                <div>
-                  <p className="text-xl font-bold text-foreground">{taskStats.pending}</p>
-                  <p className="text-xs text-muted-foreground">Te doen</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <div className="p-2 rounded-lg bg-blue-500/10">
-                  <PlayCircle className="h-5 w-5 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-xl font-bold text-foreground">{taskStats.in_progress}</p>
-                  <p className="text-xs text-muted-foreground">Bezig</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <div className="p-2 rounded-lg bg-success/10">
-                  <CheckCircle2 className="h-5 w-5 text-success" />
-                </div>
-                <div>
-                  <p className="text-xl font-bold text-foreground">{taskStats.completed}</p>
-                  <p className="text-xs text-muted-foreground">Afgerond</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+          
+          <TaskProgressChart tasks={tasks} />
+        </div>
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
