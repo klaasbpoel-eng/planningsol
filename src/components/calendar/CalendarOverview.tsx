@@ -238,40 +238,49 @@ export function CalendarOverview() {
     const dayRequests = getRequestsForDay(currentDate);
     
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 animate-fade-in">
         <div className={cn(
-          "p-6 rounded-lg border",
-          isToday(currentDate) ? "ring-2 ring-primary bg-primary/5" : "bg-card"
+          "p-8 rounded-2xl border backdrop-blur-sm transition-all duration-300",
+          isToday(currentDate) 
+            ? "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-primary/10 shadow-lg shadow-primary/10" 
+            : "bg-card/80 hover:bg-card"
         )}>
-          <div className="text-center mb-4">
-            <div className="text-4xl font-bold text-foreground">{format(currentDate, "d")}</div>
-            <div className="text-lg text-muted-foreground">{format(currentDate, "EEEE", { locale: nl })}</div>
+          <div className="text-center mb-6">
+            <div className="text-6xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
+              {format(currentDate, "d")}
+            </div>
+            <div className="text-lg text-muted-foreground mt-1 capitalize">
+              {format(currentDate, "EEEE", { locale: nl })}
+            </div>
           </div>
           
           {dayRequests.length === 0 ? (
-            <div className="text-center text-muted-foreground py-8">
-              Geen verlof gepland voor deze dag
+            <div className="text-center text-muted-foreground py-12 bg-muted/30 rounded-xl">
+              <CalendarDays className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p className="font-medium">Geen verlof gepland</p>
+              <p className="text-sm opacity-70">voor deze dag</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {dayRequests.map((request) => (
+            <div className="space-y-3">
+              {dayRequests.map((request, index) => (
                 <div
                   key={request.id}
                   className={cn(
-                    "p-3 rounded-lg text-sm",
+                    "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md",
                     getTypeColor(request.type, request.status)
                   )}
+                  style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <div className="flex items-center gap-2">
-                    <div className={cn("w-2 h-2 rounded-full", getEmployeeColor(request.user_id))} />
-                    <span className="font-medium">{getEmployeeName(request)}</span>
+                  <div className="flex items-center gap-3">
+                    <div className={cn("w-3 h-3 rounded-full ring-2 ring-white/30", getEmployeeColor(request.user_id))} />
+                    <span className="font-semibold">{getEmployeeName(request)}</span>
                   </div>
-                  <div className="font-medium mt-1">{getTypeLabel(request.type)}</div>
-                  <div className="text-xs opacity-80">
-                    {format(parseISO(request.start_date), "d MMM", { locale: nl })} - {format(parseISO(request.end_date), "d MMM", { locale: nl })}
+                  <div className="font-medium mt-2 opacity-90">{getTypeLabel(request.type)}</div>
+                  <div className="text-xs opacity-75 mt-1">
+                    {format(parseISO(request.start_date), "d MMM", { locale: nl })} — {format(parseISO(request.end_date), "d MMM", { locale: nl })}
                   </div>
                   {request.reason && (
-                    <div className="text-xs opacity-70 mt-1">{request.reason}</div>
+                    <div className="text-xs opacity-60 mt-2 italic">{request.reason}</div>
                   )}
                 </div>
               ))}
@@ -289,16 +298,16 @@ export function CalendarOverview() {
     const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-3 animate-fade-in">
         <div className="grid grid-cols-7 gap-2">
           {weekDays.map((day) => (
-            <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
+            <div key={day} className="text-center text-xs font-semibold text-muted-foreground py-2 uppercase tracking-wider">
               {day}
             </div>
           ))}
         </div>
         <div className="grid grid-cols-7 gap-2">
-          {days.map((day) => {
+          {days.map((day, index) => {
             const dayRequests = getRequestsForDay(day);
             const isCurrentDay = isToday(day);
 
@@ -306,32 +315,35 @@ export function CalendarOverview() {
               <div
                 key={day.toISOString()}
                 className={cn(
-                  "min-h-[120px] p-2 rounded-lg border transition-colors",
-                  "bg-card border-border",
-                  isCurrentDay && "ring-2 ring-primary ring-offset-1"
+                  "min-h-[140px] p-3 rounded-xl border transition-all duration-300 hover:shadow-md",
+                  "bg-card/80 backdrop-blur-sm border-border/50",
+                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent shadow-lg shadow-primary/5"
                 )}
+                style={{ animationDelay: `${index * 30}ms` }}
               >
                 <div className={cn(
-                  "text-sm font-medium mb-2",
-                  isCurrentDay ? "text-primary" : "text-foreground"
+                  "text-sm font-bold mb-3 flex items-center justify-center w-7 h-7 rounded-full",
+                  isCurrentDay 
+                    ? "bg-primary text-primary-foreground" 
+                    : "text-foreground"
                 )}>
                   {format(day, "d")}
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   {dayRequests.slice(0, 3).map((request) => (
                     <div
                       key={request.id}
                       className={cn(
-                        "text-xs px-2 py-1 rounded truncate flex items-center gap-1",
+                        "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105",
                         getTypeColor(request.type, request.status)
                       )}
                     >
-                      <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", getEmployeeColor(request.user_id))} />
-                      <span className="truncate">{getEmployeeName(request)}</span>
+                      <div className={cn("w-1.5 h-1.5 rounded-full shrink-0 ring-1 ring-white/20", getEmployeeColor(request.user_id))} />
+                      <span className="truncate font-medium">{getEmployeeName(request)}</span>
                     </div>
                   ))}
                   {dayRequests.length > 3 && (
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-primary font-medium pl-1">
                       +{dayRequests.length - 3} meer
                     </div>
                   )}
@@ -353,16 +365,16 @@ export function CalendarOverview() {
     const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-3 animate-fade-in">
         <div className="grid grid-cols-7 gap-1">
           {weekDays.map((day) => (
-            <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
+            <div key={day} className="text-center text-xs font-semibold text-muted-foreground py-2 uppercase tracking-wider">
               {day}
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-1">
-          {days.map((day) => {
+        <div className="grid grid-cols-7 gap-1.5">
+          {days.map((day, index) => {
             const dayRequests = getRequestsForDay(day);
             const isCurrentMonth = isSameMonth(day, currentDate);
             const isCurrentDay = isToday(day);
@@ -371,35 +383,38 @@ export function CalendarOverview() {
               <div
                 key={day.toISOString()}
                 className={cn(
-                  "min-h-[80px] p-1 rounded-lg border transition-colors",
+                  "min-h-[90px] p-2 rounded-xl border transition-all duration-200",
                   isCurrentMonth 
-                    ? "bg-card border-border" 
-                    : "bg-muted/30 border-transparent",
-                  isCurrentDay && "ring-2 ring-primary ring-offset-1"
+                    ? "bg-card/80 backdrop-blur-sm border-border/50 hover:bg-card hover:shadow-sm" 
+                    : "bg-muted/20 border-transparent opacity-50",
+                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent"
                 )}
               >
                 <div className={cn(
-                  "text-xs font-medium mb-1",
-                  isCurrentMonth ? "text-foreground" : "text-muted-foreground/50",
-                  isCurrentDay && "text-primary"
+                  "text-xs font-bold mb-1.5 flex items-center justify-center w-6 h-6 rounded-full transition-colors",
+                  isCurrentDay 
+                    ? "bg-primary text-primary-foreground" 
+                    : isCurrentMonth 
+                      ? "text-foreground" 
+                      : "text-muted-foreground/50"
                 )}>
                   {format(day, "d")}
                 </div>
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   {dayRequests.slice(0, 2).map((request) => (
                     <div
                       key={request.id}
                       className={cn(
-                        "text-[10px] px-1 py-0.5 rounded truncate flex items-center gap-0.5",
+                        "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105",
                         getTypeColor(request.type, request.status)
                       )}
                     >
                       <div className={cn("w-1 h-1 rounded-full shrink-0", getEmployeeColor(request.user_id))} />
-                      <span className="truncate">{getEmployeeName(request)}</span>
+                      <span className="truncate font-medium">{getEmployeeName(request)}</span>
                     </div>
                   ))}
                   {dayRequests.length > 2 && (
-                    <div className="text-[10px] text-muted-foreground">
+                    <div className="text-[10px] text-primary font-semibold pl-1">
                       +{dayRequests.length - 2}
                     </div>
                   )}
@@ -419,8 +434,8 @@ export function CalendarOverview() {
     const months = eachMonthOfInterval({ start: yearStart, end: yearEnd });
 
     return (
-      <div className="grid grid-cols-3 md:grid-cols-4 gap-4">
-        {months.map((month) => {
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 animate-fade-in">
+        {months.map((month, index) => {
           const monthStart = startOfMonth(month);
           const monthEnd = endOfMonth(month);
           const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -438,30 +453,35 @@ export function CalendarOverview() {
             <Card 
               key={month.toISOString()} 
               className={cn(
-                "cursor-pointer hover:shadow-md transition-shadow",
-                isCurrentMonth && "ring-2 ring-primary"
+                "cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl border-border/50 bg-card/80 backdrop-blur-sm overflow-hidden group",
+                isCurrentMonth && "ring-2 ring-primary/50 shadow-lg shadow-primary/10"
               )}
               onClick={() => {
                 setCurrentDate(month);
                 setViewType("month");
               }}
+              style={{ animationDelay: `${index * 40}ms` }}
             >
-              <CardHeader className="pb-2 pt-3 px-3">
-                <CardTitle className="text-sm font-medium">
+              <div className={cn(
+                "h-1 w-full transition-all duration-300",
+                isCurrentMonth ? "gradient-primary" : "bg-border group-hover:bg-primary/50"
+              )} />
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-base font-semibold capitalize">
                   {format(month, "MMMM", { locale: nl })}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-3 pb-3">
+              <CardContent className="px-4 pb-4">
                 {monthRequests.length === 0 ? (
-                  <div className="text-xs text-muted-foreground">Geen verlof</div>
+                  <div className="text-xs text-muted-foreground italic">Geen verlof gepland</div>
                 ) : (
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     {monthRequests.slice(0, 2).map((request) => (
                       <Badge
                         key={request.id}
                         variant="secondary"
                         className={cn(
-                          "text-[10px] px-1 py-0",
+                          "text-[10px] px-2 py-0.5 font-medium",
                           getTypeColor(request.type, request.status)
                         )}
                       >
@@ -469,7 +489,7 @@ export function CalendarOverview() {
                       </Badge>
                     ))}
                     {monthRequests.length > 2 && (
-                      <div className="text-[10px] text-muted-foreground">
+                      <div className="text-xs text-primary font-semibold">
                         +{monthRequests.length - 2} meer
                       </div>
                     )}
@@ -484,53 +504,60 @@ export function CalendarOverview() {
   };
 
   return (
-    <Card className="shadow-lg border-0">
-      <CardHeader className="pb-4">
-        <div className="flex flex-col gap-4">
+    <Card className="shadow-2xl border-0 bg-card/90 backdrop-blur-xl overflow-hidden">
+      {/* Decorative gradient bar */}
+      <div className="h-1.5 w-full gradient-primary" />
+      
+      <CardHeader className="pb-6 pt-6">
+        <div className="flex flex-col gap-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <CalendarDays className="h-5 w-5 text-primary" />
+              <CardTitle className="flex items-center gap-3 text-xl font-bold">
+                <div className="p-2 rounded-xl bg-primary/10">
+                  <CalendarDays className="h-5 w-5 text-primary" />
+                </div>
                 Kalenderoverzicht
               </CardTitle>
-              <CardDescription>Bekijk alle verlofaanvragen</CardDescription>
+              <CardDescription className="mt-1.5 text-muted-foreground">
+                Bekijk alle verlofaanvragen van het team
+              </CardDescription>
             </div>
             
             <ToggleGroup 
               type="single" 
               value={viewType} 
               onValueChange={(value) => value && setViewType(value as ViewType)}
-              className="justify-start"
+              className="bg-muted/50 p-1 rounded-xl"
             >
-              <ToggleGroupItem value="day" aria-label="Dagweergave" className="text-xs px-3">
-                <List className="h-4 w-4 mr-1" />
+              <ToggleGroupItem value="day" aria-label="Dagweergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <List className="h-4 w-4 mr-1.5" />
                 Dag
               </ToggleGroupItem>
-              <ToggleGroupItem value="week" aria-label="Weekweergave" className="text-xs px-3">
-                <Grid3X3 className="h-4 w-4 mr-1" />
+              <ToggleGroupItem value="week" aria-label="Weekweergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <Grid3X3 className="h-4 w-4 mr-1.5" />
                 Week
               </ToggleGroupItem>
-              <ToggleGroupItem value="month" aria-label="Maandweergave" className="text-xs px-3">
-                <CalendarIcon className="h-4 w-4 mr-1" />
+              <ToggleGroupItem value="month" aria-label="Maandweergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <CalendarIcon className="h-4 w-4 mr-1.5" />
                 Maand
               </ToggleGroupItem>
-              <ToggleGroupItem value="year" aria-label="Jaarweergave" className="text-xs px-3">
-                <LayoutGrid className="h-4 w-4 mr-1" />
+              <ToggleGroupItem value="year" aria-label="Jaarweergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <LayoutGrid className="h-4 w-4 mr-1.5" />
                 Jaar
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
 
           {/* Filters */}
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3 p-4 rounded-xl bg-muted/30 border border-border/50">
             {/* Employee Filter */}
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-muted-foreground" />
               <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                <SelectTrigger className="w-[180px] bg-background">
+                <SelectTrigger className="w-[180px] bg-background border-border/50 shadow-sm hover:bg-background/80 transition-colors">
                   <SelectValue placeholder="Filter op medewerker" />
                 </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
+                <SelectContent className="bg-background border shadow-xl z-50">
                   <SelectItem value="all">Alle medewerkers</SelectItem>
                   {uniqueEmployees.map((employee) => (
                     <SelectItem key={employee.userId} value={employee.userId}>
@@ -548,10 +575,10 @@ export function CalendarOverview() {
             <div className="flex items-center gap-2">
               <CalendarIcon className="h-4 w-4 text-muted-foreground" />
               <Select value={selectedType} onValueChange={setSelectedType}>
-                <SelectTrigger className="w-[160px] bg-background">
+                <SelectTrigger className="w-[160px] bg-background border-border/50 shadow-sm hover:bg-background/80 transition-colors">
                   <SelectValue placeholder="Filter op type" />
                 </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
+                <SelectContent className="bg-background border shadow-xl z-50">
                   <SelectItem value="all">Alle types</SelectItem>
                   {leaveTypes.map((type) => (
                     <SelectItem key={type.value} value={type.value}>
@@ -569,10 +596,10 @@ export function CalendarOverview() {
             <div className="flex items-center gap-2">
               <List className="h-4 w-4 text-muted-foreground" />
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="w-[160px] bg-background">
+                <SelectTrigger className="w-[160px] bg-background border-border/50 shadow-sm hover:bg-background/80 transition-colors">
                   <SelectValue placeholder="Filter op status" />
                 </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
+                <SelectContent className="bg-background border shadow-xl z-50">
                   <SelectItem value="all">Alle statussen</SelectItem>
                   {statusTypes.map((status) => (
                     <SelectItem key={status.value} value={status.value}>
@@ -596,7 +623,7 @@ export function CalendarOverview() {
                   setSelectedType("all");
                   setSelectedStatus("all");
                 }}
-                className="text-xs"
+                className="text-xs text-primary hover:text-primary hover:bg-primary/10"
               >
                 Reset filters
               </Button>
@@ -604,43 +631,47 @@ export function CalendarOverview() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-4">
+        {/* Navigation */}
+        <div className="flex items-center justify-between mt-6 p-3 rounded-xl bg-muted/30 border border-border/50">
           <div className="flex items-center gap-2">
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-9 w-9 rounded-lg hover:bg-background"
               onClick={() => navigate("prev")}
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-5 w-5" />
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setCurrentDate(new Date())}
-              className="text-xs"
+              className="text-xs font-medium border-primary/30 text-primary hover:bg-primary/10"
             >
               Vandaag
             </Button>
           </div>
-          <span className="text-sm font-medium capitalize">
+          <span className="text-base font-semibold capitalize text-foreground">
             {getDateRangeLabel()}
           </span>
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-9 w-9 rounded-lg hover:bg-background"
             onClick={() => navigate("next")}
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-5 w-5" />
           </Button>
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="pt-0">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="relative">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
+            </div>
+            <p className="text-sm text-muted-foreground mt-4">Laden...</p>
           </div>
         ) : (
           <>
@@ -652,34 +683,37 @@ export function CalendarOverview() {
         )}
 
         {/* Type Legend */}
-        <div className="flex flex-wrap justify-center gap-4 mt-6 pt-4 border-t">
-          <div className="flex items-center gap-2 text-sm">
-            <div className="w-3 h-3 rounded bg-primary" />
-            <span className="text-muted-foreground">Vakantie</span>
+        <div className="flex flex-wrap justify-center gap-6 mt-8 pt-6 border-t border-border/50">
+          <div className="flex items-center gap-2.5 text-sm">
+            <div className="w-3 h-3 rounded-md bg-primary shadow-sm" />
+            <span className="text-muted-foreground font-medium">Vakantie</span>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <div className="w-3 h-3 rounded bg-destructive" />
-            <span className="text-muted-foreground">Ziekteverlof</span>
+          <div className="flex items-center gap-2.5 text-sm">
+            <div className="w-3 h-3 rounded-md bg-destructive shadow-sm" />
+            <span className="text-muted-foreground font-medium">Ziekteverlof</span>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <div className="w-3 h-3 rounded bg-accent" />
-            <span className="text-muted-foreground">Persoonlijk</span>
+          <div className="flex items-center gap-2.5 text-sm">
+            <div className="w-3 h-3 rounded-md bg-accent shadow-sm" />
+            <span className="text-muted-foreground font-medium">Persoonlijk</span>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <div className="w-3 h-3 rounded bg-warning/80" />
-            <span className="text-muted-foreground">In behandeling</span>
+          <div className="flex items-center gap-2.5 text-sm">
+            <div className="w-3 h-3 rounded-md bg-warning/80 shadow-sm" />
+            <span className="text-muted-foreground font-medium">In behandeling</span>
           </div>
         </div>
 
         {/* Employee Legend */}
         {uniqueEmployees.length > 0 && (
-          <div className="mt-4 pt-4 border-t">
-            <div className="text-sm font-medium text-foreground mb-2">Medewerkers</div>
-            <div className="flex flex-wrap gap-3">
+          <div className="mt-6 pt-6 border-t border-border/50">
+            <div className="text-sm font-semibold text-foreground mb-3">Medewerkers</div>
+            <div className="flex flex-wrap gap-4">
               {uniqueEmployees.map((employee) => (
-                <div key={employee.userId} className="flex items-center gap-2 text-sm">
-                  <div className={cn("w-3 h-3 rounded-full", employee.color)} />
-                  <span className="text-muted-foreground">{employee.name}</span>
+                <div 
+                  key={employee.userId} 
+                  className="flex items-center gap-2.5 text-sm px-3 py-1.5 rounded-full bg-muted/50 border border-border/50"
+                >
+                  <div className={cn("w-2.5 h-2.5 rounded-full ring-2 ring-white/50", employee.color)} />
+                  <span className="text-muted-foreground font-medium">{employee.name}</span>
                 </div>
               ))}
             </div>
