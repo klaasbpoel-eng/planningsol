@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -18,7 +19,9 @@ import {
   List,
   Grid3X3,
   LayoutGrid,
-  Users
+  Users,
+  ClipboardList,
+  Palmtree
 } from "lucide-react";
 import { 
   format, 
@@ -29,7 +32,6 @@ import {
   startOfYear,
   endOfYear,
   eachDayOfInterval,
-  eachWeekOfInterval,
   eachMonthOfInterval,
   addDays,
   addWeeks,
@@ -44,8 +46,7 @@ import {
   isSameDay,
   parseISO,
   isWithinInterval,
-  getWeek,
-  getYear
+  getWeek
 } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -53,22 +54,33 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
+type Task = Database["public"]["Tables"]["tasks"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
 type RequestWithProfile = TimeOffRequest & {
   profile?: Profile | null;
 };
 
+type TaskWithProfile = Task & {
+  profile?: Profile | null;
+};
+
 type ViewType = "day" | "week" | "month" | "year";
+type CalendarItem = 
+  | { type: "timeoff"; data: RequestWithProfile }
+  | { type: "task"; data: TaskWithProfile };
 
 export function CalendarOverview() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<ViewType>("month");
   const [requests, setRequests] = useState<RequestWithProfile[]>([]);
+  const [tasks, setTasks] = useState<TaskWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [showTimeOff, setShowTimeOff] = useState(true);
+  const [showTasks, setShowTasks] = useState(true);
 
   const leaveTypes = [
     { value: "vacation", label: "Vakantie", color: "bg-primary" },
@@ -81,14 +93,27 @@ export function CalendarOverview() {
     { value: "approved", label: "Goedgekeurd", color: "bg-success" },
     { value: "pending", label: "In behandeling", color: "bg-warning" },
   ];
+
+  const taskStatusTypes = [
+    { value: "pending", label: "Te doen", color: "bg-warning" },
+    { value: "in_progress", label: "Bezig", color: "bg-blue-500" },
+    { value: "completed", label: "Voltooid", color: "bg-success" },
+  ];
   useEffect(() => {
-    fetchRequests();
+    fetchData();
   }, []);
 
-  const fetchRequests = async () => {
+  const fetchData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      // Fetch all profiles first
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*");
+
+      if (profilesError) throw profilesError;
 
       // Fetch all requests (RLS allows all authenticated users to view)
       const { data: requestsData, error: requestsError } = await supabase
@@ -98,12 +123,13 @@ export function CalendarOverview() {
 
       if (requestsError) throw requestsError;
 
-      // Fetch all profiles to map user names
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
-        .select("*");
+      // Fetch all tasks
+      const { data: tasksData, error: tasksError } = await supabase
+        .from("tasks")
+        .select("*")
+        .order("due_date", { ascending: true });
 
-      if (profilesError) throw profilesError;
+      if (tasksError) throw tasksError;
 
       // Map profiles to requests
       const requestsWithProfiles: RequestWithProfile[] = (requestsData || []).map((request) => {
@@ -111,9 +137,16 @@ export function CalendarOverview() {
         return { ...request, profile };
       });
 
+      // Map profiles to tasks
+      const tasksWithProfiles: TaskWithProfile[] = (tasksData || []).map((task) => {
+        const profile = profilesData?.find((p) => p.user_id === task.assigned_to) || null;
+        return { ...task, profile };
+      });
+
       setRequests(requestsWithProfiles);
+      setTasks(tasksWithProfiles);
     } catch (error) {
-      console.error("Error fetching requests:", error);
+      console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
@@ -134,9 +167,43 @@ export function CalendarOverview() {
     return filtered;
   }, [requests, selectedEmployee, selectedType, selectedStatus]);
 
+  // Filter tasks based on selected employee
+  const filteredTasks = useMemo(() => {
+    let filtered = tasks;
+    if (selectedEmployee !== "all") {
+      filtered = filtered.filter((t) => t.assigned_to === selectedEmployee);
+    }
+    return filtered;
+  }, [tasks, selectedEmployee]);
+
+  const getItemsForDay = (day: Date): CalendarItem[] => {
+    const items: CalendarItem[] = [];
+    
+    if (showTimeOff) {
+      filteredRequests.forEach((request) => {
+        if (selectedStatus === "all" && request.status === "rejected") return;
+        const start = parseISO(request.start_date);
+        const end = parseISO(request.end_date);
+        if (isWithinInterval(day, { start, end })) {
+          items.push({ type: "timeoff", data: request });
+        }
+      });
+    }
+    
+    if (showTasks) {
+      filteredTasks.forEach((task) => {
+        if (isSameDay(parseISO(task.due_date), day)) {
+          items.push({ type: "task", data: task });
+        }
+      });
+    }
+    
+    return items;
+  };
+
   const getRequestsForDay = (day: Date): RequestWithProfile[] => {
+    if (!showTimeOff) return [];
     return filteredRequests.filter((request) => {
-      // Only filter out rejected if no specific status is selected
       if (selectedStatus === "all" && request.status === "rejected") return false;
       const start = parseISO(request.start_date);
       const end = parseISO(request.end_date);
@@ -144,8 +211,31 @@ export function CalendarOverview() {
     });
   };
 
-  const getEmployeeName = (request: RequestWithProfile) => {
-    return request.profile?.full_name || request.profile?.email?.split("@")[0] || "Onbekend";
+  const getTasksForDay = (day: Date): TaskWithProfile[] => {
+    if (!showTasks) return [];
+    return filteredTasks.filter((task) => isSameDay(parseISO(task.due_date), day));
+  };
+
+  const getEmployeeName = (item: RequestWithProfile | TaskWithProfile) => {
+    return item.profile?.full_name || item.profile?.email?.split("@")[0] || "Onbekend";
+  };
+
+  const getTaskPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "high": return "bg-destructive text-destructive-foreground";
+      case "medium": return "bg-warning text-warning-foreground";
+      case "low": return "bg-muted text-muted-foreground";
+      default: return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const getTaskStatusColor = (status: string) => {
+    switch (status) {
+      case "completed": return "bg-success/80 text-success-foreground";
+      case "in_progress": return "bg-blue-500/80 text-white";
+      case "pending": return "bg-warning/80 text-warning-foreground";
+      default: return "bg-muted text-muted-foreground";
+    }
   };
 
   // Get unique employees for legend
@@ -157,6 +247,7 @@ export function CalendarOverview() {
     ];
     let colorIndex = 0;
 
+    // Add employees from requests
     requests.forEach((request) => {
       if (!employeeMap.has(request.user_id)) {
         const name = getEmployeeName(request);
@@ -168,11 +259,23 @@ export function CalendarOverview() {
       }
     });
 
+    // Add employees from tasks
+    tasks.forEach((task) => {
+      if (!employeeMap.has(task.assigned_to)) {
+        const name = getEmployeeName(task);
+        employeeMap.set(task.assigned_to, {
+          name,
+          color: colors[colorIndex % colors.length]
+        });
+        colorIndex++;
+      }
+    });
+
     return Array.from(employeeMap.entries()).map(([userId, data]) => ({
       userId,
       ...data
     }));
-  }, [requests]);
+  }, [requests, tasks]);
 
   const getEmployeeColor = (userId: string) => {
     const employee = uniqueEmployees.find((e) => e.userId === userId);
@@ -236,6 +339,8 @@ export function CalendarOverview() {
   // Day View
   const renderDayView = () => {
     const dayRequests = getRequestsForDay(currentDate);
+    const dayTasks = getTasksForDay(currentDate);
+    const hasItems = dayRequests.length > 0 || dayTasks.length > 0;
     
     return (
       <div className="space-y-4 animate-fade-in">
@@ -254,36 +359,79 @@ export function CalendarOverview() {
             </div>
           </div>
           
-          {dayRequests.length === 0 ? (
+          {!hasItems ? (
             <div className="text-center text-muted-foreground py-12 bg-muted/30 rounded-xl">
               <CalendarDays className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">Geen verlof gepland</p>
+              <p className="font-medium">Geen items gepland</p>
               <p className="text-sm opacity-70">voor deze dag</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {dayRequests.map((request, index) => (
-                <div
-                  key={request.id}
-                  className={cn(
-                    "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md",
-                    getTypeColor(request.type, request.status)
-                  )}
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={cn("w-3 h-3 rounded-full ring-2 ring-white/30", getEmployeeColor(request.user_id))} />
-                    <span className="font-semibold">{getEmployeeName(request)}</span>
+            <div className="space-y-4">
+              {/* Time Off Requests */}
+              {dayRequests.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                    <Palmtree className="h-4 w-4" />
+                    <span>Verlof</span>
                   </div>
-                  <div className="font-medium mt-2 opacity-90">{getTypeLabel(request.type)}</div>
-                  <div className="text-xs opacity-75 mt-1">
-                    {format(parseISO(request.start_date), "d MMM", { locale: nl })} — {format(parseISO(request.end_date), "d MMM", { locale: nl })}
-                  </div>
-                  {request.reason && (
-                    <div className="text-xs opacity-60 mt-2 italic">{request.reason}</div>
-                  )}
+                  {dayRequests.map((request, index) => (
+                    <div
+                      key={request.id}
+                      className={cn(
+                        "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md",
+                        getTypeColor(request.type, request.status)
+                      )}
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={cn("w-3 h-3 rounded-full ring-2 ring-white/30", getEmployeeColor(request.user_id))} />
+                        <span className="font-semibold">{getEmployeeName(request)}</span>
+                      </div>
+                      <div className="font-medium mt-2 opacity-90">{getTypeLabel(request.type)}</div>
+                      <div className="text-xs opacity-75 mt-1">
+                        {format(parseISO(request.start_date), "d MMM", { locale: nl })} — {format(parseISO(request.end_date), "d MMM", { locale: nl })}
+                      </div>
+                      {request.reason && (
+                        <div className="text-xs opacity-60 mt-2 italic">{request.reason}</div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
+
+              {/* Tasks */}
+              {dayTasks.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                    <ClipboardList className="h-4 w-4" />
+                    <span>Taken</span>
+                  </div>
+                  {dayTasks.map((task, index) => (
+                    <div
+                      key={task.id}
+                      className={cn(
+                        "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md border-l-4",
+                        getTaskStatusColor(task.status)
+                      )}
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={cn("w-3 h-3 rounded-full ring-2 ring-white/30", getEmployeeColor(task.assigned_to))} />
+                        <span className="font-semibold">{getEmployeeName(task)}</span>
+                      </div>
+                      <div className="font-medium mt-2">{task.title}</div>
+                      {task.description && (
+                        <div className="text-xs opacity-75 mt-1 line-clamp-2">{task.description}</div>
+                      )}
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant="outline" className={cn("text-xs", getTaskPriorityColor(task.priority))}>
+                          {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Gemiddeld" : "Laag"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -309,6 +457,8 @@ export function CalendarOverview() {
         <div className="grid grid-cols-7 gap-2">
           {days.map((day, index) => {
             const dayRequests = getRequestsForDay(day);
+            const dayTasks = getTasksForDay(day);
+            const allItems = [...dayRequests.map(r => ({ type: 'timeoff' as const, item: r })), ...dayTasks.map(t => ({ type: 'task' as const, item: t }))];
             const isCurrentDay = isToday(day);
 
             return (
@@ -330,21 +480,34 @@ export function CalendarOverview() {
                   {format(day, "d")}
                 </div>
                 <div className="space-y-1.5">
-                  {dayRequests.slice(0, 3).map((request) => (
-                    <div
-                      key={request.id}
-                      className={cn(
-                        "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105",
-                        getTypeColor(request.type, request.status)
-                      )}
-                    >
-                      <div className={cn("w-1.5 h-1.5 rounded-full shrink-0 ring-1 ring-white/20", getEmployeeColor(request.user_id))} />
-                      <span className="truncate font-medium">{getEmployeeName(request)}</span>
-                    </div>
+                  {allItems.slice(0, 3).map((entry) => (
+                    entry.type === 'timeoff' ? (
+                      <div
+                        key={(entry.item as RequestWithProfile).id}
+                        className={cn(
+                          "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105",
+                          getTypeColor((entry.item as RequestWithProfile).type, (entry.item as RequestWithProfile).status)
+                        )}
+                      >
+                        <Palmtree className="w-3 h-3 shrink-0" />
+                        <span className="truncate font-medium">{getEmployeeName(entry.item as RequestWithProfile)}</span>
+                      </div>
+                    ) : (
+                      <div
+                        key={(entry.item as TaskWithProfile).id}
+                        className={cn(
+                          "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105",
+                          getTaskStatusColor((entry.item as TaskWithProfile).status)
+                        )}
+                      >
+                        <ClipboardList className="w-3 h-3 shrink-0" />
+                        <span className="truncate font-medium">{(entry.item as TaskWithProfile).title}</span>
+                      </div>
+                    )
                   ))}
-                  {dayRequests.length > 3 && (
+                  {allItems.length > 3 && (
                     <div className="text-xs text-primary font-medium pl-1">
-                      +{dayRequests.length - 3} meer
+                      +{allItems.length - 3} meer
                     </div>
                   )}
                 </div>
@@ -376,6 +539,8 @@ export function CalendarOverview() {
         <div className="grid grid-cols-7 gap-1.5">
           {days.map((day, index) => {
             const dayRequests = getRequestsForDay(day);
+            const dayTasks = getTasksForDay(day);
+            const allItems = [...dayRequests.map(r => ({ type: 'timeoff' as const, item: r })), ...dayTasks.map(t => ({ type: 'task' as const, item: t }))];
             const isCurrentMonth = isSameMonth(day, currentDate);
             const isCurrentDay = isToday(day);
 
@@ -401,21 +566,34 @@ export function CalendarOverview() {
                   {format(day, "d")}
                 </div>
                 <div className="space-y-1">
-                  {dayRequests.slice(0, 2).map((request) => (
-                    <div
-                      key={request.id}
-                      className={cn(
-                        "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105",
-                        getTypeColor(request.type, request.status)
-                      )}
-                    >
-                      <div className={cn("w-1 h-1 rounded-full shrink-0", getEmployeeColor(request.user_id))} />
-                      <span className="truncate font-medium">{getEmployeeName(request)}</span>
-                    </div>
+                  {allItems.slice(0, 2).map((entry) => (
+                    entry.type === 'timeoff' ? (
+                      <div
+                        key={(entry.item as RequestWithProfile).id}
+                        className={cn(
+                          "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105",
+                          getTypeColor((entry.item as RequestWithProfile).type, (entry.item as RequestWithProfile).status)
+                        )}
+                      >
+                        <Palmtree className="w-2.5 h-2.5 shrink-0" />
+                        <span className="truncate font-medium">{getEmployeeName(entry.item as RequestWithProfile)}</span>
+                      </div>
+                    ) : (
+                      <div
+                        key={(entry.item as TaskWithProfile).id}
+                        className={cn(
+                          "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105",
+                          getTaskStatusColor((entry.item as TaskWithProfile).status)
+                        )}
+                      >
+                        <ClipboardList className="w-2.5 h-2.5 shrink-0" />
+                        <span className="truncate font-medium">{(entry.item as TaskWithProfile).title}</span>
+                      </div>
+                    )
                   ))}
-                  {dayRequests.length > 2 && (
+                  {allItems.length > 2 && (
                     <div className="text-[10px] text-primary font-semibold pl-1">
-                      +{dayRequests.length - 2}
+                      +{allItems.length - 2}
                     </div>
                   )}
                 </div>
@@ -440,13 +618,19 @@ export function CalendarOverview() {
           const monthEnd = endOfMonth(month);
           const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
           
-          const monthRequests = filteredRequests.filter((request) => {
+          const monthRequests = showTimeOff ? filteredRequests.filter((request) => {
             if (request.status === "rejected") return false;
             const start = parseISO(request.start_date);
             const end = parseISO(request.end_date);
             return monthDays.some(day => isWithinInterval(day, { start, end }));
-          });
+          }) : [];
 
+          const monthTasks = showTasks ? filteredTasks.filter((task) => {
+            const dueDate = parseISO(task.due_date);
+            return monthDays.some(day => isSameDay(day, dueDate));
+          }) : [];
+
+          const totalItems = monthRequests.length + monthTasks.length;
           const isCurrentMonth = isSameMonth(month, new Date());
 
           return (
@@ -472,25 +656,39 @@ export function CalendarOverview() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4">
-                {monthRequests.length === 0 ? (
-                  <div className="text-xs text-muted-foreground italic">Geen verlof gepland</div>
+                {totalItems === 0 ? (
+                  <div className="text-xs text-muted-foreground italic">Geen items gepland</div>
                 ) : (
                   <div className="space-y-1.5">
-                    {monthRequests.slice(0, 2).map((request) => (
+                    {monthRequests.slice(0, 1).map((request) => (
                       <Badge
                         key={request.id}
                         variant="secondary"
                         className={cn(
-                          "text-[10px] px-2 py-0.5 font-medium",
+                          "text-[10px] px-2 py-0.5 font-medium flex items-center gap-1 w-fit",
                           getTypeColor(request.type, request.status)
                         )}
                       >
+                        <Palmtree className="w-2.5 h-2.5" />
                         {getTypeLabel(request.type)}
                       </Badge>
                     ))}
-                    {monthRequests.length > 2 && (
+                    {monthTasks.slice(0, 1).map((task) => (
+                      <Badge
+                        key={task.id}
+                        variant="secondary"
+                        className={cn(
+                          "text-[10px] px-2 py-0.5 font-medium flex items-center gap-1 w-fit",
+                          getTaskStatusColor(task.status)
+                        )}
+                      >
+                        <ClipboardList className="w-2.5 h-2.5" />
+                        {task.title.substring(0, 15)}{task.title.length > 15 ? '...' : ''}
+                      </Badge>
+                    ))}
+                    {totalItems > 2 && (
                       <div className="text-xs text-primary font-semibold">
-                        +{monthRequests.length - 2} meer
+                        +{totalItems - 2} meer
                       </div>
                     )}
                   </div>
@@ -519,8 +717,34 @@ export function CalendarOverview() {
                 Kalenderoverzicht
               </CardTitle>
               <CardDescription className="mt-1.5 text-muted-foreground">
-                Bekijk alle verlofaanvragen van het team
+                Bekijk alle verlofaanvragen en taken van het team
               </CardDescription>
+            </div>
+            
+            {/* Show/Hide Toggle */}
+            <div className="flex items-center gap-4 p-2 rounded-lg bg-muted/30 border border-border/50">
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="showTimeOff" 
+                  checked={showTimeOff} 
+                  onCheckedChange={(checked) => setShowTimeOff(checked as boolean)}
+                />
+                <label htmlFor="showTimeOff" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                  <Palmtree className="h-3.5 w-3.5 text-primary" />
+                  Verlof
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="showTasks" 
+                  checked={showTasks} 
+                  onCheckedChange={(checked) => setShowTasks(checked as boolean)}
+                />
+                <label htmlFor="showTasks" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                  <ClipboardList className="h-3.5 w-3.5 text-blue-500" />
+                  Taken
+                </label>
+              </div>
             </div>
             
             <ToggleGroup 
@@ -683,22 +907,59 @@ export function CalendarOverview() {
         )}
 
         {/* Type Legend */}
-        <div className="flex flex-wrap justify-center gap-6 mt-8 pt-6 border-t border-border/50">
-          <div className="flex items-center gap-2.5 text-sm">
-            <div className="w-3 h-3 rounded-md bg-primary shadow-sm" />
-            <span className="text-muted-foreground font-medium">Vakantie</span>
-          </div>
-          <div className="flex items-center gap-2.5 text-sm">
-            <div className="w-3 h-3 rounded-md bg-destructive shadow-sm" />
-            <span className="text-muted-foreground font-medium">Ziekteverlof</span>
-          </div>
-          <div className="flex items-center gap-2.5 text-sm">
-            <div className="w-3 h-3 rounded-md bg-accent shadow-sm" />
-            <span className="text-muted-foreground font-medium">Persoonlijk</span>
-          </div>
-          <div className="flex items-center gap-2.5 text-sm">
-            <div className="w-3 h-3 rounded-md bg-warning/80 shadow-sm" />
-            <span className="text-muted-foreground font-medium">In behandeling</span>
+        <div className="mt-8 pt-6 border-t border-border/50">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Leave Types Legend */}
+            {showTimeOff && (
+              <div>
+                <div className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Palmtree className="h-4 w-4 text-primary" />
+                  Verlof types
+                </div>
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <div className="w-3 h-3 rounded-md bg-primary shadow-sm" />
+                    <span className="text-muted-foreground font-medium">Vakantie</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <div className="w-3 h-3 rounded-md bg-destructive shadow-sm" />
+                    <span className="text-muted-foreground font-medium">Ziekteverlof</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <div className="w-3 h-3 rounded-md bg-accent shadow-sm" />
+                    <span className="text-muted-foreground font-medium">Persoonlijk</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <div className="w-3 h-3 rounded-md bg-warning/80 shadow-sm" />
+                    <span className="text-muted-foreground font-medium">In behandeling</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Task Status Legend */}
+            {showTasks && (
+              <div>
+                <div className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4 text-blue-500" />
+                  Taak status
+                </div>
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <div className="w-3 h-3 rounded-md bg-warning/80 shadow-sm" />
+                    <span className="text-muted-foreground font-medium">Te doen</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <div className="w-3 h-3 rounded-md bg-blue-500/80 shadow-sm" />
+                    <span className="text-muted-foreground font-medium">Bezig</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <div className="w-3 h-3 rounded-md bg-success/80 shadow-sm" />
+                    <span className="text-muted-foreground font-medium">Voltooid</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
