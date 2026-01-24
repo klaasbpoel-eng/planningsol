@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Loader2, User, Briefcase, Phone, MapPin, Heart, Calendar as CalendarIconLucide } from "lucide-react";
+import { CalendarIcon, Loader2, User, Briefcase, Phone, MapPin, Heart, UserPlus } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,78 +34,142 @@ interface EmployeeDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   onUpdate: () => void;
   allEmployees: Profile[];
+  mode?: "edit" | "create";
 }
+
+const initialFormData = {
+  full_name: "",
+  email: "",
+  department: "",
+  job_title: "",
+  phone: "",
+  hire_date: undefined as Date | undefined,
+  manager_id: "",
+  location: "",
+  employment_type: "full-time",
+  date_of_birth: undefined as Date | undefined,
+  address: "",
+  emergency_contact_name: "",
+  emergency_contact_phone: "",
+};
 
 export function EmployeeDetailDialog({ 
   employee, 
   open, 
   onOpenChange, 
   onUpdate,
-  allEmployees 
+  allEmployees,
+  mode = "edit"
 }: EmployeeDetailDialogProps) {
   const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState({
-    full_name: "",
-    email: "",
-    department: "",
-    job_title: "",
-    phone: "",
-    hire_date: undefined as Date | undefined,
-    manager_id: "",
-    location: "",
-    employment_type: "full-time",
-    date_of_birth: undefined as Date | undefined,
-    address: "",
-    emergency_contact_name: "",
-    emergency_contact_phone: "",
-  });
+  const [formData, setFormData] = useState(initialFormData);
+
+  const isCreateMode = mode === "create";
 
   useEffect(() => {
-    if (employee) {
-      setFormData({
-        full_name: employee.full_name || "",
-        email: employee.email || "",
-        department: employee.department || "",
-        job_title: employee.job_title || "",
-        phone: employee.phone || "",
-        hire_date: employee.hire_date ? new Date(employee.hire_date) : undefined,
-        manager_id: employee.manager_id || "",
-        location: employee.location || "",
-        employment_type: employee.employment_type || "full-time",
-        date_of_birth: employee.date_of_birth ? new Date(employee.date_of_birth) : undefined,
-        address: employee.address || "",
-        emergency_contact_name: employee.emergency_contact_name || "",
-        emergency_contact_phone: employee.emergency_contact_phone || "",
-      });
+    if (open) {
+      if (isCreateMode) {
+        setFormData(initialFormData);
+      } else if (employee) {
+        setFormData({
+          full_name: employee.full_name || "",
+          email: employee.email || "",
+          department: employee.department || "",
+          job_title: employee.job_title || "",
+          phone: employee.phone || "",
+          hire_date: employee.hire_date ? new Date(employee.hire_date) : undefined,
+          manager_id: employee.manager_id || "",
+          location: employee.location || "",
+          employment_type: employee.employment_type || "full-time",
+          date_of_birth: employee.date_of_birth ? new Date(employee.date_of_birth) : undefined,
+          address: employee.address || "",
+          emergency_contact_name: employee.emergency_contact_name || "",
+          emergency_contact_phone: employee.emergency_contact_phone || "",
+        });
+      }
     }
-  }, [employee]);
+  }, [employee, open, isCreateMode]);
 
   const handleSave = async () => {
-    if (!employee) return;
-    
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: formData.full_name || null,
-          department: formData.department || null,
-          job_title: formData.job_title || null,
-          phone: formData.phone || null,
-          hire_date: formData.hire_date ? format(formData.hire_date, "yyyy-MM-dd") : null,
-          manager_id: formData.manager_id || null,
-          location: formData.location || null,
-          employment_type: formData.employment_type || "full-time",
-          date_of_birth: formData.date_of_birth ? format(formData.date_of_birth, "yyyy-MM-dd") : null,
-          address: formData.address || null,
-          emergency_contact_name: formData.emergency_contact_name || null,
-          emergency_contact_phone: formData.emergency_contact_phone || null,
-        })
-        .eq("id", employee.id);
+      if (isCreateMode) {
+        // Validate required fields for new employee
+        if (!formData.full_name.trim()) {
+          toast.error("Full name is required");
+          setSaving(false);
+          return;
+        }
+        if (!formData.email.trim()) {
+          toast.error("Email is required");
+          setSaving(false);
+          return;
+        }
 
-      if (error) throw error;
+        // Check if email already exists
+        const { data: existingProfile } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("email", formData.email.trim().toLowerCase())
+          .maybeSingle();
+
+        if (existingProfile) {
+          toast.error("An employee with this email already exists");
+          setSaving(false);
+          return;
+        }
+
+        // Create new profile - use a placeholder UUID for user_id since they haven't signed up yet
+        const placeholderUserId = crypto.randomUUID();
+        
+        const { error } = await supabase
+          .from("profiles")
+          .insert({
+            user_id: placeholderUserId,
+            full_name: formData.full_name.trim(),
+            email: formData.email.trim().toLowerCase(),
+            department: formData.department || null,
+            job_title: formData.job_title || null,
+            phone: formData.phone || null,
+            hire_date: formData.hire_date ? format(formData.hire_date, "yyyy-MM-dd") : null,
+            manager_id: formData.manager_id || null,
+            location: formData.location || null,
+            employment_type: formData.employment_type || "full-time",
+            date_of_birth: formData.date_of_birth ? format(formData.date_of_birth, "yyyy-MM-dd") : null,
+            address: formData.address || null,
+            emergency_contact_name: formData.emergency_contact_name || null,
+            emergency_contact_phone: formData.emergency_contact_phone || null,
+          });
+
+        if (error) throw error;
+        
+        toast.success("Employee added successfully");
+      } else {
+        if (!employee) return;
+        
+        const { error } = await supabase
+          .from("profiles")
+          .update({
+            full_name: formData.full_name || null,
+            department: formData.department || null,
+            job_title: formData.job_title || null,
+            phone: formData.phone || null,
+            hire_date: formData.hire_date ? format(formData.hire_date, "yyyy-MM-dd") : null,
+            manager_id: formData.manager_id || null,
+            location: formData.location || null,
+            employment_type: formData.employment_type || "full-time",
+            date_of_birth: formData.date_of_birth ? format(formData.date_of_birth, "yyyy-MM-dd") : null,
+            address: formData.address || null,
+            emergency_contact_name: formData.emergency_contact_name || null,
+            emergency_contact_phone: formData.emergency_contact_phone || null,
+          })
+          .eq("id", employee.id);
+
+        if (error) throw error;
+        
+        toast.success("Employee details updated");
+      }
       
-      toast.success("Employee details updated");
       onUpdate();
       onOpenChange(false);
     } catch (error: any) {
@@ -122,8 +186,17 @@ export function EmployeeDetailDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Employee Details
+            {isCreateMode ? (
+              <>
+                <UserPlus className="h-5 w-5" />
+                Add New Employee
+              </>
+            ) : (
+              <>
+                <User className="h-5 w-5" />
+                Edit Employee Details
+              </>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -146,7 +219,9 @@ export function EmployeeDetailDialog({
           <TabsContent value="basic" className="space-y-4 mt-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="full_name">Full Name</Label>
+                <Label htmlFor="full_name">
+                  Full Name {isCreateMode && <span className="text-destructive">*</span>}
+                </Label>
                 <Input
                   id="full_name"
                   value={formData.full_name}
@@ -155,13 +230,17 @@ export function EmployeeDetailDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">
+                  Email {isCreateMode && <span className="text-destructive">*</span>}
+                </Label>
                 <Input
                   id="email"
                   type="email"
                   value={formData.email}
-                  disabled
-                  className="bg-muted"
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  disabled={!isCreateMode}
+                  className={!isCreateMode ? "bg-muted" : ""}
+                  placeholder="john.doe@company.com"
                 />
               </div>
             </div>
@@ -363,7 +442,7 @@ export function EmployeeDetailDialog({
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Save Changes
+            {isCreateMode ? "Add Employee" : "Save Changes"}
           </Button>
         </div>
       </DialogContent>
