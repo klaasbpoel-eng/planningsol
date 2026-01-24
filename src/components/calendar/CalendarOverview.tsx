@@ -10,13 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 import { 
   CalendarDays, 
   ChevronLeft, 
@@ -27,15 +20,8 @@ import {
   LayoutGrid,
   Users,
   Plus,
-  ClipboardList,
-  Pencil,
-  Trash2,
-  Check,
-  Clock,
-  CircleDot,
-  MoreVertical
+  ClipboardList
 } from "lucide-react";
-import { toast } from "sonner";
 import { 
   format, 
   startOfWeek, 
@@ -67,7 +53,7 @@ import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
-import { TaskFormDialog, TaskToEdit } from "./TaskFormDialog";
+import { TaskFormDialog } from "./TaskFormDialog";
 import type { Database } from "@/integrations/supabase/types";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
@@ -115,114 +101,9 @@ export function CalendarOverview() {
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  const [selectedTaskStatus, setSelectedTaskStatus] = useState<string>("all");
-  const [selectedTaskType, setSelectedTaskType] = useState<string>("all");
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
-  const [taskToEdit, setTaskToEdit] = useState<TaskToEdit | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>();
   const { isAdmin } = useUserRole(currentUserId);
-
-  const handleEditTask = (task: TaskWithProfile) => {
-    setTaskToEdit({
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      assigned_to: task.assigned_to,
-      due_date: task.due_date,
-      priority: task.priority,
-      type_id: task.type_id,
-    });
-    setTaskDialogOpen(true);
-  };
-
-  const handleAddTask = () => {
-    setTaskToEdit(null);
-    setTaskDialogOpen(true);
-  };
-
-  const handleUpdateTaskStatus = async (taskId: string, newStatus: string) => {
-    try {
-      const { error } = await supabase
-        .from("tasks")
-        .update({ status: newStatus })
-        .eq("id", taskId);
-
-      if (error) throw error;
-      
-      const statusLabel = newStatus === "completed" ? "voltooid" : newStatus === "in_progress" ? "bezig" : "te doen";
-      toast.success(`Taak gemarkeerd als ${statusLabel}`);
-      fetchData();
-    } catch (error) {
-      console.error("Error updating task status:", error);
-      toast.error("Fout bij het wijzigen van de taakstatus");
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed": return Check;
-      case "in_progress": return Clock;
-      default: return CircleDot;
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "completed": return "Voltooid";
-      case "in_progress": return "Bezig";
-      default: return "Te doen";
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed": return "bg-success text-success-foreground";
-      case "in_progress": return "bg-primary text-primary-foreground";
-      default: return "bg-warning text-warning-foreground";
-    }
-  };
-
-  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-
-  const handleDragStart = (e: React.DragEvent, taskId: string) => {
-    if (!isAdmin) return;
-    e.dataTransfer.setData("taskId", taskId);
-    setDraggedTaskId(taskId);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedTaskId(null);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    if (!isAdmin) return;
-    e.preventDefault();
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetDate: Date) => {
-    if (!isAdmin) return;
-    e.preventDefault();
-    const taskId = e.dataTransfer.getData("taskId");
-    if (!taskId) return;
-
-    try {
-      const newDueDate = format(targetDate, "yyyy-MM-dd");
-      const { error } = await supabase
-        .from("tasks")
-        .update({ due_date: newDueDate })
-        .eq("id", taskId);
-
-      if (error) throw error;
-      
-      toast.success(`Taak verplaatst naar ${format(targetDate, "d MMMM", { locale: nl })}`);
-      fetchData();
-    } catch (error) {
-      console.error("Error moving task:", error);
-      toast.error("Fout bij het verplaatsen van de taak");
-    } finally {
-      setDraggedTaskId(null);
-    }
-  };
 
   const leaveTypes = [
     { value: "vacation", label: "Vakantie", color: "bg-primary" },
@@ -234,12 +115,6 @@ export function CalendarOverview() {
   const statusTypes = [
     { value: "approved", label: "Goedgekeurd", color: "bg-success" },
     { value: "pending", label: "In behandeling", color: "bg-warning" },
-  ];
-
-  const taskStatusTypes = [
-    { value: "pending", label: "Te doen", color: "bg-warning" },
-    { value: "in_progress", label: "Bezig", color: "bg-primary" },
-    { value: "completed", label: "Voltooid", color: "bg-success" },
   ];
 
   useEffect(() => {
@@ -323,20 +198,14 @@ export function CalendarOverview() {
     return filtered;
   }, [requests, selectedEmployee, selectedType, selectedStatus]);
 
-  // Filter tasks based on selected employee, task status, and task type
+  // Filter tasks based on selected employee
   const filteredTasks = useMemo(() => {
     let filtered = tasks;
     if (selectedEmployee !== "all") {
       filtered = filtered.filter((t) => t.assigned_to === selectedEmployee);
     }
-    if (selectedTaskStatus !== "all") {
-      filtered = filtered.filter((t) => t.status === selectedTaskStatus);
-    }
-    if (selectedTaskType !== "all") {
-      filtered = filtered.filter((t) => t.type_id === selectedTaskType);
-    }
     return filtered;
-  }, [tasks, selectedEmployee, selectedTaskStatus, selectedTaskType]);
+  }, [tasks, selectedEmployee]);
 
   const getRequestsForDay = (day: Date): RequestWithProfile[] => {
     return filteredRequests.filter((request) => {
@@ -504,14 +373,10 @@ export function CalendarOverview() {
                   </div>
                   {dayTasks.map((task, index) => {
                     const typeColor = getTaskTypeColor(task);
-                    const StatusIcon = getStatusIcon(task.status);
                     return (
                       <div
                         key={task.id}
-                        className={cn(
-                          "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md group",
-                          task.status === "completed" && "opacity-60"
-                        )}
+                        className="p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md"
                         style={{ 
                           animationDelay: `${index * 50}ms`,
                           borderLeft: `4px solid ${typeColor}`,
@@ -521,58 +386,11 @@ export function CalendarOverview() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <ClipboardList className="h-4 w-4" style={{ color: typeColor }} />
-                            <span className={cn("font-semibold", task.status === "completed" && "line-through")}>{task.title}</span>
+                            <span className="font-semibold">{task.title}</span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge className={getStatusColor(task.status)}>
-                              <StatusIcon className="h-3 w-3 mr-1" />
-                              {getStatusLabel(task.status)}
-                            </Badge>
-                            <Badge className={getPriorityColor(task.priority)}>
-                              {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Medium" : "Laag"}
-                            </Badge>
-                            {isAdmin && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  >
-                                    <MoreVertical className="h-3.5 w-3.5" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="bg-background border shadow-xl z-50">
-                                  <DropdownMenuItem 
-                                    onClick={() => handleUpdateTaskStatus(task.id, "pending")}
-                                    disabled={task.status === "pending"}
-                                  >
-                                    <CircleDot className="h-4 w-4 mr-2 text-warning" />
-                                    Markeer als Te doen
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    onClick={() => handleUpdateTaskStatus(task.id, "in_progress")}
-                                    disabled={task.status === "in_progress"}
-                                  >
-                                    <Clock className="h-4 w-4 mr-2 text-primary" />
-                                    Markeer als Bezig
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    onClick={() => handleUpdateTaskStatus(task.id, "completed")}
-                                    disabled={task.status === "completed"}
-                                  >
-                                    <Check className="h-4 w-4 mr-2 text-success" />
-                                    Markeer als Voltooid
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => handleEditTask(task)}>
-                                    <Pencil className="h-4 w-4 mr-2" />
-                                    Bewerken
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                          </div>
+                          <Badge className={getPriorityColor(task.priority)}>
+                            {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Medium" : "Laag"}
+                          </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground mt-2">
                           <span style={{ color: typeColor }}>{getTaskTypeName(task)}</span> • Toegewezen aan: {getTaskEmployeeName(task)}
@@ -653,12 +471,9 @@ export function CalendarOverview() {
                 className={cn(
                   "min-h-[140px] p-3 rounded-xl border transition-all duration-300 hover:shadow-md",
                   "bg-card/80 backdrop-blur-sm border-border/50",
-                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent shadow-lg shadow-primary/5",
-                  draggedTaskId && "ring-2 ring-dashed ring-primary/30"
+                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent shadow-lg shadow-primary/5"
                 )}
                 style={{ animationDelay: `${index * 30}ms` }}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, day)}
               >
                 <div className={cn(
                   "text-sm font-bold mb-3 flex items-center justify-center w-7 h-7 rounded-full",
@@ -672,64 +487,19 @@ export function CalendarOverview() {
                   {/* Tasks */}
                   {dayTasks.slice(0, 2).map((task) => {
                     const typeColor = getTaskTypeColor(task);
-                    const StatusIcon = getStatusIcon(task.status);
                     return (
-                      <DropdownMenu key={task.id}>
-                        <DropdownMenuTrigger asChild disabled={!isAdmin}>
-                          <div
-                            draggable={isAdmin}
-                            onDragStart={(e) => handleDragStart(e, task.id)}
-                            onDragEnd={handleDragEnd}
-                            className={cn(
-                              "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 group/task",
-                              isAdmin && "cursor-grab active:cursor-grabbing",
-                              task.status === "completed" && "opacity-60",
-                              draggedTaskId === task.id && "opacity-50 ring-2 ring-primary"
-                            )}
-                            style={{ 
-                              borderLeft: `2px solid ${typeColor}`,
-                              backgroundColor: `${typeColor}20`,
-                              color: typeColor
-                            }}
-                          >
-                            <StatusIcon className="w-3 h-3 shrink-0" />
-                            <span className={cn("truncate font-medium flex-1", task.status === "completed" && "line-through")}>{task.title}</span>
-                            {isAdmin && (
-                              <MoreVertical className="w-3 h-3 shrink-0 opacity-0 group-hover/task:opacity-100 transition-opacity" />
-                            )}
-                          </div>
-                        </DropdownMenuTrigger>
-                        {isAdmin && (
-                          <DropdownMenuContent align="start" className="bg-background border shadow-xl z-50">
-                            <DropdownMenuItem 
-                              onClick={() => handleUpdateTaskStatus(task.id, "pending")}
-                              disabled={task.status === "pending"}
-                            >
-                              <CircleDot className="h-4 w-4 mr-2 text-warning" />
-                              Te doen
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleUpdateTaskStatus(task.id, "in_progress")}
-                              disabled={task.status === "in_progress"}
-                            >
-                              <Clock className="h-4 w-4 mr-2 text-primary" />
-                              Bezig
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleUpdateTaskStatus(task.id, "completed")}
-                              disabled={task.status === "completed"}
-                            >
-                              <Check className="h-4 w-4 mr-2 text-success" />
-                              Voltooid
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleEditTask(task)}>
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Bewerken
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        )}
-                      </DropdownMenu>
+                      <div
+                        key={task.id}
+                        className="text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105"
+                        style={{ 
+                          borderLeft: `2px solid ${typeColor}`,
+                          backgroundColor: `${typeColor}20`,
+                          color: typeColor
+                        }}
+                      >
+                        <ClipboardList className="w-3 h-3 shrink-0" />
+                        <span className="truncate font-medium">{task.title}</span>
+                      </div>
                     );
                   })}
                   {/* Requests */}
@@ -791,11 +561,8 @@ export function CalendarOverview() {
                   isCurrentMonth 
                     ? "bg-card/80 backdrop-blur-sm border-border/50 hover:bg-card hover:shadow-sm" 
                     : "bg-muted/20 border-transparent opacity-50",
-                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent",
-                  draggedTaskId && isCurrentMonth && "ring-2 ring-dashed ring-primary/30"
+                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent"
                 )}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, day)}
               >
                 <div className={cn(
                   "text-xs font-bold mb-1.5 flex items-center justify-center w-6 h-6 rounded-full transition-colors",
@@ -811,63 +578,18 @@ export function CalendarOverview() {
                   {/* Tasks */}
                   {dayTasks.slice(0, 1).map((task) => {
                     const typeColor = getTaskTypeColor(task);
-                    const StatusIcon = getStatusIcon(task.status);
                     return (
-                      <DropdownMenu key={task.id}>
-                        <DropdownMenuTrigger asChild disabled={!isAdmin}>
-                          <div
-                            draggable={isAdmin}
-                            onDragStart={(e) => handleDragStart(e, task.id)}
-                            onDragEnd={handleDragEnd}
-                            className={cn(
-                              "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 group/task",
-                              isAdmin && "cursor-grab active:cursor-grabbing",
-                              task.status === "completed" && "opacity-60",
-                              draggedTaskId === task.id && "opacity-50 ring-2 ring-primary"
-                            )}
-                            style={{ 
-                              backgroundColor: `${typeColor}20`,
-                              color: typeColor
-                            }}
-                          >
-                            <StatusIcon className="w-2.5 h-2.5 shrink-0" />
-                            <span className={cn("truncate font-medium flex-1", task.status === "completed" && "line-through")}>{task.title}</span>
-                            {isAdmin && (
-                              <MoreVertical className="w-2 h-2 shrink-0 opacity-0 group-hover/task:opacity-100 transition-opacity" />
-                            )}
-                          </div>
-                        </DropdownMenuTrigger>
-                        {isAdmin && (
-                          <DropdownMenuContent align="start" className="bg-background border shadow-xl z-50">
-                            <DropdownMenuItem 
-                              onClick={() => handleUpdateTaskStatus(task.id, "pending")}
-                              disabled={task.status === "pending"}
-                            >
-                              <CircleDot className="h-4 w-4 mr-2 text-warning" />
-                              Te doen
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleUpdateTaskStatus(task.id, "in_progress")}
-                              disabled={task.status === "in_progress"}
-                            >
-                              <Clock className="h-4 w-4 mr-2 text-primary" />
-                              Bezig
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleUpdateTaskStatus(task.id, "completed")}
-                              disabled={task.status === "completed"}
-                            >
-                              <Check className="h-4 w-4 mr-2 text-success" />
-                              Voltooid
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleEditTask(task)}>
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Bewerken
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        )}
-                      </DropdownMenu>
+                      <div
+                        key={task.id}
+                        className="text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105"
+                        style={{ 
+                          backgroundColor: `${typeColor}20`,
+                          color: typeColor
+                        }}
+                      >
+                        <ClipboardList className="w-2.5 h-2.5 shrink-0" />
+                        <span className="truncate font-medium">{task.title}</span>
+                      </div>
                     );
                   })}
                   {/* Requests */}
@@ -996,7 +718,7 @@ export function CalendarOverview() {
             <div className="flex items-center gap-3">
               {isAdmin && (
                 <Button
-                  onClick={handleAddTask}
+                  onClick={() => setTaskDialogOpen(true)}
                   className="gap-2"
                   size="sm"
                 >
@@ -1096,52 +818,8 @@ export function CalendarOverview() {
               </Select>
             </div>
 
-            {/* Task Status Filter */}
-            <div className="flex items-center gap-2">
-              <ClipboardList className="h-4 w-4 text-muted-foreground" />
-              <Select value={selectedTaskStatus} onValueChange={setSelectedTaskStatus}>
-                <SelectTrigger className="w-[160px] bg-background border-border/50 shadow-sm hover:bg-background/80 transition-colors">
-                  <SelectValue placeholder="Taakstatus" />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-xl z-50">
-                  <SelectItem value="all">Alle taakstatussen</SelectItem>
-                  {taskStatusTypes.map((status) => (
-                    <SelectItem key={status.value} value={status.value}>
-                      <div className="flex items-center gap-2">
-                        <div className={cn("w-2 h-2 rounded", status.color)} />
-                        {status.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Task Type Filter */}
-            {taskTypes.length > 0 && (
-              <div className="flex items-center gap-2">
-                <LayoutGrid className="h-4 w-4 text-muted-foreground" />
-                <Select value={selectedTaskType} onValueChange={setSelectedTaskType}>
-                  <SelectTrigger className="w-[160px] bg-background border-border/50 shadow-sm hover:bg-background/80 transition-colors">
-                    <SelectValue placeholder="Taaktype" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background border shadow-xl z-50">
-                    <SelectItem value="all">Alle taaktypes</SelectItem>
-                    {taskTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id}>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded" style={{ backgroundColor: type.color }} />
-                          {type.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             {/* Reset Button */}
-            {(selectedEmployee !== "all" || selectedType !== "all" || selectedStatus !== "all" || selectedTaskStatus !== "all" || selectedTaskType !== "all") && (
+            {(selectedEmployee !== "all" || selectedType !== "all" || selectedStatus !== "all") && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -1149,8 +827,6 @@ export function CalendarOverview() {
                   setSelectedEmployee("all");
                   setSelectedType("all");
                   setSelectedStatus("all");
-                  setSelectedTaskStatus("all");
-                  setSelectedTaskType("all");
                 }}
                 className="text-xs text-primary hover:text-primary hover:bg-primary/10"
               >
@@ -1264,7 +940,6 @@ export function CalendarOverview() {
         onOpenChange={setTaskDialogOpen}
         employees={profiles}
         onTaskCreated={fetchData}
-        taskToEdit={taskToEdit}
       />
     </Card>
   );

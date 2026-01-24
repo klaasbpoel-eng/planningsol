@@ -3,15 +3,13 @@ import { Header } from "@/components/layout/Header";
 import { TimeOffRequestForm } from "@/components/time-off/TimeOffRequestForm";
 import { TimeOffRequestList } from "@/components/time-off/TimeOffRequestList";
 import { TimeOffCalendar } from "@/components/time-off/TimeOffCalendar";
-import { TaskProgressChart } from "@/components/dashboard/TaskProgressChart";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CalendarCheck, Clock, XCircle, Shield, ListTodo, CircleDot, PlayCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, CalendarCheck, Clock, XCircle, Shield } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
-type Task = Database["public"]["Tables"]["tasks"]["Row"];
 
 interface DashboardProps {
   userEmail?: string;
@@ -21,54 +19,36 @@ interface DashboardProps {
 
 export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin }: DashboardProps) {
   const [requests, setRequests] = useState<TimeOffRequest[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
+  const fetchRequests = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch time off requests
-      const { data: requestsData, error: requestsError } = await supabase
+      const { data, error } = await supabase
         .from("time_off_requests")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
-      if (requestsError) throw requestsError;
-      setRequests(requestsData || []);
-
-      // Fetch tasks assigned to the user
-      const { data: tasksData, error: tasksError } = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("assigned_to", user.id);
-
-      if (tasksError) throw tasksError;
-      setTasks(tasksData || []);
+      if (error) throw error;
+      setRequests(data || []);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error fetching requests:", error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchRequests();
   }, []);
 
-  const requestStats = {
+  const stats = {
     pending: requests.filter((r) => r.status === "pending").length,
     approved: requests.filter((r) => r.status === "approved").length,
     rejected: requests.filter((r) => r.status === "rejected").length,
-  };
-
-  const taskStats = {
-    total: tasks.length,
-    pending: tasks.filter((t) => t.status === "pending").length,
-    in_progress: tasks.filter((t) => t.status === "in_progress").length,
-    completed: tasks.filter((t) => t.status === "completed").length,
   };
 
   if (loading) {
@@ -97,15 +77,15 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin }: DashboardProp
           </div>
         )}
 
-        {/* Time Off Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        {/* Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <Card className="shadow-md border-0 bg-warning/5">
             <CardContent className="pt-6 flex items-center gap-4">
               <div className="p-3 rounded-xl bg-warning/10">
                 <Clock className="h-6 w-6 text-warning" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{requestStats.pending}</p>
+                <p className="text-2xl font-bold text-foreground">{stats.pending}</p>
                 <p className="text-sm text-muted-foreground">In behandeling</p>
               </div>
             </CardContent>
@@ -117,7 +97,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin }: DashboardProp
                 <CalendarCheck className="h-6 w-6 text-success" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{requestStats.approved}</p>
+                <p className="text-2xl font-bold text-foreground">{stats.approved}</p>
                 <p className="text-sm text-muted-foreground">Goedgekeurd</p>
               </div>
             </CardContent>
@@ -129,75 +109,18 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin }: DashboardProp
                 <XCircle className="h-6 w-6 text-destructive" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{requestStats.rejected}</p>
+                <p className="text-2xl font-bold text-foreground">{stats.rejected}</p>
                 <p className="text-sm text-muted-foreground">Afgewezen</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Task Stats and Progress Chart */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <Card className="shadow-md border-0">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <ListTodo className="h-5 w-5 text-primary" />
-                Mijn Taken
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <ListTodo className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-foreground">{taskStats.total}</p>
-                    <p className="text-xs text-muted-foreground">Totaal</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                  <div className="p-2 rounded-lg bg-warning/10">
-                    <CircleDot className="h-5 w-5 text-warning" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-foreground">{taskStats.pending}</p>
-                    <p className="text-xs text-muted-foreground">Te doen</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                  <div className="p-2 rounded-lg bg-blue-500/10">
-                    <PlayCircle className="h-5 w-5 text-blue-500" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-foreground">{taskStats.in_progress}</p>
-                    <p className="text-xs text-muted-foreground">Bezig</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                  <div className="p-2 rounded-lg bg-success/10">
-                    <CheckCircle2 className="h-5 w-5 text-success" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-foreground">{taskStats.completed}</p>
-                    <p className="text-xs text-muted-foreground">Afgerond</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <TaskProgressChart tasks={tasks} />
-        </div>
-
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <TimeOffRequestForm onSuccess={fetchData} />
-            <TimeOffRequestList requests={requests} onDelete={fetchData} />
+            <TimeOffRequestForm onSuccess={fetchRequests} />
+            <TimeOffRequestList requests={requests} onDelete={fetchRequests} />
           </div>
           <div className="lg:col-span-1">
             <TimeOffCalendar requests={requests.filter((r) => r.status !== "rejected")} />
