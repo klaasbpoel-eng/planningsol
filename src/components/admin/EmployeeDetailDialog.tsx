@@ -119,13 +119,10 @@ export function EmployeeDetailDialog({
           return;
         }
 
-        // Create new profile - use a placeholder UUID for user_id since they haven't signed up yet
-        const placeholderUserId = crypto.randomUUID();
-        
+        // Create new profile - user_id is null for admin-created profiles until user signs up
         const { error } = await supabase
           .from("profiles")
           .insert({
-            user_id: placeholderUserId,
             full_name: formData.full_name.trim(),
             email: formData.email.trim().toLowerCase(),
             department: formData.department || null,
