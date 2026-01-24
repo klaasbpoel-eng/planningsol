@@ -2,11 +2,12 @@ import { useEffect, useState, useMemo } from "react";
 import { Header } from "@/components/layout/Header";
 import { AdminRequestList } from "@/components/admin/AdminRequestList";
 import { TeamCalendar } from "@/components/admin/TeamCalendar";
+import { EmployeeList } from "@/components/admin/EmployeeList";
 import { AdminFilters, FilterState } from "@/components/admin/AdminFilters";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CalendarCheck, Clock, XCircle, Users, CalendarDays, ListChecks } from "lucide-react";
+import { Loader2, CalendarCheck, Clock, XCircle, Users, CalendarDays, ListChecks, UserCog } from "lucide-react";
 import { parseISO, isWithinInterval, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -203,6 +204,10 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
               <CalendarDays className="h-4 w-4" />
               Team Calendar
             </TabsTrigger>
+            <TabsTrigger value="employees" className="gap-2">
+              <UserCog className="h-4 w-4" />
+              Employees
+            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="requests">
@@ -211,6 +216,10 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
           
           <TabsContent value="calendar">
             <TeamCalendar requests={filteredRequests} />
+          </TabsContent>
+          
+          <TabsContent value="employees">
+            <EmployeeList />
           </TabsContent>
         </Tabs>
       </main>
