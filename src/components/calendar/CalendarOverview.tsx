@@ -10,6 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { 
   CalendarDays, 
   ChevronLeft, 
@@ -22,8 +29,13 @@ import {
   Plus,
   ClipboardList,
   Pencil,
-  Trash2
+  Trash2,
+  Check,
+  Clock,
+  CircleDot,
+  MoreVertical
 } from "lucide-react";
+import { toast } from "sonner";
 import { 
   format, 
   startOfWeek, 
@@ -125,6 +137,48 @@ export function CalendarOverview() {
   const handleAddTask = () => {
     setTaskToEdit(null);
     setTaskDialogOpen(true);
+  };
+
+  const handleUpdateTaskStatus = async (taskId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ status: newStatus })
+        .eq("id", taskId);
+
+      if (error) throw error;
+      
+      const statusLabel = newStatus === "completed" ? "voltooid" : newStatus === "in_progress" ? "bezig" : "te doen";
+      toast.success(`Taak gemarkeerd als ${statusLabel}`);
+      fetchData();
+    } catch (error) {
+      console.error("Error updating task status:", error);
+      toast.error("Fout bij het wijzigen van de taakstatus");
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "completed": return Check;
+      case "in_progress": return Clock;
+      default: return CircleDot;
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "completed": return "Voltooid";
+      case "in_progress": return "Bezig";
+      default: return "Te doen";
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "completed": return "bg-success text-success-foreground";
+      case "in_progress": return "bg-primary text-primary-foreground";
+      default: return "bg-warning text-warning-foreground";
+    }
   };
 
   const leaveTypes = [
@@ -404,10 +458,14 @@ export function CalendarOverview() {
                   </div>
                   {dayTasks.map((task, index) => {
                     const typeColor = getTaskTypeColor(task);
+                    const StatusIcon = getStatusIcon(task.status);
                     return (
                       <div
                         key={task.id}
-                        className="p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md group"
+                        className={cn(
+                          "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md group",
+                          task.status === "completed" && "opacity-60"
+                        )}
                         style={{ 
                           animationDelay: `${index * 50}ms`,
                           borderLeft: `4px solid ${typeColor}`,
@@ -417,21 +475,56 @@ export function CalendarOverview() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <ClipboardList className="h-4 w-4" style={{ color: typeColor }} />
-                            <span className="font-semibold">{task.title}</span>
+                            <span className={cn("font-semibold", task.status === "completed" && "line-through")}>{task.title}</span>
                           </div>
                           <div className="flex items-center gap-2">
+                            <Badge className={getStatusColor(task.status)}>
+                              <StatusIcon className="h-3 w-3 mr-1" />
+                              {getStatusLabel(task.status)}
+                            </Badge>
                             <Badge className={getPriorityColor(task.priority)}>
                               {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Medium" : "Laag"}
                             </Badge>
                             {isAdmin && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => handleEditTask(task)}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <MoreVertical className="h-3.5 w-3.5" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="bg-background border shadow-xl z-50">
+                                  <DropdownMenuItem 
+                                    onClick={() => handleUpdateTaskStatus(task.id, "pending")}
+                                    disabled={task.status === "pending"}
+                                  >
+                                    <CircleDot className="h-4 w-4 mr-2 text-warning" />
+                                    Markeer als Te doen
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleUpdateTaskStatus(task.id, "in_progress")}
+                                    disabled={task.status === "in_progress"}
+                                  >
+                                    <Clock className="h-4 w-4 mr-2 text-primary" />
+                                    Markeer als Bezig
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleUpdateTaskStatus(task.id, "completed")}
+                                    disabled={task.status === "completed"}
+                                  >
+                                    <Check className="h-4 w-4 mr-2 text-success" />
+                                    Markeer als Voltooid
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => handleEditTask(task)}>
+                                    <Pencil className="h-4 w-4 mr-2" />
+                                    Bewerken
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             )}
                           </div>
                         </div>
