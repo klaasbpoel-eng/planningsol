@@ -24,7 +24,7 @@ export function AuthForm() {
           password,
         });
         if (error) throw error;
-        toast.success("Welcome back!");
+        toast.success("Welkom terug!");
       } else {
         const { error } = await supabase.auth.signUp({
           email,
@@ -34,7 +34,7 @@ export function AuthForm() {
           },
         });
         if (error) throw error;
-        toast.success("Account created successfully!");
+        toast.success("Account succesvol aangemaakt!");
       }
     } catch (error: any) {
       toast.error(error.message);
@@ -53,22 +53,22 @@ export function AuthForm() {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight">
-            {isLogin ? "Welcome back" : "Create an account"}
+            {isLogin ? "Welkom terug" : "Account aanmaken"}
           </CardTitle>
           <CardDescription className="text-muted-foreground">
             {isLogin
-              ? "Sign in to manage your time off requests"
-              : "Sign up to start scheduling your time off"}
+              ? "Log in om uw verlofaanvragen te beheren"
+              : "Meld u aan om verlof te plannen"}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4 pt-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">E-mail</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="you@company.com"
+                placeholder="u@bedrijf.nl"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -76,7 +76,7 @@ export function AuthForm() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Wachtwoord</Label>
               <Input
                 id="password"
                 type="password"
@@ -96,16 +96,16 @@ export function AuthForm() {
               disabled={loading}
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLogin ? "Sign In" : "Create Account"}
+              {isLogin ? "Inloggen" : "Account Aanmaken"}
             </Button>
             <p className="text-sm text-muted-foreground text-center">
-              {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+              {isLogin ? "Nog geen account?" : "Heeft u al een account?"}{" "}
               <button
                 type="button"
                 onClick={() => setIsLogin(!isLogin)}
                 className="text-accent font-medium hover:underline"
               >
-                {isLogin ? "Sign up" : "Sign in"}
+                {isLogin ? "Registreren" : "Inloggen"}
               </button>
             </p>
           </CardFooter>

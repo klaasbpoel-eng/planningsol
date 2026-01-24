@@ -70,7 +70,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
         .eq("id", id);
 
       if (error) throw error;
-      toast.success(`Request ${status}`);
+      toast.success(`Aanvraag ${status === "approved" ? "goedgekeurd" : "afgewezen"}`);
       onUpdate();
     } catch (error: any) {
       toast.error(error.message);
@@ -107,7 +107,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
         .eq("id", requestToDelete.id);
 
       if (error) throw error;
-      toast.success("Request deleted");
+      toast.success("Aanvraag verwijderd");
       onUpdate();
     } catch (error: any) {
       toast.error(error.message);
@@ -144,10 +144,10 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
 
   const getTypeLabel = (type: string) => {
     switch (type) {
-      case "vacation": return "Vacation";
-      case "sick": return "Sick Leave";
-      case "personal": return "Personal";
-      default: return "Other";
+      case "vacation": return "Vakantie";
+      case "sick": return "Ziekteverlof";
+      case "personal": return "Persoonlijk";
+      default: return "Overig";
     }
   };
 
@@ -164,7 +164,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
       <DropdownMenuContent align="end" className="bg-popover z-50">
         <DropdownMenuItem onClick={() => handleEditRequest(request)}>
           <Edit className="h-4 w-4 mr-2" />
-          Edit
+          Bewerken
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem 
@@ -172,7 +172,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
           className="text-destructive focus:text-destructive"
         >
           <Trash2 className="h-4 w-4 mr-2" />
-          Delete
+          Verwijderen
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -185,7 +185,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
         <div />
         <Button onClick={handleCreateRequest} className="gap-2">
           <Plus className="h-4 w-4" />
-          Create Request
+          Aanvraag Maken
         </Button>
       </div>
 
@@ -194,15 +194,15 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Clock className="h-5 w-5 text-warning" />
-            Pending Requests
+            In Behandeling
           </CardTitle>
           <CardDescription>
-            {pendingRequests.length} request{pendingRequests.length !== 1 ? 's' : ''} awaiting approval
+            {pendingRequests.length} aanvra{pendingRequests.length !== 1 ? 'gen' : 'ag'} wachtend op goedkeuring
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {pendingRequests.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No pending requests</p>
+            <p className="text-center text-muted-foreground py-8">Geen aanvragen in behandeling</p>
           ) : (
             pendingRequests.map((request) => {
               const days = differenceInDays(new Date(request.end_date), new Date(request.start_date)) + 1;
@@ -218,7 +218,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <User className="h-4 w-4" />
                         <span className="font-medium text-foreground">
-                          {request.profiles?.full_name || request.profiles?.email || "Unknown Employee"}
+                          {request.profiles?.full_name || request.profiles?.email || "Onbekende Medewerker"}
                         </span>
                       </div>
                       
@@ -238,7 +238,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                             `, ${format(new Date(request.start_date), "yyyy")}`}
                         </span>
                         <span className="text-muted-foreground">
-                          ({days} day{days !== 1 ? 's' : ''})
+                          ({days} dag{days !== 1 ? 'en' : ''})
                         </span>
                       </div>
                       
@@ -261,7 +261,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                         ) : (
                           <>
                             <Check className="h-4 w-4 mr-1" />
-                            Approve
+                            Goedkeuren
                           </>
                         )}
                       </Button>
@@ -277,7 +277,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                         ) : (
                           <>
                             <X className="h-4 w-4 mr-1" />
-                            Reject
+                            Afwijzen
                           </>
                         )}
                       </Button>
@@ -296,15 +296,15 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Calendar className="h-5 w-5 text-primary" />
-            All Requests
+            Alle Aanvragen
           </CardTitle>
           <CardDescription>
-            {processedRequests.length} processed request{processedRequests.length !== 1 ? 's' : ''}
+            {processedRequests.length} verwerkte aanvra{processedRequests.length !== 1 ? 'gen' : 'ag'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {processedRequests.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No processed requests yet</p>
+            <p className="text-center text-muted-foreground py-8">Nog geen verwerkte aanvragen</p>
           ) : (
             processedRequests.map((request) => {
               const days = differenceInDays(new Date(request.end_date), new Date(request.start_date)) + 1;
@@ -319,7 +319,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <User className="h-4 w-4" />
                         <span className="font-medium text-foreground">
-                          {request.profiles?.full_name || request.profiles?.email || "Unknown Employee"}
+                          {request.profiles?.full_name || request.profiles?.email || "Onbekende Medewerker"}
                         </span>
                       </div>
                       
@@ -342,7 +342,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                             `, ${format(new Date(request.start_date), "yyyy")}`}
                         </span>
                         <span className="text-muted-foreground">
-                          ({days} day{days !== 1 ? 's' : ''})
+                          ({days} dag{days !== 1 ? 'en' : ''})
                         </span>
                       </div>
                     </div>
@@ -370,20 +370,20 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Request</AlertDialogTitle>
+            <AlertDialogTitle>Aanvraag Verwijderen</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this time-off request? This action cannot be undone.
+              Weet u zeker dat u deze verlofaanvraag wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={deleting}
             >
               {deleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Delete
+              Verwijderen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

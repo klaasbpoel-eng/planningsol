@@ -49,9 +49,9 @@ export function TimeOffCalendar({ requests }: TimeOffCalendarProps) {
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-lg">
           <CalendarDays className="h-5 w-5 text-primary" />
-          Calendar View
+          Kalenderweergave
         </CardTitle>
-        <CardDescription>Your scheduled time off at a glance</CardDescription>
+        <CardDescription>Uw geplande verlof in één oogopslag</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex justify-center">
@@ -67,11 +67,11 @@ export function TimeOffCalendar({ requests }: TimeOffCalendarProps) {
         <div className="flex flex-wrap justify-center gap-4 mt-4 pt-4 border-t">
           <div className="flex items-center gap-2 text-sm">
             <div className="w-3 h-3 rounded bg-success/30" />
-            <span className="text-muted-foreground">Approved</span>
+            <span className="text-muted-foreground">Goedgekeurd</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <div className="w-3 h-3 rounded bg-warning/30" />
-            <span className="text-muted-foreground">Pending</span>
+            <span className="text-muted-foreground">In behandeling</span>
           </div>
         </div>
       </CardContent>

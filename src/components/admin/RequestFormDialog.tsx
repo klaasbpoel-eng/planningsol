@@ -72,17 +72,17 @@ export function RequestFormDialog({
 
   const handleSave = async () => {
     if (!formData.start_date || !formData.end_date) {
-      toast.error("Please select start and end dates");
+      toast.error("Selecteer begin- en einddatum");
       return;
     }
 
     if (isCreateMode && !formData.user_id) {
-      toast.error("Please select an employee");
+      toast.error("Selecteer een medewerker");
       return;
     }
 
     if (formData.end_date < formData.start_date) {
-      toast.error("End date must be after start date");
+      toast.error("Einddatum moet na begindatum liggen");
       return;
     }
 
@@ -99,7 +99,7 @@ export function RequestFormDialog({
         });
 
         if (error) throw error;
-        toast.success("Request created successfully");
+        toast.success("Aanvraag succesvol aangemaakt");
       } else {
         if (!request) return;
 
@@ -115,7 +115,7 @@ export function RequestFormDialog({
           .eq("id", request.id);
 
         if (error) throw error;
-        toast.success("Request updated successfully");
+        toast.success("Aanvraag succesvol bijgewerkt");
       }
 
       onUpdate();
@@ -140,12 +140,12 @@ export function RequestFormDialog({
             {isCreateMode ? (
               <>
                 <Plus className="h-5 w-5" />
-                Create Time-Off Request
+                Verlofaanvraag Maken
               </>
             ) : (
               <>
                 <Edit className="h-5 w-5" />
-                Edit Time-Off Request
+                Verlofaanvraag Bewerken
               </>
             )}
           </DialogTitle>
@@ -156,7 +156,7 @@ export function RequestFormDialog({
           {isCreateMode && (
             <div className="space-y-2">
               <Label>
-                Employee <span className="text-destructive">*</span>
+                Medewerker <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={formData.user_id}
@@ -165,12 +165,12 @@ export function RequestFormDialog({
                 }
               >
                 <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Select employee" />
+                  <SelectValue placeholder="Selecteer medewerker" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover z-50">
                   {employees.map((emp) => (
                     <SelectItem key={emp.user_id} value={emp.user_id}>
-                      {emp.full_name || emp.email || "Unknown"}
+                      {emp.full_name || emp.email || "Onbekend"}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -181,16 +181,16 @@ export function RequestFormDialog({
           {/* Show employee name in edit mode */}
           {!isCreateMode && request?.profiles && (
             <div className="space-y-2">
-              <Label>Employee</Label>
+              <Label>Medewerker</Label>
               <div className="p-2 bg-muted rounded-md text-sm">
-                {request.profiles.full_name || request.profiles.email || "Unknown"}
+                {request.profiles.full_name || request.profiles.email || "Onbekend"}
               </div>
             </div>
           )}
 
           {/* Type selector */}
           <div className="space-y-2">
-            <Label>Leave Type</Label>
+            <Label>Verloftype</Label>
             <Select
               value={formData.type}
               onValueChange={(value) =>
@@ -201,10 +201,10 @@ export function RequestFormDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover z-50">
-                <SelectItem value="vacation">Vacation</SelectItem>
-                <SelectItem value="sick">Sick Leave</SelectItem>
-                <SelectItem value="personal">Personal</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                <SelectItem value="vacation">Vakantie</SelectItem>
+                <SelectItem value="sick">Ziekteverlof</SelectItem>
+                <SelectItem value="personal">Persoonlijk</SelectItem>
+                <SelectItem value="other">Overig</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -213,7 +213,7 @@ export function RequestFormDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>
-                Start Date <span className="text-destructive">*</span>
+                Begindatum <span className="text-destructive">*</span>
               </Label>
               <Popover>
                 <PopoverTrigger asChild>
@@ -226,8 +226,8 @@ export function RequestFormDialog({
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {formData.start_date
-                      ? format(formData.start_date, "MMM d, yyyy")
-                      : "Select date"}
+                      ? format(formData.start_date, "d MMM yyyy")
+                      : "Selecteer datum"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start">
@@ -253,7 +253,7 @@ export function RequestFormDialog({
 
             <div className="space-y-2">
               <Label>
-                End Date <span className="text-destructive">*</span>
+                Einddatum <span className="text-destructive">*</span>
               </Label>
               <Popover>
                 <PopoverTrigger asChild>
@@ -266,8 +266,8 @@ export function RequestFormDialog({
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {formData.end_date
-                      ? format(formData.end_date, "MMM d, yyyy")
-                      : "Select date"}
+                      ? format(formData.end_date, "d MMM yyyy")
+                      : "Selecteer datum"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start">
@@ -290,7 +290,7 @@ export function RequestFormDialog({
 
           {days > 0 && (
             <div className="text-sm text-muted-foreground">
-              Duration: {days} day{days !== 1 ? "s" : ""}
+              Duur: {days} dag{days !== 1 ? "en" : ""}
             </div>
           )}
 
@@ -310,19 +310,19 @@ export function RequestFormDialog({
                 <SelectItem value="pending">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-warning" />
-                    Pending
+                    In behandeling
                   </div>
                 </SelectItem>
                 <SelectItem value="approved">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-success" />
-                    Approved
+                    Goedgekeurd
                   </div>
                 </SelectItem>
                 <SelectItem value="rejected">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-destructive" />
-                    Rejected
+                    Afgewezen
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -331,13 +331,13 @@ export function RequestFormDialog({
 
           {/* Reason */}
           <div className="space-y-2">
-            <Label>Reason (optional)</Label>
+            <Label>Reden (optioneel)</Label>
             <Textarea
               value={formData.reason}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, reason: e.target.value }))
               }
-              placeholder="Enter reason for time off..."
+              placeholder="Voer reden voor verlof in..."
               rows={3}
             />
           </div>
@@ -345,11 +345,11 @@ export function RequestFormDialog({
 
         <div className="flex justify-end gap-3 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            Annuleren
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {isCreateMode ? "Create Request" : "Save Changes"}
+            {isCreateMode ? "Aanvraag Maken" : "Wijzigingen Opslaan"}
           </Button>
         </div>
       </DialogContent>

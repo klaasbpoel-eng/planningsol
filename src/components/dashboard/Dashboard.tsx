@@ -72,7 +72,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin }: DashboardProp
               className="bg-accent hover:bg-accent/90 text-accent-foreground"
             >
               <Shield className="h-4 w-4 mr-2" />
-              Switch to Admin Dashboard
+              Naar Beheerderspaneel
             </Button>
           </div>
         )}
@@ -86,7 +86,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin }: DashboardProp
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{stats.pending}</p>
-                <p className="text-sm text-muted-foreground">Pending</p>
+                <p className="text-sm text-muted-foreground">In behandeling</p>
               </div>
             </CardContent>
           </Card>
@@ -98,7 +98,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin }: DashboardProp
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{stats.approved}</p>
-                <p className="text-sm text-muted-foreground">Approved</p>
+                <p className="text-sm text-muted-foreground">Goedgekeurd</p>
               </div>
             </CardContent>
           </Card>
@@ -110,7 +110,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin }: DashboardProp
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{stats.rejected}</p>
-                <p className="text-sm text-muted-foreground">Rejected</p>
+                <p className="text-sm text-muted-foreground">Afgewezen</p>
               </div>
             </CardContent>
           </Card>
