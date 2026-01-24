@@ -266,11 +266,13 @@ export function TaskFormDialog({
                   <SelectValue placeholder="Selecteer medewerker" />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.map((emp) => (
-                    <SelectItem key={emp.user_id} value={emp.user_id || ""}>
-                      {emp.full_name || emp.email?.split("@")[0] || "Onbekend"}
-                    </SelectItem>
-                  ))}
+                  {employees
+                    .filter((emp) => emp.user_id)
+                    .map((emp) => (
+                      <SelectItem key={emp.user_id} value={emp.user_id!}>
+                        {emp.full_name || emp.email?.split("@")[0] || "Onbekend"}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
