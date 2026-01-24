@@ -59,6 +59,12 @@ import type { Database } from "@/integrations/supabase/types";
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
+interface TaskType {
+  id: string;
+  name: string;
+  color: string;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -68,6 +74,7 @@ interface Task {
   created_by: string;
   status: string;
   priority: string;
+  type_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -78,6 +85,7 @@ type RequestWithProfile = TimeOffRequest & {
 
 type TaskWithProfile = Task & {
   profile?: Profile | null;
+  taskType?: TaskType | null;
 };
 
 type ViewType = "day" | "week" | "month" | "year";
@@ -87,6 +95,7 @@ export function CalendarOverview() {
   const [viewType, setViewType] = useState<ViewType>("month");
   const [requests, setRequests] = useState<RequestWithProfile[]>([]);
   const [tasks, setTasks] = useState<TaskWithProfile[]>([]);
+  const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
@@ -142,6 +151,15 @@ export function CalendarOverview() {
 
       setRequests(requestsWithProfiles);
 
+      // Fetch all task types
+      const { data: taskTypesData, error: taskTypesError } = await supabase
+        .from("task_types")
+        .select("id, name, color")
+        .eq("is_active", true);
+
+      if (taskTypesError) throw taskTypesError;
+      setTaskTypes(taskTypesData || []);
+
       // Fetch all tasks
       const { data: tasksData, error: tasksError } = await supabase
         .from("tasks")
@@ -150,10 +168,11 @@ export function CalendarOverview() {
 
       if (tasksError) throw tasksError;
 
-      // Map profiles to tasks
+      // Map profiles and task types to tasks
       const tasksWithProfiles: TaskWithProfile[] = (tasksData || []).map((task) => {
         const profile = profilesData?.find((p) => p.user_id === task.assigned_to) || null;
-        return { ...task, profile };
+        const taskType = taskTypesData?.find((t) => t.id === task.type_id) || null;
+        return { ...task, profile, taskType };
       });
 
       setTasks(tasksWithProfiles);
@@ -220,6 +239,14 @@ export function CalendarOverview() {
       case "low": return "bg-muted text-muted-foreground";
       default: return "bg-muted text-muted-foreground";
     }
+  };
+
+  const getTaskTypeColor = (task: TaskWithProfile) => {
+    return task.taskType?.color || "#06b6d4";
+  };
+
+  const getTaskTypeName = (task: TaskWithProfile) => {
+    return task.taskType?.name || "Taak";
   };
 
   // Get unique employees for legend
@@ -344,31 +371,36 @@ export function CalendarOverview() {
                     <ClipboardList className="h-4 w-4" />
                     Taken
                   </div>
-                  {dayTasks.map((task, index) => (
-                    <div
-                      key={task.id}
-                      className={cn(
-                        "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md border-l-4 border-cyan-500 bg-cyan-500/10"
-                      )}
-                      style={{ animationDelay: `${index * 50}ms` }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <ClipboardList className="h-4 w-4 text-cyan-600" />
-                          <span className="font-semibold">{task.title}</span>
+                  {dayTasks.map((task, index) => {
+                    const typeColor = getTaskTypeColor(task);
+                    return (
+                      <div
+                        key={task.id}
+                        className="p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md"
+                        style={{ 
+                          animationDelay: `${index * 50}ms`,
+                          borderLeft: `4px solid ${typeColor}`,
+                          backgroundColor: `${typeColor}15`
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <ClipboardList className="h-4 w-4" style={{ color: typeColor }} />
+                            <span className="font-semibold">{task.title}</span>
+                          </div>
+                          <Badge className={getPriorityColor(task.priority)}>
+                            {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Medium" : "Laag"}
+                          </Badge>
                         </div>
-                        <Badge className={getPriorityColor(task.priority)}>
-                          {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Medium" : "Laag"}
-                        </Badge>
+                        <div className="text-xs text-muted-foreground mt-2">
+                          <span style={{ color: typeColor }}>{getTaskTypeName(task)}</span> • Toegewezen aan: {getTaskEmployeeName(task)}
+                        </div>
+                        {task.description && (
+                          <div className="text-xs opacity-60 mt-2 italic">{task.description}</div>
+                        )}
                       </div>
-                      <div className="text-xs text-muted-foreground mt-2">
-                        Toegewezen aan: {getTaskEmployeeName(task)}
-                      </div>
-                      {task.description && (
-                        <div className="text-xs opacity-60 mt-2 italic">{task.description}</div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -453,15 +485,23 @@ export function CalendarOverview() {
                 </div>
                 <div className="space-y-1.5">
                   {/* Tasks */}
-                  {dayTasks.slice(0, 2).map((task) => (
-                    <div
-                      key={task.id}
-                      className="text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border-l-2 border-cyan-500"
-                    >
-                      <ClipboardList className="w-3 h-3 shrink-0" />
-                      <span className="truncate font-medium">{task.title}</span>
-                    </div>
-                  ))}
+                  {dayTasks.slice(0, 2).map((task) => {
+                    const typeColor = getTaskTypeColor(task);
+                    return (
+                      <div
+                        key={task.id}
+                        className="text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105"
+                        style={{ 
+                          borderLeft: `2px solid ${typeColor}`,
+                          backgroundColor: `${typeColor}20`,
+                          color: typeColor
+                        }}
+                      >
+                        <ClipboardList className="w-3 h-3 shrink-0" />
+                        <span className="truncate font-medium">{task.title}</span>
+                      </div>
+                    );
+                  })}
                   {/* Requests */}
                   {dayRequests.slice(0, dayTasks.length > 0 ? 1 : 3).map((request) => (
                     <div
@@ -536,15 +576,22 @@ export function CalendarOverview() {
                 </div>
                 <div className="space-y-1">
                   {/* Tasks */}
-                  {dayTasks.slice(0, 1).map((task) => (
-                    <div
-                      key={task.id}
-                      className="text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 bg-cyan-500/20 text-cyan-700 dark:text-cyan-300"
-                    >
-                      <ClipboardList className="w-2.5 h-2.5 shrink-0" />
-                      <span className="truncate font-medium">{task.title}</span>
-                    </div>
-                  ))}
+                  {dayTasks.slice(0, 1).map((task) => {
+                    const typeColor = getTaskTypeColor(task);
+                    return (
+                      <div
+                        key={task.id}
+                        className="text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105"
+                        style={{ 
+                          backgroundColor: `${typeColor}20`,
+                          color: typeColor
+                        }}
+                      >
+                        <ClipboardList className="w-2.5 h-2.5 shrink-0" />
+                        <span className="truncate font-medium">{task.title}</span>
+                      </div>
+                    );
+                  })}
                   {/* Requests */}
                   {dayRequests.slice(0, dayTasks.length > 0 ? 1 : 2).map((request) => (
                     <div
@@ -842,10 +889,14 @@ export function CalendarOverview() {
 
         {/* Type Legend */}
         <div className="flex flex-wrap justify-center gap-6 mt-8 pt-6 border-t border-border/50">
-          <div className="flex items-center gap-2.5 text-sm">
-            <div className="w-3 h-3 rounded-md bg-cyan-500 shadow-sm" />
-            <span className="text-muted-foreground font-medium">Taak</span>
-          </div>
+          {/* Task Types */}
+          {taskTypes.map((type) => (
+            <div key={type.id} className="flex items-center gap-2.5 text-sm">
+              <div className="w-3 h-3 rounded-md shadow-sm" style={{ backgroundColor: type.color }} />
+              <span className="text-muted-foreground font-medium">{type.name}</span>
+            </div>
+          ))}
+          {/* Leave Types */}
           <div className="flex items-center gap-2.5 text-sm">
             <div className="w-3 h-3 rounded-md bg-primary shadow-sm" />
             <span className="text-muted-foreground font-medium">Vakantie</span>
