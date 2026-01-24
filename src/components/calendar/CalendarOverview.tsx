@@ -103,6 +103,7 @@ export function CalendarOverview() {
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [selectedTaskStatus, setSelectedTaskStatus] = useState<string>("all");
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<TaskToEdit | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>();
@@ -136,6 +137,12 @@ export function CalendarOverview() {
   const statusTypes = [
     { value: "approved", label: "Goedgekeurd", color: "bg-success" },
     { value: "pending", label: "In behandeling", color: "bg-warning" },
+  ];
+
+  const taskStatusTypes = [
+    { value: "pending", label: "Te doen", color: "bg-warning" },
+    { value: "in_progress", label: "Bezig", color: "bg-primary" },
+    { value: "completed", label: "Voltooid", color: "bg-success" },
   ];
 
   useEffect(() => {
@@ -219,14 +226,17 @@ export function CalendarOverview() {
     return filtered;
   }, [requests, selectedEmployee, selectedType, selectedStatus]);
 
-  // Filter tasks based on selected employee
+  // Filter tasks based on selected employee and task status
   const filteredTasks = useMemo(() => {
     let filtered = tasks;
     if (selectedEmployee !== "all") {
       filtered = filtered.filter((t) => t.assigned_to === selectedEmployee);
     }
+    if (selectedTaskStatus !== "all") {
+      filtered = filtered.filter((t) => t.status === selectedTaskStatus);
+    }
     return filtered;
-  }, [tasks, selectedEmployee]);
+  }, [tasks, selectedEmployee, selectedTaskStatus]);
 
   const getRequestsForDay = (day: Date): RequestWithProfile[] => {
     return filteredRequests.filter((request) => {
@@ -859,8 +869,29 @@ export function CalendarOverview() {
               </Select>
             </div>
 
+            {/* Task Status Filter */}
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedTaskStatus} onValueChange={setSelectedTaskStatus}>
+                <SelectTrigger className="w-[160px] bg-background border-border/50 shadow-sm hover:bg-background/80 transition-colors">
+                  <SelectValue placeholder="Taakstatus" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-xl z-50">
+                  <SelectItem value="all">Alle taakstatussen</SelectItem>
+                  {taskStatusTypes.map((status) => (
+                    <SelectItem key={status.value} value={status.value}>
+                      <div className="flex items-center gap-2">
+                        <div className={cn("w-2 h-2 rounded", status.color)} />
+                        {status.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Reset Button */}
-            {(selectedEmployee !== "all" || selectedType !== "all" || selectedStatus !== "all") && (
+            {(selectedEmployee !== "all" || selectedType !== "all" || selectedStatus !== "all" || selectedTaskStatus !== "all") && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -868,6 +899,7 @@ export function CalendarOverview() {
                   setSelectedEmployee("all");
                   setSelectedType("all");
                   setSelectedStatus("all");
+                  setSelectedTaskStatus("all");
                 }}
                 className="text-xs text-primary hover:text-primary hover:bg-primary/10"
               >
