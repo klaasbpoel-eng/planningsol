@@ -129,6 +129,36 @@ export type Database = {
           },
         ]
       }
+      task_types: {
+        Row: {
+          color: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           assigned_to: string
@@ -140,6 +170,7 @@ export type Database = {
           priority: string
           status: string
           title: string
+          type_id: string | null
           updated_at: string
         }
         Insert: {
@@ -152,6 +183,7 @@ export type Database = {
           priority?: string
           status?: string
           title: string
+          type_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -164,9 +196,18 @@ export type Database = {
           priority?: string
           status?: string
           title?: string
+          type_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tasks_type_id_fkey"
+            columns: ["type_id"]
+            isOneToOne: false
+            referencedRelation: "task_types"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       time_off_requests: {
         Row: {

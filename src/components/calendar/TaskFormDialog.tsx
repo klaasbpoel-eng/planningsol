@@ -34,6 +34,14 @@ import type { Database } from "@/integrations/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
+interface TaskType {
+  id: string;
+  name: string;
+  color: string;
+  description: string | null;
+  is_active: boolean;
+}
+
 interface TaskFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -52,7 +60,13 @@ export function TaskFormDialog({
   const [assignedTo, setAssignedTo] = useState("");
   const [dueDate, setDueDate] = useState<Date>();
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
+  const [typeId, setTypeId] = useState<string>("");
+  const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetchTaskTypes();
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -61,8 +75,27 @@ export function TaskFormDialog({
       setAssignedTo("");
       setDueDate(undefined);
       setPriority("medium");
+      setTypeId(taskTypes.length > 0 ? taskTypes[0].id : "");
     }
-  }, [open]);
+  }, [open, taskTypes]);
+
+  const fetchTaskTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("task_types")
+        .select("*")
+        .eq("is_active", true)
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+      setTaskTypes(data || []);
+      if (data && data.length > 0) {
+        setTypeId(data[0].id);
+      }
+    } catch (error) {
+      console.error("Error fetching task types:", error);
+    }
+  };
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -89,6 +122,7 @@ export function TaskFormDialog({
         assigned_to: assignedTo,
         due_date: format(dueDate, "yyyy-MM-dd"),
         priority,
+        type_id: typeId || null,
         created_by: user.id,
       });
 
@@ -158,6 +192,30 @@ export function TaskFormDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {taskTypes.length > 0 && (
+            <div className="grid gap-2">
+              <Label>Type</Label>
+              <Select value={typeId} onValueChange={setTypeId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecteer type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {taskTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded"
+                          style={{ backgroundColor: type.color }}
+                        />
+                        {type.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="grid gap-2">
             <Label>Datum *</Label>

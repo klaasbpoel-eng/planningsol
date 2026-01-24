@@ -3,11 +3,12 @@ import { Header } from "@/components/layout/Header";
 import { AdminRequestList } from "@/components/admin/AdminRequestList";
 import { TeamCalendar } from "@/components/admin/TeamCalendar";
 import { EmployeeList } from "@/components/admin/EmployeeList";
+import { TaskTypesManager } from "@/components/admin/TaskTypesManager";
 import { AdminFilters, FilterState } from "@/components/admin/AdminFilters";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CalendarCheck, Clock, XCircle, Users, CalendarDays, ListChecks, UserCog } from "lucide-react";
+import { Loader2, CalendarCheck, Clock, XCircle, Users, CalendarDays, ListChecks, UserCog, ClipboardList } from "lucide-react";
 import { parseISO, isWithinInterval, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -208,6 +209,10 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
               <UserCog className="h-4 w-4" />
               Medewerkers
             </TabsTrigger>
+            <TabsTrigger value="task-types" className="gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Taaktypes
+            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="requests">
@@ -220,6 +225,10 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
           
           <TabsContent value="employees">
             <EmployeeList />
+          </TabsContent>
+
+          <TabsContent value="task-types">
+            <TaskTypesManager />
           </TabsContent>
         </Tabs>
       </main>
