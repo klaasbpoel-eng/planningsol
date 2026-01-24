@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { AdminRequestList } from "@/components/admin/AdminRequestList";
+import { TeamCalendar } from "@/components/admin/TeamCalendar";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CalendarCheck, Clock, XCircle, Users } from "lucide-react";
+import { Loader2, CalendarCheck, Clock, XCircle, Users, CalendarDays, ListChecks } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
@@ -129,8 +131,27 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
           </Card>
         </div>
 
-        {/* Request List */}
-        <AdminRequestList requests={requests} onUpdate={fetchRequests} />
+        {/* Tabs for Requests and Calendar */}
+        <Tabs defaultValue="requests" className="space-y-6">
+          <TabsList className="bg-muted/50">
+            <TabsTrigger value="requests" className="gap-2">
+              <ListChecks className="h-4 w-4" />
+              Requests
+            </TabsTrigger>
+            <TabsTrigger value="calendar" className="gap-2">
+              <CalendarDays className="h-4 w-4" />
+              Team Calendar
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="requests">
+            <AdminRequestList requests={requests} onUpdate={fetchRequests} />
+          </TabsContent>
+          
+          <TabsContent value="calendar">
+            <TeamCalendar requests={requests} />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
