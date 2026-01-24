@@ -21,8 +21,10 @@ import {
   LayoutGrid,
   Users,
   ClipboardList,
-  Palmtree
+  Palmtree,
+  GripVertical
 } from "lucide-react";
+import { toast } from "sonner";
 import { 
   format, 
   startOfWeek, 
@@ -81,6 +83,8 @@ export function CalendarOverview() {
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [showTimeOff, setShowTimeOff] = useState(true);
   const [showTasks, setShowTasks] = useState(true);
+  const [draggedTask, setDraggedTask] = useState<TaskWithProfile | null>(null);
+  const [dragOverDate, setDragOverDate] = useState<Date | null>(null);
 
   const leaveTypes = [
     { value: "vacation", label: "Vakantie", color: "bg-primary" },
@@ -150,6 +154,81 @@ export function CalendarOverview() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, task: TaskWithProfile) => {
+    setDraggedTask(task);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", task.id);
+    // Add a slight delay to allow the drag image to be created
+    setTimeout(() => {
+      (e.target as HTMLElement).style.opacity = "0.5";
+    }, 0);
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    (e.target as HTMLElement).style.opacity = "1";
+    setDraggedTask(null);
+    setDragOverDate(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, date: Date) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (!dragOverDate || !isSameDay(dragOverDate, date)) {
+      setDragOverDate(date);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear if we're leaving the drop zone entirely
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    if (!relatedTarget || !e.currentTarget.contains(relatedTarget)) {
+      setDragOverDate(null);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetDate: Date) => {
+    e.preventDefault();
+    setDragOverDate(null);
+    
+    if (!draggedTask) return;
+    
+    const newDueDate = format(targetDate, "yyyy-MM-dd");
+    
+    // Optimistically update the UI
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === draggedTask.id ? { ...t, due_date: newDueDate } : t
+      )
+    );
+    
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ due_date: newDueDate })
+        .eq("id", draggedTask.id);
+
+      if (error) throw error;
+      
+      toast.success("Taak deadline bijgewerkt", {
+        description: `"${draggedTask.title}" verplaatst naar ${format(targetDate, "d MMMM yyyy", { locale: nl })}`,
+      });
+    } catch (error) {
+      console.error("Error updating task:", error);
+      // Revert on error
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === draggedTask.id ? { ...t, due_date: draggedTask.due_date } : t
+        )
+      );
+      toast.error("Fout bij verplaatsen taak", {
+        description: "Probeer het opnieuw",
+      });
+    }
+    
+    setDraggedTask(null);
   };
 
   // Filter requests based on selected employee, type, and status
@@ -460,6 +539,7 @@ export function CalendarOverview() {
             const dayTasks = getTasksForDay(day);
             const allItems = [...dayRequests.map(r => ({ type: 'timeoff' as const, item: r })), ...dayTasks.map(t => ({ type: 'task' as const, item: t }))];
             const isCurrentDay = isToday(day);
+            const isDragOver = dragOverDate && isSameDay(dragOverDate, day);
 
             return (
               <div
@@ -467,9 +547,13 @@ export function CalendarOverview() {
                 className={cn(
                   "min-h-[140px] p-3 rounded-xl border transition-all duration-300 hover:shadow-md",
                   "bg-card/80 backdrop-blur-sm border-border/50",
-                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent shadow-lg shadow-primary/5"
+                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent shadow-lg shadow-primary/5",
+                  isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]"
                 )}
                 style={{ animationDelay: `${index * 30}ms` }}
+                onDragOver={(e) => handleDragOver(e, day)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, day)}
               >
                 <div className={cn(
                   "text-sm font-bold mb-3 flex items-center justify-center w-7 h-7 rounded-full",
@@ -495,11 +579,16 @@ export function CalendarOverview() {
                     ) : (
                       <div
                         key={(entry.item as TaskWithProfile).id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, entry.item as TaskWithProfile)}
+                        onDragEnd={handleDragEnd}
                         className={cn(
-                          "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105",
-                          getTaskStatusColor((entry.item as TaskWithProfile).status)
+                          "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-all hover:scale-105 cursor-grab active:cursor-grabbing group",
+                          getTaskStatusColor((entry.item as TaskWithProfile).status),
+                          draggedTask?.id === (entry.item as TaskWithProfile).id && "opacity-50"
                         )}
                       >
+                        <GripVertical className="w-3 h-3 shrink-0 opacity-50 group-hover:opacity-100" />
                         <ClipboardList className="w-3 h-3 shrink-0" />
                         <span className="truncate font-medium">{(entry.item as TaskWithProfile).title}</span>
                       </div>
@@ -543,6 +632,7 @@ export function CalendarOverview() {
             const allItems = [...dayRequests.map(r => ({ type: 'timeoff' as const, item: r })), ...dayTasks.map(t => ({ type: 'task' as const, item: t }))];
             const isCurrentMonth = isSameMonth(day, currentDate);
             const isCurrentDay = isToday(day);
+            const isDragOver = dragOverDate && isSameDay(dragOverDate, day);
 
             return (
               <div
@@ -552,8 +642,12 @@ export function CalendarOverview() {
                   isCurrentMonth 
                     ? "bg-card/80 backdrop-blur-sm border-border/50 hover:bg-card hover:shadow-sm" 
                     : "bg-muted/20 border-transparent opacity-50",
-                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent"
+                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent",
+                  isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]"
                 )}
+                onDragOver={(e) => handleDragOver(e, day)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, day)}
               >
                 <div className={cn(
                   "text-xs font-bold mb-1.5 flex items-center justify-center w-6 h-6 rounded-full transition-colors",
@@ -581,11 +675,16 @@ export function CalendarOverview() {
                     ) : (
                       <div
                         key={(entry.item as TaskWithProfile).id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, entry.item as TaskWithProfile)}
+                        onDragEnd={handleDragEnd}
                         className={cn(
-                          "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105",
-                          getTaskStatusColor((entry.item as TaskWithProfile).status)
+                          "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-all hover:scale-105 cursor-grab active:cursor-grabbing group",
+                          getTaskStatusColor((entry.item as TaskWithProfile).status),
+                          draggedTask?.id === (entry.item as TaskWithProfile).id && "opacity-50"
                         )}
                       >
+                        <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-50 group-hover:opacity-100" />
                         <ClipboardList className="w-2.5 h-2.5 shrink-0" />
                         <span className="truncate font-medium">{(entry.item as TaskWithProfile).title}</span>
                       </div>
