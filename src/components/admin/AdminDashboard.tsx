@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Header } from "@/components/layout/Header";
 import { AdminRequestList } from "@/components/admin/AdminRequestList";
 import { TeamCalendar } from "@/components/admin/TeamCalendar";
+import { AdminFilters, FilterState } from "@/components/admin/AdminFilters";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, CalendarCheck, Clock, XCircle, Users, CalendarDays, ListChecks } from "lucide-react";
+import { parseISO, isWithinInterval, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
@@ -23,6 +25,12 @@ interface AdminDashboardProps {
 export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps) {
   const [requests, setRequests] = useState<RequestWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<FilterState>({
+    employeeId: null,
+    status: "all",
+    startDate: undefined,
+    endDate: undefined,
+  });
 
   const fetchRequests = async () => {
     try {
@@ -60,11 +68,57 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
     fetchRequests();
   }, []);
 
+  // Get unique employees from requests
+  const employees = useMemo(() => {
+    const uniqueProfiles = new Map<string, Profile>();
+    requests.forEach(r => {
+      if (r.profiles && !uniqueProfiles.has(r.profiles.user_id)) {
+        uniqueProfiles.set(r.profiles.user_id, r.profiles);
+      }
+    });
+    return Array.from(uniqueProfiles.values());
+  }, [requests]);
+
+  // Filter requests
+  const filteredRequests = useMemo(() => {
+    return requests.filter(request => {
+      // Filter by employee
+      if (filters.employeeId && request.user_id !== filters.employeeId) {
+        return false;
+      }
+
+      // Filter by status
+      if (filters.status !== "all" && request.status !== filters.status) {
+        return false;
+      }
+
+      // Filter by date range
+      const requestStart = parseISO(request.start_date);
+      const requestEnd = parseISO(request.end_date);
+
+      if (filters.startDate) {
+        // Request end date must be on or after filter start date
+        if (isBefore(requestEnd, startOfDay(filters.startDate))) {
+          return false;
+        }
+      }
+
+      if (filters.endDate) {
+        // Request start date must be on or before filter end date
+        if (isAfter(requestStart, endOfDay(filters.endDate))) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [requests, filters]);
+
   const stats = {
-    pending: requests.filter((r) => r.status === "pending").length,
-    approved: requests.filter((r) => r.status === "approved").length,
-    rejected: requests.filter((r) => r.status === "rejected").length,
-    total: requests.length,
+    pending: filteredRequests.filter((r) => r.status === "pending").length,
+    approved: filteredRequests.filter((r) => r.status === "approved").length,
+    rejected: filteredRequests.filter((r) => r.status === "rejected").length,
+    total: filteredRequests.length,
   };
 
   if (loading) {
@@ -80,6 +134,13 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
       <Header userEmail={userEmail} isAdmin onSwitchView={onSwitchView} />
       
       <main className="container mx-auto px-4 py-8">
+        {/* Filters */}
+        <AdminFilters 
+          employees={employees} 
+          filters={filters} 
+          onFiltersChange={setFilters} 
+        />
+
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card className="shadow-md border-0 bg-primary/5">
@@ -145,11 +206,11 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
           </TabsList>
           
           <TabsContent value="requests">
-            <AdminRequestList requests={requests} onUpdate={fetchRequests} />
+            <AdminRequestList requests={filteredRequests} onUpdate={fetchRequests} />
           </TabsContent>
           
           <TabsContent value="calendar">
-            <TeamCalendar requests={requests} />
+            <TeamCalendar requests={filteredRequests} />
           </TabsContent>
         </Tabs>
       </main>
