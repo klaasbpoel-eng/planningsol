@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Users, Edit, Mail, Phone, MapPin, Briefcase, Building } from "lucide-react";
+import { Search, Users, Edit, Mail, Phone, MapPin, Briefcase, Building, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { EmployeeDetailDialog } from "./EmployeeDetailDialog";
 import { EmployeeLeaveBalances } from "./EmployeeLeaveBalances";
@@ -33,6 +33,7 @@ export function EmployeeList() {
   const [selectedEmployee, setSelectedEmployee] = useState<Profile | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [balanceDialogOpen, setBalanceDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<"edit" | "create">("edit");
 
   const fetchEmployees = async () => {
     try {
@@ -87,6 +88,13 @@ export function EmployeeList() {
 
   const handleEditEmployee = (employee: Profile) => {
     setSelectedEmployee(employee);
+    setDialogMode("edit");
+    setDetailDialogOpen(true);
+  };
+
+  const handleAddEmployee = () => {
+    setSelectedEmployee(null);
+    setDialogMode("create");
     setDetailDialogOpen(true);
   };
 
@@ -114,6 +122,10 @@ export function EmployeeList() {
               <Users className="h-5 w-5" />
               Employees ({filteredEmployees.length})
             </CardTitle>
+            <Button onClick={handleAddEmployee} className="gap-2">
+              <UserPlus className="h-4 w-4" />
+              Add Employee
+            </Button>
           </div>
           <div className="relative mt-4">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -231,6 +243,7 @@ export function EmployeeList() {
         onOpenChange={setDetailDialogOpen}
         onUpdate={fetchEmployees}
         allEmployees={employees}
+        mode={dialogMode}
       />
 
       <EmployeeLeaveBalances
