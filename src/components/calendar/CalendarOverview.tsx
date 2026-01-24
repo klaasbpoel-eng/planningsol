@@ -20,7 +20,9 @@ import {
   LayoutGrid,
   Users,
   Plus,
-  ClipboardList
+  ClipboardList,
+  Pencil,
+  Trash2
 } from "lucide-react";
 import { 
   format, 
@@ -53,7 +55,7 @@ import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
-import { TaskFormDialog } from "./TaskFormDialog";
+import { TaskFormDialog, TaskToEdit } from "./TaskFormDialog";
 import type { Database } from "@/integrations/supabase/types";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
@@ -102,8 +104,27 @@ export function CalendarOverview() {
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [taskToEdit, setTaskToEdit] = useState<TaskToEdit | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>();
   const { isAdmin } = useUserRole(currentUserId);
+
+  const handleEditTask = (task: TaskWithProfile) => {
+    setTaskToEdit({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      assigned_to: task.assigned_to,
+      due_date: task.due_date,
+      priority: task.priority,
+      type_id: task.type_id,
+    });
+    setTaskDialogOpen(true);
+  };
+
+  const handleAddTask = () => {
+    setTaskToEdit(null);
+    setTaskDialogOpen(true);
+  };
 
   const leaveTypes = [
     { value: "vacation", label: "Vakantie", color: "bg-primary" },
@@ -376,7 +397,7 @@ export function CalendarOverview() {
                     return (
                       <div
                         key={task.id}
-                        className="p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md"
+                        className="p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md group"
                         style={{ 
                           animationDelay: `${index * 50}ms`,
                           borderLeft: `4px solid ${typeColor}`,
@@ -388,9 +409,21 @@ export function CalendarOverview() {
                             <ClipboardList className="h-4 w-4" style={{ color: typeColor }} />
                             <span className="font-semibold">{task.title}</span>
                           </div>
-                          <Badge className={getPriorityColor(task.priority)}>
-                            {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Medium" : "Laag"}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge className={getPriorityColor(task.priority)}>
+                              {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Medium" : "Laag"}
+                            </Badge>
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => handleEditTask(task)}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                         <div className="text-xs text-muted-foreground mt-2">
                           <span style={{ color: typeColor }}>{getTaskTypeName(task)}</span> • Toegewezen aan: {getTaskEmployeeName(task)}
@@ -718,7 +751,7 @@ export function CalendarOverview() {
             <div className="flex items-center gap-3">
               {isAdmin && (
                 <Button
-                  onClick={() => setTaskDialogOpen(true)}
+                  onClick={handleAddTask}
                   className="gap-2"
                   size="sm"
                 >
@@ -940,6 +973,7 @@ export function CalendarOverview() {
         onOpenChange={setTaskDialogOpen}
         employees={profiles}
         onTaskCreated={fetchData}
+        taskToEdit={taskToEdit}
       />
     </Card>
   );
