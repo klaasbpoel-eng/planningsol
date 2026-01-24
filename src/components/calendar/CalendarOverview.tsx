@@ -44,11 +44,11 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
-type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"] & {
-  profiles?: {
-    full_name: string | null;
-    email: string | null;
-  } | null;
+type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
+type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+
+type RequestWithProfile = TimeOffRequest & {
+  profile?: Profile | null;
 };
 
 type ViewType = "day" | "week" | "month" | "year";
@@ -56,7 +56,7 @@ type ViewType = "day" | "week" | "month" | "year";
 export function CalendarOverview() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<ViewType>("month");
-  const [requests, setRequests] = useState<TimeOffRequest[]>([]);
+  const [requests, setRequests] = useState<RequestWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -68,14 +68,28 @@ export function CalendarOverview() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      // Fetch all requests (RLS allows all authenticated users to view)
+      const { data: requestsData, error: requestsError } = await supabase
         .from("time_off_requests")
         .select("*")
-        .eq("user_id", user.id)
         .order("start_date", { ascending: true });
 
-      if (error) throw error;
-      setRequests(data || []);
+      if (requestsError) throw requestsError;
+
+      // Fetch all profiles to map user names
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*");
+
+      if (profilesError) throw profilesError;
+
+      // Map profiles to requests
+      const requestsWithProfiles: RequestWithProfile[] = (requestsData || []).map((request) => {
+        const profile = profilesData?.find((p) => p.user_id === request.user_id) || null;
+        return { ...request, profile };
+      });
+
+      setRequests(requestsWithProfiles);
     } catch (error) {
       console.error("Error fetching requests:", error);
     } finally {
@@ -83,13 +97,48 @@ export function CalendarOverview() {
     }
   };
 
-  const getRequestsForDay = (day: Date) => {
+  const getRequestsForDay = (day: Date): RequestWithProfile[] => {
     return requests.filter((request) => {
       if (request.status === "rejected") return false;
       const start = parseISO(request.start_date);
       const end = parseISO(request.end_date);
       return isWithinInterval(day, { start, end });
     });
+  };
+
+  const getEmployeeName = (request: RequestWithProfile) => {
+    return request.profile?.full_name || request.profile?.email?.split("@")[0] || "Onbekend";
+  };
+
+  // Get unique employees for legend
+  const uniqueEmployees = useMemo(() => {
+    const employeeMap = new Map<string, { name: string; color: string }>();
+    const colors = [
+      "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-orange-500", 
+      "bg-pink-500", "bg-cyan-500", "bg-indigo-500", "bg-teal-500"
+    ];
+    let colorIndex = 0;
+
+    requests.forEach((request) => {
+      if (!employeeMap.has(request.user_id)) {
+        const name = getEmployeeName(request);
+        employeeMap.set(request.user_id, {
+          name,
+          color: colors[colorIndex % colors.length]
+        });
+        colorIndex++;
+      }
+    });
+
+    return Array.from(employeeMap.entries()).map(([userId, data]) => ({
+      userId,
+      ...data
+    }));
+  }, [requests]);
+
+  const getEmployeeColor = (userId: string) => {
+    const employee = uniqueEmployees.find((e) => e.userId === userId);
+    return employee?.color || "bg-muted";
   };
 
   const getTypeColor = (type: string, status: string) => {
@@ -175,7 +224,11 @@ export function CalendarOverview() {
                     getTypeColor(request.type, request.status)
                   )}
                 >
-                  <div className="font-medium">{getTypeLabel(request.type)}</div>
+                  <div className="flex items-center gap-2">
+                    <div className={cn("w-2 h-2 rounded-full", getEmployeeColor(request.user_id))} />
+                    <span className="font-medium">{getEmployeeName(request)}</span>
+                  </div>
+                  <div className="font-medium mt-1">{getTypeLabel(request.type)}</div>
                   <div className="text-xs opacity-80">
                     {format(parseISO(request.start_date), "d MMM", { locale: nl })} - {format(parseISO(request.end_date), "d MMM", { locale: nl })}
                   </div>
@@ -231,11 +284,12 @@ export function CalendarOverview() {
                     <div
                       key={request.id}
                       className={cn(
-                        "text-xs px-2 py-1 rounded truncate",
+                        "text-xs px-2 py-1 rounded truncate flex items-center gap-1",
                         getTypeColor(request.type, request.status)
                       )}
                     >
-                      {getTypeLabel(request.type)}
+                      <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", getEmployeeColor(request.user_id))} />
+                      <span className="truncate">{getEmployeeName(request)}</span>
                     </div>
                   ))}
                   {dayRequests.length > 3 && (
@@ -298,11 +352,12 @@ export function CalendarOverview() {
                     <div
                       key={request.id}
                       className={cn(
-                        "text-[10px] px-1 py-0.5 rounded truncate",
+                        "text-[10px] px-1 py-0.5 rounded truncate flex items-center gap-0.5",
                         getTypeColor(request.type, request.status)
                       )}
                     >
-                      {getTypeLabel(request.type)}
+                      <div className={cn("w-1 h-1 rounded-full shrink-0", getEmployeeColor(request.user_id))} />
+                      <span className="truncate">{getEmployeeName(request)}</span>
                     </div>
                   ))}
                   {dayRequests.length > 2 && (
@@ -464,6 +519,7 @@ export function CalendarOverview() {
           </>
         )}
 
+        {/* Type Legend */}
         <div className="flex flex-wrap justify-center gap-4 mt-6 pt-4 border-t">
           <div className="flex items-center gap-2 text-sm">
             <div className="w-3 h-3 rounded bg-primary" />
@@ -482,6 +538,21 @@ export function CalendarOverview() {
             <span className="text-muted-foreground">In behandeling</span>
           </div>
         </div>
+
+        {/* Employee Legend */}
+        {uniqueEmployees.length > 0 && (
+          <div className="mt-4 pt-4 border-t">
+            <div className="text-sm font-medium text-foreground mb-2">Medewerkers</div>
+            <div className="flex flex-wrap gap-3">
+              {uniqueEmployees.map((employee) => (
+                <div key={employee.userId} className="flex items-center gap-2 text-sm">
+                  <div className={cn("w-3 h-3 rounded-full", employee.color)} />
+                  <span className="text-muted-foreground">{employee.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
