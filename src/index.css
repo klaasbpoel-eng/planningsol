@@ -106,6 +106,28 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50 shadow-xl;
+  }
+  
+  .glass-card-subtle {
+    @apply bg-card/60 backdrop-blur-md border border-border/30;
+  }
+  
+  .hover-lift {
+    @apply transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-lg;
+  }
+  
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(210 60% 45%) 100%);
+  }
+  
+  .gradient-accent {
+    background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(32 95% 60%) 100%);
   }
 }
