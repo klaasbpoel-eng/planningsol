@@ -5,11 +5,30 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Users, Edit, Mail, Phone, MapPin, Briefcase, Building, UserPlus } from "lucide-react";
+import { Search, Users, Edit, Mail, Briefcase, Building, UserPlus, Trash2, MoreHorizontal, MapPin } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { EmployeeDetailDialog } from "./EmployeeDetailDialog";
 import { EmployeeLeaveBalances } from "./EmployeeLeaveBalances";
 import { format } from "date-fns";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"] & {
@@ -34,6 +53,9 @@ export function EmployeeList() {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [balanceDialogOpen, setBalanceDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"edit" | "create">("edit");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<Profile | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchEmployees = async () => {
     try {
@@ -101,6 +123,33 @@ export function EmployeeList() {
   const handleManageLeaveBalances = (employee: Profile) => {
     setSelectedEmployee(employee);
     setBalanceDialogOpen(true);
+  };
+
+  const handleDeleteClick = (employee: Profile) => {
+    setEmployeeToDelete(employee);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!employeeToDelete) return;
+
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", employeeToDelete.id);
+
+      if (error) throw error;
+      toast.success("Employee deleted");
+      fetchEmployees();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+      setEmployeeToDelete(null);
+    }
   };
 
   if (loading) {
@@ -219,13 +268,27 @@ export function EmployeeList() {
                           >
                             Leave Balances
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditEmployee(employee)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-popover z-50">
+                              <DropdownMenuItem onClick={() => handleEditEmployee(employee)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Details
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={() => handleDeleteClick(employee)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Employee
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -251,6 +314,30 @@ export function EmployeeList() {
         open={balanceDialogOpen}
         onOpenChange={setBalanceDialogOpen}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Employee</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {employeeToDelete?.full_name || employeeToDelete?.email}? 
+              This will also delete all associated time-off requests and leave balances. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+            >
+              {deleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
