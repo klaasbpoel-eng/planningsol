@@ -68,12 +68,18 @@ export function CalendarOverview() {
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
 
   const leaveTypes = [
     { value: "vacation", label: "Vakantie", color: "bg-primary" },
     { value: "sick", label: "Ziekteverlof", color: "bg-destructive" },
     { value: "personal", label: "Persoonlijk", color: "bg-accent" },
     { value: "other", label: "Overig", color: "bg-muted" },
+  ];
+
+  const statusTypes = [
+    { value: "approved", label: "Goedgekeurd", color: "bg-success" },
+    { value: "pending", label: "In behandeling", color: "bg-warning" },
   ];
   useEffect(() => {
     fetchRequests();
@@ -113,7 +119,7 @@ export function CalendarOverview() {
     }
   };
 
-  // Filter requests based on selected employee and type
+  // Filter requests based on selected employee, type, and status
   const filteredRequests = useMemo(() => {
     let filtered = requests;
     if (selectedEmployee !== "all") {
@@ -122,12 +128,16 @@ export function CalendarOverview() {
     if (selectedType !== "all") {
       filtered = filtered.filter((r) => r.type === selectedType);
     }
+    if (selectedStatus !== "all") {
+      filtered = filtered.filter((r) => r.status === selectedStatus);
+    }
     return filtered;
-  }, [requests, selectedEmployee, selectedType]);
+  }, [requests, selectedEmployee, selectedType, selectedStatus]);
 
   const getRequestsForDay = (day: Date): RequestWithProfile[] => {
     return filteredRequests.filter((request) => {
-      if (request.status === "rejected") return false;
+      // Only filter out rejected if no specific status is selected
+      if (selectedStatus === "all" && request.status === "rejected") return false;
       const start = parseISO(request.start_date);
       const end = parseISO(request.end_date);
       return isWithinInterval(day, { start, end });
@@ -555,14 +565,36 @@ export function CalendarOverview() {
               </Select>
             </div>
 
+            {/* Status Filter */}
+            <div className="flex items-center gap-2">
+              <List className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-[160px] bg-background">
+                  <SelectValue placeholder="Filter op status" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="all">Alle statussen</SelectItem>
+                  {statusTypes.map((status) => (
+                    <SelectItem key={status.value} value={status.value}>
+                      <div className="flex items-center gap-2">
+                        <div className={cn("w-2 h-2 rounded", status.color)} />
+                        {status.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Reset Button */}
-            {(selectedEmployee !== "all" || selectedType !== "all") && (
+            {(selectedEmployee !== "all" || selectedType !== "all" || selectedStatus !== "all") && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
                   setSelectedEmployee("all");
                   setSelectedType("all");
+                  setSelectedStatus("all");
                 }}
                 className="text-xs"
               >
