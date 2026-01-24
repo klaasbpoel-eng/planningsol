@@ -67,7 +67,14 @@ export function CalendarOverview() {
   const [requests, setRequests] = useState<RequestWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
+  const [selectedType, setSelectedType] = useState<string>("all");
 
+  const leaveTypes = [
+    { value: "vacation", label: "Vakantie", color: "bg-primary" },
+    { value: "sick", label: "Ziekteverlof", color: "bg-destructive" },
+    { value: "personal", label: "Persoonlijk", color: "bg-accent" },
+    { value: "other", label: "Overig", color: "bg-muted" },
+  ];
   useEffect(() => {
     fetchRequests();
   }, []);
@@ -106,11 +113,17 @@ export function CalendarOverview() {
     }
   };
 
-  // Filter requests based on selected employee
+  // Filter requests based on selected employee and type
   const filteredRequests = useMemo(() => {
-    if (selectedEmployee === "all") return requests;
-    return requests.filter((r) => r.user_id === selectedEmployee);
-  }, [requests, selectedEmployee]);
+    let filtered = requests;
+    if (selectedEmployee !== "all") {
+      filtered = filtered.filter((r) => r.user_id === selectedEmployee);
+    }
+    if (selectedType !== "all") {
+      filtered = filtered.filter((r) => r.type === selectedType);
+    }
+    return filtered;
+  }, [requests, selectedEmployee, selectedType]);
 
   const getRequestsForDay = (day: Date): RequestWithProfile[] => {
     return filteredRequests.filter((request) => {
@@ -498,33 +511,62 @@ export function CalendarOverview() {
             </ToggleGroup>
           </div>
 
-          {/* Employee Filter */}
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-              <SelectTrigger className="w-[200px] bg-background">
-                <SelectValue placeholder="Filter op medewerker" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border shadow-lg z-50">
-                <SelectItem value="all">Alle medewerkers</SelectItem>
-                {uniqueEmployees.map((employee) => (
-                  <SelectItem key={employee.userId} value={employee.userId}>
-                    <div className="flex items-center gap-2">
-                      <div className={cn("w-2 h-2 rounded-full", employee.color)} />
-                      {employee.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedEmployee !== "all" && (
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Employee Filter */}
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                <SelectTrigger className="w-[180px] bg-background">
+                  <SelectValue placeholder="Filter op medewerker" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="all">Alle medewerkers</SelectItem>
+                  {uniqueEmployees.map((employee) => (
+                    <SelectItem key={employee.userId} value={employee.userId}>
+                      <div className="flex items-center gap-2">
+                        <div className={cn("w-2 h-2 rounded-full", employee.color)} />
+                        {employee.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Type Filter */}
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger className="w-[160px] bg-background">
+                  <SelectValue placeholder="Filter op type" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="all">Alle types</SelectItem>
+                  {leaveTypes.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      <div className="flex items-center gap-2">
+                        <div className={cn("w-2 h-2 rounded", type.color)} />
+                        {type.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Reset Button */}
+            {(selectedEmployee !== "all" || selectedType !== "all") && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setSelectedEmployee("all")}
+                onClick={() => {
+                  setSelectedEmployee("all");
+                  setSelectedType("all");
+                }}
                 className="text-xs"
               >
-                Reset
+                Reset filters
               </Button>
             )}
           </div>
