@@ -116,6 +116,7 @@ export function CalendarOverview() {
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedTaskStatus, setSelectedTaskStatus] = useState<string>("all");
+  const [selectedTaskType, setSelectedTaskType] = useState<string>("all");
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<TaskToEdit | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>();
@@ -280,7 +281,7 @@ export function CalendarOverview() {
     return filtered;
   }, [requests, selectedEmployee, selectedType, selectedStatus]);
 
-  // Filter tasks based on selected employee and task status
+  // Filter tasks based on selected employee, task status, and task type
   const filteredTasks = useMemo(() => {
     let filtered = tasks;
     if (selectedEmployee !== "all") {
@@ -289,8 +290,11 @@ export function CalendarOverview() {
     if (selectedTaskStatus !== "all") {
       filtered = filtered.filter((t) => t.status === selectedTaskStatus);
     }
+    if (selectedTaskType !== "all") {
+      filtered = filtered.filter((t) => t.type_id === selectedTaskType);
+    }
     return filtered;
-  }, [tasks, selectedEmployee, selectedTaskStatus]);
+  }, [tasks, selectedEmployee, selectedTaskStatus, selectedTaskType]);
 
   const getRequestsForDay = (day: Date): RequestWithProfile[] => {
     return filteredRequests.filter((request) => {
@@ -983,8 +987,31 @@ export function CalendarOverview() {
               </Select>
             </div>
 
+            {/* Task Type Filter */}
+            {taskTypes.length > 0 && (
+              <div className="flex items-center gap-2">
+                <LayoutGrid className="h-4 w-4 text-muted-foreground" />
+                <Select value={selectedTaskType} onValueChange={setSelectedTaskType}>
+                  <SelectTrigger className="w-[160px] bg-background border-border/50 shadow-sm hover:bg-background/80 transition-colors">
+                    <SelectValue placeholder="Taaktype" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border shadow-xl z-50">
+                    <SelectItem value="all">Alle taaktypes</SelectItem>
+                    {taskTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded" style={{ backgroundColor: type.color }} />
+                          {type.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* Reset Button */}
-            {(selectedEmployee !== "all" || selectedType !== "all" || selectedStatus !== "all" || selectedTaskStatus !== "all") && (
+            {(selectedEmployee !== "all" || selectedType !== "all" || selectedStatus !== "all" || selectedTaskStatus !== "all" || selectedTaskType !== "all") && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -993,6 +1020,7 @@ export function CalendarOverview() {
                   setSelectedType("all");
                   setSelectedStatus("all");
                   setSelectedTaskStatus("all");
+                  setSelectedTaskType("all");
                 }}
                 className="text-xs text-primary hover:text-primary hover:bg-primary/10"
               >
