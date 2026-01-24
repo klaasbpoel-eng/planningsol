@@ -523,15 +523,19 @@ export function CalendarOverview() {
                     return (
                       <div
                         key={task.id}
-                        className="text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105"
+                        className="text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 group/task cursor-pointer"
                         style={{ 
                           borderLeft: `2px solid ${typeColor}`,
                           backgroundColor: `${typeColor}20`,
                           color: typeColor
                         }}
+                        onClick={isAdmin ? () => handleEditTask(task) : undefined}
                       >
                         <ClipboardList className="w-3 h-3 shrink-0" />
-                        <span className="truncate font-medium">{task.title}</span>
+                        <span className="truncate font-medium flex-1">{task.title}</span>
+                        {isAdmin && (
+                          <Pencil className="w-3 h-3 shrink-0 opacity-0 group-hover/task:opacity-100 transition-opacity" />
+                        )}
                       </div>
                     );
                   })}
@@ -614,14 +618,18 @@ export function CalendarOverview() {
                     return (
                       <div
                         key={task.id}
-                        className="text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105"
+                        className="text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 group/task cursor-pointer"
                         style={{ 
                           backgroundColor: `${typeColor}20`,
                           color: typeColor
                         }}
+                        onClick={isAdmin ? () => handleEditTask(task) : undefined}
                       >
                         <ClipboardList className="w-2.5 h-2.5 shrink-0" />
-                        <span className="truncate font-medium">{task.title}</span>
+                        <span className="truncate font-medium flex-1">{task.title}</span>
+                        {isAdmin && (
+                          <Pencil className="w-2 h-2 shrink-0 opacity-0 group-hover/task:opacity-100 transition-opacity" />
+                        )}
                       </div>
                     );
                   })}
