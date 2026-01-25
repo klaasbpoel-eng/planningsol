@@ -77,6 +77,7 @@ import { CalendarItemDialog } from "./CalendarItemDialog";
 import { DryIceOrderDialog } from "./DryIceOrderDialog";
 import { CreateTaskDialog } from "./CreateTaskDialog";
 import { CreateLeaveRequestDialog } from "./CreateLeaveRequestDialog";
+import { CreateDryIceOrderCalendarDialog } from "./CreateDryIceOrderCalendarDialog";
 import { CalendarItemPreview } from "./CalendarItemPreview";
 import { DryIceOrderPreview } from "./DryIceOrderPreview";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -139,6 +140,7 @@ export function CalendarOverview() {
   const [dryIceDialogOpen, setDryIceDialogOpen] = useState(false);
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
   const [createLeaveDialogOpen, setCreateLeaveDialogOpen] = useState(false);
+  const [createDryIceDialogOpen, setCreateDryIceDialogOpen] = useState(false);
   const [createDate, setCreateDate] = useState<Date | undefined>();
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
@@ -326,6 +328,11 @@ export function CalendarOverview() {
   const handleCreateLeave = () => {
     setShowCreateMenu(false);
     setCreateLeaveDialogOpen(true);
+  };
+
+  const handleCreateDryIce = () => {
+    setShowCreateMenu(false);
+    setCreateDryIceDialogOpen(true);
   };
 
   const handleTaskCreated = () => {
@@ -1950,7 +1957,7 @@ export function CalendarOverview() {
               Wat wil je aanmaken voor {createDate ? format(createDate, "d MMMM yyyy", { locale: nl }) : "deze dag"}?
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4">
+          <div className="grid grid-cols-3 gap-4 py-4">
             <Button
               variant="outline"
               className="h-24 flex flex-col items-center justify-center gap-2 hover:bg-blue-50 hover:border-blue-300 dark:hover:bg-blue-950/30"
@@ -1966,6 +1973,14 @@ export function CalendarOverview() {
             >
               <Palmtree className="h-8 w-8 text-primary" />
               <span className="font-medium">Verlof</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-24 flex flex-col items-center justify-center gap-2 hover:bg-cyan-50 hover:border-cyan-300 dark:hover:bg-cyan-950/30"
+              onClick={handleCreateDryIce}
+            >
+              <Snowflake className="h-8 w-8 text-cyan-500" />
+              <span className="font-medium">Droogijs</span>
             </Button>
           </div>
         </DialogContent>
@@ -1991,6 +2006,14 @@ export function CalendarOverview() {
         currentUserId={currentUserId}
         currentProfileId={currentProfileId}
         isAdmin={isAdmin}
+      />
+      
+      {/* Create Dry Ice Order Dialog */}
+      <CreateDryIceOrderCalendarDialog
+        open={createDryIceDialogOpen}
+        onOpenChange={setCreateDryIceDialogOpen}
+        onCreate={handleTaskCreated}
+        initialDate={createDate}
       />
     </Card>
   );
