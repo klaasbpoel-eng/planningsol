@@ -78,6 +78,7 @@ import { DryIceOrderDialog } from "./DryIceOrderDialog";
 import { CreateTaskDialog } from "./CreateTaskDialog";
 import { CreateLeaveRequestDialog } from "./CreateLeaveRequestDialog";
 import { CalendarItemPreview } from "./CalendarItemPreview";
+import { DryIceOrderPreview } from "./DryIceOrderPreview";
 import { useUserRole } from "@/hooks/useUserRole";
 import { 
   formatTimeRange, 
@@ -880,40 +881,41 @@ export function CalendarOverview() {
                   );
                 } else if (calendarItem.type === "dryice") {
                   const order = calendarItem.data;
-                  return (
-                    <motion.div
-                      key={`dryice-${order.id}`}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }}
-                      onClick={(e) => handleDryIceOrderClick(order, e)}
-                      className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4"
-                    >
-                      <div className="w-1 h-12 rounded-full bg-cyan-500" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Snowflake className="h-4 w-4 text-cyan-500 flex-shrink-0" />
-                          <span className="font-medium truncate">{order.customer_name}</span>
-                          <Badge variant="outline" className={cn("text-xs flex-shrink-0", getDryIceStatusColor(order.status))}>
-                            {getDryIceStatusLabel(order.status)}
-                          </Badge>
-                        </div>
-                        <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
-                          <span>{order.quantity_kg} kg {order.product_type_info?.name || ""}</span>
-                          {order.packaging_info && (
-                            <span className="text-xs">• {order.packaging_info.name}</span>
-                          )}
-                          {order.packaging_info?.name?.toLowerCase().includes("container") && (
-                            <span className="text-xs">• {order.container_has_wheels ? "Met wielen" : "Zonder wielen"}</span>
-                          )}
-                        </div>
-                        {order.notes && (
-                          <div className="text-xs text-muted-foreground/70 mt-1 truncate italic">{order.notes}</div>
-                        )}
-                      </div>
-                      <div className="w-2 h-2 rounded-full flex-shrink-0 bg-cyan-500" />
-                    </motion.div>
-                  );
+                    return (
+                      <DryIceOrderPreview key={`dryice-${order.id}`} order={order} side="right">
+                        <motion.div
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }}
+                          onClick={(e) => handleDryIceOrderClick(order, e)}
+                          className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4"
+                        >
+                          <div className="w-1 h-12 rounded-full bg-cyan-500" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Snowflake className="h-4 w-4 text-cyan-500 flex-shrink-0" />
+                              <span className="font-medium truncate">{order.customer_name}</span>
+                              <Badge variant="outline" className={cn("text-xs flex-shrink-0", getDryIceStatusColor(order.status))}>
+                                {getDryIceStatusLabel(order.status)}
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+                              <span>{order.quantity_kg} kg {order.product_type_info?.name || ""}</span>
+                              {order.packaging_info && (
+                                <span className="text-xs">• {order.packaging_info.name}</span>
+                              )}
+                              {order.packaging_info?.name?.toLowerCase().includes("container") && (
+                                <span className="text-xs">• {order.container_has_wheels ? "Met wielen" : "Zonder wielen"}</span>
+                              )}
+                            </div>
+                            {order.notes && (
+                              <div className="text-xs text-muted-foreground/70 mt-1 truncate italic">{order.notes}</div>
+                            )}
+                          </div>
+                          <div className="w-2 h-2 rounded-full flex-shrink-0 bg-cyan-500" />
+                        </motion.div>
+                      </DryIceOrderPreview>
+                    );
                 }
                 return null;
               })}
@@ -1053,41 +1055,42 @@ export function CalendarOverview() {
                     <span>Droogijs productie</span>
                   </div>
                   {dayDryIceOrders.map((order, index) => (
-                    <motion.div
-                      key={order.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.25, delay: (dayRequests.length + dayTasks.length + index) * 0.05 }}
-                      onClick={(e) => handleDryIceOrderClick(order, e)}
-                      className={cn(
-                        "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md cursor-pointer",
-                        getDryIceStatusColor(order.status)
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <Snowflake className="w-4 h-4" />
-                          <span className="font-semibold">{order.customer_name}</span>
+                    <DryIceOrderPreview key={order.id} order={order} side="right">
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.25, delay: (dayRequests.length + dayTasks.length + index) * 0.05 }}
+                        onClick={(e) => handleDryIceOrderClick(order, e)}
+                        className={cn(
+                          "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md cursor-pointer",
+                          getDryIceStatusColor(order.status)
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <Snowflake className="w-4 h-4" />
+                            <span className="font-semibold">{order.customer_name}</span>
+                          </div>
+                          <Badge variant="outline" className="text-xs bg-white/20">
+                            {order.order_number}
+                          </Badge>
                         </div>
-                        <Badge variant="outline" className="text-xs bg-white/20">
-                          {order.order_number}
-                        </Badge>
-                      </div>
-                      <div className="font-medium mt-2">
-                        {order.quantity_kg} kg {order.product_type_info?.name || ""}
-                      </div>
-                      {order.packaging_info && (
-                        <div className="text-xs opacity-75 mt-1">
-                          {order.packaging_info.name}
-                          {order.packaging_info.name?.toLowerCase().includes("container") && (
-                            <span> • {order.container_has_wheels ? "Met wielen" : "Zonder wielen"}</span>
-                          )}
+                        <div className="font-medium mt-2">
+                          {order.quantity_kg} kg {order.product_type_info?.name || ""}
                         </div>
-                      )}
-                      {order.notes && (
-                        <div className="text-xs opacity-60 mt-2 italic">{order.notes}</div>
-                      )}
-                    </motion.div>
+                        {order.packaging_info && (
+                          <div className="text-xs opacity-75 mt-1">
+                            {order.packaging_info.name}
+                            {order.packaging_info.name?.toLowerCase().includes("container") && (
+                              <span> • {order.container_has_wheels ? "Met wielen" : "Zonder wielen"}</span>
+                            )}
+                          </div>
+                        )}
+                        {order.notes && (
+                          <div className="text-xs opacity-60 mt-2 italic">{order.notes}</div>
+                        )}
+                      </motion.div>
+                    </DryIceOrderPreview>
                   ))}
                 </div>
               )}
@@ -1221,17 +1224,17 @@ export function CalendarOverview() {
                     } else if (entry.type === 'dryice') {
                       const order = entry.item as DryIceOrderWithDetails;
                       return (
-                        <div
-                          key={order.id}
-                          onClick={(e) => handleDryIceOrderClick(order, e)}
-                          className={cn(
-                            "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
-                          )}
-                          title={`${order.customer_name} - ${order.quantity_kg}kg${order.product_type_info ? ` ${order.product_type_info.name}` : ""}${order.packaging_info ? ` (${order.packaging_info.name}${order.packaging_info.name?.toLowerCase().includes("container") ? ` - ${order.container_has_wheels ? "met wielen" : "zonder wielen"}` : ""})` : ""}`}
-                        >
-                          <Snowflake className="w-3 h-3 shrink-0" />
-                          <span className="truncate font-medium">{order.customer_name} • {order.quantity_kg}kg</span>
-                        </div>
+                        <DryIceOrderPreview key={order.id} order={order} side="bottom" align="start">
+                          <div
+                            onClick={(e) => handleDryIceOrderClick(order, e)}
+                            className={cn(
+                              "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
+                            )}
+                          >
+                            <Snowflake className="w-3 h-3 shrink-0" />
+                            <span className="truncate font-medium">{order.customer_name} • {order.quantity_kg}kg</span>
+                          </div>
+                        </DryIceOrderPreview>
                       );
                     }
                     return null;
@@ -1393,15 +1396,15 @@ export function CalendarOverview() {
                     } else if (entry.type === 'dryice') {
                       const order = entry.item as DryIceOrderWithDetails;
                       return (
-                        <div
-                          key={order.id}
-                          onClick={(e) => handleDryIceOrderClick(order, e)}
-                          className="text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
-                          title={`${order.customer_name} - ${order.quantity_kg}kg${order.product_type_info ? ` ${order.product_type_info.name}` : ""}${order.packaging_info ? ` (${order.packaging_info.name}${order.packaging_info.name?.toLowerCase().includes("container") ? ` - ${order.container_has_wheels ? "met wielen" : "zonder wielen"}` : ""})` : ""}`}
-                        >
-                          <Snowflake className="w-2.5 h-2.5 shrink-0" />
-                          <span className="truncate font-medium">{order.customer_name} • {order.quantity_kg}kg</span>
-                        </div>
+                        <DryIceOrderPreview key={order.id} order={order} side="bottom" align="start">
+                          <div
+                            onClick={(e) => handleDryIceOrderClick(order, e)}
+                            className="text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
+                          >
+                            <Snowflake className="w-2.5 h-2.5 shrink-0" />
+                            <span className="truncate font-medium">{order.customer_name} • {order.quantity_kg}kg</span>
+                          </div>
+                        </DryIceOrderPreview>
                       );
                     }
                     return null;
