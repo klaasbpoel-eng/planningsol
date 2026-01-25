@@ -67,6 +67,13 @@ import { CalendarItemDialog } from "./CalendarItemDialog";
 import { CreateTaskDialog } from "./CreateTaskDialog";
 import { CreateLeaveRequestDialog } from "./CreateLeaveRequestDialog";
 import { useUserRole } from "@/hooks/useUserRole";
+import { 
+  formatTimeRange, 
+  getDayPartLabel, 
+  getDayPartIcon,
+  hasTimeInfo 
+} from "@/lib/calendar-utils";
+import { Clock, Sun, Sunset } from "lucide-react";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Task = Database["public"]["Tables"]["tasks"]["Row"];
@@ -593,9 +600,21 @@ export function CalendarOverview() {
                       )}
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={cn("w-3 h-3 rounded-full ring-2 ring-white/30", getEmployeeColor(request.user_id))} />
-                        <span className="font-semibold">{getEmployeeName(request)}</span>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className={cn("w-3 h-3 rounded-full ring-2 ring-white/30", getEmployeeColor(request.user_id))} />
+                          <span className="font-semibold">{getEmployeeName(request)}</span>
+                        </div>
+                        {request.day_part && request.day_part !== "full_day" && (
+                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/20 text-xs font-medium">
+                            {request.day_part === "morning" ? (
+                              <Sun className="h-3 w-3" />
+                            ) : (
+                              <Sunset className="h-3 w-3" />
+                            )}
+                            <span>{getDayPartLabel(request.day_part)}</span>
+                          </div>
+                        )}
                       </div>
                       <div className="font-medium mt-2 opacity-90">{getTypeLabel(request.type)}</div>
                       <div className="text-xs opacity-75 mt-1">
@@ -626,9 +645,17 @@ export function CalendarOverview() {
                       )}
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={cn("w-3 h-3 rounded-full ring-2 ring-white/30", getEmployeeColor(task.assigned_to))} />
-                        <span className="font-semibold">{getEmployeeName(task)}</span>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className={cn("w-3 h-3 rounded-full ring-2 ring-white/30", getEmployeeColor(task.assigned_to))} />
+                          <span className="font-semibold">{getEmployeeName(task)}</span>
+                        </div>
+                        {hasTimeInfo(task.start_time, task.end_time) && (
+                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/20 text-xs font-medium">
+                            <Clock className="h-3 w-3" />
+                            <span>{formatTimeRange(task.start_time, task.end_time)}</span>
+                          </div>
+                        )}
                       </div>
                       <div className="font-medium mt-2">{task.title}</div>
                       {task.description && (
@@ -707,8 +734,15 @@ export function CalendarOverview() {
                           "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer",
                           getTypeColor((entry.item as RequestWithProfile).type, (entry.item as RequestWithProfile).status)
                         )}
+                        title={`${getEmployeeName(entry.item as RequestWithProfile)} - ${getTypeLabel((entry.item as RequestWithProfile).type)}${(entry.item as RequestWithProfile).day_part && (entry.item as RequestWithProfile).day_part !== "full_day" ? ` (${getDayPartLabel((entry.item as RequestWithProfile).day_part)})` : ""}`}
                       >
-                        <Palmtree className="w-3 h-3 shrink-0" />
+                        {(entry.item as RequestWithProfile).day_part === "morning" ? (
+                          <Sun className="w-3 h-3 shrink-0" />
+                        ) : (entry.item as RequestWithProfile).day_part === "afternoon" ? (
+                          <Sunset className="w-3 h-3 shrink-0" />
+                        ) : (
+                          <Palmtree className="w-3 h-3 shrink-0" />
+                        )}
                         <span className="truncate font-medium">{getEmployeeName(entry.item as RequestWithProfile)}</span>
                       </div>
                     ) : (
@@ -723,8 +757,13 @@ export function CalendarOverview() {
                           getTaskStatusColor((entry.item as TaskWithProfile).status),
                           draggedTask?.id === (entry.item as TaskWithProfile).id && "opacity-50"
                         )}
+                        title={`${(entry.item as TaskWithProfile).title}${hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? ` (${formatTimeRange((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time)})` : ""}`}
                       >
-                        <GripVertical className="w-3 h-3 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
+                        {hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? (
+                          <Clock className="w-3 h-3 shrink-0 opacity-70" />
+                        ) : (
+                          <GripVertical className="w-3 h-3 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
+                        )}
                         <ClipboardList className="w-3 h-3 shrink-0" />
                         <span className="truncate font-medium">{(entry.item as TaskWithProfile).title}</span>
                       </div>
@@ -807,8 +846,15 @@ export function CalendarOverview() {
                           "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer",
                           getTypeColor((entry.item as RequestWithProfile).type, (entry.item as RequestWithProfile).status)
                         )}
+                        title={`${getEmployeeName(entry.item as RequestWithProfile)}${(entry.item as RequestWithProfile).day_part && (entry.item as RequestWithProfile).day_part !== "full_day" ? ` (${getDayPartLabel((entry.item as RequestWithProfile).day_part)})` : ""}`}
                       >
-                        <Palmtree className="w-2.5 h-2.5 shrink-0" />
+                        {(entry.item as RequestWithProfile).day_part === "morning" ? (
+                          <Sun className="w-2.5 h-2.5 shrink-0" />
+                        ) : (entry.item as RequestWithProfile).day_part === "afternoon" ? (
+                          <Sunset className="w-2.5 h-2.5 shrink-0" />
+                        ) : (
+                          <Palmtree className="w-2.5 h-2.5 shrink-0" />
+                        )}
                         <span className="truncate font-medium">{getEmployeeName(entry.item as RequestWithProfile)}</span>
                       </div>
                     ) : (
@@ -823,8 +869,13 @@ export function CalendarOverview() {
                           getTaskStatusColor((entry.item as TaskWithProfile).status),
                           draggedTask?.id === (entry.item as TaskWithProfile).id && "opacity-50"
                         )}
+                        title={`${(entry.item as TaskWithProfile).title}${hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? ` (${formatTimeRange((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time)})` : ""}`}
                       >
-                        <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
+                        {hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? (
+                          <Clock className="w-2.5 h-2.5 shrink-0 opacity-70" />
+                        ) : (
+                          <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
+                        )}
                         <ClipboardList className="w-2.5 h-2.5 shrink-0" />
                         <span className="truncate font-medium">{(entry.item as TaskWithProfile).title}</span>
                       </div>

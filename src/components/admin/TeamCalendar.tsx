@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, ChevronLeft, ChevronRight, Users } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Users, Sun, Sunset } from "lucide-react";
+import { getDayPartLabel } from "@/lib/calendar-utils";
 import { 
   format, 
   startOfMonth, 
@@ -155,12 +156,19 @@ export function TeamCalendar({ requests }: TeamCalendarProps) {
                     <div
                       key={`${request.id}-${i}`}
                       className={cn(
-                        "text-[10px] px-1 py-0.5 rounded truncate text-white font-medium",
+                        "text-[10px] px-1 py-0.5 rounded truncate text-white font-medium flex items-center gap-1",
                         getTypeColor(request.type, request.status)
                       )}
-                      title={`${request.profiles?.full_name || request.profiles?.email || "Unknown"} - ${request.type}${request.status === "pending" ? " (pending)" : ""}`}
+                      title={`${request.profiles?.full_name || request.profiles?.email || "Unknown"} - ${request.type}${request.status === "pending" ? " (pending)" : ""}${request.day_part && request.day_part !== "full_day" ? ` (${getDayPartLabel(request.day_part)})` : ""}`}
                     >
-                      {request.profiles?.full_name?.split(' ')[0] || request.profiles?.email?.split('@')[0] || "?"}
+                      {request.day_part === "morning" ? (
+                        <Sun className="w-2 h-2 shrink-0" />
+                      ) : request.day_part === "afternoon" ? (
+                        <Sunset className="w-2 h-2 shrink-0" />
+                      ) : null}
+                      <span className="truncate">
+                        {request.profiles?.full_name?.split(' ')[0] || request.profiles?.email?.split('@')[0] || "?"}
+                      </span>
                     </div>
                   ))}
                   {dayRequests.length > 3 && (
@@ -191,6 +199,14 @@ export function TeamCalendar({ requests }: TeamCalendarProps) {
           <div className="flex items-center gap-2 text-xs">
             <div className="w-3 h-3 rounded bg-warning/80" />
             <span className="text-muted-foreground">In behandeling</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs border-l pl-4 ml-2">
+            <Sun className="w-3 h-3 text-amber-500" />
+            <span className="text-muted-foreground">Ochtend</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <Sunset className="w-3 h-3 text-orange-500" />
+            <span className="text-muted-foreground">Middag</span>
           </div>
         </div>
 

@@ -31,8 +31,11 @@ import {
   Save, 
   X,
   AlertCircle,
-  Trash2
+  Trash2,
+  Sun,
+  Sunset
 } from "lucide-react";
+import { formatTimeRange, getDayPartLabel, hasTimeInfo } from "@/lib/calendar-utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -499,6 +502,14 @@ export function CalendarItemDialog({
                     </div>
                   </div>
 
+                  {hasTimeInfo(task.start_time, task.end_time) && (
+                    <div className="flex items-center gap-2 text-sm pt-1">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Tijd:</span>
+                      <span className="font-medium">{formatTimeRange(task.start_time, task.end_time)}</span>
+                    </div>
+                  )}
+
                   <div className="pt-2 border-t">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />
@@ -708,6 +719,18 @@ export function CalendarItemDialog({
                       {format(parseISO(request.start_date), "d MMM yyyy", { locale: nl })} - {format(parseISO(request.end_date), "d MMM yyyy", { locale: nl })}
                     </span>
                   </div>
+
+                  {request.day_part && request.day_part !== "full_day" && (
+                    <div className="flex items-center gap-2 text-sm">
+                      {request.day_part === "morning" ? (
+                        <Sun className="h-4 w-4 text-amber-500" />
+                      ) : (
+                        <Sunset className="h-4 w-4 text-orange-500" />
+                      )}
+                      <span className="text-muted-foreground">Dagdeel:</span>
+                      <span className="font-medium">{getDayPartLabel(request.day_part)}</span>
+                    </div>
+                  )}
 
                   {request.reason && (
                     <div className="pt-2">
