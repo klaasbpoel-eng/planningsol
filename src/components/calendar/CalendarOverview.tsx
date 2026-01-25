@@ -123,6 +123,7 @@ export function CalendarOverview() {
   const [createDate, setCreateDate] = useState<Date | undefined>();
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
+  const [currentProfileId, setCurrentProfileId] = useState<string | undefined>();
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
   const [lastAction, setLastAction] = useState<{
     type: "task_move";
@@ -199,11 +200,21 @@ export function CalendarOverview() {
 
       if (taskTypesError) throw taskTypesError;
 
-      // Map profiles to requests
+      // Map profiles to requests using profile_id (new) or user_id (legacy)
       const requestsWithProfiles: RequestWithProfile[] = (requestsData || []).map((request) => {
-        const profile = profilesData?.find((p) => p.user_id === request.user_id) || null;
+        // Use profile_id if available, otherwise fall back to user_id
+        const requestAny = request as any;
+        const profile = requestAny.profile_id 
+          ? profilesData?.find((p) => p.id === requestAny.profile_id) 
+          : profilesData?.find((p) => p.user_id === request.user_id) || null;
         return { ...request, profile };
       });
+
+      // Find current user's profile
+      const currentProfile = profilesData?.find((p) => p.user_id === user.id);
+      if (currentProfile) {
+        setCurrentProfileId(currentProfile.id);
+      }
 
       // Map profiles and task types to tasks
       const tasksWithProfiles: TaskWithProfile[] = (tasksData || []).map((task) => {
@@ -1647,6 +1658,7 @@ export function CalendarOverview() {
         initialDate={createDate}
         profiles={profiles}
         currentUserId={currentUserId}
+        currentProfileId={currentProfileId}
         isAdmin={isAdmin}
       />
     </Card>

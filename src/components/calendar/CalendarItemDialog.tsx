@@ -253,18 +253,19 @@ export function CalendarItemDialog({
             label: "Ongedaan maken",
             onClick: async () => {
               try {
-                // Restore the time off request
+                // Restore the time off request using profile_id
+                const requestData = itemData as RequestWithProfile & { profile_id?: string };
                 const { error: restoreError } = await supabase
                   .from("time_off_requests")
                   .insert({
-                    id: itemData.id,
-                    user_id: (itemData as RequestWithProfile).user_id,
-                    start_date: (itemData as RequestWithProfile).start_date,
-                    end_date: (itemData as RequestWithProfile).end_date,
-                    type: (itemData as RequestWithProfile).type,
-                    reason: (itemData as RequestWithProfile).reason,
-                    status: (itemData as RequestWithProfile).status,
-                  });
+                    id: requestData.id,
+                    profile_id: (requestData as any).profile_id,
+                    start_date: requestData.start_date,
+                    end_date: requestData.end_date,
+                    type: requestData.type,
+                    reason: requestData.reason,
+                    status: requestData.status,
+                  } as any);
                 
                 if (restoreError) throw restoreError;
                 toast.success("Verlofaanvraag hersteld");

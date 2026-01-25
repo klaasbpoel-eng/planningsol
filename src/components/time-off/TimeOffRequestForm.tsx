@@ -46,14 +46,23 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Get the profile for the current user
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+      
+      if (profileError || !profile) throw new Error("Profiel niet gevonden");
+
       const { error } = await supabase.from("time_off_requests").insert({
-        user_id: user.id,
+        profile_id: profile.id,
         start_date: format(startDate, "yyyy-MM-dd"),
         end_date: format(endDate, "yyyy-MM-dd"),
         type,
         day_part: dayPart,
         reason: reason.trim() || null,
-      });
+      } as any);
 
       if (error) throw error;
 

@@ -45,19 +45,29 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
 
       if (requestsError) throw requestsError;
 
-      // Fetch profiles for all unique user IDs
-      const userIds = [...new Set((requestsData || []).map(r => r.user_id))];
+      // Fetch profiles - use profile_id for new schema, fall back to user_id
+      const requestsAny = requestsData as any[];
+      const profileIds = [...new Set(requestsAny.filter(r => r.profile_id).map(r => r.profile_id))];
+      const userIds = [...new Set((requestsData || []).filter(r => r.user_id).map(r => r.user_id))];
+      
       const { data: profilesData } = await supabase
         .from("profiles")
-        .select("*")
-        .in("user_id", userIds);
+        .select("*");
 
-      // Map profiles to requests
-      const profilesMap = new Map((profilesData || []).map(p => [p.user_id, p]));
-      const requestsWithProfiles = (requestsData || []).map(request => ({
-        ...request,
-        profiles: profilesMap.get(request.user_id) || null,
-      }));
+      // Map profiles to requests - try profile_id first, then user_id
+      const profilesById = new Map((profilesData || []).map(p => [p.id, p]));
+      const profilesByUserId = new Map((profilesData || []).map(p => [p.user_id, p]));
+      
+      const requestsWithProfiles = (requestsData || []).map(request => {
+        const requestAny = request as any;
+        const profile = requestAny.profile_id 
+          ? profilesById.get(requestAny.profile_id)
+          : profilesByUserId.get(request.user_id) || null;
+        return {
+          ...request,
+          profiles: profile || null,
+        };
+      });
 
       setRequests(requestsWithProfiles);
     } catch (error) {
@@ -75,8 +85,8 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
   const employees = useMemo(() => {
     const uniqueProfiles = new Map<string, Profile>();
     requests.forEach(r => {
-      if (r.profiles && !uniqueProfiles.has(r.profiles.user_id)) {
-        uniqueProfiles.set(r.profiles.user_id, r.profiles);
+      if (r.profiles && !uniqueProfiles.has(r.profiles.id)) {
+        uniqueProfiles.set(r.profiles.id, r.profiles);
       }
     });
     return Array.from(uniqueProfiles.values());
@@ -85,8 +95,10 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
   // Filter requests
   const filteredRequests = useMemo(() => {
     return requests.filter(request => {
-      // Filter by employee
-      if (filters.employeeId && request.user_id !== filters.employeeId) {
+      // Filter by employee (using profile_id)
+      const requestAny = request as any;
+      const profileId = requestAny.profile_id || request.profiles?.id;
+      if (filters.employeeId && profileId !== filters.employeeId) {
         return false;
       }
 

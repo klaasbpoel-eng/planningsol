@@ -38,6 +38,7 @@ interface CreateLeaveRequestDialogProps {
   initialDate?: Date;
   profiles: Profile[];
   currentUserId?: string;
+  currentProfileId?: string;
   isAdmin: boolean;
 }
 
@@ -56,6 +57,7 @@ export function CreateLeaveRequestDialog({
   initialDate,
   profiles,
   currentUserId,
+  currentProfileId,
   isAdmin,
 }: CreateLeaveRequestDialogProps) {
   const [saving, setSaving] = useState(false);
@@ -63,7 +65,7 @@ export function CreateLeaveRequestDialog({
   const [endDate, setEndDate] = useState<Date | undefined>(initialDate);
   const [type, setType] = useState<TimeOffType>("vacation");
   const [reason, setReason] = useState("");
-  const [selectedUserId, setSelectedUserId] = useState(currentUserId || "");
+  const [selectedProfileId, setSelectedProfileId] = useState(currentProfileId || "");
   const [leaveTypes, setLeaveTypes] = useState<TimeOffTypeRecord[]>([]);
 
   useEffect(() => {
@@ -80,10 +82,10 @@ export function CreateLeaveRequestDialog({
   }, [initialDate]);
 
   useEffect(() => {
-    if (currentUserId && !selectedUserId) {
-      setSelectedUserId(currentUserId);
+    if (currentProfileId && !selectedProfileId) {
+      setSelectedProfileId(currentProfileId);
     }
-  }, [currentUserId, selectedUserId]);
+  }, [currentProfileId, selectedProfileId]);
 
   const fetchLeaveTypes = async () => {
     const { data, error } = await supabase
@@ -112,7 +114,7 @@ export function CreateLeaveRequestDialog({
     setEndDate(initialDate);
     setType("vacation");
     setReason("");
-    setSelectedUserId(currentUserId || "");
+    setSelectedProfileId(currentProfileId || "");
   };
 
   const handleClose = () => {
@@ -131,27 +133,28 @@ export function CreateLeaveRequestDialog({
       return;
     }
 
-    const userId = isAdmin ? selectedUserId : currentUserId;
-    if (!userId) {
-      toast.error("Geen gebruiker geselecteerd");
+    const profileId = isAdmin ? selectedProfileId : currentProfileId;
+    if (!profileId) {
+      toast.error("Geen medewerker geselecteerd");
       return;
     }
 
     setSaving(true);
 
     try {
+      // Use profile_id for the new schema
       const { error } = await supabase.from("time_off_requests").insert({
-        user_id: userId,
+        profile_id: profileId,
         start_date: format(startDate, "yyyy-MM-dd"),
         end_date: format(endDate, "yyyy-MM-dd"),
         type,
         reason: reason.trim() || null,
-      });
+      } as any);
 
       if (error) throw error;
 
       const employeeName = isAdmin 
-        ? profiles.find(p => p.user_id === userId)?.full_name || "Medewerker"
+        ? profiles.find(p => p.id === profileId)?.full_name || "Medewerker"
         : "Je";
 
       toast.success("Verlofaanvraag ingediend", {
@@ -202,21 +205,22 @@ export function CreateLeaveRequestDialog({
               <Label>
                 Medewerker <span className="text-destructive">*</span>
               </Label>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+              <Select value={selectedProfileId} onValueChange={setSelectedProfileId}>
                 <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Selecteer medewerker" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
-                  {profiles
-                    .filter((profile) => profile.user_id)
-                    .map((profile) => (
-                      <SelectItem
-                        key={profile.user_id}
-                        value={profile.user_id!}
-                      >
-                        {profile.full_name || profile.email?.split("@")[0]}
-                      </SelectItem>
-                    ))}
+                  {profiles.map((profile) => (
+                    <SelectItem
+                      key={profile.id}
+                      value={profile.id}
+                    >
+                      {profile.full_name || profile.email?.split("@")[0]}
+                      {!profile.user_id && (
+                        <span className="ml-2 text-xs text-muted-foreground">(geen account)</span>
+                      )}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -354,7 +358,7 @@ export function CreateLeaveRequestDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={saving || !startDate || !endDate || (isAdmin && !selectedUserId)}
+            disabled={saving || !startDate || !endDate || (isAdmin && !selectedProfileId)}
           >
             <Plus className="h-4 w-4 mr-2" />
             {saving ? "Indienen..." : "Aanvraag indienen"}
