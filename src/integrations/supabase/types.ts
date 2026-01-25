@@ -157,6 +157,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "profiles_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_limited"
+            referencedColumns: ["id"]
+          },
         ]
       }
       task_types: {
@@ -348,7 +355,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      profiles_limited: {
+        Row: {
+          department: string | null
+          email: string | null
+          full_name: string | null
+          id: string | null
+          job_title: string | null
+          user_id: string | null
+        }
+        Insert: {
+          department?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string | null
+          job_title?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          department?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string | null
+          job_title?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
