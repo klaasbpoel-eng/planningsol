@@ -454,13 +454,14 @@ export function CalendarItemDialog({
                         <SelectValue placeholder="Selecteer medewerker" />
                       </SelectTrigger>
                       <SelectContent className="bg-background border shadow-lg z-50">
-                        {profiles
-                          .filter((profile) => profile.user_id)
-                          .map((profile) => (
-                            <SelectItem key={profile.user_id} value={profile.user_id!}>
-                              {profile.full_name || profile.email?.split("@")[0]}
-                            </SelectItem>
-                          ))}
+                        {profiles.map((profile) => (
+                          <SelectItem key={profile.id} value={profile.id}>
+                            {profile.full_name || profile.email?.split("@")[0]}
+                            {!profile.user_id && (
+                              <span className="ml-2 text-xs text-muted-foreground">(geen account)</span>
+                            )}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
