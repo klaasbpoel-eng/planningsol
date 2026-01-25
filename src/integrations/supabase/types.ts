@@ -14,6 +14,80 @@ export type Database = {
   }
   public: {
     Tables: {
+      dry_ice_orders: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by: string
+          customer_name: string
+          id: string
+          notes: string | null
+          order_number: string
+          product_type: Database["public"]["Enums"]["dry_ice_product_type"]
+          quantity_kg: number
+          scheduled_date: string
+          status: Database["public"]["Enums"]["production_order_status"]
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by: string
+          customer_name: string
+          id?: string
+          notes?: string | null
+          order_number: string
+          product_type?: Database["public"]["Enums"]["dry_ice_product_type"]
+          quantity_kg: number
+          scheduled_date: string
+          status?: Database["public"]["Enums"]["production_order_status"]
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string
+          customer_name?: string
+          id?: string
+          notes?: string | null
+          order_number?: string
+          product_type?: Database["public"]["Enums"]["dry_ice_product_type"]
+          quantity_kg?: number
+          scheduled_date?: string
+          status?: Database["public"]["Enums"]["production_order_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dry_ice_orders_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dry_ice_orders_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles_limited"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dry_ice_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dry_ice_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_limited"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_leave_balances: {
         Row: {
           accrual_rate: number | null
@@ -57,6 +131,83 @@ export type Database = {
             columns: ["type_id"]
             isOneToOne: false
             referencedRelation: "time_off_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gas_cylinder_orders: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by: string
+          customer_name: string
+          cylinder_count: number
+          cylinder_size: string
+          gas_type: Database["public"]["Enums"]["gas_type"]
+          id: string
+          notes: string | null
+          order_number: string
+          scheduled_date: string
+          status: Database["public"]["Enums"]["production_order_status"]
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by: string
+          customer_name: string
+          cylinder_count: number
+          cylinder_size?: string
+          gas_type?: Database["public"]["Enums"]["gas_type"]
+          id?: string
+          notes?: string | null
+          order_number: string
+          scheduled_date: string
+          status?: Database["public"]["Enums"]["production_order_status"]
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string
+          customer_name?: string
+          cylinder_count?: number
+          cylinder_size?: string
+          gas_type?: Database["public"]["Enums"]["gas_type"]
+          id?: string
+          notes?: string | null
+          order_number?: string
+          scheduled_date?: string
+          status?: Database["public"]["Enums"]["production_order_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gas_cylinder_orders_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gas_cylinder_orders_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles_limited"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gas_cylinder_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gas_cylinder_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_limited"
             referencedColumns: ["id"]
           },
         ]
@@ -420,6 +571,20 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      dry_ice_product_type: "blocks" | "pellets" | "sticks"
+      gas_type:
+        | "co2"
+        | "nitrogen"
+        | "argon"
+        | "acetylene"
+        | "oxygen"
+        | "helium"
+        | "other"
+      production_order_status:
+        | "pending"
+        | "in_progress"
+        | "completed"
+        | "cancelled"
       request_status: "pending" | "approved" | "rejected"
       time_off_type: "vacation" | "sick" | "personal" | "other"
     }
@@ -550,6 +715,22 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      dry_ice_product_type: ["blocks", "pellets", "sticks"],
+      gas_type: [
+        "co2",
+        "nitrogen",
+        "argon",
+        "acetylene",
+        "oxygen",
+        "helium",
+        "other",
+      ],
+      production_order_status: [
+        "pending",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ],
       request_status: ["pending", "approved", "rejected"],
       time_off_type: ["vacation", "sick", "personal", "other"],
     },

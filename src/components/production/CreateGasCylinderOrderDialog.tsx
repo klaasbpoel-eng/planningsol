@@ -1,0 +1,274 @@
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarDays, Cylinder, Plus } from "lucide-react";
+import { format } from "date-fns";
+import { nl } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface CreateGasCylinderOrderDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: () => void;
+}
+
+export function CreateGasCylinderOrderDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: CreateGasCylinderOrderDialogProps) {
+  const [saving, setSaving] = useState(false);
+  const [customerName, setCustomerName] = useState("");
+  const [gasType, setGasType] = useState("co2");
+  const [cylinderCount, setCylinderCount] = useState("");
+  const [cylinderSize, setCylinderSize] = useState("medium");
+  const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
+  const [notes, setNotes] = useState("");
+  const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("user_id", user.id)
+          .single();
+        
+        if (profile) {
+          setCurrentProfileId(profile.id);
+        }
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const resetForm = () => {
+    setCustomerName("");
+    setGasType("co2");
+    setCylinderCount("");
+    setCylinderSize("medium");
+    setScheduledDate(new Date());
+    setNotes("");
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onOpenChange(false);
+  };
+
+  const generateOrderNumber = () => {
+    const date = format(new Date(), "yyyyMMdd");
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
+    return `GC-${date}-${random}`;
+  };
+
+  const handleCreate = async () => {
+    if (!customerName.trim() || !cylinderCount || !scheduledDate || !currentProfileId) {
+      toast.error("Vul alle verplichte velden in");
+      return;
+    }
+
+    const count = parseInt(cylinderCount);
+    if (isNaN(count) || count <= 0) {
+      toast.error("Voer een geldig aantal in");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const insertData = {
+        order_number: generateOrderNumber(),
+        customer_name: customerName.trim(),
+        gas_type: gasType as "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other",
+        cylinder_count: count,
+        cylinder_size: cylinderSize,
+        scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
+        notes: notes.trim() || null,
+        created_by: currentProfileId,
+      };
+      
+      const { error } = await supabase.from("gas_cylinder_orders").insert(insertData);
+
+      toast.success("Vulorder aangemaakt");
+      resetForm();
+      onCreated();
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error creating order:", error);
+      toast.error("Fout bij aanmaken order");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-orange-500/10">
+              <Cylinder className="h-5 w-5 text-orange-500" />
+            </div>
+            <div className="flex-1">
+              <DialogTitle className="text-lg">Nieuwe gascilinder order</DialogTitle>
+              <DialogDescription>
+                Maak een nieuwe vulorder voor gascilinders
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="customerName">
+              Klantnaam <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="customerName"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Voer klantnaam in"
+              className="bg-background"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Gastype</Label>
+              <Select value={gasType} onValueChange={setGasType}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="co2">CO₂</SelectItem>
+                  <SelectItem value="nitrogen">Stikstof (N₂)</SelectItem>
+                  <SelectItem value="argon">Argon</SelectItem>
+                  <SelectItem value="acetylene">Acetyleen</SelectItem>
+                  <SelectItem value="oxygen">Zuurstof</SelectItem>
+                  <SelectItem value="helium">Helium</SelectItem>
+                  <SelectItem value="other">Overig</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cylinderCount">
+                Aantal cilinders <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="cylinderCount"
+                type="number"
+                min="1"
+                value={cylinderCount}
+                onChange={(e) => setCylinderCount(e.target.value)}
+                placeholder="0"
+                className="bg-background"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Cilindergrootte</Label>
+              <Select value={cylinderSize} onValueChange={setCylinderSize}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="small">Klein (10L)</SelectItem>
+                  <SelectItem value="medium">Medium (20L)</SelectItem>
+                  <SelectItem value="large">Groot (50L)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>
+                Geplande datum <span className="text-destructive">*</span>
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !scheduledDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    {scheduledDate
+                      ? format(scheduledDate, "d MMM", { locale: nl })
+                      : "Datum"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-auto p-0 bg-background border shadow-lg z-50"
+                  align="start"
+                >
+                  <Calendar
+                    mode="single"
+                    selected={scheduledDate}
+                    onSelect={setScheduledDate}
+                    locale={nl}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notities</Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Optionele notities..."
+              className="bg-background resize-none"
+              rows={3}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose} disabled={saving}>
+            Annuleren
+          </Button>
+          <Button
+            onClick={handleCreate}
+            disabled={saving || !customerName.trim() || !cylinderCount || !scheduledDate}
+            className="bg-orange-500 hover:bg-orange-600"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {saving ? "Aanmaken..." : "Order aanmaken"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
