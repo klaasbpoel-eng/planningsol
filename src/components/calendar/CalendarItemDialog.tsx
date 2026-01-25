@@ -30,8 +30,19 @@ import {
   Edit2, 
   Save, 
   X,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { format, parseISO } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -74,6 +85,8 @@ export function CalendarItemDialog({
 }: CalendarItemDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
   // Task edit state
   const [taskTitle, setTaskTitle] = useState("");
@@ -159,8 +172,45 @@ export function CalendarItemDialog({
     }
   };
 
+  const handleDelete = async () => {
+    if (!item) return;
+    setDeleting(true);
+
+    try {
+      if (item.type === "task") {
+        const { error } = await supabase
+          .from("tasks")
+          .delete()
+          .eq("id", item.data.id);
+
+        if (error) throw error;
+        toast.success("Taak verwijderd");
+      } else if (item.type === "timeoff") {
+        const { error } = await supabase
+          .from("time_off_requests")
+          .delete()
+          .eq("id", item.data.id);
+
+        if (error) throw error;
+        toast.success("Verlofaanvraag verwijderd");
+      }
+
+      setShowDeleteConfirm(false);
+      onOpenChange(false);
+      onUpdate();
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      toast.error("Fout bij verwijderen", {
+        description: "Probeer het opnieuw",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleClose = () => {
     setIsEditing(false);
+    setShowDeleteConfirm(false);
     onOpenChange(false);
   };
 
@@ -233,6 +283,7 @@ export function CalendarItemDialog({
     const task = item.data as TaskWithProfile;
     
     return (
+      <>
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -393,7 +444,7 @@ export function CalendarItemDialog({
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             {isEditing ? (
               <>
                 <Button variant="outline" onClick={cancelEditing} disabled={saving}>
@@ -407,6 +458,16 @@ export function CalendarItemDialog({
               </>
             ) : (
               <>
+                {isAdmin && (
+                  <Button 
+                    variant="destructive" 
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="sm:mr-auto"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Verwijderen
+                  </Button>
+                )}
                 <Button variant="outline" onClick={handleClose}>
                   Sluiten
                 </Button>
@@ -421,6 +482,30 @@ export function CalendarItemDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Taak verwijderen</AlertDialogTitle>
+            <AlertDialogDescription>
+              Weet je zeker dat je de taak "{item.type === "task" ? (item.data as TaskWithProfile).title : ""}" wilt verwijderen? 
+              Deze actie kan niet ongedaan worden gemaakt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Verwijderen..." : "Verwijderen"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      </>
     );
   }
 
