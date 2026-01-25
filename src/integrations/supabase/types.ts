@@ -63,12 +63,15 @@ export type Database = {
           customer_id: string | null
           customer_name: string
           id: string
+          is_recurring: boolean | null
           notes: string | null
           order_number: string
           packaging_id: string | null
+          parent_order_id: string | null
           product_type: Database["public"]["Enums"]["dry_ice_product_type"]
           product_type_id: string | null
           quantity_kg: number
+          recurrence_end_date: string | null
           scheduled_date: string
           status: Database["public"]["Enums"]["production_order_status"]
           updated_at: string
@@ -82,12 +85,15 @@ export type Database = {
           customer_id?: string | null
           customer_name: string
           id?: string
+          is_recurring?: boolean | null
           notes?: string | null
           order_number: string
           packaging_id?: string | null
+          parent_order_id?: string | null
           product_type?: Database["public"]["Enums"]["dry_ice_product_type"]
           product_type_id?: string | null
           quantity_kg: number
+          recurrence_end_date?: string | null
           scheduled_date: string
           status?: Database["public"]["Enums"]["production_order_status"]
           updated_at?: string
@@ -101,12 +107,15 @@ export type Database = {
           customer_id?: string | null
           customer_name?: string
           id?: string
+          is_recurring?: boolean | null
           notes?: string | null
           order_number?: string
           packaging_id?: string | null
+          parent_order_id?: string | null
           product_type?: Database["public"]["Enums"]["dry_ice_product_type"]
           product_type_id?: string | null
           quantity_kg?: number
+          recurrence_end_date?: string | null
           scheduled_date?: string
           status?: Database["public"]["Enums"]["production_order_status"]
           updated_at?: string
@@ -152,6 +161,13 @@ export type Database = {
             columns: ["packaging_id"]
             isOneToOne: false
             referencedRelation: "dry_ice_packaging"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dry_ice_orders_parent_order_id_fkey"
+            columns: ["parent_order_id"]
+            isOneToOne: false
+            referencedRelation: "dry_ice_orders"
             referencedColumns: ["id"]
           },
           {
@@ -284,8 +300,11 @@ export type Database = {
           cylinder_size: string
           gas_type: Database["public"]["Enums"]["gas_type"]
           id: string
+          is_recurring: boolean | null
           notes: string | null
           order_number: string
+          parent_order_id: string | null
+          recurrence_end_date: string | null
           scheduled_date: string
           status: Database["public"]["Enums"]["production_order_status"]
           updated_at: string
@@ -300,8 +319,11 @@ export type Database = {
           cylinder_size?: string
           gas_type?: Database["public"]["Enums"]["gas_type"]
           id?: string
+          is_recurring?: boolean | null
           notes?: string | null
           order_number: string
+          parent_order_id?: string | null
+          recurrence_end_date?: string | null
           scheduled_date: string
           status?: Database["public"]["Enums"]["production_order_status"]
           updated_at?: string
@@ -316,8 +338,11 @@ export type Database = {
           cylinder_size?: string
           gas_type?: Database["public"]["Enums"]["gas_type"]
           id?: string
+          is_recurring?: boolean | null
           notes?: string | null
           order_number?: string
+          parent_order_id?: string | null
+          recurrence_end_date?: string | null
           scheduled_date?: string
           status?: Database["public"]["Enums"]["production_order_status"]
           updated_at?: string
@@ -356,6 +381,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gas_cylinder_orders_parent_order_id_fkey"
+            columns: ["parent_order_id"]
+            isOneToOne: false
+            referencedRelation: "gas_cylinder_orders"
             referencedColumns: ["id"]
           },
         ]

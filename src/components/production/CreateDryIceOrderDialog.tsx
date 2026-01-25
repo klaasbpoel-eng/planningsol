@@ -19,10 +19,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays, Snowflake, Plus } from "lucide-react";
-import { format } from "date-fns";
+import { CalendarDays, Snowflake, Plus, Repeat } from "lucide-react";
+import { format, addWeeks } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +50,8 @@ export function CreateDryIceOrderDialog({
   const [boxCount, setBoxCount] = useState("");
   const [containerHasWheels, setContainerHasWheels] = useState<boolean | null>(null);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>(undefined);
   const [notes, setNotes] = useState("");
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   
@@ -114,6 +117,8 @@ export function CreateDryIceOrderDialog({
     setBoxCount("");
     setContainerHasWheels(null);
     setScheduledDate(new Date());
+    setIsRecurring(false);
+    setRecurrenceEndDate(undefined);
     setNotes("");
   };
 
@@ -134,6 +139,11 @@ export function CreateDryIceOrderDialog({
       return;
     }
 
+    if (isRecurring && !recurrenceEndDate) {
+      toast.error("Selecteer een einddatum voor de herhaling");
+      return;
+    }
+
     const quantity = parseFloat(quantityKg);
     if (isNaN(quantity) || quantity <= 0) {
       toast.error("Voer een geldige hoeveelheid in");
@@ -143,24 +153,50 @@ export function CreateDryIceOrderDialog({
     setSaving(true);
 
     try {
-      const insertData = {
-        order_number: generateOrderNumber(),
+      // Generate dates for recurring orders
+      const orderDates: Date[] = [scheduledDate];
+      
+      if (isRecurring && recurrenceEndDate) {
+        let nextDate = addWeeks(scheduledDate, 1);
+        while (nextDate <= recurrenceEndDate) {
+          orderDates.push(nextDate);
+          nextDate = addWeeks(nextDate, 1);
+        }
+      }
+
+      // Create the first order
+      const baseOrderData = {
         customer_name: customerName.trim(),
         customer_id: customerId || null,
         quantity_kg: quantity,
-        product_type: "blocks" as "blocks" | "pellets" | "sticks", // Keep for backwards compat
+        product_type: "blocks" as "blocks" | "pellets" | "sticks",
         product_type_id: productTypeId,
         packaging_id: packagingId || null,
         box_count: isEpsPackaging && boxCount ? parseInt(boxCount, 10) : null,
         container_has_wheels: isKunststofContainer ? containerHasWheels : null,
-        scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
         notes: notes.trim() || null,
         created_by: currentProfileId,
+        is_recurring: isRecurring,
+        recurrence_end_date: isRecurring && recurrenceEndDate ? format(recurrenceEndDate, "yyyy-MM-dd") : null,
       };
-      
-      const { error } = await supabase.from("dry_ice_orders").insert(insertData);
 
-      toast.success("Productieorder aangemaakt");
+      // Insert all orders
+      const ordersToInsert = orderDates.map((date, index) => ({
+        ...baseOrderData,
+        order_number: generateOrderNumber() + (index > 0 ? `-${index}` : ""),
+        scheduled_date: format(date, "yyyy-MM-dd"),
+      }));
+
+      const { error } = await supabase.from("dry_ice_orders").insert(ordersToInsert);
+
+      if (error) throw error;
+
+      const orderCount = ordersToInsert.length;
+      toast.success(
+        orderCount > 1 
+          ? `${orderCount} productieorders aangemaakt` 
+          : "Productieorder aangemaakt"
+      );
       resetForm();
       onCreated();
       onOpenChange(false);
@@ -341,6 +377,69 @@ export function CreateDryIceOrderDialog({
             </Popover>
           </div>
 
+          {/* Weekly recurrence option */}
+          <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="isRecurring" 
+                checked={isRecurring}
+                onCheckedChange={(checked) => {
+                  setIsRecurring(checked === true);
+                  if (!checked) {
+                    setRecurrenceEndDate(undefined);
+                  }
+                }}
+              />
+              <Label htmlFor="isRecurring" className="flex items-center gap-2 cursor-pointer font-normal">
+                <Repeat className="h-4 w-4" />
+                Wekelijks herhalen op dezelfde dag
+              </Label>
+            </div>
+            
+            {isRecurring && (
+              <div className="space-y-2 pl-6">
+                <Label>
+                  Herhalen tot <span className="text-destructive">*</span>
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !recurrenceEndDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarDays className="mr-2 h-4 w-4" />
+                      {recurrenceEndDate
+                        ? format(recurrenceEndDate, "d MMM yyyy", { locale: nl })
+                        : "Selecteer einddatum"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-auto p-0 bg-background border shadow-lg z-50"
+                    align="start"
+                  >
+                    <Calendar
+                      mode="single"
+                      selected={recurrenceEndDate}
+                      onSelect={setRecurrenceEndDate}
+                      locale={nl}
+                      disabled={(date) => scheduledDate ? date <= scheduledDate : false}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+                {scheduledDate && recurrenceEndDate && (
+                  <p className="text-xs text-muted-foreground">
+                    Dit maakt {Math.floor((recurrenceEndDate.getTime() - scheduledDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1} orders aan
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="notes">Notities</Label>
             <Textarea
@@ -360,11 +459,11 @@ export function CreateDryIceOrderDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={saving || !customerId || !quantityKg || !scheduledDate || !productTypeId || (isEpsPackaging && !boxCount) || (isKunststofContainer && containerHasWheels === null)}
+            disabled={saving || !customerId || !quantityKg || !scheduledDate || !productTypeId || (isEpsPackaging && !boxCount) || (isKunststofContainer && containerHasWheels === null) || (isRecurring && !recurrenceEndDate)}
             className="bg-cyan-500 hover:bg-cyan-600"
           >
             <Plus className="h-4 w-4 mr-2" />
-            {saving ? "Aanmaken..." : "Order aanmaken"}
+            {saving ? "Aanmaken..." : isRecurring ? "Orders aanmaken" : "Order aanmaken"}
           </Button>
         </DialogFooter>
       </DialogContent>
