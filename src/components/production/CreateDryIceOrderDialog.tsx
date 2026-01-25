@@ -45,12 +45,17 @@ export function CreateDryIceOrderDialog({
   const [quantityKg, setQuantityKg] = useState("");
   const [productTypeId, setProductTypeId] = useState("");
   const [packagingId, setPackagingId] = useState("");
+  const [boxCount, setBoxCount] = useState("");
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [notes, setNotes] = useState("");
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   
   const [productTypes, setProductTypes] = useState<{ id: string; name: string }[]>([]);
   const [packagingOptions, setPackagingOptions] = useState<{ id: string; name: string }[]>([]);
+  
+  // Check if selected packaging is EPS type
+  const selectedPackaging = packagingOptions.find(p => p.id === packagingId);
+  const isEpsPackaging = selectedPackaging?.name.toLowerCase().includes("eps");
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -103,6 +108,7 @@ export function CreateDryIceOrderDialog({
       setProductTypeId(productTypes[0].id);
     }
     setPackagingId("");
+    setBoxCount("");
     setScheduledDate(new Date());
     setNotes("");
   };
@@ -141,6 +147,7 @@ export function CreateDryIceOrderDialog({
         product_type: "blocks" as "blocks" | "pellets" | "sticks", // Keep for backwards compat
         product_type_id: productTypeId,
         packaging_id: packagingId || null,
+        box_count: isEpsPackaging && boxCount ? parseInt(boxCount, 10) : null,
         scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
         notes: notes.trim() || null,
         created_by: currentProfileId,
@@ -225,20 +232,46 @@ export function CreateDryIceOrderDialog({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Verpakking</Label>
-            <Select value={packagingId} onValueChange={setPackagingId}>
-              <SelectTrigger className="bg-background">
-                <SelectValue placeholder="Selecteer verpakking (optioneel)" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border shadow-lg z-50">
-                {packagingOptions.map((pkg) => (
-                  <SelectItem key={pkg.id} value={pkg.id}>
-                    {pkg.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Verpakking</Label>
+              <Select value={packagingId} onValueChange={(value) => {
+                setPackagingId(value);
+                // Reset box count when changing packaging
+                if (!packagingOptions.find(p => p.id === value)?.name.toLowerCase().includes("eps")) {
+                  setBoxCount("");
+                }
+              }}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Selecteer verpakking (optioneel)" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  {packagingOptions.map((pkg) => (
+                    <SelectItem key={pkg.id} value={pkg.id}>
+                      {pkg.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {isEpsPackaging && (
+              <div className="space-y-2">
+                <Label htmlFor="boxCount">
+                  Aantal dozen <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="boxCount"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={boxCount}
+                  onChange={(e) => setBoxCount(e.target.value)}
+                  placeholder="0"
+                  className="bg-background"
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -295,7 +328,7 @@ export function CreateDryIceOrderDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={saving || !customerId || !quantityKg || !scheduledDate || !productTypeId}
+            disabled={saving || !customerId || !quantityKg || !scheduledDate || !productTypeId || (isEpsPackaging && !boxCount)}
             className="bg-cyan-500 hover:bg-cyan-600"
           >
             <Plus className="h-4 w-4 mr-2" />
