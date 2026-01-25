@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Edit } from "lucide-react";
+import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Settings, Box } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -16,7 +16,19 @@ import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { toast } from "sonner";
 import { CreateDryIceOrderDialog } from "./CreateDryIceOrderDialog";
+import { DryIceProductTypeManager } from "./DryIceProductTypeManager";
+import { DryIcePackagingManager } from "./DryIcePackagingManager";
 import { useUserRole } from "@/hooks/useUserRole";
+
+interface ProductType {
+  id: string;
+  name: string;
+}
+
+interface Packaging {
+  id: string;
+  name: string;
+}
 
 interface DryIceOrder {
   id: string;
@@ -24,6 +36,8 @@ interface DryIceOrder {
   customer_name: string;
   quantity_kg: number;
   product_type: string;
+  product_type_id: string | null;
+  packaging_id: string | null;
   scheduled_date: string;
   status: string;
   notes: string | null;
@@ -32,8 +46,12 @@ interface DryIceOrder {
 
 export function DryIcePlanning() {
   const [orders, setOrders] = useState<DryIceOrder[]>([]);
+  const [productTypes, setProductTypes] = useState<ProductType[]>([]);
+  const [packagingOptions, setPackagingOptions] = useState<Packaging[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [productTypeManagerOpen, setProductTypeManagerOpen] = useState(false);
+  const [packagingManagerOpen, setPackagingManagerOpen] = useState(false);
   const [userId, setUserId] = useState<string | undefined>();
   const { isAdmin } = useUserRole(userId);
 
@@ -45,6 +63,8 @@ export function DryIcePlanning() {
 
   useEffect(() => {
     fetchOrders();
+    fetchProductTypes();
+    fetchPackaging();
   }, []);
 
   const fetchOrders = async () => {
@@ -61,6 +81,30 @@ export function DryIcePlanning() {
       setOrders(data || []);
     }
     setLoading(false);
+  };
+
+  const fetchProductTypes = async () => {
+    const { data, error } = await supabase
+      .from("dry_ice_product_types")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("sort_order");
+
+    if (!error && data) {
+      setProductTypes(data);
+    }
+  };
+
+  const fetchPackaging = async () => {
+    const { data, error } = await supabase
+      .from("dry_ice_packaging")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("sort_order");
+
+    if (!error && data) {
+      setPackagingOptions(data);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -88,13 +132,26 @@ export function DryIcePlanning() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const getProductTypeLabel = (type: string) => {
+  const getProductTypeLabel = (order: DryIceOrder) => {
+    if (order.product_type_id) {
+      const pt = productTypes.find(p => p.id === order.product_type_id);
+      if (pt) return pt.name;
+    }
+    // Fallback to old enum-based labels
     const labels: Record<string, string> = {
-      blocks: "Blokken (10kg)",
-      pellets: "Pellets (3mm)",
-      sticks: "Sticks (16mm)",
+      blocks: "Blokken",
+      pellets: "Pellets",
+      sticks: "Sticks",
     };
-    return labels[type] || type;
+    return labels[order.product_type] || order.product_type;
+  };
+
+  const getPackagingLabel = (order: DryIceOrder) => {
+    if (order.packaging_id) {
+      const pkg = packagingOptions.find(p => p.id === order.packaging_id);
+      if (pkg) return pkg.name;
+    }
+    return "-";
   };
 
   const todayTotal = orders
@@ -163,7 +220,7 @@ export function DryIcePlanning() {
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">{order.order_number}</TableCell>
                         <TableCell>{order.customer_name}</TableCell>
-                        <TableCell>{getProductTypeLabel(order.product_type)}</TableCell>
+                        <TableCell>{getProductTypeLabel(order)}</TableCell>
                         <TableCell>{order.quantity_kg} kg</TableCell>
                         <TableCell>
                           {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
@@ -194,24 +251,57 @@ export function DryIcePlanning() {
         <div className="space-y-4">
           <Card className="glass-card border-cyan-500/20">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Package className="h-4 w-4 text-cyan-500" />
-                Producttypen
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="h-4 w-4 text-cyan-500" />
+                  Producttypen
+                </CardTitle>
+                {isAdmin && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setProductTypeManagerOpen(true)}>
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between items-center p-2 rounded-lg bg-muted/50">
-                <span className="text-sm">Blokken (10kg)</span>
-                <Badge variant="secondary">Standaard</Badge>
+            <CardContent className="space-y-2">
+              {productTypes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Geen producttypen</p>
+              ) : (
+                productTypes.map((pt) => (
+                  <div key={pt.id} className="flex justify-between items-center p-2 rounded-lg bg-muted/50">
+                    <span className="text-sm">{pt.name}</span>
+                    <Badge variant="secondary">Actief</Badge>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card border-cyan-500/20">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Box className="h-4 w-4 text-cyan-500" />
+                  Verpakkingen
+                </CardTitle>
+                {isAdmin && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPackagingManagerOpen(true)}>
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
-              <div className="flex justify-between items-center p-2 rounded-lg bg-muted/50">
-                <span className="text-sm">Pellets (3mm)</span>
-                <Badge variant="secondary">Beschikbaar</Badge>
-              </div>
-              <div className="flex justify-between items-center p-2 rounded-lg bg-muted/50">
-                <span className="text-sm">Sticks (16mm)</span>
-                <Badge variant="secondary">Beschikbaar</Badge>
-              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {packagingOptions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Geen verpakkingen</p>
+              ) : (
+                packagingOptions.map((pkg) => (
+                  <div key={pkg.id} className="flex justify-between items-center p-2 rounded-lg bg-muted/50">
+                    <span className="text-sm">{pkg.name}</span>
+                    <Badge variant="secondary">Actief</Badge>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -243,6 +333,22 @@ export function DryIcePlanning() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onCreated={fetchOrders}
+      />
+
+      <DryIceProductTypeManager
+        open={productTypeManagerOpen}
+        onOpenChange={(open) => {
+          setProductTypeManagerOpen(open);
+          if (!open) fetchProductTypes();
+        }}
+      />
+
+      <DryIcePackagingManager
+        open={packagingManagerOpen}
+        onOpenChange={(open) => {
+          setPackagingManagerOpen(open);
+          if (!open) fetchPackaging();
+        }}
       />
     </div>
   );

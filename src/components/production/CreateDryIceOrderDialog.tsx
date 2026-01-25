@@ -43,10 +43,14 @@ export function CreateDryIceOrderDialog({
   const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [quantityKg, setQuantityKg] = useState("");
-  const [productType, setProductType] = useState("blocks");
+  const [productTypeId, setProductTypeId] = useState("");
+  const [packagingId, setPackagingId] = useState("");
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [notes, setNotes] = useState("");
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
+  
+  const [productTypes, setProductTypes] = useState<{ id: string; name: string }[]>([]);
+  const [packagingOptions, setPackagingOptions] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -56,7 +60,7 @@ export function CreateDryIceOrderDialog({
           .from("profiles")
           .select("id")
           .eq("user_id", user.id)
-          .single();
+          .maybeSingle();
         
         if (profile) {
           setCurrentProfileId(profile.id);
@@ -64,13 +68,41 @@ export function CreateDryIceOrderDialog({
       }
     };
     fetchProfile();
+    fetchProductTypes();
+    fetchPackaging();
   }, []);
+
+  const fetchProductTypes = async () => {
+    const { data } = await supabase
+      .from("dry_ice_product_types")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("sort_order");
+    if (data && data.length > 0) {
+      setProductTypes(data);
+      setProductTypeId(data[0].id);
+    }
+  };
+
+  const fetchPackaging = async () => {
+    const { data } = await supabase
+      .from("dry_ice_packaging")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("sort_order");
+    if (data) {
+      setPackagingOptions(data);
+    }
+  };
 
   const resetForm = () => {
     setCustomerId("");
     setCustomerName("");
     setQuantityKg("");
-    setProductType("blocks");
+    if (productTypes.length > 0) {
+      setProductTypeId(productTypes[0].id);
+    }
+    setPackagingId("");
     setScheduledDate(new Date());
     setNotes("");
   };
@@ -87,7 +119,7 @@ export function CreateDryIceOrderDialog({
   };
 
   const handleCreate = async () => {
-    if (!customerName.trim() || !quantityKg || !scheduledDate || !currentProfileId) {
+    if (!customerName.trim() || !quantityKg || !scheduledDate || !currentProfileId || !productTypeId) {
       toast.error("Vul alle verplichte velden in");
       return;
     }
@@ -106,7 +138,9 @@ export function CreateDryIceOrderDialog({
         customer_name: customerName.trim(),
         customer_id: customerId || null,
         quantity_kg: quantity,
-        product_type: productType as "blocks" | "pellets" | "sticks",
+        product_type: "blocks" as "blocks" | "pellets" | "sticks", // Keep for backwards compat
+        product_type_id: productTypeId,
+        packaging_id: packagingId || null,
         scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
         notes: notes.trim() || null,
         created_by: currentProfileId,
@@ -175,18 +209,36 @@ export function CreateDryIceOrderDialog({
             </div>
 
             <div className="space-y-2">
-              <Label>Producttype</Label>
-              <Select value={productType} onValueChange={setProductType}>
+              <Label>Producttype <span className="text-destructive">*</span></Label>
+              <Select value={productTypeId} onValueChange={setProductTypeId}>
                 <SelectTrigger className="bg-background">
-                  <SelectValue />
+                  <SelectValue placeholder="Selecteer type" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="blocks">Blokken (10kg)</SelectItem>
-                  <SelectItem value="pellets">Pellets (3mm)</SelectItem>
-                  <SelectItem value="sticks">Sticks (16mm)</SelectItem>
+                  {productTypes.map((pt) => (
+                    <SelectItem key={pt.id} value={pt.id}>
+                      {pt.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Verpakking</Label>
+            <Select value={packagingId} onValueChange={setPackagingId}>
+              <SelectTrigger className="bg-background">
+                <SelectValue placeholder="Selecteer verpakking (optioneel)" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border shadow-lg z-50">
+                {packagingOptions.map((pkg) => (
+                  <SelectItem key={pkg.id} value={pkg.id}>
+                    {pkg.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
@@ -243,7 +295,7 @@ export function CreateDryIceOrderDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={saving || !customerId || !quantityKg || !scheduledDate}
+            disabled={saving || !customerId || !quantityKg || !scheduledDate || !productTypeId}
             className="bg-cyan-500 hover:bg-cyan-600"
           >
             <Plus className="h-4 w-4 mr-2" />
