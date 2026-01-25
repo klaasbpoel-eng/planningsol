@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Flame, Plus, Pencil, Trash2, Save } from "lucide-react";
+import { Flame, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -49,6 +49,9 @@ interface GasTypeManagerProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type SortColumn = "name" | "description" | "is_active";
+type SortDirection = "asc" | "desc";
+
 export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +59,10 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState<GasType | null>(null);
   const [typeToDelete, setTypeToDelete] = useState<GasType | null>(null);
+  
+  // Sort state
+  const [sortColumn, setSortColumn] = useState<SortColumn>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   
   // Form state
   const [name, setName] = useState("");
@@ -68,7 +75,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
     const { data, error } = await supabase
       .from("gas_types")
       .select("*")
-      .order("description", { ascending: true, nullsFirst: false });
+      .order(sortColumn, { ascending: sortDirection === "asc", nullsFirst: false });
 
     if (error) {
       console.error("Error fetching gas types:", error);
@@ -78,11 +85,29 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
     setLoading(false);
   };
 
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    }
+    return sortDirection === "asc" 
+      ? <ArrowUp className="h-4 w-4 ml-1" />
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
+
   useEffect(() => {
     if (open) {
       fetchGasTypes();
     }
-  }, [open]);
+  }, [open, sortColumn, sortDirection]);
 
   const openEditDialog = (type: GasType | null) => {
     if (type) {
@@ -210,10 +235,34 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Kleur</TableHead>
-                    <TableHead>Naam</TableHead>
-                    <TableHead>Omschrijving</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="w-16">Kleur</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort("name")}
+                    >
+                      <div className="flex items-center">
+                        Naam
+                        <SortIcon column="name" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort("description")}
+                    >
+                      <div className="flex items-center">
+                        Omschrijving
+                        <SortIcon column="description" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort("is_active")}
+                    >
+                      <div className="flex items-center">
+                        Status
+                        <SortIcon column="is_active" />
+                      </div>
+                    </TableHead>
                     <TableHead className="text-right">Acties</TableHead>
                   </TableRow>
                 </TableHeader>
