@@ -646,9 +646,15 @@ export function CalendarOverview() {
     }
     
     return (
-      <div className="space-y-4 animate-fade-in">
-        {sortedGroups.map(({ date, items }) => (
-          <div key={format(date, "yyyy-MM-dd")} className="rounded-xl border border-border/50 overflow-hidden">
+      <div className="space-y-4">
+        {sortedGroups.map(({ date, items }, groupIndex) => (
+          <motion.div 
+            key={format(date, "yyyy-MM-dd")} 
+            className="rounded-xl border border-border/50 overflow-hidden"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: groupIndex * 0.05 }}
+          >
             {/* Date Header */}
             <div className={cn(
               "px-4 py-3 flex items-center gap-3 font-medium",
@@ -677,8 +683,11 @@ export function CalendarOverview() {
                 if (calendarItem.type === "timeoff") {
                   const request = calendarItem.data;
                   return (
-                    <div
+                    <motion.div
                       key={`timeoff-${request.id}`}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }}
                       onClick={(e) => handleItemClick(calendarItem, e)}
                       className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4"
                     >
@@ -705,13 +714,16 @@ export function CalendarOverview() {
                         )}
                       </div>
                       <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getEmployeeColor(request.user_id))} />
-                    </div>
+                    </motion.div>
                   );
                 } else {
                   const task = calendarItem.data;
                   return (
-                    <div
+                    <motion.div
                       key={`task-${task.id}`}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }}
                       onClick={(e) => handleItemClick(calendarItem, e)}
                       className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4"
                     >
@@ -741,12 +753,12 @@ export function CalendarOverview() {
                         </div>
                       </div>
                       <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getEmployeeColor(task.assigned_to))} />
-                    </div>
+                    </motion.div>
                   );
                 }
               })}
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
     );
@@ -791,14 +803,16 @@ export function CalendarOverview() {
                     <span>Verlof</span>
                   </div>
                   {dayRequests.map((request, index) => (
-                    <div
+                    <motion.div
                       key={request.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25, delay: index * 0.05 }}
                       onClick={(e) => handleItemClick({ type: "timeoff", data: request }, e)}
                       className={cn(
                         "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md cursor-pointer",
                         getTypeColor(request.type, request.status)
                       )}
-                      style={{ animationDelay: `${index * 50}ms` }}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
@@ -823,7 +837,7 @@ export function CalendarOverview() {
                       {request.reason && (
                         <div className="text-xs opacity-60 mt-2 italic">{request.reason}</div>
                       )}
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               )}
@@ -836,14 +850,16 @@ export function CalendarOverview() {
                     <span>Taken</span>
                   </div>
                   {dayTasks.map((task, index) => (
-                    <div
+                    <motion.div
                       key={task.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25, delay: (dayRequests.length + index) * 0.05 }}
                       onClick={(e) => handleItemClick({ type: "task", data: task }, e)}
                       className={cn(
                         "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md border-l-4 cursor-pointer",
                         getTaskStatusColor(task.status)
                       )}
-                      style={{ animationDelay: `${index * 50}ms` }}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
@@ -863,7 +879,7 @@ export function CalendarOverview() {
                           {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Gemiddeld" : "Laag"}
                         </Badge>
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               )}
