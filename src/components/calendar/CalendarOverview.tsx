@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -1469,13 +1470,24 @@ export function CalendarOverview() {
             <p className="text-sm text-muted-foreground mt-4">Laden...</p>
           </div>
         ) : (
-          <>
-            {viewType === "list" && renderListView()}
-            {viewType === "day" && renderDayView()}
-            {viewType === "week" && renderWeekView()}
-            {viewType === "month" && renderMonthView()}
-            {viewType === "year" && renderYearView()}
-          </>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={viewType}
+              initial={{ opacity: 0, y: 20, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.98 }}
+              transition={{ 
+                duration: 0.3, 
+                ease: [0.4, 0, 0.2, 1]
+              }}
+            >
+              {viewType === "list" && renderListView()}
+              {viewType === "day" && renderDayView()}
+              {viewType === "week" && renderWeekView()}
+              {viewType === "month" && renderMonthView()}
+              {viewType === "year" && renderYearView()}
+            </motion.div>
+          </AnimatePresence>
         )}
 
         {/* Type Legend */}
