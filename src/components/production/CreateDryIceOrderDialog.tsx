@@ -136,8 +136,28 @@ export function CreateDryIceOrderDialog({
   };
 
   const handleCreate = async () => {
-    if (!customerName.trim() || !quantityKg || !scheduledDate || !currentProfileId || !productTypeId) {
-      toast.error("Vul alle verplichte velden in");
+    if (!currentProfileId) {
+      toast.error("Kon je gebruikersprofiel niet vinden. Probeer opnieuw in te loggen.");
+      return;
+    }
+    
+    if (!customerName.trim()) {
+      toast.error("Selecteer een klant");
+      return;
+    }
+    
+    if (!quantityKg) {
+      toast.error("Vul de hoeveelheid in");
+      return;
+    }
+    
+    if (!scheduledDate) {
+      toast.error("Selecteer een datum");
+      return;
+    }
+    
+    if (!productTypeId) {
+      toast.error("Selecteer een producttype");
       return;
     }
 
