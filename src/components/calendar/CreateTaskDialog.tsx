@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+type TaskType = Database["public"]["Tables"]["task_types"]["Row"];
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -54,6 +55,30 @@ export function CreateTaskDialog({
   const [priority, setPriority] = useState("medium");
   const [dueDate, setDueDate] = useState<Date | undefined>(initialDate);
   const [assignedTo, setAssignedTo] = useState(currentUserId || "");
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [subcategoryId, setSubcategoryId] = useState<string>("");
+  const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      fetchTaskTypes();
+    }
+  }, [open]);
+
+  const fetchTaskTypes = async () => {
+    const { data, error } = await supabase
+      .from("task_types")
+      .select("*")
+      .eq("is_active", true)
+      .order("sort_order");
+
+    if (!error && data) {
+      setTaskTypes(data);
+    }
+  };
+
+  const mainCategories = taskTypes.filter((t) => !t.parent_id);
+  const subcategories = taskTypes.filter((t) => t.parent_id === categoryId);
 
   const resetForm = () => {
     setTitle("");
@@ -62,6 +87,8 @@ export function CreateTaskDialog({
     setPriority("medium");
     setDueDate(initialDate);
     setAssignedTo(currentUserId || "");
+    setCategoryId("");
+    setSubcategoryId("");
   };
 
   const handleClose = () => {
@@ -78,6 +105,9 @@ export function CreateTaskDialog({
     setSaving(true);
 
     try {
+      // Use subcategory if selected, otherwise main category
+      const typeId = subcategoryId || categoryId || null;
+
       const { error } = await supabase.from("tasks").insert({
         title: title.trim(),
         description: description.trim() || null,
@@ -86,6 +116,7 @@ export function CreateTaskDialog({
         due_date: format(dueDate, "yyyy-MM-dd"),
         assigned_to: assignedTo,
         created_by: currentUserId,
+        type_id: typeId,
       });
 
       if (error) throw error;
@@ -111,6 +142,12 @@ export function CreateTaskDialog({
   if (initialDate && (!dueDate || dueDate.getTime() !== initialDate.getTime())) {
     setDueDate(initialDate);
   }
+
+  // Reset subcategory when main category changes
+  const handleCategoryChange = (value: string) => {
+    setCategoryId(value);
+    setSubcategoryId("");
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -151,6 +188,57 @@ export function CreateTaskDialog({
               placeholder="Optionele beschrijving"
               rows={3}
             />
+          </div>
+
+          {/* Category selectors */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Hoofdcategorie</Label>
+              <Select value={categoryId} onValueChange={handleCategoryChange}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Selecteer categorie" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  {mainCategories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                        {cat.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Subcategorie</Label>
+              <Select
+                value={subcategoryId}
+                onValueChange={setSubcategoryId}
+                disabled={!categoryId || subcategories.length === 0}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder={subcategories.length === 0 ? "Geen subcategorieën" : "Selecteer subcategorie"} />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  {subcategories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                        {cat.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

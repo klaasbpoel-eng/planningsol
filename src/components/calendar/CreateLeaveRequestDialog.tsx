@@ -29,6 +29,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type TimeOffType = Database["public"]["Enums"]["time_off_type"];
+type TimeOffTypeRecord = Database["public"]["Tables"]["time_off_types"]["Row"];
 
 interface CreateLeaveRequestDialogProps {
   open: boolean;
@@ -40,11 +41,12 @@ interface CreateLeaveRequestDialogProps {
   isAdmin: boolean;
 }
 
-const timeOffTypes: { value: TimeOffType; label: string; color: string }[] = [
-  { value: "vacation", label: "Vakantie", color: "bg-primary" },
-  { value: "sick", label: "Ziekteverlof", color: "bg-destructive" },
-  { value: "personal", label: "Persoonlijk", color: "bg-accent" },
-  { value: "other", label: "Overig", color: "bg-muted-foreground" },
+// Fallback types if no dynamic types exist in the database
+const defaultTimeOffTypes: { value: TimeOffType; label: string; color: string }[] = [
+  { value: "vacation", label: "Vakantie", color: "hsl(var(--primary))" },
+  { value: "sick", label: "Ziekteverlof", color: "hsl(var(--destructive))" },
+  { value: "personal", label: "Persoonlijk", color: "hsl(var(--accent))" },
+  { value: "other", label: "Overig", color: "hsl(var(--muted-foreground))" },
 ];
 
 export function CreateLeaveRequestDialog({
@@ -62,6 +64,13 @@ export function CreateLeaveRequestDialog({
   const [type, setType] = useState<TimeOffType>("vacation");
   const [reason, setReason] = useState("");
   const [selectedUserId, setSelectedUserId] = useState(currentUserId || "");
+  const [leaveTypes, setLeaveTypes] = useState<TimeOffTypeRecord[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      fetchLeaveTypes();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (initialDate) {
@@ -75,6 +84,28 @@ export function CreateLeaveRequestDialog({
       setSelectedUserId(currentUserId);
     }
   }, [currentUserId, selectedUserId]);
+
+  const fetchLeaveTypes = async () => {
+    const { data, error } = await supabase
+      .from("time_off_types")
+      .select("*")
+      .eq("is_active", true)
+      .order("name");
+
+    if (!error && data) {
+      setLeaveTypes(data);
+    }
+  };
+
+  // Map dynamic leave types to the expected format, or use defaults
+  const availableTypes = leaveTypes.length > 0
+    ? leaveTypes.map((lt) => ({
+        value: lt.name.toLowerCase() as TimeOffType,
+        label: lt.name,
+        color: lt.color,
+        dbName: lt.name,
+      }))
+    : defaultTimeOffTypes.map((t) => ({ ...t, dbName: t.label }));
 
   const resetForm = () => {
     setStartDate(initialDate);
@@ -189,7 +220,7 @@ export function CreateLeaveRequestDialog({
             </div>
           )}
 
-          {/* Type selector */}
+          {/* Type selector with dynamic leave types */}
           <div className="space-y-2">
             <Label>Type verlof</Label>
             <Select value={type} onValueChange={(v) => setType(v as TimeOffType)}>
@@ -197,10 +228,13 @@ export function CreateLeaveRequestDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-background border shadow-lg z-50">
-                {timeOffTypes.map((t) => (
+                {availableTypes.map((t) => (
                   <SelectItem key={t.value} value={t.value}>
                     <div className="flex items-center gap-2">
-                      <div className={cn("w-2 h-2 rounded-full", t.color)} />
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: t.color }}
+                      />
                       {t.label}
                     </div>
                   </SelectItem>
