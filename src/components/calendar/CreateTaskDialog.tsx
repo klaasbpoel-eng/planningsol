@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -18,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays, ClipboardList, Plus } from "lucide-react";
+import { CalendarDays, ClipboardList, Plus, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -54,6 +56,9 @@ export function CreateTaskDialog({
   const [categoryId, setCategoryId] = useState<string>("");
   const [subcategoryId, setSubcategoryId] = useState<string>("");
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
+  const [hasTime, setHasTime] = useState(false);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -83,6 +88,9 @@ export function CreateTaskDialog({
     setAssignedTo(currentUserId || "");
     setCategoryId("");
     setSubcategoryId("");
+    setHasTime(false);
+    setStartTime("");
+    setEndTime("");
   };
 
   const handleClose = () => {
@@ -90,9 +98,19 @@ export function CreateTaskDialog({
     onOpenChange(false);
   };
 
+  const validateTimeOrder = (): boolean => {
+    if (!hasTime || !startTime || !endTime) return true;
+    return startTime < endTime;
+  };
+
   const handleCreate = async () => {
     if (!dueDate || !assignedTo || !currentUserId) {
       toast.error("Vul alle verplichte velden in");
+      return;
+    }
+
+    if (hasTime && startTime && endTime && !validateTimeOrder()) {
+      toast.error("Eindtijd moet na starttijd liggen");
       return;
     }
 
@@ -109,6 +127,8 @@ export function CreateTaskDialog({
         assigned_to: assignedTo,
         created_by: currentUserId,
         type_id: typeId,
+        start_time: hasTime && startTime ? startTime : null,
+        end_time: hasTime && endTime ? endTime : null,
       });
 
       if (error) throw error;
@@ -295,6 +315,60 @@ export function CreateTaskDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Time selection */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="hasTime"
+                checked={hasTime}
+                onCheckedChange={(checked) => {
+                  setHasTime(checked as boolean);
+                  if (!checked) {
+                    setStartTime("");
+                    setEndTime("");
+                  }
+                }}
+              />
+              <label
+                htmlFor="hasTime"
+                className="text-sm font-medium leading-none cursor-pointer flex items-center gap-2"
+              >
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                Specifieke tijd instellen
+              </label>
+            </div>
+
+            {hasTime && (
+              <div className="grid grid-cols-2 gap-4 pl-6 animate-in slide-in-from-top-2 duration-200">
+                <div className="space-y-2">
+                  <Label htmlFor="startTime">Starttijd</Label>
+                  <Input
+                    id="startTime"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="bg-background"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="endTime">Eindtijd</Label>
+                  <Input
+                    id="endTime"
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="bg-background"
+                  />
+                </div>
+                {startTime && endTime && !validateTimeOrder() && (
+                  <div className="col-span-2 text-sm text-destructive">
+                    Eindtijd moet na starttijd liggen
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
