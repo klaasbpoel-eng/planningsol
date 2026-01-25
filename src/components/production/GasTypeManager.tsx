@@ -1,0 +1,367 @@
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Flame, Plus, Pencil, Trash2, Save } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+interface GasType {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string;
+  is_active: boolean;
+  sort_order: number;
+}
+
+interface GasTypeManagerProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
+  const [gasTypes, setGasTypes] = useState<GasType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editingType, setEditingType] = useState<GasType | null>(null);
+  const [typeToDelete, setTypeToDelete] = useState<GasType | null>(null);
+  
+  // Form state
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [color, setColor] = useState("#3b82f6");
+  const [isActive, setIsActive] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const fetchGasTypes = async () => {
+    const { data, error } = await supabase
+      .from("gas_types")
+      .select("*")
+      .order("sort_order");
+
+    if (error) {
+      console.error("Error fetching gas types:", error);
+    } else {
+      setGasTypes(data || []);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchGasTypes();
+    }
+  }, [open]);
+
+  const openEditDialog = (type: GasType | null) => {
+    if (type) {
+      setName(type.name);
+      setDescription(type.description || "");
+      setColor(type.color);
+      setIsActive(type.is_active);
+    } else {
+      setName("");
+      setDescription("");
+      setColor("#3b82f6");
+      setIsActive(true);
+    }
+    setEditingType(type);
+    setEditDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      toast.error("Voer een naam in");
+      return;
+    }
+
+    setSaving(true);
+    const typeData = {
+      name: name.trim(),
+      description: description.trim() || null,
+      color,
+      is_active: isActive,
+      sort_order: editingType ? editingType.sort_order : gasTypes.length,
+    };
+
+    try {
+      if (editingType) {
+        const { error } = await supabase
+          .from("gas_types")
+          .update(typeData)
+          .eq("id", editingType.id);
+        if (error) throw error;
+        toast.success("Gastype bijgewerkt");
+      } else {
+        const { error } = await supabase
+          .from("gas_types")
+          .insert(typeData);
+        if (error) throw error;
+        toast.success("Gastype toegevoegd");
+      }
+      fetchGasTypes();
+      setEditDialogOpen(false);
+    } catch (error) {
+      console.error("Error saving gas type:", error);
+      toast.error("Fout bij opslaan");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!typeToDelete) return;
+
+    const { error } = await supabase
+      .from("gas_types")
+      .delete()
+      .eq("id", typeToDelete.id);
+
+    if (error) {
+      console.error("Error deleting gas type:", error);
+      toast.error("Fout bij verwijderen");
+    } else {
+      toast.success("Gastype verwijderd");
+      fetchGasTypes();
+    }
+    setDeleteDialogOpen(false);
+    setTypeToDelete(null);
+  };
+
+  const handleToggleActive = async (type: GasType) => {
+    const { error } = await supabase
+      .from("gas_types")
+      .update({ is_active: !type.is_active })
+      .eq("id", type.id);
+
+    if (error) {
+      toast.error("Fout bij bijwerken");
+    } else {
+      fetchGasTypes();
+    }
+  };
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-orange-500/10">
+                <Flame className="h-5 w-5 text-orange-500" />
+              </div>
+              <div>
+                <DialogTitle>Gastypes beheren</DialogTitle>
+                <DialogDescription>
+                  Beheer de beschikbare gassoorten
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="py-4">
+            <div className="flex justify-end mb-4">
+              <Button size="sm" onClick={() => openEditDialog(null)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nieuw gastype
+              </Button>
+            </div>
+
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : gasTypes.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Geen gastypes gevonden
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Kleur</TableHead>
+                    <TableHead>Naam</TableHead>
+                    <TableHead>Omschrijving</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Acties</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {gasTypes.map((type) => (
+                    <TableRow key={type.id}>
+                      <TableCell>
+                        <div
+                          className="w-6 h-6 rounded-full border"
+                          style={{ backgroundColor: type.color }}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">{type.name}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {type.description || "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={type.is_active ? "default" : "secondary"}
+                          className="cursor-pointer"
+                          onClick={() => handleToggleActive(type)}
+                        >
+                          {type.is_active ? "Actief" : "Inactief"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(type)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setTypeToDelete(type);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Sluiten
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit/Create Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingType ? "Gastype bewerken" : "Nieuw gastype"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="typeName">
+                Naam <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="typeName"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="bijv. Stikstof"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="typeDescription">Omschrijving</Label>
+              <Textarea
+                id="typeDescription"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Optionele omschrijving..."
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="typeColor">Kleur</Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="typeColor"
+                  type="color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="w-16 h-10 p-1 cursor-pointer"
+                />
+                <Input
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  placeholder="#3b82f6"
+                  className="flex-1"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <Label>Actief</Label>
+              <Switch checked={isActive} onCheckedChange={setIsActive} />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)} disabled={saving}>
+              Annuleren
+            </Button>
+            <Button onClick={handleSave} disabled={saving || !name.trim()}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? "Opslaan..." : "Opslaan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Gastype verwijderen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Weet je zeker dat je "{typeToDelete?.name}" wilt verwijderen?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Verwijderen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
