@@ -23,6 +23,7 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [type, setType] = useState<TimeOffType>("vacation");
+  const [dayPart, setDayPart] = useState<"morning" | "afternoon" | "full_day">("full_day");
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -50,6 +51,7 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
         start_date: format(startDate, "yyyy-MM-dd"),
         end_date: format(endDate, "yyyy-MM-dd"),
         type,
+        day_part: dayPart,
         reason: reason.trim() || null,
       });
 
@@ -59,6 +61,7 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
       setStartDate(undefined);
       setEndDate(undefined);
       setType("vacation");
+      setDayPart("full_day");
       setReason("");
       onSuccess();
     } catch (error: any) {
@@ -73,6 +76,12 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
     { value: "sick", label: "Ziekteverlof", color: "bg-destructive" },
     { value: "personal", label: "Persoonlijk", color: "bg-accent" },
     { value: "other", label: "Overig", color: "bg-muted-foreground" },
+  ];
+
+  const dayPartOptions = [
+    { value: "full_day", label: "Hele dag" },
+    { value: "morning", label: "Ochtend (tot 12:00)" },
+    { value: "afternoon", label: "Middag (vanaf 12:00)" },
   ];
 
   return (
@@ -155,6 +164,22 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
                       <div className={cn("w-2 h-2 rounded-full", t.color)} />
                       {t.label}
                     </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Dagdeel</Label>
+            <Select value={dayPart} onValueChange={(v) => setDayPart(v as "morning" | "afternoon" | "full_day")}>
+              <SelectTrigger className="h-11">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {dayPartOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
                   </SelectItem>
                 ))}
               </SelectContent>

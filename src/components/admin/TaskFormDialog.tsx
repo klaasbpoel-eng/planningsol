@@ -24,7 +24,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, Clock, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -57,6 +57,8 @@ const initialFormData = {
   assigned_to: "",
   type_id: null as string | null,
   main_category_id: null as string | null,
+  start_time: "" as string,
+  end_time: "" as string,
 };
 
 export function TaskFormDialog({
@@ -95,6 +97,8 @@ export function TaskFormDialog({
           assigned_to: task.assigned_to,
           type_id: subCategoryId,
           main_category_id: mainCategoryId,
+          start_time: (task as any).start_time || "",
+          end_time: (task as any).end_time || "",
         });
       }
     }
@@ -135,6 +139,8 @@ export function TaskFormDialog({
         status: formData.status,
         assigned_to: formData.assigned_to,
         type_id: finalTypeId,
+        start_time: formData.start_time || null,
+        end_time: formData.end_time || null,
       };
 
       if (mode === "create") {
@@ -337,6 +343,38 @@ export function TaskFormDialog({
                 />
               </PopoverContent>
             </Popover>
+          </div>
+
+          {/* Start and End Time */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Starttijd
+              </Label>
+              <Input
+                type="time"
+                value={formData.start_time}
+                onChange={(e) =>
+                  setFormData({ ...formData, start_time: e.target.value })
+                }
+                placeholder="09:00"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Eindtijd
+              </Label>
+              <Input
+                type="time"
+                value={formData.end_time}
+                onChange={(e) =>
+                  setFormData({ ...formData, end_time: e.target.value })
+                }
+                placeholder="17:00"
+              />
+            </div>
           </div>
 
           {/* Priority & Status */}
