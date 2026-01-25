@@ -68,7 +68,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
     const { data, error } = await supabase
       .from("gas_types")
       .select("*")
-      .order("sort_order");
+      .order("description", { ascending: true, nullsFirst: false });
 
     if (error) {
       console.error("Error fetching gas types:", error);
