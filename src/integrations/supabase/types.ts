@@ -159,6 +159,7 @@ export type Database = {
       }
       dry_ice_packaging: {
         Row: {
+          capacity_kg: number | null
           created_at: string
           description: string | null
           id: string
@@ -168,6 +169,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          capacity_kg?: number | null
           created_at?: string
           description?: string | null
           id?: string
@@ -177,6 +179,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          capacity_kg?: number | null
           created_at?: string
           description?: string | null
           id?: string
