@@ -312,7 +312,7 @@ export function TaskList() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <CardTitle className="text-base font-semibold line-clamp-2">
-                      {task.title}
+                      {task.task_types?.name || "Taak"}
                     </CardTitle>
                     {task.task_types && (
                       <div className="flex items-center gap-1.5 mt-1">
@@ -349,12 +349,6 @@ export function TaskList() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {task.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {task.description}
-                  </p>
-                )}
-
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline" className={getStatusStyle(task.status)}>
                     {getStatusIcon(task.status)}
@@ -416,7 +410,7 @@ export function TaskList() {
           <AlertDialogHeader>
             <AlertDialogTitle>Taak Verwijderen</AlertDialogTitle>
             <AlertDialogDescription>
-              Weet je zeker dat je de taak "{taskToDelete?.title}" wilt verwijderen?
+              Weet je zeker dat je deze taak wilt verwijderen?
               Deze actie kan niet ongedaan worden gemaakt.
             </AlertDialogDescription>
           </AlertDialogHeader>

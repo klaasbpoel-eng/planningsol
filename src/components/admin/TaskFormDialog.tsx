@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+
 import {
   Select,
   SelectContent,
@@ -49,8 +49,6 @@ interface TaskFormDialogProps {
 }
 
 const initialFormData = {
-  title: "",
-  description: "",
   due_date: undefined as Date | undefined,
   priority: "medium" as string,
   status: "pending" as string,
@@ -89,8 +87,6 @@ export function TaskFormDialog({
         const subCategoryId = taskType?.parent_id ? task.type_id : null;
         
         setFormData({
-          title: task.title,
-          description: task.description || "",
           due_date: task.due_date ? new Date(task.due_date) : undefined,
           priority: task.priority,
           status: task.status,
@@ -106,10 +102,6 @@ export function TaskFormDialog({
 
   const handleSave = async () => {
     // Validation
-    if (!formData.title.trim()) {
-      toast.error("Titel is verplicht");
-      return;
-    }
     if (!formData.assigned_to) {
       toast.error("Selecteer een medewerker");
       return;
@@ -140,8 +132,6 @@ export function TaskFormDialog({
       const finalTypeId = formData.type_id || formData.main_category_id;
 
       const taskData = {
-        title: formData.title.trim(),
-        description: formData.description.trim() || null,
         due_date: format(formData.due_date, "yyyy-MM-dd"),
         priority: formData.priority,
         status: formData.status,
@@ -206,32 +196,6 @@ export function TaskFormDialog({
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
-          {/* Title */}
-          <div className="grid gap-2">
-            <Label htmlFor="title">Titel *</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
-              }
-              placeholder="Taaknaam..."
-            />
-          </div>
-
-          {/* Description */}
-          <div className="grid gap-2">
-            <Label htmlFor="description">Beschrijving</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              placeholder="Taakbeschrijving..."
-              rows={3}
-            />
-          </div>
 
           {/* Assigned To */}
           <div className="grid gap-2">

@@ -78,6 +78,7 @@ import { Clock, Sun, Sunset } from "lucide-react";
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Task = Database["public"]["Tables"]["tasks"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+type TaskType = Database["public"]["Tables"]["task_types"]["Row"];
 
 type RequestWithProfile = TimeOffRequest & {
   profile?: Profile | null;
@@ -85,6 +86,7 @@ type RequestWithProfile = TimeOffRequest & {
 
 type TaskWithProfile = Task & {
   profile?: Profile | null;
+  task_type?: TaskType | null;
 };
 
 type ViewType = "day" | "week" | "month" | "year";
@@ -113,10 +115,11 @@ export function CalendarOverview() {
   const [createDate, setCreateDate] = useState<Date | undefined>();
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
+  const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
   const [lastAction, setLastAction] = useState<{
     type: "task_move";
     taskId: string;
-    taskTitle: string;
+    taskName: string;
     previousDate: string;
     newDate: string;
   } | null>(null);
@@ -180,21 +183,31 @@ export function CalendarOverview() {
 
       if (tasksError) throw tasksError;
 
+      // Fetch task types
+      const { data: taskTypesData, error: taskTypesError } = await supabase
+        .from("task_types")
+        .select("*")
+        .eq("is_active", true);
+
+      if (taskTypesError) throw taskTypesError;
+
       // Map profiles to requests
       const requestsWithProfiles: RequestWithProfile[] = (requestsData || []).map((request) => {
         const profile = profilesData?.find((p) => p.user_id === request.user_id) || null;
         return { ...request, profile };
       });
 
-      // Map profiles to tasks
+      // Map profiles and task types to tasks
       const tasksWithProfiles: TaskWithProfile[] = (tasksData || []).map((task) => {
         const profile = profilesData?.find((p) => p.user_id === task.assigned_to) || null;
-        return { ...task, profile };
+        const task_type = taskTypesData?.find((t) => t.id === task.type_id) || null;
+        return { ...task, profile, task_type };
       });
 
       setRequests(requestsWithProfiles);
       setTasks(tasksWithProfiles);
       setProfiles(profilesData || []);
+      setTaskTypes(taskTypesData || []);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -255,7 +268,7 @@ export function CalendarOverview() {
         
         setLastAction(null);
         toast.success("Actie ongedaan gemaakt", {
-          description: `"${action.taskTitle}" teruggezet naar ${format(parseISO(action.previousDate), "d MMMM yyyy", { locale: nl })}`,
+          description: `"${action.taskName}" teruggezet naar ${format(parseISO(action.previousDate), "d MMMM yyyy", { locale: nl })}`,
         });
       } catch (error) {
         console.error("Error undoing action:", error);
@@ -335,17 +348,18 @@ export function CalendarOverview() {
       if (error) throw error;
       
       // Store the action for undo
+      const taskName = draggedTask.task_type?.name || "Taak";
       const actionData = {
         type: "task_move" as const,
         taskId: draggedTask.id,
-        taskTitle: draggedTask.title,
+        taskName,
         previousDate,
         newDate: newDueDate,
       };
       setLastAction(actionData);
       
       toast.success("Taak deadline bijgewerkt", {
-        description: `"${draggedTask.title}" verplaatst naar ${format(targetDate, "d MMMM yyyy", { locale: nl })}`,
+        description: `"${taskName}" verplaatst naar ${format(targetDate, "d MMMM yyyy", { locale: nl })}`,
         action: {
           label: "Ongedaan maken",
           onClick: () => handleUndoAction(actionData),
@@ -657,10 +671,7 @@ export function CalendarOverview() {
                           </div>
                         )}
                       </div>
-                      <div className="font-medium mt-2">{task.title}</div>
-                      {task.description && (
-                        <div className="text-xs opacity-75 mt-1 line-clamp-2">{task.description}</div>
-                      )}
+                      <div className="font-medium mt-2">{task.task_type?.name || "Taak"}</div>
                       <div className="flex items-center gap-2 mt-2">
                         <Badge variant="outline" className={cn("text-xs", getTaskPriorityColor(task.priority))}>
                           {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Gemiddeld" : "Laag"}
@@ -757,7 +768,7 @@ export function CalendarOverview() {
                           getTaskStatusColor((entry.item as TaskWithProfile).status),
                           draggedTask?.id === (entry.item as TaskWithProfile).id && "opacity-50"
                         )}
-                        title={`${(entry.item as TaskWithProfile).title}${hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? ` (${formatTimeRange((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time)})` : ""}`}
+                        title={`${(entry.item as TaskWithProfile).task_type?.name || "Taak"}${hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? ` (${formatTimeRange((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time)})` : ""}`}
                       >
                         {hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? (
                           <Clock className="w-3 h-3 shrink-0 opacity-70" />
@@ -765,7 +776,7 @@ export function CalendarOverview() {
                           <GripVertical className="w-3 h-3 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
                         )}
                         <ClipboardList className="w-3 h-3 shrink-0" />
-                        <span className="truncate font-medium">{(entry.item as TaskWithProfile).title}</span>
+                        <span className="truncate font-medium">{(entry.item as TaskWithProfile).task_type?.name || "Taak"}</span>
                       </div>
                     )
                   ))}
@@ -869,7 +880,7 @@ export function CalendarOverview() {
                           getTaskStatusColor((entry.item as TaskWithProfile).status),
                           draggedTask?.id === (entry.item as TaskWithProfile).id && "opacity-50"
                         )}
-                        title={`${(entry.item as TaskWithProfile).title}${hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? ` (${formatTimeRange((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time)})` : ""}`}
+                        title={`${(entry.item as TaskWithProfile).task_type?.name || "Taak"}${hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? ` (${formatTimeRange((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time)})` : ""}`}
                       >
                         {hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? (
                           <Clock className="w-2.5 h-2.5 shrink-0 opacity-70" />
@@ -877,7 +888,7 @@ export function CalendarOverview() {
                           <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
                         )}
                         <ClipboardList className="w-2.5 h-2.5 shrink-0" />
-                        <span className="truncate font-medium">{(entry.item as TaskWithProfile).title}</span>
+                        <span className="truncate font-medium">{(entry.item as TaskWithProfile).task_type?.name || "Taak"}</span>
                       </div>
                     )
                   ))}
@@ -973,7 +984,7 @@ export function CalendarOverview() {
                         )}
                       >
                         <ClipboardList className="w-2.5 h-2.5" />
-                        {task.title.substring(0, 15)}{task.title.length > 15 ? '...' : ''}
+                        {(task.task_type?.name || "Taak").substring(0, 15)}{(task.task_type?.name || "Taak").length > 15 ? '...' : ''}
                       </Badge>
                     ))}
                     {totalItems > 2 && (

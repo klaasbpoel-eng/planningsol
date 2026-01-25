@@ -215,14 +215,12 @@ export type Database = {
           assigned_to: string
           created_at: string
           created_by: string
-          description: string | null
           due_date: string
           end_time: string | null
           id: string
           priority: string
           start_time: string | null
           status: string
-          title: string
           type_id: string | null
           updated_at: string
         }
@@ -230,14 +228,12 @@ export type Database = {
           assigned_to: string
           created_at?: string
           created_by: string
-          description?: string | null
           due_date: string
           end_time?: string | null
           id?: string
           priority?: string
           start_time?: string | null
           status?: string
-          title: string
           type_id?: string | null
           updated_at?: string
         }
@@ -245,14 +241,12 @@ export type Database = {
           assigned_to?: string
           created_at?: string
           created_by?: string
-          description?: string | null
           due_date?: string
           end_time?: string | null
           id?: string
           priority?: string
           start_time?: string | null
           status?: string
-          title?: string
           type_id?: string | null
           updated_at?: string
         }
