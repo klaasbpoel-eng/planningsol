@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays, Snowflake, Plus } from "lucide-react";
@@ -46,6 +47,7 @@ export function CreateDryIceOrderDialog({
   const [productTypeId, setProductTypeId] = useState("");
   const [packagingId, setPackagingId] = useState("");
   const [boxCount, setBoxCount] = useState("");
+  const [containerHasWheels, setContainerHasWheels] = useState<boolean | null>(null);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [notes, setNotes] = useState("");
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
@@ -53,9 +55,10 @@ export function CreateDryIceOrderDialog({
   const [productTypes, setProductTypes] = useState<{ id: string; name: string }[]>([]);
   const [packagingOptions, setPackagingOptions] = useState<{ id: string; name: string }[]>([]);
   
-  // Check if selected packaging is EPS type
+  // Check if selected packaging is EPS type or Kunststof container
   const selectedPackaging = packagingOptions.find(p => p.id === packagingId);
   const isEpsPackaging = selectedPackaging?.name.toLowerCase().includes("eps");
+  const isKunststofContainer = selectedPackaging?.name.toLowerCase().includes("kunststof");
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -109,6 +112,7 @@ export function CreateDryIceOrderDialog({
     }
     setPackagingId("");
     setBoxCount("");
+    setContainerHasWheels(null);
     setScheduledDate(new Date());
     setNotes("");
   };
@@ -148,6 +152,7 @@ export function CreateDryIceOrderDialog({
         product_type_id: productTypeId,
         packaging_id: packagingId || null,
         box_count: isEpsPackaging && boxCount ? parseInt(boxCount, 10) : null,
+        container_has_wheels: isKunststofContainer ? containerHasWheels : null,
         scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
         notes: notes.trim() || null,
         created_by: currentProfileId,
@@ -237,9 +242,14 @@ export function CreateDryIceOrderDialog({
               <Label>Verpakking</Label>
               <Select value={packagingId} onValueChange={(value) => {
                 setPackagingId(value);
+                const newPackaging = packagingOptions.find(p => p.id === value);
                 // Reset box count when changing packaging
-                if (!packagingOptions.find(p => p.id === value)?.name.toLowerCase().includes("eps")) {
+                if (!newPackaging?.name.toLowerCase().includes("eps")) {
                   setBoxCount("");
+                }
+                // Reset wheels option when not kunststof
+                if (!newPackaging?.name.toLowerCase().includes("kunststof")) {
+                  setContainerHasWheels(null);
                 }
               }}>
                 <SelectTrigger className="bg-background">
@@ -273,6 +283,28 @@ export function CreateDryIceOrderDialog({
               </div>
             )}
           </div>
+
+          {isKunststofContainer && (
+            <div className="space-y-2">
+              <Label>
+                Type container <span className="text-destructive">*</span>
+              </Label>
+              <RadioGroup
+                value={containerHasWheels === null ? "" : containerHasWheels ? "with-wheels" : "without-wheels"}
+                onValueChange={(value) => setContainerHasWheels(value === "with-wheels")}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="with-wheels" id="with-wheels" />
+                  <Label htmlFor="with-wheels" className="font-normal cursor-pointer">Met wielen</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="without-wheels" id="without-wheels" />
+                  <Label htmlFor="without-wheels" className="font-normal cursor-pointer">Zonder wielen</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>
@@ -328,7 +360,7 @@ export function CreateDryIceOrderDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={saving || !customerId || !quantityKg || !scheduledDate || !productTypeId || (isEpsPackaging && !boxCount)}
+            disabled={saving || !customerId || !quantityKg || !scheduledDate || !productTypeId || (isEpsPackaging && !boxCount) || (isKunststofContainer && containerHasWheels === null)}
             className="bg-cyan-500 hover:bg-cyan-600"
           >
             <Plus className="h-4 w-4 mr-2" />
