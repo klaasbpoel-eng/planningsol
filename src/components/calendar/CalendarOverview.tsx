@@ -898,10 +898,13 @@ export function CalendarOverview() {
                             {getDryIceStatusLabel(order.status)}
                           </Badge>
                         </div>
-                        <div className="text-sm text-muted-foreground flex items-center gap-2">
+                        <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
                           <span>{order.quantity_kg} kg {order.product_type_info?.name || ""}</span>
                           {order.packaging_info && (
                             <span className="text-xs">• {order.packaging_info.name}</span>
+                          )}
+                          {order.packaging_info?.name?.toLowerCase().includes("container") && (
+                            <span className="text-xs">• {order.container_has_wheels ? "Met wielen" : "Zonder wielen"}</span>
                           )}
                         </div>
                         {order.notes && (
@@ -1074,7 +1077,12 @@ export function CalendarOverview() {
                         {order.quantity_kg} kg {order.product_type_info?.name || ""}
                       </div>
                       {order.packaging_info && (
-                        <div className="text-xs opacity-75 mt-1">{order.packaging_info.name}</div>
+                        <div className="text-xs opacity-75 mt-1">
+                          {order.packaging_info.name}
+                          {order.packaging_info.name?.toLowerCase().includes("container") && (
+                            <span> • {order.container_has_wheels ? "Met wielen" : "Zonder wielen"}</span>
+                          )}
+                        </div>
                       )}
                       {order.notes && (
                         <div className="text-xs opacity-60 mt-2 italic">{order.notes}</div>
@@ -1219,10 +1227,10 @@ export function CalendarOverview() {
                           className={cn(
                             "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
                           )}
-                          title={`${order.customer_name} - ${order.quantity_kg}kg ${order.product_type_info?.name || ""}${order.packaging_info ? ` (${order.packaging_info.name})` : ""}`}
+                          title={`${order.customer_name} - ${order.quantity_kg}kg${order.product_type_info ? ` ${order.product_type_info.name}` : ""}${order.packaging_info ? ` (${order.packaging_info.name}${order.packaging_info.name?.toLowerCase().includes("container") ? ` - ${order.container_has_wheels ? "met wielen" : "zonder wielen"}` : ""})` : ""}`}
                         >
                           <Snowflake className="w-3 h-3 shrink-0" />
-                          <span className="truncate font-medium">{order.customer_name}</span>
+                          <span className="truncate font-medium">{order.customer_name} • {order.quantity_kg}kg</span>
                         </div>
                       );
                     }
@@ -1389,10 +1397,10 @@ export function CalendarOverview() {
                           key={order.id}
                           onClick={(e) => handleDryIceOrderClick(order, e)}
                           className="text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
-                          title={`${order.customer_name} - ${order.quantity_kg}kg${order.packaging_info ? ` (${order.packaging_info.name})` : ""}`}
+                          title={`${order.customer_name} - ${order.quantity_kg}kg${order.product_type_info ? ` ${order.product_type_info.name}` : ""}${order.packaging_info ? ` (${order.packaging_info.name}${order.packaging_info.name?.toLowerCase().includes("container") ? ` - ${order.container_has_wheels ? "met wielen" : "zonder wielen"}` : ""})` : ""}`}
                         >
                           <Snowflake className="w-2.5 h-2.5 shrink-0" />
-                          <span className="truncate font-medium">{order.customer_name}</span>
+                          <span className="truncate font-medium">{order.customer_name} • {order.quantity_kg}kg</span>
                         </div>
                       );
                     }
