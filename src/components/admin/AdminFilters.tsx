@@ -96,8 +96,11 @@ export function AdminFilters({ employees, filters, onFiltersChange }: AdminFilte
                 <SelectContent className="bg-popover z-50">
                   <SelectItem value="all">Alle medewerkers</SelectItem>
                   {employees.map((emp) => (
-                    <SelectItem key={emp.user_id} value={emp.user_id}>
+                    <SelectItem key={emp.id} value={emp.id}>
                       {emp.full_name || emp.email || "Onbekend"}
+                      {!emp.user_id && (
+                        <span className="ml-2 text-xs text-muted-foreground">(geen account)</span>
+                      )}
                     </SelectItem>
                   ))}
                 </SelectContent>
