@@ -26,6 +26,7 @@ import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { CustomerSelect } from "./CustomerSelect";
 
 interface CreateGasCylinderOrderDialogProps {
   open: boolean;
@@ -39,6 +40,7 @@ export function CreateGasCylinderOrderDialog({
   onCreated,
 }: CreateGasCylinderOrderDialogProps) {
   const [saving, setSaving] = useState(false);
+  const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [gasType, setGasType] = useState("co2");
   const [cylinderCount, setCylinderCount] = useState("");
@@ -66,6 +68,7 @@ export function CreateGasCylinderOrderDialog({
   }, []);
 
   const resetForm = () => {
+    setCustomerId("");
     setCustomerName("");
     setGasType("co2");
     setCylinderCount("");
@@ -103,6 +106,7 @@ export function CreateGasCylinderOrderDialog({
       const insertData = {
         order_number: generateOrderNumber(),
         customer_name: customerName.trim(),
+        customer_id: customerId || null,
         gas_type: gasType as "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other",
         cylinder_count: count,
         cylinder_size: cylinderSize,
@@ -144,15 +148,15 @@ export function CreateGasCylinderOrderDialog({
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="customerName">
-              Klantnaam <span className="text-destructive">*</span>
+            <Label>
+              Klant <span className="text-destructive">*</span>
             </Label>
-            <Input
-              id="customerName"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Voer klantnaam in"
-              className="bg-background"
+            <CustomerSelect
+              value={customerId}
+              onValueChange={(id, name) => {
+                setCustomerId(id);
+                setCustomerName(name);
+              }}
             />
           </div>
 
@@ -261,7 +265,7 @@ export function CreateGasCylinderOrderDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={saving || !customerName.trim() || !cylinderCount || !scheduledDate}
+            disabled={saving || !customerId || !cylinderCount || !scheduledDate}
             className="bg-orange-500 hover:bg-orange-600"
           >
             <Plus className="h-4 w-4 mr-2" />

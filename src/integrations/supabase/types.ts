@@ -14,11 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      customers: {
+        Row: {
+          address: string | null
+          contact_person: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dry_ice_orders: {
         Row: {
           assigned_to: string | null
           created_at: string
           created_by: string
+          customer_id: string | null
           customer_name: string
           id: string
           notes: string | null
@@ -33,6 +73,7 @@ export type Database = {
           assigned_to?: string | null
           created_at?: string
           created_by: string
+          customer_id?: string | null
           customer_name: string
           id?: string
           notes?: string | null
@@ -47,6 +88,7 @@ export type Database = {
           assigned_to?: string | null
           created_at?: string
           created_by?: string
+          customer_id?: string | null
           customer_name?: string
           id?: string
           notes?: string | null
@@ -84,6 +126,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles_limited"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dry_ice_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
@@ -140,6 +189,7 @@ export type Database = {
           assigned_to: string | null
           created_at: string
           created_by: string
+          customer_id: string | null
           customer_name: string
           cylinder_count: number
           cylinder_size: string
@@ -155,6 +205,7 @@ export type Database = {
           assigned_to?: string | null
           created_at?: string
           created_by: string
+          customer_id?: string | null
           customer_name: string
           cylinder_count: number
           cylinder_size?: string
@@ -170,6 +221,7 @@ export type Database = {
           assigned_to?: string | null
           created_at?: string
           created_by?: string
+          customer_id?: string | null
           customer_name?: string
           cylinder_count?: number
           cylinder_size?: string
@@ -208,6 +260,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles_limited"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gas_cylinder_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
