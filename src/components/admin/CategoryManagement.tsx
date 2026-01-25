@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,19 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, FolderTree, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, FolderTree, Loader2, GripVertical } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type TaskType = Database["public"]["Tables"]["task_types"]["Row"];
@@ -60,13 +52,15 @@ export function CategoryManagement() {
   const [deletingCategory, setDeletingCategory] = useState<TaskType | null>(null);
   const [formData, setFormData] = useState<CategoryFormData>(initialFormData);
   const [saving, setSaving] = useState(false);
+  const [draggedItem, setDraggedItem] = useState<TaskType | null>(null);
+  const [dragOverItem, setDragOverItem] = useState<string | null>(null);
 
   const fetchCategories = async () => {
     try {
       const { data, error } = await supabase
         .from("task_types")
         .select("*")
-        .order("name");
+        .order("sort_order");
 
       if (error) throw error;
       setCategories(data || []);
@@ -82,9 +76,14 @@ export function CategoryManagement() {
     fetchCategories();
   }, []);
 
-  const mainCategories = categories.filter((c) => !c.parent_id);
+  const mainCategories = categories
+    .filter((c) => !c.parent_id)
+    .sort((a, b) => a.sort_order - b.sort_order);
+  
   const getSubcategories = (parentId: string) =>
-    categories.filter((c) => c.parent_id === parentId);
+    categories
+      .filter((c) => c.parent_id === parentId)
+      .sort((a, b) => a.sort_order - b.sort_order);
 
   const openCreateDialog = (parentId: string | null = null) => {
     setEditingCategory(null);
@@ -133,12 +132,21 @@ export function CategoryManagement() {
         if (error) throw error;
         toast.success("Categorie bijgewerkt");
       } else {
+        // Get the max sort_order for the parent
+        const siblings = formData.parent_id
+          ? getSubcategories(formData.parent_id)
+          : mainCategories;
+        const maxOrder = siblings.length > 0 
+          ? Math.max(...siblings.map(s => s.sort_order)) 
+          : 0;
+
         const { error } = await supabase.from("task_types").insert({
           name: formData.name.trim(),
           description: formData.description.trim() || null,
           color: formData.color,
           parent_id: formData.parent_id,
           is_active: formData.is_active,
+          sort_order: maxOrder + 1,
         });
 
         if (error) throw error;
@@ -161,7 +169,6 @@ export function CategoryManagement() {
     setSaving(true);
 
     try {
-      // Check if category has subcategories
       const subcategories = getSubcategories(deletingCategory.id);
       if (subcategories.length > 0) {
         toast.error("Verwijder eerst alle subcategorieën");
@@ -187,6 +194,86 @@ export function CategoryManagement() {
     }
   };
 
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, category: TaskType) => {
+    setDraggedItem(category);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", category.id);
+  };
+
+  const handleDragOver = (e: React.DragEvent, categoryId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverItem(categoryId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverItem(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+    setDragOverItem(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetCategory: TaskType) => {
+    e.preventDefault();
+    
+    if (!draggedItem || draggedItem.id === targetCategory.id) {
+      handleDragEnd();
+      return;
+    }
+
+    // Only allow reordering within the same parent
+    if (draggedItem.parent_id !== targetCategory.parent_id) {
+      toast.error("Categorieën kunnen alleen binnen dezelfde groep worden verplaatst");
+      handleDragEnd();
+      return;
+    }
+
+    const siblings = draggedItem.parent_id
+      ? getSubcategories(draggedItem.parent_id)
+      : mainCategories;
+
+    const draggedIndex = siblings.findIndex(c => c.id === draggedItem.id);
+    const targetIndex = siblings.findIndex(c => c.id === targetCategory.id);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      handleDragEnd();
+      return;
+    }
+
+    // Reorder the array
+    const reordered = [...siblings];
+    const [removed] = reordered.splice(draggedIndex, 1);
+    reordered.splice(targetIndex, 0, removed);
+
+    // Update sort_order for all affected items
+    try {
+      const updates = reordered.map((cat, index) => ({
+        id: cat.id,
+        sort_order: index + 1,
+      }));
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from("task_types")
+          .update({ sort_order: update.sort_order })
+          .eq("id", update.id);
+        
+        if (error) throw error;
+      }
+
+      toast.success("Volgorde bijgewerkt");
+      fetchCategories();
+    } catch (error) {
+      console.error("Error updating order:", error);
+      toast.error("Fout bij bijwerken volgorde");
+    }
+
+    handleDragEnd();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -206,7 +293,7 @@ export function CategoryManagement() {
             <div>
               <CardTitle>Taakcategorieën</CardTitle>
               <CardDescription>
-                Beheer hoofd- en subcategorieën voor taken
+                Beheer hoofd- en subcategorieën voor taken. Sleep om te sorteren.
               </CardDescription>
             </div>
           </div>
@@ -224,9 +311,25 @@ export function CategoryManagement() {
         ) : (
           <div className="space-y-4">
             {mainCategories.map((mainCat) => (
-              <div key={mainCat.id} className="border rounded-lg">
-                <div className="flex items-center justify-between p-4 bg-muted/30">
+              <div 
+                key={mainCat.id} 
+                className={`border rounded-lg transition-colors ${
+                  dragOverItem === mainCat.id ? "border-primary bg-primary/5" : ""
+                }`}
+              >
+                <div 
+                  className={`flex items-center justify-between p-4 bg-muted/30 ${
+                    draggedItem?.id === mainCat.id ? "opacity-50" : ""
+                  }`}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, mainCat)}
+                  onDragOver={(e) => handleDragOver(e, mainCat.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, mainCat)}
+                  onDragEnd={handleDragEnd}
+                >
                   <div className="flex items-center gap-3">
+                    <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab active:cursor-grabbing" />
                     <div
                       className="w-4 h-4 rounded-full"
                       style={{ backgroundColor: mainCat.color }}
@@ -263,44 +366,52 @@ export function CategoryManagement() {
                 </div>
 
                 {getSubcategories(mainCat.id).length > 0 && (
-                  <Table>
-                    <TableBody>
-                      {getSubcategories(mainCat.id).map((subCat) => (
-                        <TableRow key={subCat.id}>
-                          <TableCell className="pl-8">
-                            <div className="flex items-center gap-3">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: subCat.color }}
-                              />
-                              <span>{subCat.name}</span>
-                              {!subCat.is_active && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Inactief
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEditDialog(subCat)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openDeleteDialog(subCat)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <div className="divide-y">
+                    {getSubcategories(mainCat.id).map((subCat) => (
+                      <div
+                        key={subCat.id}
+                        className={`flex items-center justify-between py-3 px-4 pl-8 transition-colors ${
+                          dragOverItem === subCat.id ? "bg-primary/5" : ""
+                        } ${draggedItem?.id === subCat.id ? "opacity-50" : ""}`}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, subCat)}
+                        onDragOver={(e) => handleDragOver(e, subCat.id)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, subCat)}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <div className="flex items-center gap-3">
+                          <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab active:cursor-grabbing" />
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: subCat.color }}
+                          />
+                          <span>{subCat.name}</span>
+                          {!subCat.is_active && (
+                            <Badge variant="secondary" className="text-xs">
+                              Inactief
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(subCat)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openDeleteDialog(subCat)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             ))}
