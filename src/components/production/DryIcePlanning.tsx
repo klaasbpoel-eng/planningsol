@@ -1,6 +1,7 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Snowflake, Calendar, Package } from "lucide-react";
+import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Edit } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -10,10 +11,95 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import { nl } from "date-fns/locale";
+import { toast } from "sonner";
+import { CreateDryIceOrderDialog } from "./CreateDryIceOrderDialog";
+import { useUserRole } from "@/hooks/useUserRole";
+
+interface DryIceOrder {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  quantity_kg: number;
+  product_type: string;
+  scheduled_date: string;
+  status: string;
+  notes: string | null;
+  created_at: string;
+}
 
 export function DryIcePlanning() {
-  // Placeholder data - will be replaced with real data later
-  const productionOrders: any[] = [];
+  const [orders, setOrders] = useState<DryIceOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [userId, setUserId] = useState<string | undefined>();
+  const { isAdmin } = useUserRole(userId);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id);
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("dry_ice_orders")
+      .select("*")
+      .order("scheduled_date", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching orders:", error);
+      toast.error("Fout bij ophalen orders");
+    } else {
+      setOrders(data || []);
+    }
+    setLoading(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase
+      .from("dry_ice_orders")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      toast.error("Fout bij verwijderen order");
+    } else {
+      toast.success("Order verwijderd");
+      fetchOrders();
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+      pending: { variant: "secondary", label: "Gepland" },
+      in_progress: { variant: "default", label: "Bezig" },
+      completed: { variant: "outline", label: "Voltooid" },
+      cancelled: { variant: "destructive", label: "Geannuleerd" },
+    };
+    const config = variants[status] || { variant: "secondary", label: status };
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const getProductTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      blocks: "Blokken (10kg)",
+      pellets: "Pellets (3mm)",
+      sticks: "Sticks (16mm)",
+    };
+    return labels[type] || type;
+  };
+
+  const todayTotal = orders
+    .filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd") && o.status !== "cancelled")
+    .reduce((sum, o) => sum + Number(o.quantity_kg), 0);
 
   return (
     <div className="space-y-6">
@@ -27,10 +113,12 @@ export function DryIcePlanning() {
             Beheer productieorders voor droogijs
           </p>
         </div>
-        <Button className="bg-cyan-500 hover:bg-cyan-600">
-          <Plus className="h-4 w-4 mr-2" />
-          Nieuwe productieorder
-        </Button>
+        {isAdmin && (
+          <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={() => setDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nieuwe productieorder
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -47,7 +135,11 @@ export function DryIcePlanning() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {productionOrders.length === 0 ? (
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : orders.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Snowflake className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="font-medium">Geen productieorders gepland</p>
@@ -59,21 +151,36 @@ export function DryIcePlanning() {
                     <TableRow>
                       <TableHead>Order</TableHead>
                       <TableHead>Klant</TableHead>
+                      <TableHead>Type</TableHead>
                       <TableHead>Hoeveelheid</TableHead>
                       <TableHead>Datum</TableHead>
                       <TableHead>Status</TableHead>
+                      {isAdmin && <TableHead className="w-[80px]"></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {productionOrders.map((order) => (
+                    {orders.map((order) => (
                       <TableRow key={order.id}>
-                        <TableCell>{order.orderNumber}</TableCell>
-                        <TableCell>{order.customer}</TableCell>
-                        <TableCell>{order.quantity} kg</TableCell>
-                        <TableCell>{order.date}</TableCell>
+                        <TableCell className="font-medium">{order.order_number}</TableCell>
+                        <TableCell>{order.customer_name}</TableCell>
+                        <TableCell>{getProductTypeLabel(order.product_type)}</TableCell>
+                        <TableCell>{order.quantity_kg} kg</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{order.status}</Badge>
+                          {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
                         </TableCell>
+                        <TableCell>{getStatusBadge(order.status)}</TableCell>
+                        {isAdmin && (
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(order.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -120,17 +227,23 @@ export function DryIcePlanning() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Vandaag gepland</span>
-                  <span className="font-medium">0 kg</span>
+                  <span className="font-medium">{todayTotal} kg</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Beschikbaar</span>
-                  <span className="font-medium text-green-500">500 kg</span>
+                  <span className="font-medium text-green-500">{500 - todayTotal} kg</span>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      <CreateDryIceOrderDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onCreated={fetchOrders}
+      />
     </div>
   );
 }

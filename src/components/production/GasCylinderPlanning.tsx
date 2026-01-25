@@ -1,6 +1,7 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Cylinder, Calendar, Gauge, AlertTriangle } from "lucide-react";
+import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -11,10 +12,100 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import { nl } from "date-fns/locale";
+import { toast } from "sonner";
+import { CreateGasCylinderOrderDialog } from "./CreateGasCylinderOrderDialog";
+import { useUserRole } from "@/hooks/useUserRole";
+
+interface GasCylinderOrder {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  gas_type: string;
+  cylinder_count: number;
+  cylinder_size: string;
+  scheduled_date: string;
+  status: string;
+  notes: string | null;
+  created_at: string;
+}
 
 export function GasCylinderPlanning() {
-  // Placeholder data - will be replaced with real data later
-  const fillingOrders: any[] = [];
+  const [orders, setOrders] = useState<GasCylinderOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [userId, setUserId] = useState<string | undefined>();
+  const { isAdmin } = useUserRole(userId);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id);
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("gas_cylinder_orders")
+      .select("*")
+      .order("scheduled_date", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching orders:", error);
+      toast.error("Fout bij ophalen orders");
+    } else {
+      setOrders(data || []);
+    }
+    setLoading(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase
+      .from("gas_cylinder_orders")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      toast.error("Fout bij verwijderen order");
+    } else {
+      toast.success("Order verwijderd");
+      fetchOrders();
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+      pending: { variant: "secondary", label: "Gepland" },
+      in_progress: { variant: "default", label: "Bezig" },
+      completed: { variant: "outline", label: "Voltooid" },
+      cancelled: { variant: "destructive", label: "Geannuleerd" },
+    };
+    const config = variants[status] || { variant: "secondary", label: status };
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const getGasTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      co2: "CO₂",
+      nitrogen: "Stikstof (N₂)",
+      argon: "Argon",
+      acetylene: "Acetyleen",
+      oxygen: "Zuurstof",
+      helium: "Helium",
+      other: "Overig",
+    };
+    return labels[type] || type;
+  };
+
+  const todayCount = orders
+    .filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd") && o.status !== "cancelled")
+    .reduce((sum, o) => sum + o.cylinder_count, 0);
 
   return (
     <div className="space-y-6">
@@ -28,10 +119,12 @@ export function GasCylinderPlanning() {
             Beheer vulorders voor gascilinders
           </p>
         </div>
-        <Button className="bg-orange-500 hover:bg-orange-600">
-          <Plus className="h-4 w-4 mr-2" />
-          Nieuwe vulorder
-        </Button>
+        {isAdmin && (
+          <Button className="bg-orange-500 hover:bg-orange-600" onClick={() => setDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nieuwe vulorder
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -48,7 +141,11 @@ export function GasCylinderPlanning() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {fillingOrders.length === 0 ? (
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : orders.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Cylinder className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="font-medium">Geen vulorders gepland</p>
@@ -62,19 +159,34 @@ export function GasCylinderPlanning() {
                       <TableHead>Klant</TableHead>
                       <TableHead>Gastype</TableHead>
                       <TableHead>Aantal</TableHead>
+                      <TableHead>Datum</TableHead>
                       <TableHead>Status</TableHead>
+                      {isAdmin && <TableHead className="w-[80px]"></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {fillingOrders.map((order) => (
+                    {orders.map((order) => (
                       <TableRow key={order.id}>
-                        <TableCell>{order.orderNumber}</TableCell>
-                        <TableCell>{order.customer}</TableCell>
-                        <TableCell>{order.gasType}</TableCell>
-                        <TableCell>{order.quantity}</TableCell>
+                        <TableCell className="font-medium">{order.order_number}</TableCell>
+                        <TableCell>{order.customer_name}</TableCell>
+                        <TableCell>{getGasTypeLabel(order.gas_type)}</TableCell>
+                        <TableCell>{order.cylinder_count} st.</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{order.status}</Badge>
+                          {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
                         </TableCell>
+                        <TableCell>{getStatusBadge(order.status)}</TableCell>
+                        {isAdmin && (
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(order.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -141,27 +253,31 @@ export function GasCylinderPlanning() {
 
           <Card className="glass-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Cilindervoorraad</CardTitle>
+              <CardTitle className="text-base">Vandaag gepland</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Lege cilinders</span>
-                  <span className="font-medium">0</span>
+                  <span className="text-muted-foreground">Cilinders te vullen</span>
+                  <span className="font-medium">{todayCount}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Volle cilinders</span>
-                  <span className="font-medium">0</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">In test</span>
-                  <span className="font-medium">0</span>
+                  <span className="text-muted-foreground">Orders</span>
+                  <span className="font-medium">
+                    {orders.filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd")).length}
+                  </span>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      <CreateGasCylinderOrderDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onCreated={fetchOrders}
+      />
     </div>
   );
 }
