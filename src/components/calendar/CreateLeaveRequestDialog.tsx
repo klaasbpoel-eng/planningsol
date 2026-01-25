@@ -28,7 +28,6 @@ import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
-type TimeOffType = Database["public"]["Enums"]["time_off_type"];
 type TimeOffTypeRecord = Database["public"]["Tables"]["time_off_types"]["Row"];
 
 interface CreateLeaveRequestDialogProps {
@@ -41,14 +40,6 @@ interface CreateLeaveRequestDialogProps {
   currentProfileId?: string;
   isAdmin: boolean;
 }
-
-// Fallback types if no dynamic types exist in the database
-const defaultTimeOffTypes: { value: TimeOffType; label: string; color: string }[] = [
-  { value: "vacation", label: "Vakantie", color: "hsl(var(--primary))" },
-  { value: "sick", label: "Ziekteverlof", color: "hsl(var(--destructive))" },
-  { value: "personal", label: "Persoonlijk", color: "hsl(var(--accent))" },
-  { value: "other", label: "Overig", color: "hsl(var(--muted-foreground))" },
-];
 
 export function CreateLeaveRequestDialog({
   open,
@@ -63,7 +54,7 @@ export function CreateLeaveRequestDialog({
   const [saving, setSaving] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>(initialDate);
   const [endDate, setEndDate] = useState<Date | undefined>(initialDate);
-  const [type, setType] = useState<TimeOffType>("vacation");
+  const [typeId, setTypeId] = useState<string>("");
   const [reason, setReason] = useState("");
   const [selectedProfileId, setSelectedProfileId] = useState(currentProfileId || "");
   const [leaveTypes, setLeaveTypes] = useState<TimeOffTypeRecord[]>([]);
@@ -99,20 +90,17 @@ export function CreateLeaveRequestDialog({
     }
   };
 
-  // Map dynamic leave types to the expected format, or use defaults
-  const availableTypes = leaveTypes.length > 0
-    ? leaveTypes.map((lt) => ({
-        value: lt.name.toLowerCase() as TimeOffType,
-        label: lt.name,
-        color: lt.color,
-        dbName: lt.name,
-      }))
-    : defaultTimeOffTypes.map((t) => ({ ...t, dbName: t.label }));
+  // Set default type when leave types are loaded
+  useEffect(() => {
+    if (leaveTypes.length > 0 && !typeId) {
+      setTypeId(leaveTypes[0].id);
+    }
+  }, [leaveTypes, typeId]);
 
   const resetForm = () => {
     setStartDate(initialDate);
     setEndDate(initialDate);
-    setType("vacation");
+    setTypeId(leaveTypes.length > 0 ? leaveTypes[0].id : "");
     setReason("");
     setSelectedProfileId(currentProfileId || "");
   };
@@ -142,12 +130,12 @@ export function CreateLeaveRequestDialog({
     setSaving(true);
 
     try {
-      // Use profile_id for the new schema
+      // Use profile_id and type_id for the new schema
       const { error } = await supabase.from("time_off_requests").insert({
         profile_id: profileId,
         start_date: format(startDate, "yyyy-MM-dd"),
         end_date: format(endDate, "yyyy-MM-dd"),
-        type,
+        type_id: typeId,
         reason: reason.trim() || null,
       } as any);
 
@@ -229,19 +217,19 @@ export function CreateLeaveRequestDialog({
           {/* Type selector with dynamic leave types */}
           <div className="space-y-2">
             <Label>Type verlof</Label>
-            <Select value={type} onValueChange={(v) => setType(v as TimeOffType)}>
+            <Select value={typeId} onValueChange={setTypeId}>
               <SelectTrigger className="bg-background">
-                <SelectValue />
+                <SelectValue placeholder="Selecteer type" />
               </SelectTrigger>
               <SelectContent className="bg-background border shadow-lg z-50">
-                {availableTypes.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
+                {leaveTypes.map((lt) => (
+                  <SelectItem key={lt.id} value={lt.id}>
                     <div className="flex items-center gap-2">
                       <div
                         className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: t.color }}
+                        style={{ backgroundColor: lt.color }}
                       />
-                      {t.label}
+                      {lt.name}
                     </div>
                   </SelectItem>
                 ))}
@@ -358,7 +346,7 @@ export function CreateLeaveRequestDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={saving || !startDate || !endDate || (isAdmin && !selectedProfileId)}
+            disabled={saving || !startDate || !endDate || !typeId || (isAdmin && !selectedProfileId)}
           >
             <Plus className="h-4 w-4 mr-2" />
             {saving ? "Indienen..." : "Aanvraag indienen"}

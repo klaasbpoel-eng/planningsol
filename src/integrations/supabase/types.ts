@@ -271,6 +271,7 @@ export type Database = {
           start_date: string
           status: Database["public"]["Enums"]["request_status"]
           type: Database["public"]["Enums"]["time_off_type"]
+          type_id: string | null
           updated_at: string
           user_id: string | null
         }
@@ -284,6 +285,7 @@ export type Database = {
           start_date: string
           status?: Database["public"]["Enums"]["request_status"]
           type?: Database["public"]["Enums"]["time_off_type"]
+          type_id?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -297,6 +299,7 @@ export type Database = {
           start_date?: string
           status?: Database["public"]["Enums"]["request_status"]
           type?: Database["public"]["Enums"]["time_off_type"]
+          type_id?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -313,6 +316,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles_limited"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_off_requests_type_id_fkey"
+            columns: ["type_id"]
+            isOneToOne: false
+            referencedRelation: "time_off_types"
             referencedColumns: ["id"]
           },
         ]

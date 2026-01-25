@@ -15,7 +15,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
-type TimeOffType = Database["public"]["Enums"]["time_off_type"];
+type TimeOffTypeRecord = Database["public"]["Tables"]["time_off_types"]["Row"];
 type RequestStatus = Database["public"]["Enums"]["request_status"];
 
 interface RequestWithProfile extends TimeOffRequest {
@@ -33,7 +33,7 @@ interface RequestFormDialogProps {
 
 const initialFormData = {
   profile_id: "",
-  type: "vacation" as TimeOffType,
+  type_id: "",
   start_date: undefined as Date | undefined,
   end_date: undefined as Date | undefined,
   reason: "",
@@ -50,20 +50,44 @@ export function RequestFormDialog({
 }: RequestFormDialogProps) {
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(initialFormData);
+  const [leaveTypes, setLeaveTypes] = useState<TimeOffTypeRecord[]>([]);
 
   const isCreateMode = mode === "create";
 
   useEffect(() => {
     if (open) {
+      fetchLeaveTypes();
+    }
+  }, [open]);
+
+  const fetchLeaveTypes = async () => {
+    const { data, error } = await supabase
+      .from("time_off_types")
+      .select("*")
+      .eq("is_active", true)
+      .order("name");
+
+    if (!error && data) {
+      setLeaveTypes(data);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
       if (isCreateMode) {
-        setFormData(initialFormData);
+        setFormData({
+          ...initialFormData,
+          type_id: leaveTypes.length > 0 ? leaveTypes[0].id : "",
+        });
       } else if (request) {
         // Use profile_id for new schema, fall back to finding profile by user_id for old data
         const profileId = (request as any).profile_id || 
           employees.find(e => e.user_id === request.user_id)?.id || "";
+        const typeId = (request as any).type_id || 
+          leaveTypes.find(lt => lt.name.toLowerCase() === request.type)?.id || "";
         setFormData({
           profile_id: profileId,
-          type: request.type,
+          type_id: typeId,
           start_date: new Date(request.start_date),
           end_date: new Date(request.end_date),
           reason: request.reason || "",
@@ -71,7 +95,7 @@ export function RequestFormDialog({
         });
       }
     }
-  }, [request, open, isCreateMode, employees]);
+  }, [request, open, isCreateMode, employees, leaveTypes]);
 
   const handleSave = async () => {
     if (!formData.start_date || !formData.end_date) {
@@ -81,6 +105,11 @@ export function RequestFormDialog({
 
     if (isCreateMode && !formData.profile_id) {
       toast.error("Selecteer een medewerker");
+      return;
+    }
+
+    if (!formData.type_id) {
+      toast.error("Selecteer een verloftype");
       return;
     }
 
@@ -94,7 +123,7 @@ export function RequestFormDialog({
       if (isCreateMode) {
         const { error } = await supabase.from("time_off_requests").insert({
           profile_id: formData.profile_id,
-          type: formData.type,
+          type_id: formData.type_id,
           start_date: format(formData.start_date, "yyyy-MM-dd"),
           end_date: format(formData.end_date, "yyyy-MM-dd"),
           reason: formData.reason || null,
@@ -109,12 +138,12 @@ export function RequestFormDialog({
         const { error } = await supabase
           .from("time_off_requests")
           .update({
-            type: formData.type,
+            type_id: formData.type_id,
             start_date: format(formData.start_date, "yyyy-MM-dd"),
             end_date: format(formData.end_date, "yyyy-MM-dd"),
             reason: formData.reason || null,
             status: formData.status,
-          })
+          } as any)
           .eq("id", request.id);
 
         if (error) throw error;
@@ -198,19 +227,26 @@ export function RequestFormDialog({
           <div className="space-y-2">
             <Label>Verloftype</Label>
             <Select
-              value={formData.type}
+              value={formData.type_id}
               onValueChange={(value) =>
-                setFormData((prev) => ({ ...prev, type: value as TimeOffType }))
+                setFormData((prev) => ({ ...prev, type_id: value }))
               }
             >
               <SelectTrigger className="bg-background">
-                <SelectValue />
+                <SelectValue placeholder="Selecteer type" />
               </SelectTrigger>
               <SelectContent className="bg-popover z-50">
-                <SelectItem value="vacation">Vakantie</SelectItem>
-                <SelectItem value="sick">Ziekteverlof</SelectItem>
-                <SelectItem value="personal">Persoonlijk</SelectItem>
-                <SelectItem value="other">Overig</SelectItem>
+                {leaveTypes.map((lt) => (
+                  <SelectItem key={lt.id} value={lt.id}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: lt.color }}
+                      />
+                      {lt.name}
+                    </div>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -353,7 +389,7 @@ export function RequestFormDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Annuleren
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving || !formData.type_id}>
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {isCreateMode ? "Aanvraag Maken" : "Wijzigingen Opslaan"}
           </Button>
