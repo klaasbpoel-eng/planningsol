@@ -207,8 +207,10 @@ export type Database = {
           created_by: string
           description: string | null
           due_date: string
+          end_time: string | null
           id: string
           priority: string
+          start_time: string | null
           status: string
           title: string
           type_id: string | null
@@ -220,8 +222,10 @@ export type Database = {
           created_by: string
           description?: string | null
           due_date: string
+          end_time?: string | null
           id?: string
           priority?: string
+          start_time?: string | null
           status?: string
           title: string
           type_id?: string | null
@@ -233,8 +237,10 @@ export type Database = {
           created_by?: string
           description?: string | null
           due_date?: string
+          end_time?: string | null
           id?: string
           priority?: string
+          start_time?: string | null
           status?: string
           title?: string
           type_id?: string | null
@@ -253,6 +259,7 @@ export type Database = {
       time_off_requests: {
         Row: {
           created_at: string
+          day_part: string | null
           end_date: string
           id: string
           reason: string | null
@@ -264,6 +271,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          day_part?: string | null
           end_date: string
           id?: string
           reason?: string | null
@@ -275,6 +283,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          day_part?: string | null
           end_date?: string
           id?: string
           reason?: string | null
