@@ -30,7 +30,8 @@ import {
   ClipboardList,
   Palmtree,
   GripVertical,
-  Plus
+  Plus,
+  Undo2
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -105,6 +106,13 @@ export function CalendarOverview() {
   const [createDate, setCreateDate] = useState<Date | undefined>();
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
+  const [lastAction, setLastAction] = useState<{
+    type: "task_move";
+    taskId: string;
+    taskTitle: string;
+    previousDate: string;
+    newDate: string;
+  } | null>(null);
   
   const { isAdmin } = useUserRole(currentUserId);
 
@@ -218,6 +226,45 @@ export function CalendarOverview() {
   const handleTaskCreated = () => {
     fetchData();
   };
+
+  const handleUndoAction = async (action: typeof lastAction) => {
+    if (!action) return;
+    
+    if (action.type === "task_move") {
+      // Optimistically revert the UI
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === action.taskId ? { ...t, due_date: action.previousDate } : t
+        )
+      );
+      
+      try {
+        const { error } = await supabase
+          .from("tasks")
+          .update({ due_date: action.previousDate })
+          .eq("id", action.taskId);
+
+        if (error) throw error;
+        
+        setLastAction(null);
+        toast.success("Actie ongedaan gemaakt", {
+          description: `"${action.taskTitle}" teruggezet naar ${format(parseISO(action.previousDate), "d MMMM yyyy", { locale: nl })}`,
+        });
+      } catch (error) {
+        console.error("Error undoing action:", error);
+        // Revert back to the new date on error
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === action.taskId ? { ...t, due_date: action.newDate } : t
+          )
+        );
+        toast.error("Fout bij ongedaan maken", {
+          description: "Probeer het opnieuw",
+        });
+      }
+    }
+  };
+
   const handleDragStart = (e: React.DragEvent, task: TaskWithProfile) => {
     setDraggedTask(task);
     e.dataTransfer.effectAllowed = "move";
@@ -256,7 +303,14 @@ export function CalendarOverview() {
     
     if (!draggedTask) return;
     
+    const previousDate = draggedTask.due_date;
     const newDueDate = format(targetDate, "yyyy-MM-dd");
+    
+    // Don't do anything if dropped on the same date
+    if (previousDate === newDueDate) {
+      setDraggedTask(null);
+      return;
+    }
     
     // Optimistically update the UI
     setTasks((prev) =>
@@ -273,8 +327,23 @@ export function CalendarOverview() {
 
       if (error) throw error;
       
+      // Store the action for undo
+      const actionData = {
+        type: "task_move" as const,
+        taskId: draggedTask.id,
+        taskTitle: draggedTask.title,
+        previousDate,
+        newDate: newDueDate,
+      };
+      setLastAction(actionData);
+      
       toast.success("Taak deadline bijgewerkt", {
         description: `"${draggedTask.title}" verplaatst naar ${format(targetDate, "d MMMM yyyy", { locale: nl })}`,
+        action: {
+          label: "Ongedaan maken",
+          onClick: () => handleUndoAction(actionData),
+        },
+        duration: 8000,
       });
     } catch (error) {
       console.error("Error updating task:", error);
