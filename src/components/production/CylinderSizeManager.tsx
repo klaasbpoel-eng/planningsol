@@ -68,7 +68,7 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
     const { data, error } = await supabase
       .from("cylinder_sizes")
       .select("*")
-      .order("sort_order");
+      .order("capacity_liters", { ascending: true, nullsFirst: false });
 
     if (error) {
       console.error("Error fetching cylinder sizes:", error);
