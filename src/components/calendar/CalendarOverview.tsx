@@ -1239,25 +1239,25 @@ export function CalendarOverview() {
               type="single" 
               value={viewType} 
               onValueChange={(value) => value && setViewType(value as ViewType)}
-              className="bg-muted/50 p-1 rounded-xl"
+              className="bg-muted/50 p-1 rounded-xl border border-border/50"
             >
-              <ToggleGroupItem value="list" aria-label="Lijstweergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
+              <ToggleGroupItem value="list" aria-label="Lijstweergave" className="text-xs px-3 rounded-lg transition-all data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-md data-[state=on]:shadow-primary/25">
                 <List className="h-4 w-4 mr-1.5" />
                 Lijst
               </ToggleGroupItem>
-              <ToggleGroupItem value="day" aria-label="Dagweergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
+              <ToggleGroupItem value="day" aria-label="Dagweergave" className="text-xs px-3 rounded-lg transition-all data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-md data-[state=on]:shadow-primary/25">
                 <CalendarDays className="h-4 w-4 mr-1.5" />
                 Dag
               </ToggleGroupItem>
-              <ToggleGroupItem value="week" aria-label="Weekweergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
+              <ToggleGroupItem value="week" aria-label="Weekweergave" className="text-xs px-3 rounded-lg transition-all data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-md data-[state=on]:shadow-primary/25">
                 <Grid3X3 className="h-4 w-4 mr-1.5" />
                 Week
               </ToggleGroupItem>
-              <ToggleGroupItem value="month" aria-label="Maandweergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
+              <ToggleGroupItem value="month" aria-label="Maandweergave" className="text-xs px-3 rounded-lg transition-all data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-md data-[state=on]:shadow-primary/25">
                 <CalendarIcon className="h-4 w-4 mr-1.5" />
                 Maand
               </ToggleGroupItem>
-              <ToggleGroupItem value="year" aria-label="Jaarweergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
+              <ToggleGroupItem value="year" aria-label="Jaarweergave" className="text-xs px-3 rounded-lg transition-all data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-md data-[state=on]:shadow-primary/25">
                 <LayoutGrid className="h-4 w-4 mr-1.5" />
                 Jaar
               </ToggleGroupItem>
