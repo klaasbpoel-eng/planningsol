@@ -104,6 +104,7 @@ export function CalendarOverview() {
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [selectedTaskCategory, setSelectedTaskCategory] = useState<string>("all");
   const [showTimeOff, setShowTimeOff] = useState(true);
   const [showTasks, setShowTasks] = useState(true);
   const [draggedTask, setDraggedTask] = useState<TaskWithProfile | null>(null);
@@ -397,14 +398,26 @@ export function CalendarOverview() {
     return filtered;
   }, [requests, selectedEmployee, selectedType, selectedStatus]);
 
-  // Filter tasks based on selected employee
+  // Filter tasks based on selected employee and category
   const filteredTasks = useMemo(() => {
     let filtered = tasks;
     if (selectedEmployee !== "all") {
       filtered = filtered.filter((t) => t.assigned_to === selectedEmployee);
     }
+    if (selectedTaskCategory !== "all") {
+      // Check if the selected category is a parent category
+      const isParent = taskTypes.some((t) => t.parent_id === selectedTaskCategory);
+      if (isParent) {
+        // Filter by parent category (include all tasks with types that have this parent)
+        const childTypeIds = taskTypes.filter((t) => t.parent_id === selectedTaskCategory).map((t) => t.id);
+        filtered = filtered.filter((t) => t.type_id === selectedTaskCategory || childTypeIds.includes(t.type_id || ""));
+      } else {
+        // Filter by specific category
+        filtered = filtered.filter((t) => t.type_id === selectedTaskCategory);
+      }
+    }
     return filtered;
-  }, [tasks, selectedEmployee]);
+  }, [tasks, selectedEmployee, selectedTaskCategory, taskTypes]);
 
   const getItemsForDay = (day: Date): CalendarItem[] => {
     const items: CalendarItem[] = [];
@@ -1148,8 +1161,52 @@ export function CalendarOverview() {
               </Select>
             </div>
 
+            {/* Task Category Filter */}
+            {showTasks && (
+              <div className="flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                <Select value={selectedTaskCategory} onValueChange={setSelectedTaskCategory}>
+                  <SelectTrigger className="w-[180px] bg-background border-border/50 shadow-sm hover:bg-background/80 transition-colors">
+                    <SelectValue placeholder="Filter op categorie" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border shadow-xl z-50">
+                    <SelectItem value="all">Alle categorieën</SelectItem>
+                    {taskTypes
+                      .filter((type) => !type.parent_id)
+                      .map((parentType) => {
+                        const children = taskTypes.filter((t) => t.parent_id === parentType.id);
+                        return (
+                          <div key={parentType.id}>
+                            <SelectItem value={parentType.id}>
+                              <div className="flex items-center gap-2">
+                                <div 
+                                  className="w-2 h-2 rounded" 
+                                  style={{ backgroundColor: parentType.color }}
+                                />
+                                <span className="font-medium">{parentType.name}</span>
+                              </div>
+                            </SelectItem>
+                            {children.map((child) => (
+                              <SelectItem key={child.id} value={child.id}>
+                                <div className="flex items-center gap-2 pl-3">
+                                  <div 
+                                    className="w-2 h-2 rounded" 
+                                    style={{ backgroundColor: child.color }}
+                                  />
+                                  <span>{child.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </div>
+                        );
+                      })}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* Reset Button */}
-            {(selectedEmployee !== "all" || selectedType !== "all" || selectedStatus !== "all") && (
+            {(selectedEmployee !== "all" || selectedType !== "all" || selectedStatus !== "all" || selectedTaskCategory !== "all") && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -1157,6 +1214,7 @@ export function CalendarOverview() {
                   setSelectedEmployee("all");
                   setSelectedType("all");
                   setSelectedStatus("all");
+                  setSelectedTaskCategory("all");
                 }}
                 className="text-xs text-primary hover:text-primary hover:bg-primary/10"
               >
