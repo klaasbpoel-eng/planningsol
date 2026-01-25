@@ -206,11 +206,13 @@ export function TaskFormDialog({
                 <SelectValue placeholder="Selecteer medewerker" />
               </SelectTrigger>
               <SelectContent>
-                {employees.map((employee) => (
-                  <SelectItem key={employee.user_id || employee.id} value={employee.user_id || employee.id}>
-                    {employee.full_name || employee.email || "Onbekend"}
-                  </SelectItem>
-                ))}
+                {employees
+                  .filter((employee) => employee.user_id || employee.id)
+                  .map((employee) => (
+                    <SelectItem key={employee.user_id || employee.id} value={employee.user_id || employee.id}>
+                      {employee.full_name || employee.email || "Onbekend"}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
