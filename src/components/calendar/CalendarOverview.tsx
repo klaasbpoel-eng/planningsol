@@ -73,6 +73,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { CalendarItemDialog } from "./CalendarItemDialog";
 import { CreateTaskDialog } from "./CreateTaskDialog";
 import { CreateLeaveRequestDialog } from "./CreateLeaveRequestDialog";
+import { CalendarItemPreview } from "./CalendarItemPreview";
 import { useUserRole } from "@/hooks/useUserRole";
 import { 
   formatTimeRange, 
@@ -1068,51 +1069,63 @@ export function CalendarOverview() {
                 <div className="space-y-1">
                   {allItems.slice(0, 2).map((entry) => (
                     entry.type === 'timeoff' ? (
-                      <div
+                      <CalendarItemPreview
                         key={(entry.item as RequestWithProfile).id}
-                        onClick={(e) => handleItemClick({ type: "timeoff", data: entry.item as RequestWithProfile }, e)}
-                        className={cn(
-                          "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer",
-                          getTypeColor((entry.item as RequestWithProfile).type, (entry.item as RequestWithProfile).status)
-                        )}
-                        title={`${getEmployeeName(entry.item as RequestWithProfile)}${(entry.item as RequestWithProfile).day_part && (entry.item as RequestWithProfile).day_part !== "full_day" ? ` (${getDayPartLabel((entry.item as RequestWithProfile).day_part)})` : ""}`}
+                        item={entry.item as RequestWithProfile}
+                        type="timeoff"
+                        side="right"
+                        align="start"
                       >
-                        {(entry.item as RequestWithProfile).day_part === "morning" ? (
-                          <Sun className="w-2.5 h-2.5 shrink-0" />
-                        ) : (entry.item as RequestWithProfile).day_part === "afternoon" ? (
-                          <Sunset className="w-2.5 h-2.5 shrink-0" />
-                        ) : (
-                          <Palmtree className="w-2.5 h-2.5 shrink-0" />
-                        )}
-                        <span className="truncate font-medium">{getEmployeeName(entry.item as RequestWithProfile)}</span>
-                      </div>
-                    ) : (
-                      <div
-                        key={(entry.item as TaskWithProfile).id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, entry.item as TaskWithProfile)}
-                        onDragEnd={handleDragEnd}
-                        onClick={(e) => handleItemClick({ type: "task", data: entry.item as TaskWithProfile }, e)}
-                        className={cn(
-                          "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-all hover:scale-105 cursor-pointer group",
-                          getTaskStatusColor((entry.item as TaskWithProfile).status),
-                          draggedTask?.id === (entry.item as TaskWithProfile).id && "opacity-50"
-                        )}
-                        title={`${(entry.item as TaskWithProfile).task_type?.name || "Taak"}${hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? ` (${formatTimeRange((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time)})` : ""}`}
-                      >
-                        {hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? (
-                          <Clock className="w-2.5 h-2.5 shrink-0 opacity-70" />
-                        ) : (
-                          <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
-                        )}
-                        <ClipboardList className="w-2.5 h-2.5 shrink-0" />
-                        <span className="truncate font-medium">
-                          {hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) && (
-                            <span className="opacity-80 mr-0.5">{formatTimeRange((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time)}</span>
+                        <div
+                          onClick={(e) => handleItemClick({ type: "timeoff", data: entry.item as RequestWithProfile }, e)}
+                          className={cn(
+                            "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer",
+                            getTypeColor((entry.item as RequestWithProfile).type, (entry.item as RequestWithProfile).status)
                           )}
-                          {(entry.item as TaskWithProfile).task_type?.name || "Taak"}
-                        </span>
-                      </div>
+                        >
+                          {(entry.item as RequestWithProfile).day_part === "morning" ? (
+                            <Sun className="w-2.5 h-2.5 shrink-0" />
+                          ) : (entry.item as RequestWithProfile).day_part === "afternoon" ? (
+                            <Sunset className="w-2.5 h-2.5 shrink-0" />
+                          ) : (
+                            <Palmtree className="w-2.5 h-2.5 shrink-0" />
+                          )}
+                          <span className="truncate font-medium">{getEmployeeName(entry.item as RequestWithProfile)}</span>
+                        </div>
+                      </CalendarItemPreview>
+                    ) : (
+                      <CalendarItemPreview
+                        key={(entry.item as TaskWithProfile).id}
+                        item={entry.item as TaskWithProfile}
+                        type="task"
+                        side="right"
+                        align="start"
+                      >
+                        <div
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, entry.item as TaskWithProfile)}
+                          onDragEnd={handleDragEnd}
+                          onClick={(e) => handleItemClick({ type: "task", data: entry.item as TaskWithProfile }, e)}
+                          className={cn(
+                            "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-all hover:scale-105 cursor-pointer group",
+                            getTaskStatusColor((entry.item as TaskWithProfile).status),
+                            draggedTask?.id === (entry.item as TaskWithProfile).id && "opacity-50"
+                          )}
+                        >
+                          {hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? (
+                            <Clock className="w-2.5 h-2.5 shrink-0 opacity-70" />
+                          ) : (
+                            <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
+                          )}
+                          <ClipboardList className="w-2.5 h-2.5 shrink-0" />
+                          <span className="truncate font-medium">
+                            {hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) && (
+                              <span className="opacity-80 mr-0.5">{formatTimeRange((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time)}</span>
+                            )}
+                            {(entry.item as TaskWithProfile).task_type?.name || "Taak"}
+                          </span>
+                        </div>
+                      </CalendarItemPreview>
                     )
                   ))}
                   {allItems.length > 2 && (
