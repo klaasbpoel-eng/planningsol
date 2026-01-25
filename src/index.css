@@ -119,8 +119,32 @@ All colors MUST be HSL.
     @apply bg-card/60 backdrop-blur-md border border-border/30;
   }
   
+  .glass-calendar {
+    @apply bg-gradient-to-br from-card/95 via-card/90 to-card/85 backdrop-blur-2xl border border-white/20 shadow-2xl;
+  }
+  
+  .glass-day-cell {
+    @apply bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm border border-white/10 transition-all duration-300;
+  }
+  
+  .glass-day-cell:hover {
+    @apply bg-white/10 border-white/20 shadow-lg;
+  }
+  
   .hover-lift {
     @apply transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-lg;
+  }
+  
+  .hover-glow {
+    @apply transition-all duration-300 ease-out hover:shadow-[0_0_30px_-5px_hsl(var(--primary)/0.3)];
+  }
+  
+  .calendar-item-modern {
+    @apply rounded-xl px-2.5 py-1.5 text-xs font-medium shadow-sm backdrop-blur-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-pointer;
+  }
+  
+  .calendar-header-modern {
+    @apply bg-gradient-to-r from-primary/10 via-transparent to-accent/10 backdrop-blur-sm rounded-2xl p-4;
   }
   
   .gradient-primary {
@@ -129,5 +153,42 @@ All colors MUST be HSL.
   
   .gradient-accent {
     background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(32 95% 60%) 100%);
+  }
+  
+  .gradient-mesh {
+    background: 
+      radial-gradient(at 40% 20%, hsl(var(--primary)/0.1) 0px, transparent 50%),
+      radial-gradient(at 80% 0%, hsl(var(--accent)/0.08) 0px, transparent 50%),
+      radial-gradient(at 0% 50%, hsl(var(--primary)/0.05) 0px, transparent 50%),
+      radial-gradient(at 80% 50%, hsl(var(--accent)/0.05) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsl(var(--primary)/0.08) 0px, transparent 50%);
+  }
+  
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70;
+  }
+  
+  .shimmer {
+    background: linear-gradient(
+      110deg,
+      transparent 25%,
+      hsl(var(--primary)/0.1) 50%,
+      transparent 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+  
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  
+  .today-indicator {
+    @apply ring-2 ring-primary ring-offset-2 ring-offset-background;
+  }
+  
+  .today-badge {
+    @apply bg-gradient-to-r from-primary to-primary/80 text-primary-foreground font-semibold shadow-lg shadow-primary/25;
   }
 }
