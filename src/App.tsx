@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import Index from "./pages/Index";
 import CalendarPage from "./pages/CalendarPage";
 import ProductionPlanningPage from "./pages/ProductionPlanningPage";
+import CustomersPage from "./pages/CustomersPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/kalender" element={<CalendarPage />} />
             <Route path="/productie" element={<ProductionPlanningPage />} />
+            <Route path="/klanten" element={<CustomersPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
