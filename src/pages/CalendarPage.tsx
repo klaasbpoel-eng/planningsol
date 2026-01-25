@@ -49,7 +49,7 @@ const CalendarPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <Header userEmail={user.email} />
       
-      <main className="container mx-auto px-4 py-8 max-w-6xl">
+      <main className="px-4 py-8 w-full">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground">Verlofkalender</h1>
           <p className="text-muted-foreground mt-1">
