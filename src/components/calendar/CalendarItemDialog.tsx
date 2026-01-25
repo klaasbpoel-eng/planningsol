@@ -513,6 +513,7 @@ export function CalendarItemDialog({
   const request = item.data as RequestWithProfile;
   
   return (
+    <>
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
@@ -666,7 +667,7 @@ export function CalendarItemDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
           {isEditing ? (
             <>
               <Button variant="outline" onClick={cancelEditing} disabled={saving}>
@@ -680,6 +681,16 @@ export function CalendarItemDialog({
             </>
           ) : (
             <>
+              {isAdmin && (
+                <Button 
+                  variant="destructive" 
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="sm:mr-auto"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Verwijderen
+                </Button>
+              )}
               <Button variant="outline" onClick={handleClose}>
                 Sluiten
               </Button>
@@ -694,5 +705,29 @@ export function CalendarItemDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Delete Confirmation Dialog for Time Off */}
+    <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Verlofaanvraag verwijderen</AlertDialogTitle>
+          <AlertDialogDescription>
+            Weet je zeker dat je deze verlofaanvraag wilt verwijderen? 
+            Deze actie kan niet ongedaan worden gemaakt.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
+          <AlertDialogAction 
+            onClick={handleDelete} 
+            disabled={deleting}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {deleting ? "Verwijderen..." : "Verwijderen"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
