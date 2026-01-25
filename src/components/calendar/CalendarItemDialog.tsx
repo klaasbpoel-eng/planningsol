@@ -98,6 +98,8 @@ export function CalendarItemDialog({
   const [taskPriority, setTaskPriority] = useState("");
   const [taskDueDate, setTaskDueDate] = useState<Date | undefined>();
   const [taskAssignedTo, setTaskAssignedTo] = useState("");
+  const [taskStartTime, setTaskStartTime] = useState("");
+  const [taskEndTime, setTaskEndTime] = useState("");
   
   // TimeOff edit state
   const [timeOffStatus, setTimeOffStatus] = useState("");
@@ -112,6 +114,8 @@ export function CalendarItemDialog({
       setTaskPriority(task.priority);
       setTaskDueDate(parseISO(task.due_date));
       setTaskAssignedTo(task.assigned_to);
+      setTaskStartTime(task.start_time || "");
+      setTaskEndTime(task.end_time || "");
     } else if (item?.type === "timeoff") {
       const request = item.data as RequestWithProfile;
       setTimeOffStatus(request.status);
@@ -126,8 +130,20 @@ export function CalendarItemDialog({
     setIsEditing(false);
   };
 
+  const validateTimeOrder = (): boolean => {
+    if (!taskStartTime || !taskEndTime) return true;
+    return taskStartTime < taskEndTime;
+  };
+
   const handleSave = async () => {
     if (!item) return;
+
+    // Validate time order for tasks
+    if (item.type === "task" && taskStartTime && taskEndTime && !validateTimeOrder()) {
+      toast.error("Eindtijd moet na starttijd liggen");
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -139,6 +155,8 @@ export function CalendarItemDialog({
             priority: taskPriority,
             due_date: taskDueDate ? format(taskDueDate, "yyyy-MM-dd") : item.data.due_date,
             assigned_to: taskAssignedTo,
+            start_time: taskStartTime || null,
+            end_time: taskEndTime || null,
           })
           .eq("id", item.data.id);
 
@@ -206,6 +224,8 @@ export function CalendarItemDialog({
                     assigned_to: (itemData as TaskWithProfile).assigned_to,
                     created_by: (itemData as TaskWithProfile).created_by,
                     type_id: (itemData as TaskWithProfile).type_id,
+                    start_time: (itemData as TaskWithProfile).start_time,
+                    end_time: (itemData as TaskWithProfile).end_time,
                   });
                 
                 if (restoreError) throw restoreError;
@@ -442,6 +462,40 @@ export function CalendarItemDialog({
                     </Select>
                   </div>
                 </div>
+
+                {/* Time selection */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      Starttijd
+                    </Label>
+                    <Input
+                      type="time"
+                      value={taskStartTime}
+                      onChange={(e) => setTaskStartTime(e.target.value)}
+                      className="bg-background"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      Eindtijd
+                    </Label>
+                    <Input
+                      type="time"
+                      value={taskEndTime}
+                      onChange={(e) => setTaskEndTime(e.target.value)}
+                      className="bg-background"
+                    />
+                  </div>
+                </div>
+                {taskStartTime && taskEndTime && !validateTimeOrder() && (
+                  <div className="text-sm text-destructive flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    Eindtijd moet na starttijd liggen
+                  </div>
+                )}
               </>
             ) : (
               <>
