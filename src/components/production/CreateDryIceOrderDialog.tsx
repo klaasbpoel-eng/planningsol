@@ -23,7 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays, Snowflake, Plus, Repeat } from "lucide-react";
-import { format, addWeeks } from "date-fns";
+import { format, addWeeks, addYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,6 +51,7 @@ export function CreateDryIceOrderDialog({
   const [containerHasWheels, setContainerHasWheels] = useState<boolean | null>(null);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [isRecurring, setIsRecurring] = useState(false);
+  const [isInfiniteRecurrence, setIsInfiniteRecurrence] = useState(false);
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>(undefined);
   const [notes, setNotes] = useState("");
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
@@ -118,6 +119,7 @@ export function CreateDryIceOrderDialog({
     setContainerHasWheels(null);
     setScheduledDate(new Date());
     setIsRecurring(false);
+    setIsInfiniteRecurrence(false);
     setRecurrenceEndDate(undefined);
     setNotes("");
   };
@@ -139,7 +141,7 @@ export function CreateDryIceOrderDialog({
       return;
     }
 
-    if (isRecurring && !recurrenceEndDate) {
+    if (isRecurring && !isInfiniteRecurrence && !recurrenceEndDate) {
       toast.error("Selecteer een einddatum voor de herhaling");
       return;
     }
@@ -156,11 +158,18 @@ export function CreateDryIceOrderDialog({
       // Generate dates for recurring orders
       const orderDates: Date[] = [scheduledDate];
       
-      if (isRecurring && recurrenceEndDate) {
-        let nextDate = addWeeks(scheduledDate, 1);
-        while (nextDate <= recurrenceEndDate) {
-          orderDates.push(nextDate);
-          nextDate = addWeeks(nextDate, 1);
+      if (isRecurring) {
+        // For infinite recurrence, create orders for 1 year ahead
+        const endDate = isInfiniteRecurrence 
+          ? addYears(scheduledDate, 1)
+          : recurrenceEndDate;
+        
+        if (endDate) {
+          let nextDate = addWeeks(scheduledDate, 1);
+          while (nextDate <= endDate) {
+            orderDates.push(nextDate);
+            nextDate = addWeeks(nextDate, 1);
+          }
         }
       }
 
@@ -177,7 +186,9 @@ export function CreateDryIceOrderDialog({
         notes: notes.trim() || null,
         created_by: currentProfileId,
         is_recurring: isRecurring,
-        recurrence_end_date: isRecurring && recurrenceEndDate ? format(recurrenceEndDate, "yyyy-MM-dd") : null,
+        recurrence_end_date: isRecurring && !isInfiniteRecurrence && recurrenceEndDate 
+          ? format(recurrenceEndDate, "yyyy-MM-dd") 
+          : null,
       };
 
       // Insert all orders
@@ -397,43 +408,66 @@ export function CreateDryIceOrderDialog({
             </div>
             
             {isRecurring && (
-              <div className="space-y-2 pl-6">
-                <Label>
-                  Herhalen tot <span className="text-destructive">*</span>
-                </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !recurrenceEndDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarDays className="mr-2 h-4 w-4" />
-                      {recurrenceEndDate
-                        ? format(recurrenceEndDate, "d MMM yyyy", { locale: nl })
-                        : "Selecteer einddatum"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-auto p-0 bg-background border shadow-lg z-50"
-                    align="start"
-                  >
-                    <Calendar
-                      mode="single"
-                      selected={recurrenceEndDate}
-                      onSelect={setRecurrenceEndDate}
-                      locale={nl}
-                      disabled={(date) => scheduledDate ? date <= scheduledDate : false}
-                      initialFocus
-                      className={cn("p-3 pointer-events-auto")}
-                    />
-                  </PopoverContent>
-                </Popover>
-                {scheduledDate && recurrenceEndDate && (
+              <div className="space-y-3 pl-6">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="isInfinite" 
+                    checked={isInfiniteRecurrence}
+                    onCheckedChange={(checked) => {
+                      setIsInfiniteRecurrence(checked === true);
+                      if (checked) {
+                        setRecurrenceEndDate(undefined);
+                      }
+                    }}
+                  />
+                  <Label htmlFor="isInfinite" className="cursor-pointer font-normal text-sm">
+                    Oneindig herhalen (1 jaar vooruit aanmaken)
+                  </Label>
+                </div>
+                
+                {!isInfiniteRecurrence && (
+                  <div className="space-y-2">
+                    <Label>
+                      Herhalen tot <span className="text-destructive">*</span>
+                    </Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !recurrenceEndDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarDays className="mr-2 h-4 w-4" />
+                          {recurrenceEndDate
+                            ? format(recurrenceEndDate, "d MMM yyyy", { locale: nl })
+                            : "Selecteer einddatum"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-auto p-0 bg-background border shadow-lg z-50"
+                        align="start"
+                      >
+                        <Calendar
+                          mode="single"
+                          selected={recurrenceEndDate}
+                          onSelect={setRecurrenceEndDate}
+                          locale={nl}
+                          disabled={(date) => scheduledDate ? date <= scheduledDate : false}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
+                
+                {scheduledDate && (isInfiniteRecurrence || recurrenceEndDate) && (
                   <p className="text-xs text-muted-foreground">
-                    Dit maakt {Math.floor((recurrenceEndDate.getTime() - scheduledDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1} orders aan
+                    Dit maakt {isInfiniteRecurrence 
+                      ? "52" 
+                      : Math.floor((recurrenceEndDate!.getTime() - scheduledDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1} orders aan
                   </p>
                 )}
               </div>
@@ -459,7 +493,7 @@ export function CreateDryIceOrderDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={saving || !customerId || !quantityKg || !scheduledDate || !productTypeId || (isEpsPackaging && !boxCount) || (isKunststofContainer && containerHasWheels === null) || (isRecurring && !recurrenceEndDate)}
+            disabled={saving || !customerId || !quantityKg || !scheduledDate || !productTypeId || (isEpsPackaging && !boxCount) || (isKunststofContainer && containerHasWheels === null) || (isRecurring && !isInfiniteRecurrence && !recurrenceEndDate)}
             className="bg-cyan-500 hover:bg-cyan-600"
           >
             <Plus className="h-4 w-4 mr-2" />
