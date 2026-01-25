@@ -56,6 +56,7 @@ export type Database = {
       dry_ice_orders: {
         Row: {
           assigned_to: string | null
+          box_count: number | null
           created_at: string
           created_by: string
           customer_id: string | null
@@ -73,6 +74,7 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          box_count?: number | null
           created_at?: string
           created_by: string
           customer_id?: string | null
@@ -90,6 +92,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          box_count?: number | null
           created_at?: string
           created_by?: string
           customer_id?: string | null
