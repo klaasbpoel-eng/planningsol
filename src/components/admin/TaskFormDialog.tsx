@@ -33,7 +33,9 @@ import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
 type Task = Database["public"]["Tables"]["tasks"]["Row"];
-type TaskType = Database["public"]["Tables"]["task_types"]["Row"];
+type TaskType = Database["public"]["Tables"]["task_types"]["Row"] & {
+  parent_id?: string | null;
+};
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
 interface TaskFormDialogProps {
@@ -54,6 +56,7 @@ const initialFormData = {
   status: "pending" as string,
   assigned_to: "",
   type_id: null as string | null,
+  main_category_id: null as string | null,
 };
 
 export function TaskFormDialog({
@@ -68,11 +71,21 @@ export function TaskFormDialog({
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
 
+  // Separate main categories (no parent) and subcategories (have parent)
+  const mainCategories = taskTypes.filter((t) => !t.parent_id);
+  const getSubcategories = (parentId: string) =>
+    taskTypes.filter((t) => t.parent_id === parentId);
+
   useEffect(() => {
     if (open) {
       if (mode === "create") {
         setFormData(initialFormData);
       } else if (task) {
+        // Find the parent category if the task has a subcategory
+        const taskType = taskTypes.find((t) => t.id === task.type_id);
+        const mainCategoryId = taskType?.parent_id || (taskType && !taskType.parent_id ? task.type_id : null);
+        const subCategoryId = taskType?.parent_id ? task.type_id : null;
+        
         setFormData({
           title: task.title,
           description: task.description || "",
@@ -80,11 +93,12 @@ export function TaskFormDialog({
           priority: task.priority,
           status: task.status,
           assigned_to: task.assigned_to,
-          type_id: task.type_id,
+          type_id: subCategoryId,
+          main_category_id: mainCategoryId,
         });
       }
     }
-  }, [open, task, mode]);
+  }, [open, task, mode, taskTypes]);
 
   const handleSave = async () => {
     // Validation
@@ -110,6 +124,9 @@ export function TaskFormDialog({
         return;
       }
 
+      // Use subcategory if selected, otherwise use main category
+      const finalTypeId = formData.type_id || formData.main_category_id;
+
       const taskData = {
         title: formData.title.trim(),
         description: formData.description.trim() || null,
@@ -117,7 +134,7 @@ export function TaskFormDialog({
         priority: formData.priority,
         status: formData.status,
         assigned_to: formData.assigned_to,
-        type_id: formData.type_id,
+        type_id: finalTypeId,
       };
 
       if (mode === "create") {
@@ -224,10 +241,45 @@ export function TaskFormDialog({
             </Select>
           </div>
 
-          {/* Task Type */}
-          {taskTypes.length > 0 && (
+          {/* Main Category */}
+          {mainCategories.length > 0 && (
             <div className="grid gap-2">
-              <Label>Categorie</Label>
+              <Label>Hoofdcategorie</Label>
+              <Select
+                value={formData.main_category_id || "none"}
+                onValueChange={(value) =>
+                  setFormData({ 
+                    ...formData, 
+                    main_category_id: value === "none" ? null : value,
+                    type_id: null // Reset subcategory when main category changes
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecteer hoofdcategorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Geen categorie</SelectItem>
+                  {mainCategories.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: type.color }}
+                        />
+                        {type.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Subcategory - only show if main category is selected */}
+          {formData.main_category_id && getSubcategories(formData.main_category_id).length > 0 && (
+            <div className="grid gap-2">
+              <Label>Subcategorie</Label>
               <Select
                 value={formData.type_id || "none"}
                 onValueChange={(value) =>
@@ -235,11 +287,11 @@ export function TaskFormDialog({
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecteer categorie" />
+                  <SelectValue placeholder="Selecteer subcategorie" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Geen categorie</SelectItem>
-                  {taskTypes.map((type) => (
+                  <SelectItem value="none">Geen subcategorie</SelectItem>
+                  {getSubcategories(formData.main_category_id).map((type) => (
                     <SelectItem key={type.id} value={type.id}>
                       <div className="flex items-center gap-2">
                         <div
