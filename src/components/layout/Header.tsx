@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "react-router-dom";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface HeaderProps {
   userEmail?: string;
@@ -53,7 +54,8 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
           </Link>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <NotificationBell />
           <Link to="/kalender">
             <Button
               variant="ghost"
