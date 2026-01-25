@@ -64,7 +64,9 @@ import {
   isSameDay,
   parseISO,
   isWithinInterval,
-  getWeek
+  getWeek,
+  isWeekend,
+  getDay
 } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -911,11 +913,22 @@ export function CalendarOverview() {
     return (
       <div className="space-y-3 animate-fade-in">
         <div className="grid grid-cols-7 gap-2">
-          {weekDays.map((day) => (
-            <div key={day} className="text-center text-xs font-semibold text-muted-foreground py-2 uppercase tracking-wider">
-              {day}
-            </div>
-          ))}
+          {weekDays.map((day, index) => {
+            const isWeekendDay = index >= 5;
+            return (
+              <div 
+                key={day} 
+                className={cn(
+                  "text-center text-xs font-semibold py-2 uppercase tracking-wider",
+                  isWeekendDay 
+                    ? "text-primary/70 bg-primary/5 rounded-lg" 
+                    : "text-muted-foreground"
+                )}
+              >
+                {day}
+              </div>
+            );
+          })}
         </div>
         <div className="grid grid-cols-7 gap-2">
           {days.map((day, index) => {
@@ -924,6 +937,7 @@ export function CalendarOverview() {
             const allItems = [...dayRequests.map(r => ({ type: 'timeoff' as const, item: r })), ...dayTasks.map(t => ({ type: 'task' as const, item: t }))];
             const isCurrentDay = isToday(day);
             const isDragOver = dragOverDate && isSameDay(dragOverDate, day);
+            const isWeekendDay = isWeekend(day);
 
             return (
               <div
@@ -931,8 +945,10 @@ export function CalendarOverview() {
                 onClick={(e) => handleDayClick(day, e)}
                 className={cn(
                   "min-h-[140px] p-3 rounded-xl border transition-all duration-300 hover:shadow-md",
-                  "bg-card/80 backdrop-blur-sm border-border/50",
-                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent shadow-lg shadow-primary/5",
+                  isWeekendDay
+                    ? "bg-primary/5 backdrop-blur-sm border-primary/20 hover:bg-primary/10"
+                    : "bg-card/80 backdrop-blur-sm border-border/50",
+                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/10 to-transparent shadow-lg shadow-primary/5",
                   isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]",
                   isAdmin && "cursor-pointer"
                 )}
@@ -1024,11 +1040,23 @@ export function CalendarOverview() {
     return (
       <div className="space-y-3 animate-fade-in">
         <div className="grid grid-cols-7 gap-1">
-          {weekDays.map((day) => (
-            <div key={day} className="text-center text-xs font-semibold text-muted-foreground py-2 uppercase tracking-wider">
-              {day}
-            </div>
-          ))}
+          {weekDays.map((day, index) => {
+            // Index 5 and 6 are Saturday and Sunday (0-indexed, starting from Monday)
+            const isWeekendDay = index >= 5;
+            return (
+              <div 
+                key={day} 
+                className={cn(
+                  "text-center text-xs font-semibold py-2 uppercase tracking-wider",
+                  isWeekendDay 
+                    ? "text-primary/70 bg-primary/5 rounded-lg" 
+                    : "text-muted-foreground"
+                )}
+              >
+                {day}
+              </div>
+            );
+          })}
         </div>
         <div className="grid grid-cols-7 gap-1.5">
           {days.map((day, index) => {
@@ -1039,6 +1067,8 @@ export function CalendarOverview() {
             const isCurrentDay = isToday(day);
             const isDragOver = dragOverDate && isSameDay(dragOverDate, day);
 
+            const isWeekendDay = isWeekend(day);
+
             return (
               <div
                 key={day.toISOString()}
@@ -1046,9 +1076,11 @@ export function CalendarOverview() {
                 className={cn(
                   "min-h-[90px] p-2 rounded-xl border transition-all duration-200",
                   isCurrentMonth 
-                    ? "bg-card/80 backdrop-blur-sm border-border/50 hover:bg-card hover:shadow-sm" 
+                    ? isWeekendDay
+                      ? "bg-primary/5 backdrop-blur-sm border-primary/20 hover:bg-primary/10 hover:shadow-sm" 
+                      : "bg-card/80 backdrop-blur-sm border-border/50 hover:bg-card hover:shadow-sm"
                     : "bg-muted/20 border-transparent opacity-50",
-                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent",
+                  isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/10 to-transparent",
                   isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]",
                   isCurrentMonth && isAdmin && "cursor-pointer"
                 )}

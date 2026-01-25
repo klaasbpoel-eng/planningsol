@@ -18,7 +18,8 @@ import {
   parseISO,
   isWithinInterval,
   startOfWeek,
-  endOfWeek
+  endOfWeek,
+  isWeekend
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/integrations/supabase/types";
@@ -131,14 +132,22 @@ export function TeamCalendar({ requests }: TeamCalendarProps) {
         <CardContent className="pt-6">
           {/* Week day headers */}
           <div className="grid grid-cols-7 gap-1.5 mb-3">
-            {weekDays.map((day) => (
-              <div
-                key={day}
-                className="text-center text-xs font-semibold text-muted-foreground py-2 uppercase tracking-wider"
-              >
-                {day}
-              </div>
-            ))}
+            {weekDays.map((day, index) => {
+              const isWeekendDay = index >= 5;
+              return (
+                <div
+                  key={day}
+                  className={cn(
+                    "text-center text-xs font-semibold py-2 uppercase tracking-wider",
+                    isWeekendDay 
+                      ? "text-primary/70 bg-primary/5 rounded-lg" 
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {day}
+                </div>
+              );
+            })}
           </div>
 
           {/* Calendar grid */}
@@ -147,6 +156,7 @@ export function TeamCalendar({ requests }: TeamCalendarProps) {
               const dayRequests = getRequestsForDay(day);
               const isCurrentMonth = isSameMonth(day, currentMonth);
               const isCurrentDay = isToday(day);
+              const isWeekendDay = isWeekend(day);
 
               return (
                 <motion.div
@@ -157,7 +167,9 @@ export function TeamCalendar({ requests }: TeamCalendarProps) {
                   className={cn(
                     "min-h-[90px] p-1.5 rounded-xl transition-all duration-300",
                     isCurrentMonth 
-                      ? "glass-day-cell" 
+                      ? isWeekendDay
+                        ? "bg-primary/5 border border-primary/20 hover:bg-primary/10"
+                        : "glass-day-cell"
                       : "bg-muted/20 opacity-40",
                     isCurrentDay && "today-indicator",
                     dayRequests.length > 0 && isCurrentMonth && "hover:scale-[1.02]"
