@@ -119,6 +119,14 @@ export function TaskFormDialog({
       return;
     }
 
+    // Validate that end time is after start time (if both are provided)
+    if (formData.start_time && formData.end_time) {
+      if (formData.end_time <= formData.start_time) {
+        toast.error("Eindtijd moet na starttijd liggen");
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
