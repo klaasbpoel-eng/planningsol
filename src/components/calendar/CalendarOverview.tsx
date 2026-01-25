@@ -1498,10 +1498,6 @@ export function CalendarOverview() {
                     <span className="text-muted-foreground font-medium">Ziekteverlof</span>
                   </div>
                   <div className="flex items-center gap-2.5 text-sm">
-                    <div className="w-3 h-3 rounded-md bg-accent shadow-sm" />
-                    <span className="text-muted-foreground font-medium">Persoonlijk</span>
-                  </div>
-                  <div className="flex items-center gap-2.5 text-sm">
                     <div className="w-3 h-3 rounded-md bg-warning/80 shadow-sm" />
                     <span className="text-muted-foreground font-medium">In behandeling</span>
                   </div>
