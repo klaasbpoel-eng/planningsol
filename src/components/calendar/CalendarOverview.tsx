@@ -55,6 +55,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { CalendarItemDialog } from "./CalendarItemDialog";
+import { CreateTaskDialog } from "./CreateTaskDialog";
 import { useUserRole } from "@/hooks/useUserRole";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
@@ -90,6 +91,8 @@ export function CalendarOverview() {
   const [dragOverDate, setDragOverDate] = useState<Date | null>(null);
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
+  const [createTaskDate, setCreateTaskDate] = useState<Date | undefined>();
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
   
   const { isAdmin } = useUserRole(currentUserId);
@@ -183,7 +186,17 @@ export function CalendarOverview() {
     fetchData();
   };
 
-  // Drag and drop handlers
+  const handleDayClick = (day: Date, e: React.MouseEvent) => {
+    // Only open create dialog if admin and clicking on empty area (not on an item)
+    if (isAdmin) {
+      setCreateTaskDate(day);
+      setCreateTaskDialogOpen(true);
+    }
+  };
+
+  const handleTaskCreated = () => {
+    fetchData();
+  };
   const handleDragStart = (e: React.DragEvent, task: TaskWithProfile) => {
     setDraggedTask(task);
     e.dataTransfer.effectAllowed = "move";
@@ -573,11 +586,13 @@ export function CalendarOverview() {
             return (
               <div
                 key={day.toISOString()}
+                onClick={(e) => handleDayClick(day, e)}
                 className={cn(
                   "min-h-[140px] p-3 rounded-xl border transition-all duration-300 hover:shadow-md",
                   "bg-card/80 backdrop-blur-sm border-border/50",
                   isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent shadow-lg shadow-primary/5",
-                  isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]"
+                  isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]",
+                  isAdmin && "cursor-pointer"
                 )}
                 style={{ animationDelay: `${index * 30}ms` }}
                 onDragOver={(e) => handleDragOver(e, day)}
@@ -668,13 +683,15 @@ export function CalendarOverview() {
             return (
               <div
                 key={day.toISOString()}
+                onClick={(e) => isCurrentMonth && handleDayClick(day, e)}
                 className={cn(
                   "min-h-[90px] p-2 rounded-xl border transition-all duration-200",
                   isCurrentMonth 
                     ? "bg-card/80 backdrop-blur-sm border-border/50 hover:bg-card hover:shadow-sm" 
                     : "bg-muted/20 border-transparent opacity-50",
                   isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-transparent",
-                  isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]"
+                  isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]",
+                  isCurrentMonth && isAdmin && "cursor-pointer"
                 )}
                 onDragOver={(e) => handleDragOver(e, day)}
                 onDragLeave={handleDragLeave}
@@ -1122,6 +1139,16 @@ export function CalendarOverview() {
         onUpdate={handleDialogUpdate}
         isAdmin={isAdmin}
         profiles={profiles}
+      />
+      
+      {/* Create Task Dialog */}
+      <CreateTaskDialog
+        open={createTaskDialogOpen}
+        onOpenChange={setCreateTaskDialogOpen}
+        onCreate={handleTaskCreated}
+        initialDate={createTaskDate}
+        profiles={profiles}
+        currentUserId={currentUserId}
       />
     </Card>
   );
