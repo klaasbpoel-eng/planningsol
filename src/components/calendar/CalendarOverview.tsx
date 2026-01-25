@@ -1097,10 +1097,13 @@ export function CalendarOverview() {
           </div>
 
           {/* Filters */}
-          <div className="flex flex-wrap items-center gap-3 p-4 rounded-xl bg-muted/30 border border-border/50">
-            {/* Employee Filter */}
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
+          <div className="space-y-3">
+            {/* General Filter */}
+            <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/50">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Users className="h-4 w-4" />
+                <span>Algemeen:</span>
+              </div>
               <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
                 <SelectTrigger className="w-[180px] bg-background border-border/50 shadow-sm hover:bg-background/80 transition-colors">
                   <SelectValue placeholder="Filter op medewerker" />
@@ -1117,57 +1120,78 @@ export function CalendarOverview() {
                   ))}
                 </SelectContent>
               </Select>
+
+              {/* Reset Button */}
+              {(selectedEmployee !== "all" || selectedType !== "all" || selectedStatus !== "all" || selectedTaskCategory !== "all") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedEmployee("all");
+                    setSelectedType("all");
+                    setSelectedStatus("all");
+                    setSelectedTaskCategory("all");
+                  }}
+                  className="text-xs text-primary hover:text-primary hover:bg-primary/10 ml-auto"
+                >
+                  Reset alle filters
+                </Button>
+              )}
             </div>
 
-            {/* Type Filter */}
-            <div className="flex items-center gap-2">
-              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-              <Select value={selectedType} onValueChange={setSelectedType}>
-                <SelectTrigger className="w-[160px] bg-background border-border/50 shadow-sm hover:bg-background/80 transition-colors">
-                  <SelectValue placeholder="Filter op type" />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-xl z-50">
-                  <SelectItem value="all">Alle types</SelectItem>
-                  {leaveTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      <div className="flex items-center gap-2">
-                        <div className={cn("w-2 h-2 rounded", type.color)} />
-                        {type.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Leave Filters */}
+            {showTimeOff && (
+              <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20">
+                <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                  <Palmtree className="h-4 w-4" />
+                  <span>Verlof:</span>
+                </div>
+                <Select value={selectedType} onValueChange={setSelectedType}>
+                  <SelectTrigger className="w-[160px] bg-background border-border/50 shadow-sm hover:bg-background/80 transition-colors">
+                    <SelectValue placeholder="Type verlof" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border shadow-xl z-50">
+                    <SelectItem value="all">Alle types</SelectItem>
+                    {leaveTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        <div className="flex items-center gap-2">
+                          <div className={cn("w-2 h-2 rounded", type.color)} />
+                          {type.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-            {/* Status Filter */}
-            <div className="flex items-center gap-2">
-              <List className="h-4 w-4 text-muted-foreground" />
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="w-[160px] bg-background border-border/50 shadow-sm hover:bg-background/80 transition-colors">
-                  <SelectValue placeholder="Filter op status" />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-xl z-50">
-                  <SelectItem value="all">Alle statussen</SelectItem>
-                  {statusTypes.map((status) => (
-                    <SelectItem key={status.value} value={status.value}>
-                      <div className="flex items-center gap-2">
-                        <div className={cn("w-2 h-2 rounded", status.color)} />
-                        {status.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="w-[160px] bg-background border-border/50 shadow-sm hover:bg-background/80 transition-colors">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border shadow-xl z-50">
+                    <SelectItem value="all">Alle statussen</SelectItem>
+                    {statusTypes.map((status) => (
+                      <SelectItem key={status.value} value={status.value}>
+                        <div className="flex items-center gap-2">
+                          <div className={cn("w-2 h-2 rounded", status.color)} />
+                          {status.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-            {/* Task Category Filter */}
+            {/* Task Filters */}
             {showTasks && (
-              <div className="flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-blue-500/5 border border-blue-500/20">
+                <div className="flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400">
+                  <ClipboardList className="h-4 w-4" />
+                  <span>Taken:</span>
+                </div>
                 <Select value={selectedTaskCategory} onValueChange={setSelectedTaskCategory}>
                   <SelectTrigger className="w-[180px] bg-background border-border/50 shadow-sm hover:bg-background/80 transition-colors">
-                    <SelectValue placeholder="Filter op categorie" />
+                    <SelectValue placeholder="Categorie" />
                   </SelectTrigger>
                   <SelectContent className="bg-background border shadow-xl z-50">
                     <SelectItem value="all">Alle categorieën</SelectItem>
@@ -1203,23 +1227,6 @@ export function CalendarOverview() {
                   </SelectContent>
                 </Select>
               </div>
-            )}
-
-            {/* Reset Button */}
-            {(selectedEmployee !== "all" || selectedType !== "all" || selectedStatus !== "all" || selectedTaskCategory !== "all") && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSelectedEmployee("all");
-                  setSelectedType("all");
-                  setSelectedStatus("all");
-                  setSelectedTaskCategory("all");
-                }}
-                className="text-xs text-primary hover:text-primary hover:bg-primary/10"
-              >
-                Reset filters
-              </Button>
             )}
           </div>
         </div>
