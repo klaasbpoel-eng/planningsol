@@ -53,6 +53,39 @@ export type Database = {
         }
         Relationships: []
       }
+      cylinder_sizes: {
+        Row: {
+          capacity_liters: number | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          capacity_liters?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          capacity_liters?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dry_ice_orders: {
         Row: {
           assigned_to: string | null
@@ -391,6 +424,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      gas_types: {
+        Row: {
+          color: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
