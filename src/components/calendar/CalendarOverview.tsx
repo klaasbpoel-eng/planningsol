@@ -74,6 +74,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { CalendarItemDialog } from "./CalendarItemDialog";
+import { DryIceOrderDialog } from "./DryIceOrderDialog";
 import { CreateTaskDialog } from "./CreateTaskDialog";
 import { CreateLeaveRequestDialog } from "./CreateLeaveRequestDialog";
 import { CalendarItemPreview } from "./CalendarItemPreview";
@@ -132,7 +133,9 @@ export function CalendarOverview() {
   const [draggedTask, setDraggedTask] = useState<TaskWithProfile | null>(null);
   const [dragOverDate, setDragOverDate] = useState<Date | null>(null);
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
+  const [selectedDryIceOrder, setSelectedDryIceOrder] = useState<DryIceOrderWithDetails | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dryIceDialogOpen, setDryIceDialogOpen] = useState(false);
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
   const [createLeaveDialogOpen, setCreateLeaveDialogOpen] = useState(false);
   const [createDate, setCreateDate] = useState<Date | undefined>();
@@ -287,8 +290,19 @@ export function CalendarOverview() {
 
   const handleItemClick = (item: CalendarItem, e: React.MouseEvent) => {
     e.stopPropagation();
-    setSelectedItem(item);
-    setDialogOpen(true);
+    if (item.type === "dryice") {
+      setSelectedDryIceOrder(item.data);
+      setDryIceDialogOpen(true);
+    } else {
+      setSelectedItem(item);
+      setDialogOpen(true);
+    }
+  };
+
+  const handleDryIceOrderClick = (order: DryIceOrderWithDetails, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedDryIceOrder(order);
+    setDryIceDialogOpen(true);
   };
 
   const handleDialogUpdate = () => {
@@ -872,6 +886,7 @@ export function CalendarOverview() {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }}
+                      onClick={(e) => handleDryIceOrderClick(order, e)}
                       className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4"
                     >
                       <div className="w-1 h-12 rounded-full bg-cyan-500" />
@@ -1040,8 +1055,9 @@ export function CalendarOverview() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.25, delay: (dayRequests.length + dayTasks.length + index) * 0.05 }}
+                      onClick={(e) => handleDryIceOrderClick(order, e)}
                       className={cn(
-                        "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md",
+                        "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md cursor-pointer",
                         getDryIceStatusColor(order.status)
                       )}
                     >
@@ -1199,6 +1215,7 @@ export function CalendarOverview() {
                       return (
                         <div
                           key={order.id}
+                          onClick={(e) => handleDryIceOrderClick(order, e)}
                           className={cn(
                             "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
                           )}
@@ -1370,6 +1387,7 @@ export function CalendarOverview() {
                       return (
                         <div
                           key={order.id}
+                          onClick={(e) => handleDryIceOrderClick(order, e)}
                           className="text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
                           title={`${order.customer_name} - ${order.quantity_kg}kg${order.packaging_info ? ` (${order.packaging_info.name})` : ""}`}
                         >
@@ -1896,6 +1914,17 @@ export function CalendarOverview() {
         onUpdate={handleDialogUpdate}
         isAdmin={isAdmin}
         profiles={profiles}
+      />
+      
+      {/* Dry Ice Order Dialog */}
+      <DryIceOrderDialog
+        order={selectedDryIceOrder}
+        open={dryIceDialogOpen}
+        onOpenChange={setDryIceDialogOpen}
+        onUpdate={handleDialogUpdate}
+        isAdmin={isAdmin}
+        productTypes={dryIceProductTypes}
+        packagingOptions={dryIcePackaging}
       />
       
       {/* Create Menu Dialog */}
