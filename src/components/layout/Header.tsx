@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "react-router-dom";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import logo from "@/assets/logo.png";
 
 interface HeaderProps {
   userEmail?: string;
@@ -29,6 +30,7 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-3">
+            <img src={logo} alt="SOL Group Logo" className="h-10 w-auto" />
             <div className="p-2 bg-primary-foreground/10 rounded-lg">
               {isAdmin ? (
                 <Shield className="h-6 w-6 text-primary-foreground" />
