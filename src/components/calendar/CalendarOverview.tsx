@@ -95,7 +95,7 @@ type TaskWithProfile = Task & {
   task_type?: TaskType | null;
 };
 
-type ViewType = "day" | "week" | "month" | "year";
+type ViewType = "list" | "day" | "week" | "month" | "year";
 type CalendarItem = 
   | { type: "timeoff"; data: RequestWithProfile }
   | { type: "task"; data: TaskWithProfile };
@@ -584,6 +584,164 @@ export function CalendarOverview() {
   };
 
   const weekDays = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
+
+  // List View - Shows all items in a chronological list
+  const renderListView = () => {
+    // Combine and sort all items by date
+    const allItems: { date: Date; item: CalendarItem }[] = [];
+    
+    if (showTimeOff) {
+      filteredRequests.forEach((request) => {
+        if (selectedStatus === "all" && request.status === "rejected") return;
+        allItems.push({
+          date: parseISO(request.start_date),
+          item: { type: "timeoff", data: request }
+        });
+      });
+    }
+    
+    if (showTasks) {
+      filteredTasks.forEach((task) => {
+        allItems.push({
+          date: parseISO(task.due_date),
+          item: { type: "task", data: task }
+        });
+      });
+    }
+    
+    // Sort by date ascending
+    allItems.sort((a, b) => a.date.getTime() - b.date.getTime());
+    
+    // Group by date
+    const groupedItems = allItems.reduce((acc, { date, item }) => {
+      const dateKey = format(date, "yyyy-MM-dd");
+      if (!acc[dateKey]) {
+        acc[dateKey] = { date, items: [] };
+      }
+      acc[dateKey].items.push(item);
+      return acc;
+    }, {} as Record<string, { date: Date; items: CalendarItem[] }>);
+    
+    const sortedGroups = Object.values(groupedItems).sort(
+      (a, b) => a.date.getTime() - b.date.getTime()
+    );
+    
+    if (sortedGroups.length === 0) {
+      return (
+        <div className="text-center text-muted-foreground py-16 bg-muted/30 rounded-xl animate-fade-in">
+          <List className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">Geen items gevonden</p>
+          <p className="text-sm opacity-70">Pas de filters aan om items te zien</p>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-4 animate-fade-in">
+        {sortedGroups.map(({ date, items }) => (
+          <div key={format(date, "yyyy-MM-dd")} className="rounded-xl border border-border/50 overflow-hidden">
+            {/* Date Header */}
+            <div className={cn(
+              "px-4 py-3 flex items-center gap-3 font-medium",
+              isToday(date) 
+                ? "bg-primary/10 text-primary" 
+                : "bg-muted/30 text-foreground"
+            )}>
+              <div className={cn(
+                "w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold",
+                isToday(date) ? "bg-primary text-primary-foreground" : "bg-background border"
+              )}>
+                {format(date, "d")}
+              </div>
+              <div>
+                <div className="capitalize">{format(date, "EEEE", { locale: nl })}</div>
+                <div className="text-xs text-muted-foreground">{format(date, "d MMMM yyyy", { locale: nl })}</div>
+              </div>
+              {isToday(date) && (
+                <Badge variant="secondary" className="ml-auto text-xs">Vandaag</Badge>
+              )}
+            </div>
+            
+            {/* Items for this date */}
+            <div className="divide-y divide-border/50">
+              {items.map((calendarItem, index) => {
+                if (calendarItem.type === "timeoff") {
+                  const request = calendarItem.data;
+                  return (
+                    <div
+                      key={`timeoff-${request.id}`}
+                      onClick={(e) => handleItemClick(calendarItem, e)}
+                      className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4"
+                    >
+                      <div className={cn("w-1 h-12 rounded-full", getTypeColor(request.type, request.status).split(" ")[0])} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Palmtree className="h-4 w-4 text-primary flex-shrink-0" />
+                          <span className="font-medium truncate">{getEmployeeName(request)}</span>
+                          <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTypeColor(request.type, request.status))}>
+                            {getTypeLabel(request.type)}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground flex items-center gap-2">
+                          <span>{format(parseISO(request.start_date), "d MMM", { locale: nl })} — {format(parseISO(request.end_date), "d MMM", { locale: nl })}</span>
+                          {request.day_part && request.day_part !== "full_day" && (
+                            <span className="flex items-center gap-1 text-xs">
+                              {request.day_part === "morning" ? <Sun className="h-3 w-3" /> : <Sunset className="h-3 w-3" />}
+                              {getDayPartLabel(request.day_part)}
+                            </span>
+                          )}
+                        </div>
+                        {request.reason && (
+                          <div className="text-xs text-muted-foreground/70 mt-1 truncate italic">{request.reason}</div>
+                        )}
+                      </div>
+                      <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getEmployeeColor(request.user_id))} />
+                    </div>
+                  );
+                } else {
+                  const task = calendarItem.data;
+                  return (
+                    <div
+                      key={`task-${task.id}`}
+                      onClick={(e) => handleItemClick(calendarItem, e)}
+                      className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4"
+                    >
+                      <div 
+                        className="w-1 h-12 rounded-full" 
+                        style={{ backgroundColor: task.task_type?.color || "#888" }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <ClipboardList className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                          <span className="font-medium truncate">{task.task_type?.name || "Taak"}</span>
+                          <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTaskStatusColor(task.status))}>
+                            {task.status === "pending" ? "Te doen" : task.status === "in_progress" ? "Bezig" : "Voltooid"}
+                          </Badge>
+                          <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTaskPriorityColor(task.priority))}>
+                            {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Gemiddeld" : "Laag"}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground flex items-center gap-2">
+                          <span>{getEmployeeName(task)}</span>
+                          {hasTimeInfo(task.start_time, task.end_time) && (
+                            <span className="flex items-center gap-1 text-xs">
+                              <Clock className="h-3 w-3" />
+                              {formatTimeRange(task.start_time, task.end_time)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getEmployeeColor(task.assigned_to))} />
+                    </div>
+                  );
+                }
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   // Day View
   const renderDayView = () => {
@@ -1083,8 +1241,12 @@ export function CalendarOverview() {
               onValueChange={(value) => value && setViewType(value as ViewType)}
               className="bg-muted/50 p-1 rounded-xl"
             >
-              <ToggleGroupItem value="day" aria-label="Dagweergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
+              <ToggleGroupItem value="list" aria-label="Lijstweergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
                 <List className="h-4 w-4 mr-1.5" />
+                Lijst
+              </ToggleGroupItem>
+              <ToggleGroupItem value="day" aria-label="Dagweergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <CalendarDays className="h-4 w-4 mr-1.5" />
                 Dag
               </ToggleGroupItem>
               <ToggleGroupItem value="week" aria-label="Weekweergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
@@ -1308,6 +1470,7 @@ export function CalendarOverview() {
           </div>
         ) : (
           <>
+            {viewType === "list" && renderListView()}
             {viewType === "day" && renderDayView()}
             {viewType === "week" && renderWeekView()}
             {viewType === "month" && renderMonthView()}
