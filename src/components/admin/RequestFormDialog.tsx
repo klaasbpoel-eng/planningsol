@@ -32,7 +32,7 @@ interface RequestFormDialogProps {
 }
 
 const initialFormData = {
-  user_id: "",
+  profile_id: "",
   type: "vacation" as TimeOffType,
   start_date: undefined as Date | undefined,
   end_date: undefined as Date | undefined,
@@ -58,8 +58,11 @@ export function RequestFormDialog({
       if (isCreateMode) {
         setFormData(initialFormData);
       } else if (request) {
+        // Use profile_id for new schema, fall back to finding profile by user_id for old data
+        const profileId = (request as any).profile_id || 
+          employees.find(e => e.user_id === request.user_id)?.id || "";
         setFormData({
-          user_id: request.user_id,
+          profile_id: profileId,
           type: request.type,
           start_date: new Date(request.start_date),
           end_date: new Date(request.end_date),
@@ -68,7 +71,7 @@ export function RequestFormDialog({
         });
       }
     }
-  }, [request, open, isCreateMode]);
+  }, [request, open, isCreateMode, employees]);
 
   const handleSave = async () => {
     if (!formData.start_date || !formData.end_date) {
@@ -76,7 +79,7 @@ export function RequestFormDialog({
       return;
     }
 
-    if (isCreateMode && !formData.user_id) {
+    if (isCreateMode && !formData.profile_id) {
       toast.error("Selecteer een medewerker");
       return;
     }
@@ -90,13 +93,13 @@ export function RequestFormDialog({
     try {
       if (isCreateMode) {
         const { error } = await supabase.from("time_off_requests").insert({
-          user_id: formData.user_id,
+          profile_id: formData.profile_id,
           type: formData.type,
           start_date: format(formData.start_date, "yyyy-MM-dd"),
           end_date: format(formData.end_date, "yyyy-MM-dd"),
           reason: formData.reason || null,
           status: formData.status,
-        });
+        } as any);
 
         if (error) throw error;
         toast.success("Aanvraag succesvol aangemaakt");
@@ -159,9 +162,9 @@ export function RequestFormDialog({
                 Medewerker <span className="text-destructive">*</span>
               </Label>
               <Select
-                value={formData.user_id}
+                value={formData.profile_id}
                 onValueChange={(value) =>
-                  setFormData((prev) => ({ ...prev, user_id: value }))
+                  setFormData((prev) => ({ ...prev, profile_id: value }))
                 }
               >
                 <SelectTrigger className="bg-background">
@@ -169,8 +172,11 @@ export function RequestFormDialog({
                 </SelectTrigger>
                 <SelectContent className="bg-popover z-50">
                   {employees.map((emp) => (
-                    <SelectItem key={emp.user_id} value={emp.user_id}>
+                    <SelectItem key={emp.id} value={emp.id}>
                       {emp.full_name || emp.email || "Onbekend"}
+                      {!emp.user_id && (
+                        <span className="ml-2 text-xs text-muted-foreground">(geen account)</span>
+                      )}
                     </SelectItem>
                   ))}
                 </SelectContent>
