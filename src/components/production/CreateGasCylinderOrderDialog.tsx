@@ -81,7 +81,7 @@ export function CreateGasCylinderOrderDialog({
         .from("gas_types")
         .select("id, name, color")
         .eq("is_active", true)
-        .order("sort_order");
+        .order("name");
       
       if (data) {
         setGasTypes(data);
