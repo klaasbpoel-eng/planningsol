@@ -207,14 +207,16 @@ export function CreateLeaveRequestDialog({
                   <SelectValue placeholder="Selecteer medewerker" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
-                  {profiles.map((profile) => (
-                    <SelectItem
-                      key={profile.user_id}
-                      value={profile.user_id || ""}
-                    >
-                      {profile.full_name || profile.email?.split("@")[0]}
-                    </SelectItem>
-                  ))}
+                  {profiles
+                    .filter((profile) => profile.user_id)
+                    .map((profile) => (
+                      <SelectItem
+                        key={profile.user_id}
+                        value={profile.user_id!}
+                      >
+                        {profile.full_name || profile.email?.split("@")[0]}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
