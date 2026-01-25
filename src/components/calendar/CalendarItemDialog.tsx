@@ -56,6 +56,7 @@ import type { Database } from "@/integrations/supabase/types";
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Task = Database["public"]["Tables"]["tasks"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+type TaskType = Database["public"]["Tables"]["task_types"]["Row"];
 
 type RequestWithProfile = TimeOffRequest & {
   profile?: Profile | null;
@@ -63,6 +64,7 @@ type RequestWithProfile = TimeOffRequest & {
 
 type TaskWithProfile = Task & {
   profile?: Profile | null;
+  task_type?: TaskType | null;
 };
 
 type CalendarItem = 
@@ -92,8 +94,6 @@ export function CalendarItemDialog({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
   // Task edit state
-  const [taskTitle, setTaskTitle] = useState("");
-  const [taskDescription, setTaskDescription] = useState("");
   const [taskStatus, setTaskStatus] = useState("");
   const [taskPriority, setTaskPriority] = useState("");
   const [taskDueDate, setTaskDueDate] = useState<Date | undefined>();
@@ -108,8 +108,6 @@ export function CalendarItemDialog({
   const startEditing = () => {
     if (item?.type === "task") {
       const task = item.data as TaskWithProfile;
-      setTaskTitle(task.title);
-      setTaskDescription(task.description || "");
       setTaskStatus(task.status);
       setTaskPriority(task.priority);
       setTaskDueDate(parseISO(task.due_date));
@@ -137,8 +135,6 @@ export function CalendarItemDialog({
         const { error } = await supabase
           .from("tasks")
           .update({
-            title: taskTitle,
-            description: taskDescription || null,
             status: taskStatus,
             priority: taskPriority,
             due_date: taskDueDate ? format(taskDueDate, "yyyy-MM-dd") : item.data.due_date,
@@ -204,8 +200,6 @@ export function CalendarItemDialog({
                   .from("tasks")
                   .insert({
                     id: itemData.id,
-                    title: (itemData as TaskWithProfile).title,
-                    description: (itemData as TaskWithProfile).description,
                     status: (itemData as TaskWithProfile).status,
                     priority: (itemData as TaskWithProfile).priority,
                     due_date: (itemData as TaskWithProfile).due_date,
@@ -374,27 +368,6 @@ export function CalendarItemDialog({
           <div className="space-y-4 py-4">
             {isEditing ? (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="title">Titel</Label>
-                  <Input
-                    id="title"
-                    value={taskTitle}
-                    onChange={(e) => setTaskTitle(e.target.value)}
-                    placeholder="Taak titel"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="description">Beschrijving</Label>
-                  <Textarea
-                    id="description"
-                    value={taskDescription}
-                    onChange={(e) => setTaskDescription(e.target.value)}
-                    placeholder="Optionele beschrijving"
-                    rows={3}
-                  />
-                </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Status</Label>
@@ -474,10 +447,7 @@ export function CalendarItemDialog({
               <>
                 <div className="space-y-3">
                   <div>
-                    <h3 className="font-semibold text-lg">{task.title}</h3>
-                    {task.description && (
-                      <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
-                    )}
+                    <h3 className="font-semibold text-lg">{task.task_type?.name || "Taak"}</h3>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
@@ -528,7 +498,7 @@ export function CalendarItemDialog({
                   <X className="h-4 w-4 mr-2" />
                   Annuleren
                 </Button>
-                <Button onClick={handleSave} disabled={saving || !taskTitle.trim()}>
+                <Button onClick={handleSave} disabled={saving}>
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? "Opslaan..." : "Opslaan"}
                 </Button>
@@ -566,7 +536,7 @@ export function CalendarItemDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>Taak verwijderen</AlertDialogTitle>
             <AlertDialogDescription>
-              Weet je zeker dat je de taak "{item.type === "task" ? (item.data as TaskWithProfile).title : ""}" wilt verwijderen? 
+              Weet je zeker dat je deze taak wilt verwijderen? 
               Deze actie kan niet ongedaan worden gemaakt.
             </AlertDialogDescription>
           </AlertDialogHeader>

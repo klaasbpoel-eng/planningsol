@@ -8,8 +8,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -49,8 +47,6 @@ export function CreateTaskDialog({
   currentUserId,
 }: CreateTaskDialogProps) {
   const [saving, setSaving] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
   const [status, setStatus] = useState("pending");
   const [priority, setPriority] = useState("medium");
   const [dueDate, setDueDate] = useState<Date | undefined>(initialDate);
@@ -81,8 +77,6 @@ export function CreateTaskDialog({
   const subcategories = taskTypes.filter((t) => t.parent_id === categoryId);
 
   const resetForm = () => {
-    setTitle("");
-    setDescription("");
     setStatus("pending");
     setPriority("medium");
     setDueDate(initialDate);
@@ -97,7 +91,7 @@ export function CreateTaskDialog({
   };
 
   const handleCreate = async () => {
-    if (!title.trim() || !dueDate || !assignedTo || !currentUserId) {
+    if (!dueDate || !assignedTo || !currentUserId) {
       toast.error("Vul alle verplichte velden in");
       return;
     }
@@ -109,8 +103,6 @@ export function CreateTaskDialog({
       const typeId = subcategoryId || categoryId || null;
 
       const { error } = await supabase.from("tasks").insert({
-        title: title.trim(),
-        description: description.trim() || null,
         status,
         priority,
         due_date: format(dueDate, "yyyy-MM-dd"),
@@ -121,9 +113,7 @@ export function CreateTaskDialog({
 
       if (error) throw error;
 
-      toast.success("Taak aangemaakt", {
-        description: `"${title}" is toegevoegd aan de kalender`,
-      });
+      toast.success("Taak aangemaakt");
       
       resetForm();
       onCreate();
@@ -167,28 +157,6 @@ export function CreateTaskDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">
-              Titel <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Voer een titel in"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Beschrijving</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optionele beschrijving"
-              rows={3}
-            />
-          </div>
 
           {/* Category selectors */}
           <div className="grid grid-cols-2 gap-4">
@@ -336,7 +304,7 @@ export function CreateTaskDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={saving || !title.trim() || !dueDate || !assignedTo}
+            disabled={saving || !dueDate || !assignedTo}
           >
             <Plus className="h-4 w-4 mr-2" />
             {saving ? "Aanmaken..." : "Taak aanmaken"}
