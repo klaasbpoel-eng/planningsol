@@ -63,7 +63,9 @@ export type Database = {
           id: string
           notes: string | null
           order_number: string
+          packaging_id: string | null
           product_type: Database["public"]["Enums"]["dry_ice_product_type"]
+          product_type_id: string | null
           quantity_kg: number
           scheduled_date: string
           status: Database["public"]["Enums"]["production_order_status"]
@@ -78,7 +80,9 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number: string
+          packaging_id?: string | null
           product_type?: Database["public"]["Enums"]["dry_ice_product_type"]
+          product_type_id?: string | null
           quantity_kg: number
           scheduled_date: string
           status?: Database["public"]["Enums"]["production_order_status"]
@@ -93,7 +97,9 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number?: string
+          packaging_id?: string | null
           product_type?: Database["public"]["Enums"]["dry_ice_product_type"]
+          product_type_id?: string | null
           quantity_kg?: number
           scheduled_date?: string
           status?: Database["public"]["Enums"]["production_order_status"]
@@ -135,7 +141,81 @@ export type Database = {
             referencedRelation: "customers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "dry_ice_orders_packaging_id_fkey"
+            columns: ["packaging_id"]
+            isOneToOne: false
+            referencedRelation: "dry_ice_packaging"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dry_ice_orders_product_type_id_fkey"
+            columns: ["product_type_id"]
+            isOneToOne: false
+            referencedRelation: "dry_ice_product_types"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      dry_ice_packaging: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      dry_ice_product_types: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       employee_leave_balances: {
         Row: {
