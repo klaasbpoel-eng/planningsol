@@ -5,6 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -22,7 +29,8 @@ import {
   Users,
   ClipboardList,
   Palmtree,
-  GripVertical
+  GripVertical,
+  Plus
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -56,6 +64,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { CalendarItemDialog } from "./CalendarItemDialog";
 import { CreateTaskDialog } from "./CreateTaskDialog";
+import { CreateLeaveRequestDialog } from "./CreateLeaveRequestDialog";
 import { useUserRole } from "@/hooks/useUserRole";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
@@ -92,7 +101,9 @@ export function CalendarOverview() {
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
-  const [createTaskDate, setCreateTaskDate] = useState<Date | undefined>();
+  const [createLeaveDialogOpen, setCreateLeaveDialogOpen] = useState(false);
+  const [createDate, setCreateDate] = useState<Date | undefined>();
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
   
   const { isAdmin } = useUserRole(currentUserId);
@@ -187,11 +198,21 @@ export function CalendarOverview() {
   };
 
   const handleDayClick = (day: Date, e: React.MouseEvent) => {
-    // Only open create dialog if admin and clicking on empty area (not on an item)
+    // Only open create menu if admin and clicking on empty area (not on an item)
     if (isAdmin) {
-      setCreateTaskDate(day);
-      setCreateTaskDialogOpen(true);
+      setCreateDate(day);
+      setShowCreateMenu(true);
     }
+  };
+
+  const handleCreateTask = () => {
+    setShowCreateMenu(false);
+    setCreateTaskDialogOpen(true);
+  };
+
+  const handleCreateLeave = () => {
+    setShowCreateMenu(false);
+    setCreateLeaveDialogOpen(true);
   };
 
   const handleTaskCreated = () => {
@@ -1141,14 +1162,58 @@ export function CalendarOverview() {
         profiles={profiles}
       />
       
+      {/* Create Menu Dialog */}
+      <Dialog open={showCreateMenu} onOpenChange={setShowCreateMenu}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" />
+              Nieuw item aanmaken
+            </DialogTitle>
+            <DialogDescription>
+              Wat wil je aanmaken voor {createDate ? format(createDate, "d MMMM yyyy", { locale: nl }) : "deze dag"}?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <Button
+              variant="outline"
+              className="h-24 flex flex-col items-center justify-center gap-2 hover:bg-blue-50 hover:border-blue-300 dark:hover:bg-blue-950/30"
+              onClick={handleCreateTask}
+            >
+              <ClipboardList className="h-8 w-8 text-blue-500" />
+              <span className="font-medium">Taak</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-24 flex flex-col items-center justify-center gap-2 hover:bg-primary/5 hover:border-primary/30"
+              onClick={handleCreateLeave}
+            >
+              <Palmtree className="h-8 w-8 text-primary" />
+              <span className="font-medium">Verlof</span>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
       {/* Create Task Dialog */}
       <CreateTaskDialog
         open={createTaskDialogOpen}
         onOpenChange={setCreateTaskDialogOpen}
         onCreate={handleTaskCreated}
-        initialDate={createTaskDate}
+        initialDate={createDate}
         profiles={profiles}
         currentUserId={currentUserId}
+      />
+      
+      {/* Create Leave Request Dialog */}
+      <CreateLeaveRequestDialog
+        open={createLeaveDialogOpen}
+        onOpenChange={setCreateLeaveDialogOpen}
+        onCreate={handleTaskCreated}
+        initialDate={createDate}
+        profiles={profiles}
+        currentUserId={currentUserId}
+        isAdmin={isAdmin}
       />
     </Card>
   );
