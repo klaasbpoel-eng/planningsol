@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "react-router-dom";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface HeaderProps {
   userEmail?: string;
@@ -55,6 +56,7 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
         </div>
         
         <div className="flex items-center gap-2">
+          <ThemeToggle variant="header" />
           <NotificationBell />
           <Link to="/kalender">
             <Button
