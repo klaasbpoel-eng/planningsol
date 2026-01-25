@@ -814,38 +814,39 @@ export function CalendarOverview() {
                 if (calendarItem.type === "timeoff") {
                   const request = calendarItem.data;
                   return (
-                    <motion.div
-                      key={`timeoff-${request.id}`}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }}
-                      onClick={(e) => handleItemClick(calendarItem, e)}
-                      className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4"
-                    >
-                      <div className={cn("w-1 h-12 rounded-full", getTypeColor(request.type, request.status).split(" ")[0])} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Palmtree className="h-4 w-4 text-primary flex-shrink-0" />
-                          <span className="font-medium truncate">{getEmployeeName(request)}</span>
-                          <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTypeColor(request.type, request.status))}>
-                            {getTypeLabel(request.type)}
-                          </Badge>
-                        </div>
-                        <div className="text-sm text-muted-foreground flex items-center gap-2">
-                          <span>{format(parseISO(request.start_date), "d MMM", { locale: nl })} — {format(parseISO(request.end_date), "d MMM", { locale: nl })}</span>
-                          {request.day_part && request.day_part !== "full_day" && (
-                            <span className="flex items-center gap-1 text-xs">
-                              {request.day_part === "morning" ? <Sun className="h-3 w-3" /> : <Sunset className="h-3 w-3" />}
-                              {getDayPartLabel(request.day_part)}
-                            </span>
+                    <CalendarItemPreview key={`timeoff-${request.id}`} item={request} type="timeoff" side="right">
+                      <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }}
+                        onClick={(e) => handleItemClick(calendarItem, e)}
+                        className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4"
+                      >
+                        <div className={cn("w-1 h-12 rounded-full", getTypeColor(request.type, request.status).split(" ")[0])} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Palmtree className="h-4 w-4 text-primary flex-shrink-0" />
+                            <span className="font-medium truncate">{getEmployeeName(request)}</span>
+                            <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTypeColor(request.type, request.status))}>
+                              {getTypeLabel(request.type)}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground flex items-center gap-2">
+                            <span>{format(parseISO(request.start_date), "d MMM", { locale: nl })} — {format(parseISO(request.end_date), "d MMM", { locale: nl })}</span>
+                            {request.day_part && request.day_part !== "full_day" && (
+                              <span className="flex items-center gap-1 text-xs">
+                                {request.day_part === "morning" ? <Sun className="h-3 w-3" /> : <Sunset className="h-3 w-3" />}
+                                {getDayPartLabel(request.day_part)}
+                              </span>
+                            )}
+                          </div>
+                          {request.reason && (
+                            <div className="text-xs text-muted-foreground/70 mt-1 truncate italic">{request.reason}</div>
                           )}
                         </div>
-                        {request.reason && (
-                          <div className="text-xs text-muted-foreground/70 mt-1 truncate italic">{request.reason}</div>
-                        )}
-                      </div>
-                      <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getEmployeeColor(request.user_id))} />
-                    </motion.div>
+                        <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getEmployeeColor(request.user_id))} />
+                      </motion.div>
+                    </CalendarItemPreview>
                   );
                 } else if (calendarItem.type === "task") {
                   const task = calendarItem.data;
@@ -973,41 +974,42 @@ export function CalendarOverview() {
                     <span>Verlof</span>
                   </div>
                   {dayRequests.map((request, index) => (
-                    <motion.div
-                      key={request.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.25, delay: index * 0.05 }}
-                      onClick={(e) => handleItemClick({ type: "timeoff", data: request }, e)}
-                      className={cn(
-                        "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md cursor-pointer",
-                        getTypeColor(request.type, request.status)
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className={cn("w-3 h-3 rounded-full ring-2 ring-white/30", getEmployeeColor(request.user_id))} />
-                          <span className="font-semibold">{getEmployeeName(request)}</span>
-                        </div>
-                        {request.day_part && request.day_part !== "full_day" && (
-                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/20 text-xs font-medium">
-                            {request.day_part === "morning" ? (
-                              <Sun className="h-3 w-3" />
-                            ) : (
-                              <Sunset className="h-3 w-3" />
-                            )}
-                            <span>{getDayPartLabel(request.day_part)}</span>
-                          </div>
+                    <CalendarItemPreview key={request.id} item={request} type="timeoff" side="right">
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.25, delay: index * 0.05 }}
+                        onClick={(e) => handleItemClick({ type: "timeoff", data: request }, e)}
+                        className={cn(
+                          "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md cursor-pointer",
+                          getTypeColor(request.type, request.status)
                         )}
-                      </div>
-                      <div className="font-medium mt-2 opacity-90">{getTypeLabel(request.type)}</div>
-                      <div className="text-xs opacity-75 mt-1">
-                        {format(parseISO(request.start_date), "d MMM", { locale: nl })} — {format(parseISO(request.end_date), "d MMM", { locale: nl })}
-                      </div>
-                      {request.reason && (
-                        <div className="text-xs opacity-60 mt-2 italic">{request.reason}</div>
-                      )}
-                    </motion.div>
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className={cn("w-3 h-3 rounded-full ring-2 ring-white/30", getEmployeeColor(request.user_id))} />
+                            <span className="font-semibold">{getEmployeeName(request)}</span>
+                          </div>
+                          {request.day_part && request.day_part !== "full_day" && (
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/20 text-xs font-medium">
+                              {request.day_part === "morning" ? (
+                                <Sun className="h-3 w-3" />
+                              ) : (
+                                <Sunset className="h-3 w-3" />
+                              )}
+                              <span>{getDayPartLabel(request.day_part)}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="font-medium mt-2 opacity-90">{getTypeLabel(request.type)}</div>
+                        <div className="text-xs opacity-75 mt-1">
+                          {format(parseISO(request.start_date), "d MMM", { locale: nl })} — {format(parseISO(request.end_date), "d MMM", { locale: nl })}
+                        </div>
+                        {request.reason && (
+                          <div className="text-xs opacity-60 mt-2 italic">{request.reason}</div>
+                        )}
+                      </motion.div>
+                    </CalendarItemPreview>
                   ))}
                 </div>
               )}
@@ -1179,24 +1181,25 @@ export function CalendarOverview() {
                     if (entry.type === 'timeoff') {
                       const request = entry.item as RequestWithProfile;
                       return (
-                        <div
-                          key={request.id}
-                          onClick={(e) => handleItemClick({ type: "timeoff", data: request }, e)}
-                          className={cn(
-                            "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer",
-                            getTypeColor(request.type, request.status)
-                          )}
-                          title={`${getEmployeeName(request)} - ${getTypeLabel(request.type)}${request.day_part && request.day_part !== "full_day" ? ` (${getDayPartLabel(request.day_part)})` : ""}`}
-                        >
-                          {request.day_part === "morning" ? (
-                            <Sun className="w-3 h-3 shrink-0" />
-                          ) : request.day_part === "afternoon" ? (
-                            <Sunset className="w-3 h-3 shrink-0" />
-                          ) : (
-                            <Palmtree className="w-3 h-3 shrink-0" />
-                          )}
-                          <span className="truncate font-medium">{getEmployeeName(request)}</span>
-                        </div>
+                        <CalendarItemPreview key={request.id} item={request} type="timeoff" side="bottom" align="start">
+                          <div
+                            onClick={(e) => handleItemClick({ type: "timeoff", data: request }, e)}
+                            className={cn(
+                              "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer",
+                              getTypeColor(request.type, request.status)
+                            )}
+                            title={`${getEmployeeName(request)} - ${getTypeLabel(request.type)}${request.day_part && request.day_part !== "full_day" ? ` (${getDayPartLabel(request.day_part)})` : ""}`}
+                          >
+                            {request.day_part === "morning" ? (
+                              <Sun className="w-3 h-3 shrink-0" />
+                            ) : request.day_part === "afternoon" ? (
+                              <Sunset className="w-3 h-3 shrink-0" />
+                            ) : (
+                              <Palmtree className="w-3 h-3 shrink-0" />
+                            )}
+                            <span className="truncate font-medium">{getEmployeeName(request)}</span>
+                          </div>
+                        </CalendarItemPreview>
                       );
                     } else if (entry.type === 'task') {
                       const task = entry.item as TaskWithProfile;
