@@ -43,7 +43,7 @@ export function CreateGasCylinderOrderDialog({
   const [saving, setSaving] = useState(false);
   const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
-  const [gasType, setGasType] = useState("co2");
+  const [gasType, setGasType] = useState("");
   const [gasGrade, setGasGrade] = useState<"medical" | "technical">("technical");
   const [cylinderCount, setCylinderCount] = useState("");
   const [cylinderSize, setCylinderSize] = useState("medium");
@@ -51,6 +51,11 @@ export function CreateGasCylinderOrderDialog({
   const [notes, setNotes] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
+  const [gasTypes, setGasTypes] = useState<Array<{
+    id: string;
+    name: string;
+    color: string;
+  }>>([]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -70,10 +75,29 @@ export function CreateGasCylinderOrderDialog({
     fetchProfile();
   }, []);
 
+  useEffect(() => {
+    const fetchGasTypes = async () => {
+      const { data } = await supabase
+        .from("gas_types")
+        .select("id, name, color")
+        .eq("is_active", true)
+        .order("sort_order");
+      
+      if (data) {
+        setGasTypes(data);
+        if (data.length > 0 && !gasType) {
+          setGasType(data[0].name);
+        }
+      }
+    };
+    
+    if (open) fetchGasTypes();
+  }, [open]);
+
   const resetForm = () => {
     setCustomerId("");
     setCustomerName("");
-    setGasType("co2");
+    setGasType(gasTypes.length > 0 ? gasTypes[0].name : "");
     setGasGrade("technical");
     setCylinderCount("");
     setCylinderSize("medium");
@@ -172,16 +196,20 @@ export function CreateGasCylinderOrderDialog({
               <Label>Gastype</Label>
               <Select value={gasType} onValueChange={setGasType}>
                 <SelectTrigger className="bg-background">
-                  <SelectValue />
+                  <SelectValue placeholder="Selecteer gastype" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="co2">CO₂</SelectItem>
-                  <SelectItem value="nitrogen">Stikstof (N₂)</SelectItem>
-                  <SelectItem value="argon">Argon</SelectItem>
-                  <SelectItem value="acetylene">Acetyleen</SelectItem>
-                  <SelectItem value="oxygen">Zuurstof</SelectItem>
-                  <SelectItem value="helium">Helium</SelectItem>
-                  <SelectItem value="other">Overig</SelectItem>
+                  {gasTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.name}>
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-2 h-2 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: type.color }} 
+                        />
+                        {type.name}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
