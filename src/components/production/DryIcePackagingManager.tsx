@@ -41,6 +41,7 @@ interface Packaging {
   description: string | null;
   is_active: boolean;
   sort_order: number;
+  capacity_kg: number | null;
 }
 
 interface DryIcePackagingManagerProps {
@@ -59,6 +60,7 @@ export function DryIcePackagingManager({ open, onOpenChange }: DryIcePackagingMa
   // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [capacityKg, setCapacityKg] = useState<string>("");
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -86,10 +88,12 @@ export function DryIcePackagingManager({ open, onOpenChange }: DryIcePackagingMa
     if (packaging) {
       setName(packaging.name);
       setDescription(packaging.description || "");
+      setCapacityKg(packaging.capacity_kg?.toString() || "");
       setIsActive(packaging.is_active);
     } else {
       setName("");
       setDescription("");
+      setCapacityKg("");
       setIsActive(true);
     }
     setEditingPackaging(packaging);
@@ -106,6 +110,7 @@ export function DryIcePackagingManager({ open, onOpenChange }: DryIcePackagingMa
     const packagingData = {
       name: name.trim(),
       description: description.trim() || null,
+      capacity_kg: capacityKg ? parseFloat(capacityKg) : null,
       is_active: isActive,
       sort_order: editingPackaging ? editingPackaging.sort_order : packagingOptions.length,
     };
@@ -206,6 +211,7 @@ export function DryIcePackagingManager({ open, onOpenChange }: DryIcePackagingMa
                 <TableHeader>
                   <TableRow>
                     <TableHead>Naam</TableHead>
+                    <TableHead>Inhoud (kg)</TableHead>
                     <TableHead>Omschrijving</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Acties</TableHead>
@@ -215,7 +221,10 @@ export function DryIcePackagingManager({ open, onOpenChange }: DryIcePackagingMa
                   {packagingOptions.map((packaging) => (
                     <TableRow key={packaging.id}>
                       <TableCell className="font-medium">{packaging.name}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
+                      <TableCell>
+                        {packaging.capacity_kg ? `${packaging.capacity_kg} kg` : "-"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm max-w-[150px] truncate">
                         {packaging.description || "-"}
                       </TableCell>
                       <TableCell>
@@ -282,6 +291,18 @@ export function DryIcePackagingManager({ open, onOpenChange }: DryIcePackagingMa
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="bijv. Piepschuim box"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="packagingCapacity">Inhoud (kg)</Label>
+              <Input
+                id="packagingCapacity"
+                type="number"
+                min="0"
+                step="0.1"
+                value={capacityKg}
+                onChange={(e) => setCapacityKg(e.target.value)}
+                placeholder="bijv. 22"
               />
             </div>
             <div className="space-y-2">
