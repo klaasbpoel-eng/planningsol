@@ -54,6 +54,8 @@ import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { CalendarItemDialog } from "./CalendarItemDialog";
+import { useUserRole } from "@/hooks/useUserRole";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Task = Database["public"]["Tables"]["tasks"]["Row"];
@@ -77,6 +79,7 @@ export function CalendarOverview() {
   const [viewType, setViewType] = useState<ViewType>("month");
   const [requests, setRequests] = useState<RequestWithProfile[]>([]);
   const [tasks, setTasks] = useState<TaskWithProfile[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
@@ -85,6 +88,11 @@ export function CalendarOverview() {
   const [showTasks, setShowTasks] = useState(true);
   const [draggedTask, setDraggedTask] = useState<TaskWithProfile | null>(null);
   const [dragOverDate, setDragOverDate] = useState<Date | null>(null);
+  const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>();
+  
+  const { isAdmin } = useUserRole(currentUserId);
 
   const leaveTypes = [
     { value: "vacation", label: "Vakantie", color: "bg-primary" },
@@ -103,7 +111,15 @@ export function CalendarOverview() {
     { value: "in_progress", label: "Bezig", color: "bg-blue-500" },
     { value: "completed", label: "Voltooid", color: "bg-success" },
   ];
+
   useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+      }
+    };
+    getUser();
     fetchData();
   }, []);
 
@@ -149,11 +165,22 @@ export function CalendarOverview() {
 
       setRequests(requestsWithProfiles);
       setTasks(tasksWithProfiles);
+      setProfiles(profilesData || []);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleItemClick = (item: CalendarItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedItem(item);
+    setDialogOpen(true);
+  };
+
+  const handleDialogUpdate = () => {
+    fetchData();
   };
 
   // Drag and drop handlers
@@ -456,8 +483,9 @@ export function CalendarOverview() {
                   {dayRequests.map((request, index) => (
                     <div
                       key={request.id}
+                      onClick={(e) => handleItemClick({ type: "timeoff", data: request }, e)}
                       className={cn(
-                        "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md",
+                        "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md cursor-pointer",
                         getTypeColor(request.type, request.status)
                       )}
                       style={{ animationDelay: `${index * 50}ms` }}
@@ -488,8 +516,9 @@ export function CalendarOverview() {
                   {dayTasks.map((task, index) => (
                     <div
                       key={task.id}
+                      onClick={(e) => handleItemClick({ type: "task", data: task }, e)}
                       className={cn(
-                        "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md border-l-4",
+                        "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md border-l-4 cursor-pointer",
                         getTaskStatusColor(task.status)
                       )}
                       style={{ animationDelay: `${index * 50}ms` }}
@@ -568,8 +597,9 @@ export function CalendarOverview() {
                     entry.type === 'timeoff' ? (
                       <div
                         key={(entry.item as RequestWithProfile).id}
+                        onClick={(e) => handleItemClick({ type: "timeoff", data: entry.item as RequestWithProfile }, e)}
                         className={cn(
-                          "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105",
+                          "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer",
                           getTypeColor((entry.item as RequestWithProfile).type, (entry.item as RequestWithProfile).status)
                         )}
                       >
@@ -582,13 +612,14 @@ export function CalendarOverview() {
                         draggable
                         onDragStart={(e) => handleDragStart(e, entry.item as TaskWithProfile)}
                         onDragEnd={handleDragEnd}
+                        onClick={(e) => handleItemClick({ type: "task", data: entry.item as TaskWithProfile }, e)}
                         className={cn(
-                          "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-all hover:scale-105 cursor-grab active:cursor-grabbing group",
+                          "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-all hover:scale-105 cursor-pointer group",
                           getTaskStatusColor((entry.item as TaskWithProfile).status),
                           draggedTask?.id === (entry.item as TaskWithProfile).id && "opacity-50"
                         )}
                       >
-                        <GripVertical className="w-3 h-3 shrink-0 opacity-50 group-hover:opacity-100" />
+                        <GripVertical className="w-3 h-3 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
                         <ClipboardList className="w-3 h-3 shrink-0" />
                         <span className="truncate font-medium">{(entry.item as TaskWithProfile).title}</span>
                       </div>
@@ -664,8 +695,9 @@ export function CalendarOverview() {
                     entry.type === 'timeoff' ? (
                       <div
                         key={(entry.item as RequestWithProfile).id}
+                        onClick={(e) => handleItemClick({ type: "timeoff", data: entry.item as RequestWithProfile }, e)}
                         className={cn(
-                          "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105",
+                          "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer",
                           getTypeColor((entry.item as RequestWithProfile).type, (entry.item as RequestWithProfile).status)
                         )}
                       >
@@ -678,13 +710,14 @@ export function CalendarOverview() {
                         draggable
                         onDragStart={(e) => handleDragStart(e, entry.item as TaskWithProfile)}
                         onDragEnd={handleDragEnd}
+                        onClick={(e) => handleItemClick({ type: "task", data: entry.item as TaskWithProfile }, e)}
                         className={cn(
-                          "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-all hover:scale-105 cursor-grab active:cursor-grabbing group",
+                          "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-all hover:scale-105 cursor-pointer group",
                           getTaskStatusColor((entry.item as TaskWithProfile).status),
                           draggedTask?.id === (entry.item as TaskWithProfile).id && "opacity-50"
                         )}
                       >
-                        <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-50 group-hover:opacity-100" />
+                        <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
                         <ClipboardList className="w-2.5 h-2.5 shrink-0" />
                         <span className="truncate font-medium">{(entry.item as TaskWithProfile).title}</span>
                       </div>
@@ -1080,6 +1113,16 @@ export function CalendarOverview() {
           </div>
         )}
       </CardContent>
+      
+      {/* Calendar Item Dialog */}
+      <CalendarItemDialog
+        item={selectedItem}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onUpdate={handleDialogUpdate}
+        isAdmin={isAdmin}
+        profiles={profiles}
+      />
     </Card>
   );
 }
