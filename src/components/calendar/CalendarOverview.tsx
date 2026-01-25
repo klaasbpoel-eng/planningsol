@@ -851,41 +851,42 @@ export function CalendarOverview() {
                 } else if (calendarItem.type === "task") {
                   const task = calendarItem.data;
                   return (
-                    <motion.div
-                      key={`task-${task.id}`}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }}
-                      onClick={(e) => handleItemClick(calendarItem, e)}
-                      className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4"
-                    >
-                      <div 
-                        className="w-1 h-12 rounded-full" 
-                        style={{ backgroundColor: task.task_type?.color || "#888" }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <ClipboardList className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                          <span className="font-medium truncate">{task.task_type?.name || "Taak"}</span>
-                          <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTaskStatusColor(task.status))}>
-                            {task.status === "pending" ? "Te doen" : task.status === "in_progress" ? "Bezig" : "Voltooid"}
-                          </Badge>
-                          <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTaskPriorityColor(task.priority))}>
-                            {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Gemiddeld" : "Laag"}
-                          </Badge>
+                    <CalendarItemPreview key={`task-${task.id}`} item={task} type="task" side="right">
+                      <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }}
+                        onClick={(e) => handleItemClick(calendarItem, e)}
+                        className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4"
+                      >
+                        <div 
+                          className="w-1 h-12 rounded-full" 
+                          style={{ backgroundColor: task.task_type?.color || "#888" }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <ClipboardList className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                            <span className="font-medium truncate">{task.task_type?.name || "Taak"}</span>
+                            <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTaskStatusColor(task.status))}>
+                              {task.status === "pending" ? "Te doen" : task.status === "in_progress" ? "Bezig" : "Voltooid"}
+                            </Badge>
+                            <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTaskPriorityColor(task.priority))}>
+                              {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Gemiddeld" : "Laag"}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground flex items-center gap-2">
+                            <span>{getEmployeeName(task)}</span>
+                            {hasTimeInfo(task.start_time, task.end_time) && (
+                              <span className="flex items-center gap-1 text-xs">
+                                <Clock className="h-3 w-3" />
+                                {formatTimeRange(task.start_time, task.end_time)}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground flex items-center gap-2">
-                          <span>{getEmployeeName(task)}</span>
-                          {hasTimeInfo(task.start_time, task.end_time) && (
-                            <span className="flex items-center gap-1 text-xs">
-                              <Clock className="h-3 w-3" />
-                              {formatTimeRange(task.start_time, task.end_time)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getEmployeeColor(task.assigned_to))} />
-                    </motion.div>
+                        <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getEmployeeColor(task.assigned_to))} />
+                      </motion.div>
+                    </CalendarItemPreview>
                   );
                 } else if (calendarItem.type === "dryice") {
                   const order = calendarItem.data;
@@ -1022,36 +1023,37 @@ export function CalendarOverview() {
                     <span>Taken</span>
                   </div>
                   {dayTasks.map((task, index) => (
-                    <motion.div
-                      key={task.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.25, delay: (dayRequests.length + index) * 0.05 }}
-                      onClick={(e) => handleItemClick({ type: "task", data: task }, e)}
-                      className={cn(
-                        "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md border-l-4 cursor-pointer",
-                        getTaskStatusColor(task.status)
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className={cn("w-3 h-3 rounded-full ring-2 ring-white/30", getEmployeeColor(task.assigned_to))} />
-                          <span className="font-semibold">{getEmployeeName(task)}</span>
-                        </div>
-                        {hasTimeInfo(task.start_time, task.end_time) && (
-                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/20 text-xs font-medium">
-                            <Clock className="h-3 w-3" />
-                            <span>{formatTimeRange(task.start_time, task.end_time)}</span>
-                          </div>
+                    <CalendarItemPreview key={task.id} item={task} type="task" side="right">
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.25, delay: (dayRequests.length + index) * 0.05 }}
+                        onClick={(e) => handleItemClick({ type: "task", data: task }, e)}
+                        className={cn(
+                          "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md border-l-4 cursor-pointer",
+                          getTaskStatusColor(task.status)
                         )}
-                      </div>
-                      <div className="font-medium mt-2">{task.task_type?.name || "Taak"}</div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="outline" className={cn("text-xs", getTaskPriorityColor(task.priority))}>
-                          {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Gemiddeld" : "Laag"}
-                        </Badge>
-                      </div>
-                    </motion.div>
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className={cn("w-3 h-3 rounded-full ring-2 ring-white/30", getEmployeeColor(task.assigned_to))} />
+                            <span className="font-semibold">{getEmployeeName(task)}</span>
+                          </div>
+                          {hasTimeInfo(task.start_time, task.end_time) && (
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/20 text-xs font-medium">
+                              <Clock className="h-3 w-3" />
+                              <span>{formatTimeRange(task.start_time, task.end_time)}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="font-medium mt-2">{task.task_type?.name || "Taak"}</div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="outline" className={cn("text-xs", getTaskPriorityColor(task.priority))}>
+                            {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Gemiddeld" : "Laag"}
+                          </Badge>
+                        </div>
+                      </motion.div>
+                    </CalendarItemPreview>
                   ))}
                 </div>
               )}
@@ -1204,32 +1206,33 @@ export function CalendarOverview() {
                     } else if (entry.type === 'task') {
                       const task = entry.item as TaskWithProfile;
                       return (
-                        <div
-                          key={task.id}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, task)}
-                          onDragEnd={handleDragEnd}
-                          onClick={(e) => handleItemClick({ type: "task", data: task }, e)}
-                          className={cn(
-                            "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-all hover:scale-105 cursor-pointer group",
-                            getTaskStatusColor(task.status),
-                            draggedTask?.id === task.id && "opacity-50"
-                          )}
-                          title={`${task.task_type?.name || "Taak"}${hasTimeInfo(task.start_time, task.end_time) ? ` (${formatTimeRange(task.start_time, task.end_time)})` : ""}`}
-                        >
-                          {hasTimeInfo(task.start_time, task.end_time) ? (
-                            <Clock className="w-3 h-3 shrink-0 opacity-70" />
-                          ) : (
-                            <GripVertical className="w-3 h-3 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
-                          )}
-                          <ClipboardList className="w-3 h-3 shrink-0" />
-                          <span className="truncate font-medium">
-                            {hasTimeInfo(task.start_time, task.end_time) && (
-                              <span className="opacity-80 mr-1">{formatTimeRange(task.start_time, task.end_time)}</span>
+                        <CalendarItemPreview key={task.id} item={task} type="task" side="bottom" align="start">
+                          <div
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, task)}
+                            onDragEnd={handleDragEnd}
+                            onClick={(e) => handleItemClick({ type: "task", data: task }, e)}
+                            className={cn(
+                              "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-all hover:scale-105 cursor-pointer group",
+                              getTaskStatusColor(task.status),
+                              draggedTask?.id === task.id && "opacity-50"
                             )}
-                            {task.task_type?.name || "Taak"}
-                          </span>
-                        </div>
+                            title={`${task.task_type?.name || "Taak"}${hasTimeInfo(task.start_time, task.end_time) ? ` (${formatTimeRange(task.start_time, task.end_time)})` : ""}`}
+                          >
+                            {hasTimeInfo(task.start_time, task.end_time) ? (
+                              <Clock className="w-3 h-3 shrink-0 opacity-70" />
+                            ) : (
+                              <GripVertical className="w-3 h-3 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
+                            )}
+                            <ClipboardList className="w-3 h-3 shrink-0" />
+                            <span className="truncate font-medium">
+                              {hasTimeInfo(task.start_time, task.end_time) && (
+                                <span className="opacity-80 mr-1">{formatTimeRange(task.start_time, task.end_time)}</span>
+                              )}
+                              {task.task_type?.name || "Taak"}
+                            </span>
+                          </div>
+                        </CalendarItemPreview>
                       );
                     } else if (entry.type === 'dryice') {
                       const order = entry.item as DryIceOrderWithDetails;
