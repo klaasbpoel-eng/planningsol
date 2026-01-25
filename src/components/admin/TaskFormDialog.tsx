@@ -102,10 +102,6 @@ export function TaskFormDialog({
 
   const handleSave = async () => {
     // Validation
-    if (!formData.assigned_to) {
-      toast.error("Selecteer een medewerker");
-      return;
-    }
     if (!formData.due_date) {
       toast.error("Selecteer een deadline");
       return;
@@ -135,7 +131,7 @@ export function TaskFormDialog({
         due_date: format(formData.due_date, "yyyy-MM-dd"),
         priority: formData.priority,
         status: formData.status,
-        assigned_to: formData.assigned_to,
+        assigned_to: formData.assigned_to || null,
         type_id: finalTypeId,
         start_time: formData.start_time || null,
         end_time: formData.end_time || null,

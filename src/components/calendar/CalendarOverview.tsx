@@ -467,7 +467,14 @@ export function CalendarOverview() {
   };
 
   const getEmployeeName = (item: RequestWithProfile | TaskWithProfile) => {
-    return item.profile?.full_name || item.profile?.email?.split("@")[0] || "Onbekend";
+    if (!item.profile) {
+      // Check if this is a task without assignment
+      if ('assigned_to' in item && !item.assigned_to) {
+        return "Niet toegewezen";
+      }
+      return "Onbekend";
+    }
+    return item.profile.full_name || item.profile.email?.split("@")[0] || "Onbekend";
   };
 
   const getTaskPriorityColor = (priority: string) => {
@@ -527,7 +534,8 @@ export function CalendarOverview() {
     }));
   }, [requests, tasks]);
 
-  const getEmployeeColor = (userId: string) => {
+  const getEmployeeColor = (userId: string | null) => {
+    if (!userId) return "bg-muted";
     const employee = uniqueEmployees.find((e) => e.userId === userId);
     return employee?.color || "bg-muted";
   };

@@ -104,7 +104,7 @@ export function CreateTaskDialog({
   };
 
   const handleCreate = async () => {
-    if (!dueDate || !assignedTo || !currentUserId) {
+    if (!dueDate || !currentUserId) {
       toast.error("Vul alle verplichte velden in");
       return;
     }
@@ -124,7 +124,7 @@ export function CreateTaskDialog({
         status,
         priority,
         due_date: format(dueDate, "yyyy-MM-dd"),
-        assigned_to: assignedTo,
+        assigned_to: assignedTo || null,
         created_by: currentUserId,
         type_id: typeId,
         start_time: hasTime && startTime ? startTime : null,
@@ -378,7 +378,7 @@ export function CreateTaskDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={saving || !dueDate || !assignedTo}
+            disabled={saving || !dueDate}
           >
             <Plus className="h-4 w-4 mr-2" />
             {saving ? "Aanmaken..." : "Taak aanmaken"}
