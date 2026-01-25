@@ -38,7 +38,8 @@ import {
   Palmtree,
   GripVertical,
   Plus,
-  Undo2
+  Undo2,
+  Snowflake
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -89,6 +90,9 @@ type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Task = Database["public"]["Tables"]["tasks"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type TaskType = Database["public"]["Tables"]["task_types"]["Row"];
+type DryIceOrder = Database["public"]["Tables"]["dry_ice_orders"]["Row"];
+type DryIceProductType = Database["public"]["Tables"]["dry_ice_product_types"]["Row"];
+type DryIcePackaging = Database["public"]["Tables"]["dry_ice_packaging"]["Row"];
 
 type RequestWithProfile = TimeOffRequest & {
   profile?: Profile | null;
@@ -99,16 +103,23 @@ type TaskWithProfile = Task & {
   task_type?: TaskType | null;
 };
 
+type DryIceOrderWithDetails = DryIceOrder & {
+  product_type_info?: DryIceProductType | null;
+  packaging_info?: DryIcePackaging | null;
+};
+
 type ViewType = "list" | "day" | "week" | "month" | "year";
 type CalendarItem = 
   | { type: "timeoff"; data: RequestWithProfile }
-  | { type: "task"; data: TaskWithProfile };
+  | { type: "task"; data: TaskWithProfile }
+  | { type: "dryice"; data: DryIceOrderWithDetails };
 
 export function CalendarOverview() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<ViewType>("month");
   const [requests, setRequests] = useState<RequestWithProfile[]>([]);
   const [tasks, setTasks] = useState<TaskWithProfile[]>([]);
+  const [dryIceOrders, setDryIceOrders] = useState<DryIceOrderWithDetails[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
@@ -117,6 +128,7 @@ export function CalendarOverview() {
   const [selectedTaskCategory, setSelectedTaskCategory] = useState<string>("all");
   const [showTimeOff, setShowTimeOff] = useState(true);
   const [showTasks, setShowTasks] = useState(true);
+  const [showDryIce, setShowDryIce] = useState(true);
   const [draggedTask, setDraggedTask] = useState<TaskWithProfile | null>(null);
   const [dragOverDate, setDragOverDate] = useState<Date | null>(null);
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
@@ -128,6 +140,8 @@ export function CalendarOverview() {
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
   const [currentProfileId, setCurrentProfileId] = useState<string | undefined>();
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
+  const [dryIceProductTypes, setDryIceProductTypes] = useState<DryIceProductType[]>([]);
+  const [dryIcePackaging, setDryIcePackaging] = useState<DryIcePackaging[]>([]);
   const [lastAction, setLastAction] = useState<{
     type: "task_move";
     taskId: string;
@@ -203,6 +217,30 @@ export function CalendarOverview() {
 
       if (taskTypesError) throw taskTypesError;
 
+      // Fetch dry ice orders
+      const { data: dryIceOrdersData, error: dryIceOrdersError } = await supabase
+        .from("dry_ice_orders")
+        .select("*")
+        .order("scheduled_date", { ascending: true });
+
+      if (dryIceOrdersError) throw dryIceOrdersError;
+
+      // Fetch dry ice product types
+      const { data: dryIceProductTypesData, error: dryIceProductTypesError } = await supabase
+        .from("dry_ice_product_types")
+        .select("*")
+        .eq("is_active", true);
+
+      if (dryIceProductTypesError) throw dryIceProductTypesError;
+
+      // Fetch dry ice packaging
+      const { data: dryIcePackagingData, error: dryIcePackagingError } = await supabase
+        .from("dry_ice_packaging")
+        .select("*")
+        .eq("is_active", true);
+
+      if (dryIcePackagingError) throw dryIcePackagingError;
+
       // Map profiles to requests using profile_id (new) or user_id (legacy)
       const requestsWithProfiles: RequestWithProfile[] = (requestsData || []).map((request) => {
         // Use profile_id if available, otherwise fall back to user_id
@@ -226,10 +264,20 @@ export function CalendarOverview() {
         return { ...task, profile, task_type };
       });
 
+      // Map product types and packaging to dry ice orders
+      const dryIceOrdersWithDetails: DryIceOrderWithDetails[] = (dryIceOrdersData || []).map((order) => {
+        const product_type_info = dryIceProductTypesData?.find((t) => t.id === order.product_type_id) || null;
+        const packaging_info = dryIcePackagingData?.find((p) => p.id === order.packaging_id) || null;
+        return { ...order, product_type_info, packaging_info };
+      });
+
       setRequests(requestsWithProfiles);
       setTasks(tasksWithProfiles);
+      setDryIceOrders(dryIceOrdersWithDetails);
       setProfiles(profilesData || []);
       setTaskTypes(taskTypesData || []);
+      setDryIceProductTypes(dryIceProductTypesData || []);
+      setDryIcePackaging(dryIcePackagingData || []);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -440,6 +488,11 @@ export function CalendarOverview() {
     return filtered;
   }, [tasks, selectedEmployee, selectedTaskCategory, taskTypes]);
 
+  // Filter dry ice orders
+  const filteredDryIceOrders = useMemo(() => {
+    return dryIceOrders;
+  }, [dryIceOrders]);
+
   const getItemsForDay = (day: Date): CalendarItem[] => {
     const items: CalendarItem[] = [];
     
@@ -461,6 +514,14 @@ export function CalendarOverview() {
         }
       });
     }
+
+    if (showDryIce) {
+      filteredDryIceOrders.forEach((order) => {
+        if (isSameDay(parseISO(order.scheduled_date), day)) {
+          items.push({ type: "dryice", data: order });
+        }
+      });
+    }
     
     return items;
   };
@@ -478,6 +539,31 @@ export function CalendarOverview() {
   const getTasksForDay = (day: Date): TaskWithProfile[] => {
     if (!showTasks) return [];
     return filteredTasks.filter((task) => isSameDay(parseISO(task.due_date), day));
+  };
+
+  const getDryIceOrdersForDay = (day: Date): DryIceOrderWithDetails[] => {
+    if (!showDryIce) return [];
+    return filteredDryIceOrders.filter((order) => isSameDay(parseISO(order.scheduled_date), day));
+  };
+
+  const getDryIceStatusColor = (status: string) => {
+    switch (status) {
+      case "completed": return "bg-success/80 text-success-foreground";
+      case "in_progress": return "bg-blue-500/80 text-white";
+      case "pending": return "bg-cyan-500/80 text-white";
+      case "cancelled": return "bg-muted text-muted-foreground";
+      default: return "bg-cyan-500/80 text-white";
+    }
+  };
+
+  const getDryIceStatusLabel = (status: string) => {
+    switch (status) {
+      case "completed": return "Voltooid";
+      case "in_progress": return "Bezig";
+      case "pending": return "Gepland";
+      case "cancelled": return "Geannuleerd";
+      default: return "Gepland";
+    }
   };
 
   const getEmployeeName = (item: RequestWithProfile | TaskWithProfile) => {
@@ -631,6 +717,15 @@ export function CalendarOverview() {
         });
       });
     }
+
+    if (showDryIce) {
+      filteredDryIceOrders.forEach((order) => {
+        allItems.push({
+          date: parseISO(order.scheduled_date),
+          item: { type: "dryice", data: order }
+        });
+      });
+    }
     
     // Sort by date ascending
     allItems.sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -730,7 +825,7 @@ export function CalendarOverview() {
                       <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getEmployeeColor(request.user_id))} />
                     </motion.div>
                   );
-                } else {
+                } else if (calendarItem.type === "task") {
                   const task = calendarItem.data;
                   return (
                     <motion.div
@@ -769,7 +864,40 @@ export function CalendarOverview() {
                       <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getEmployeeColor(task.assigned_to))} />
                     </motion.div>
                   );
+                } else if (calendarItem.type === "dryice") {
+                  const order = calendarItem.data;
+                  return (
+                    <motion.div
+                      key={`dryice-${order.id}`}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }}
+                      className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4"
+                    >
+                      <div className="w-1 h-12 rounded-full bg-cyan-500" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Snowflake className="h-4 w-4 text-cyan-500 flex-shrink-0" />
+                          <span className="font-medium truncate">{order.customer_name}</span>
+                          <Badge variant="outline" className={cn("text-xs flex-shrink-0", getDryIceStatusColor(order.status))}>
+                            {getDryIceStatusLabel(order.status)}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground flex items-center gap-2">
+                          <span>{order.quantity_kg} kg {order.product_type_info?.name || ""}</span>
+                          {order.packaging_info && (
+                            <span className="text-xs">• {order.packaging_info.name}</span>
+                          )}
+                        </div>
+                        {order.notes && (
+                          <div className="text-xs text-muted-foreground/70 mt-1 truncate italic">{order.notes}</div>
+                        )}
+                      </div>
+                      <div className="w-2 h-2 rounded-full flex-shrink-0 bg-cyan-500" />
+                    </motion.div>
+                  );
                 }
+                return null;
               })}
             </div>
           </motion.div>
@@ -782,7 +910,8 @@ export function CalendarOverview() {
   const renderDayView = () => {
     const dayRequests = getRequestsForDay(currentDate);
     const dayTasks = getTasksForDay(currentDate);
-    const hasItems = dayRequests.length > 0 || dayTasks.length > 0;
+    const dayDryIceOrders = getDryIceOrdersForDay(currentDate);
+    const hasItems = dayRequests.length > 0 || dayTasks.length > 0 || dayDryIceOrders.length > 0;
     
     return (
       <div className="space-y-4 animate-fade-in">
@@ -893,6 +1022,47 @@ export function CalendarOverview() {
                           {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Gemiddeld" : "Laag"}
                         </Badge>
                       </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+
+              {/* Dry Ice Orders */}
+              {dayDryIceOrders.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                    <Snowflake className="h-4 w-4 text-cyan-500" />
+                    <span>Droogijs productie</span>
+                  </div>
+                  {dayDryIceOrders.map((order, index) => (
+                    <motion.div
+                      key={order.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25, delay: (dayRequests.length + dayTasks.length + index) * 0.05 }}
+                      className={cn(
+                        "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md",
+                        getDryIceStatusColor(order.status)
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <Snowflake className="w-4 h-4" />
+                          <span className="font-semibold">{order.customer_name}</span>
+                        </div>
+                        <Badge variant="outline" className="text-xs bg-white/20">
+                          {order.order_number}
+                        </Badge>
+                      </div>
+                      <div className="font-medium mt-2">
+                        {order.quantity_kg} kg {order.product_type_info?.name || ""}
+                      </div>
+                      {order.packaging_info && (
+                        <div className="text-xs opacity-75 mt-1">{order.packaging_info.name}</div>
+                      )}
+                      {order.notes && (
+                        <div className="text-xs opacity-60 mt-2 italic">{order.notes}</div>
+                      )}
                     </motion.div>
                   ))}
                 </div>
@@ -1314,6 +1484,17 @@ export function CalendarOverview() {
                   Taken
                 </label>
               </div>
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="showDryIce" 
+                  checked={showDryIce} 
+                  onCheckedChange={(checked) => setShowDryIce(checked as boolean)}
+                />
+                <label htmlFor="showDryIce" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                  <Snowflake className="h-3.5 w-3.5 text-cyan-500" />
+                  Droogijs
+                </label>
+              </div>
             </div>
             
             <ToggleGroup 
@@ -1644,8 +1825,8 @@ export function CalendarOverview() {
       
       {/* Calendar Item Dialog */}
       <CalendarItemDialog
-        item={selectedItem}
-        open={dialogOpen}
+        item={selectedItem && selectedItem.type !== "dryice" ? selectedItem as { type: "timeoff"; data: RequestWithProfile } | { type: "task"; data: TaskWithProfile } : null}
+        open={dialogOpen && selectedItem?.type !== "dryice"}
         onOpenChange={setDialogOpen}
         onUpdate={handleDialogUpdate}
         isAdmin={isAdmin}
