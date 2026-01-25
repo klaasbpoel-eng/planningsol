@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Cylinder, Plus, Pencil, Trash2, Save } from "lucide-react";
+import { Cylinder, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -49,6 +49,9 @@ interface CylinderSizeManagerProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type SortColumn = "name" | "capacity_liters" | "description" | "is_active";
+type SortDirection = "asc" | "desc";
+
 export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerProps) {
   const [cylinderSizes, setCylinderSizes] = useState<CylinderSize[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +59,10 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingSize, setEditingSize] = useState<CylinderSize | null>(null);
   const [sizeToDelete, setSizeToDelete] = useState<CylinderSize | null>(null);
+  
+  // Sort state
+  const [sortColumn, setSortColumn] = useState<SortColumn>("capacity_liters");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   
   // Form state
   const [name, setName] = useState("");
@@ -68,7 +75,7 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
     const { data, error } = await supabase
       .from("cylinder_sizes")
       .select("*")
-      .order("capacity_liters", { ascending: true, nullsFirst: false });
+      .order(sortColumn, { ascending: sortDirection === "asc", nullsFirst: false });
 
     if (error) {
       console.error("Error fetching cylinder sizes:", error);
@@ -78,11 +85,29 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
     setLoading(false);
   };
 
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    }
+    return sortDirection === "asc" 
+      ? <ArrowUp className="h-4 w-4 ml-1" />
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
+
   useEffect(() => {
     if (open) {
       fetchCylinderSizes();
     }
-  }, [open]);
+  }, [open, sortColumn, sortDirection]);
 
   const openEditDialog = (size: CylinderSize | null) => {
     if (size) {
@@ -210,10 +235,42 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Naam</TableHead>
-                    <TableHead>Inhoud (L)</TableHead>
-                    <TableHead>Omschrijving</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort("name")}
+                    >
+                      <div className="flex items-center">
+                        Naam
+                        <SortIcon column="name" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort("capacity_liters")}
+                    >
+                      <div className="flex items-center">
+                        Inhoud (L)
+                        <SortIcon column="capacity_liters" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort("description")}
+                    >
+                      <div className="flex items-center">
+                        Omschrijving
+                        <SortIcon column="description" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort("is_active")}
+                    >
+                      <div className="flex items-center">
+                        Status
+                        <SortIcon column="is_active" />
+                      </div>
+                    </TableHead>
                     <TableHead className="text-right">Acties</TableHead>
                   </TableRow>
                 </TableHeader>
