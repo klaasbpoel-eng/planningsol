@@ -266,38 +266,56 @@ export type Database = {
           day_part: string | null
           end_date: string
           id: string
+          profile_id: string
           reason: string | null
           start_date: string
           status: Database["public"]["Enums"]["request_status"]
           type: Database["public"]["Enums"]["time_off_type"]
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
           day_part?: string | null
           end_date: string
           id?: string
+          profile_id: string
           reason?: string | null
           start_date: string
           status?: Database["public"]["Enums"]["request_status"]
           type?: Database["public"]["Enums"]["time_off_type"]
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
           day_part?: string | null
           end_date?: string
           id?: string
+          profile_id?: string
           reason?: string | null
           start_date?: string
           status?: Database["public"]["Enums"]["request_status"]
           type?: Database["public"]["Enums"]["time_off_type"]
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "time_off_requests_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_off_requests_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_limited"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       time_off_types: {
         Row: {
