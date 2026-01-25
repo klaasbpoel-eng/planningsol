@@ -43,6 +43,7 @@ export function CreateGasCylinderOrderDialog({
   const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [gasType, setGasType] = useState("co2");
+  const [gasGrade, setGasGrade] = useState<"medical" | "technical">("technical");
   const [cylinderCount, setCylinderCount] = useState("");
   const [cylinderSize, setCylinderSize] = useState("medium");
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
@@ -71,6 +72,7 @@ export function CreateGasCylinderOrderDialog({
     setCustomerId("");
     setCustomerName("");
     setGasType("co2");
+    setGasGrade("technical");
     setCylinderCount("");
     setCylinderSize("medium");
     setScheduledDate(new Date());
@@ -108,6 +110,7 @@ export function CreateGasCylinderOrderDialog({
         customer_name: customerName.trim(),
         customer_id: customerId || null,
         gas_type: gasType as "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other",
+        gas_grade: gasGrade,
         cylinder_count: count,
         cylinder_size: cylinderSize,
         scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
@@ -180,6 +183,21 @@ export function CreateGasCylinderOrderDialog({
             </div>
 
             <div className="space-y-2">
+              <Label>Kwaliteit</Label>
+              <Select value={gasGrade} onValueChange={(v) => setGasGrade(v as "medical" | "technical")}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="technical">Technisch</SelectItem>
+                  <SelectItem value="medical">Medisch</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="cylinderCount">
                 Aantal cilinders <span className="text-destructive">*</span>
               </Label>
@@ -193,9 +211,7 @@ export function CreateGasCylinderOrderDialog({
                 className="bg-background"
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Cilindergrootte</Label>
               <Select value={cylinderSize} onValueChange={setCylinderSize}>
@@ -209,41 +225,41 @@ export function CreateGasCylinderOrderDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label>
-                Geplande datum <span className="text-destructive">*</span>
-              </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !scheduledDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarDays className="mr-2 h-4 w-4" />
-                    {scheduledDate
-                      ? format(scheduledDate, "d MMM", { locale: nl })
-                      : "Datum"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-auto p-0 bg-background border shadow-lg z-50"
-                  align="start"
+          <div className="space-y-2">
+            <Label>
+              Geplande datum <span className="text-destructive">*</span>
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !scheduledDate && "text-muted-foreground"
+                  )}
                 >
-                  <Calendar
-                    mode="single"
-                    selected={scheduledDate}
-                    onSelect={setScheduledDate}
-                    locale={nl}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+                  <CalendarDays className="mr-2 h-4 w-4" />
+                  {scheduledDate
+                    ? format(scheduledDate, "d MMM", { locale: nl })
+                    : "Datum"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-auto p-0 bg-background border shadow-lg z-50"
+                align="start"
+              >
+                <Calendar
+                  mode="single"
+                  selected={scheduledDate}
+                  onSelect={setScheduledDate}
+                  locale={nl}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="space-y-2">

@@ -331,6 +331,7 @@ export type Database = {
           customer_name: string
           cylinder_count: number
           cylinder_size: string
+          gas_grade: Database["public"]["Enums"]["gas_grade"]
           gas_type: Database["public"]["Enums"]["gas_type"]
           id: string
           is_recurring: boolean | null
@@ -350,6 +351,7 @@ export type Database = {
           customer_name: string
           cylinder_count: number
           cylinder_size?: string
+          gas_grade?: Database["public"]["Enums"]["gas_grade"]
           gas_type?: Database["public"]["Enums"]["gas_type"]
           id?: string
           is_recurring?: boolean | null
@@ -369,6 +371,7 @@ export type Database = {
           customer_name?: string
           cylinder_count?: number
           cylinder_size?: string
+          gas_grade?: Database["public"]["Enums"]["gas_grade"]
           gas_type?: Database["public"]["Enums"]["gas_type"]
           id?: string
           is_recurring?: boolean | null
@@ -818,6 +821,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       dry_ice_product_type: "blocks" | "pellets" | "sticks"
+      gas_grade: "medical" | "technical"
       gas_type:
         | "co2"
         | "nitrogen"
@@ -962,6 +966,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user"],
       dry_ice_product_type: ["blocks", "pellets", "sticks"],
+      gas_grade: ["medical", "technical"],
       gas_type: [
         "co2",
         "nitrogen",
