@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Settings, Box } from "lucide-react";
+import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Settings, Box, Repeat } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -42,6 +42,8 @@ interface DryIceOrder {
   status: string;
   notes: string | null;
   created_at: string;
+  is_recurring: boolean | null;
+  recurrence_end_date: string | null;
 }
 
 export function DryIcePlanning() {
@@ -218,7 +220,16 @@ export function DryIcePlanning() {
                   <TableBody>
                     {orders.map((order) => (
                       <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.order_number}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {order.order_number}
+                            {order.is_recurring && (
+                              <span title="Onderdeel van herhalende reeks" className="text-cyan-500">
+                                <Repeat className="h-3.5 w-3.5" />
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>{order.customer_name}</TableCell>
                         <TableCell>{getProductTypeLabel(order)}</TableCell>
                         <TableCell>{order.quantity_kg} kg</TableCell>
