@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -48,6 +49,7 @@ export function CreateGasCylinderOrderDialog({
   const [cylinderSize, setCylinderSize] = useState("medium");
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [notes, setNotes] = useState("");
+  const [isCompleted, setIsCompleted] = useState(false);
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -77,6 +79,7 @@ export function CreateGasCylinderOrderDialog({
     setCylinderSize("medium");
     setScheduledDate(new Date());
     setNotes("");
+    setIsCompleted(false);
   };
 
   const handleClose = () => {
@@ -116,6 +119,7 @@ export function CreateGasCylinderOrderDialog({
         scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
         notes: notes.trim() || null,
         created_by: currentProfileId,
+        status: isCompleted ? "completed" as const : "pending" as const,
       };
       
       const { error } = await supabase.from("gas_cylinder_orders").insert(insertData);
@@ -271,6 +275,20 @@ export function CreateGasCylinderOrderDialog({
               placeholder="Optionele notities..."
               className="bg-background resize-none"
               rows={3}
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
+            <div className="space-y-0.5">
+              <Label htmlFor="isCompleted" className="font-medium">Reeds uitgevoerd</Label>
+              <p className="text-xs text-muted-foreground">
+                Markeer deze order direct als voltooid
+              </p>
+            </div>
+            <Switch
+              id="isCompleted"
+              checked={isCompleted}
+              onCheckedChange={setIsCompleted}
             />
           </div>
         </div>
