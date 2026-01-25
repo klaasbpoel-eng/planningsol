@@ -177,22 +177,88 @@ export function CalendarItemDialog({
     setDeleting(true);
 
     try {
-      if (item.type === "task") {
+      // Store item data for potential undo
+      const itemData = { ...item.data };
+      const itemType = item.type;
+      
+      if (itemType === "task") {
         const { error } = await supabase
           .from("tasks")
           .delete()
-          .eq("id", item.data.id);
+          .eq("id", itemData.id);
 
         if (error) throw error;
-        toast.success("Taak verwijderd");
-      } else if (item.type === "timeoff") {
+        
+        // Show toast with undo option
+        toast.success("Taak verwijderd", {
+          duration: 5000,
+          action: {
+            label: "Ongedaan maken",
+            onClick: async () => {
+              try {
+                // Restore the task
+                const { error: restoreError } = await supabase
+                  .from("tasks")
+                  .insert({
+                    id: itemData.id,
+                    title: (itemData as TaskWithProfile).title,
+                    description: (itemData as TaskWithProfile).description,
+                    status: (itemData as TaskWithProfile).status,
+                    priority: (itemData as TaskWithProfile).priority,
+                    due_date: (itemData as TaskWithProfile).due_date,
+                    assigned_to: (itemData as TaskWithProfile).assigned_to,
+                    created_by: (itemData as TaskWithProfile).created_by,
+                    type_id: (itemData as TaskWithProfile).type_id,
+                  });
+                
+                if (restoreError) throw restoreError;
+                toast.success("Taak hersteld");
+                onUpdate();
+              } catch (err) {
+                console.error("Error restoring task:", err);
+                toast.error("Kon taak niet herstellen");
+              }
+            },
+          },
+        });
+      } else if (itemType === "timeoff") {
         const { error } = await supabase
           .from("time_off_requests")
           .delete()
-          .eq("id", item.data.id);
+          .eq("id", itemData.id);
 
         if (error) throw error;
-        toast.success("Verlofaanvraag verwijderd");
+        
+        // Show toast with undo option
+        toast.success("Verlofaanvraag verwijderd", {
+          duration: 5000,
+          action: {
+            label: "Ongedaan maken",
+            onClick: async () => {
+              try {
+                // Restore the time off request
+                const { error: restoreError } = await supabase
+                  .from("time_off_requests")
+                  .insert({
+                    id: itemData.id,
+                    user_id: (itemData as RequestWithProfile).user_id,
+                    start_date: (itemData as RequestWithProfile).start_date,
+                    end_date: (itemData as RequestWithProfile).end_date,
+                    type: (itemData as RequestWithProfile).type,
+                    reason: (itemData as RequestWithProfile).reason,
+                    status: (itemData as RequestWithProfile).status,
+                  });
+                
+                if (restoreError) throw restoreError;
+                toast.success("Verlofaanvraag hersteld");
+                onUpdate();
+              } catch (err) {
+                console.error("Error restoring request:", err);
+                toast.error("Kon verlofaanvraag niet herstellen");
+              }
+            },
+          },
+        });
       }
 
       setShowDeleteConfirm(false);
