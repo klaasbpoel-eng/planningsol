@@ -31,8 +31,7 @@ import {
   Palmtree,
   GripVertical,
   Plus,
-  Undo2,
-  Maximize2
+  Undo2
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -75,7 +74,6 @@ import {
   hasTimeInfo 
 } from "@/lib/calendar-utils";
 import { Clock, Sun, Sunset } from "lucide-react";
-import { FullScreenCalendar, type CalendarData, type CalendarEvent } from "@/components/ui/fullscreen-calendar";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Task = Database["public"]["Tables"]["tasks"]["Row"];
@@ -91,7 +89,7 @@ type TaskWithProfile = Task & {
   task_type?: TaskType | null;
 };
 
-type ViewType = "day" | "week" | "month" | "year" | "fullscreen";
+type ViewType = "day" | "week" | "month" | "year";
 type CalendarItem = 
   | { type: "timeoff"; data: RequestWithProfile }
   | { type: "task"; data: TaskWithProfile };
@@ -1014,128 +1012,6 @@ export function CalendarOverview() {
     );
   };
 
-  // Fullscreen View - Convert data to FullScreenCalendar format
-  const renderFullscreenView = () => {
-    // Transform filtered data into CalendarData format
-    const calendarData: CalendarData[] = [];
-    const dateMap = new Map<string, CalendarEvent[]>();
-
-    // Add time-off requests
-    if (showTimeOff) {
-      filteredRequests.forEach((request) => {
-        if (selectedStatus === "all" && request.status === "rejected") return;
-        
-        const start = parseISO(request.start_date);
-        const end = parseISO(request.end_date);
-        const days = eachDayOfInterval({ start, end });
-        
-        days.forEach((day) => {
-          const dateKey = format(day, "yyyy-MM-dd");
-          const events = dateMap.get(dateKey) || [];
-          
-          const dayPartLabel = request.day_part && request.day_part !== "full_day" 
-            ? ` (${getDayPartLabel(request.day_part)})` 
-            : "";
-          
-          events.push({
-            id: `timeoff-${request.id}-${dateKey}`,
-            name: `${getEmployeeName(request)} - ${getTypeLabel(request.type)}${dayPartLabel}`,
-            time: request.day_part === "morning" ? "Ochtend" : request.day_part === "afternoon" ? "Middag" : "Hele dag",
-            datetime: request.start_date,
-            color: request.status === "pending" 
-              ? "bg-warning/20 text-warning-foreground" 
-              : request.type === "vacation" 
-                ? "bg-primary/20 text-primary" 
-                : request.type === "sick" 
-                  ? "bg-destructive/20 text-destructive" 
-                  : "bg-accent/20 text-accent-foreground"
-          });
-          
-          dateMap.set(dateKey, events);
-        });
-      });
-    }
-
-    // Add tasks
-    if (showTasks) {
-      filteredTasks.forEach((task) => {
-        const dateKey = task.due_date;
-        const events = dateMap.get(dateKey) || [];
-        
-        const timeLabel = hasTimeInfo(task.start_time, task.end_time) 
-          ? formatTimeRange(task.start_time, task.end_time)
-          : task.status === "completed" ? "Voltooid" : task.status === "in_progress" ? "Bezig" : "Te doen";
-        
-        events.push({
-          id: `task-${task.id}`,
-          name: `${task.task_type?.name || "Taak"} - ${getEmployeeName(task)}`,
-          time: timeLabel,
-          datetime: task.due_date,
-          color: task.status === "completed" 
-            ? "bg-success/20 text-success" 
-            : task.status === "in_progress" 
-              ? "bg-blue-500/20 text-blue-600" 
-              : "bg-warning/20 text-warning-foreground"
-        });
-        
-        dateMap.set(dateKey, events);
-      });
-    }
-
-    // Convert map to array
-    dateMap.forEach((events, dateKey) => {
-      calendarData.push({
-        day: parseISO(dateKey),
-        events
-      });
-    });
-
-    const handleFullscreenDayClick = (day: Date) => {
-      if (isAdmin) {
-        setCreateDate(day);
-        setShowCreateMenu(true);
-      }
-    };
-
-    const handleFullscreenEventClick = (event: CalendarEvent) => {
-      const eventId = String(event.id);
-      
-      if (eventId.startsWith("timeoff-")) {
-        const requestId = eventId.split("-")[1];
-        const request = requests.find(r => r.id === requestId);
-        if (request) {
-          setSelectedItem({ type: "timeoff", data: request });
-          setDialogOpen(true);
-        }
-      } else if (eventId.startsWith("task-")) {
-        const taskId = eventId.replace("task-", "");
-        const task = tasks.find(t => t.id === taskId);
-        if (task) {
-          setSelectedItem({ type: "task", data: task });
-          setDialogOpen(true);
-        }
-      }
-    };
-
-    const handleNewEvent = () => {
-      if (isAdmin) {
-        setCreateDate(new Date());
-        setShowCreateMenu(true);
-      }
-    };
-
-    return (
-      <div className="h-[700px] animate-fade-in">
-        <FullScreenCalendar 
-          data={calendarData}
-          onDayClick={handleFullscreenDayClick}
-          onEventClick={handleFullscreenEventClick}
-          onNewEvent={isAdmin ? handleNewEvent : undefined}
-        />
-      </div>
-    );
-  };
-
   return (
     <Card className="shadow-2xl border-0 bg-card/90 backdrop-blur-xl overflow-hidden">
       {/* Decorative gradient bar */}
@@ -1203,10 +1079,6 @@ export function CalendarOverview() {
               <ToggleGroupItem value="year" aria-label="Jaarweergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
                 <LayoutGrid className="h-4 w-4 mr-1.5" />
                 Jaar
-              </ToggleGroupItem>
-              <ToggleGroupItem value="fullscreen" aria-label="Fullscreen weergave" className="text-xs px-3 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm">
-                <Maximize2 className="h-4 w-4 mr-1.5" />
-                Volledig
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
@@ -1342,7 +1214,6 @@ export function CalendarOverview() {
             {viewType === "week" && renderWeekView()}
             {viewType === "month" && renderMonthView()}
             {viewType === "year" && renderYearView()}
-            {viewType === "fullscreen" && renderFullscreenView()}
           </>
         )}
 
