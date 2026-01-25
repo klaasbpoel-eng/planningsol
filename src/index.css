@@ -108,6 +108,20 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground antialiased;
   }
+  
+  /* Smooth theme transition */
+  html {
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  html.transitioning,
+  html.transitioning * {
+    transition: background-color 0.4s ease-out, 
+                color 0.3s ease-out, 
+                border-color 0.3s ease-out,
+                box-shadow 0.3s ease-out,
+                opacity 0.3s ease-out !important;
+  }
 }
 
 @layer utilities {
