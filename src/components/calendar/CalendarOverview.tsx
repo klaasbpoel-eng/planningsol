@@ -776,7 +776,12 @@ export function CalendarOverview() {
                           <GripVertical className="w-3 h-3 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
                         )}
                         <ClipboardList className="w-3 h-3 shrink-0" />
-                        <span className="truncate font-medium">{(entry.item as TaskWithProfile).task_type?.name || "Taak"}</span>
+                        <span className="truncate font-medium">
+                          {hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) && (
+                            <span className="opacity-80 mr-1">{formatTimeRange((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time)}</span>
+                          )}
+                          {(entry.item as TaskWithProfile).task_type?.name || "Taak"}
+                        </span>
                       </div>
                     )
                   ))}
@@ -888,7 +893,12 @@ export function CalendarOverview() {
                           <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
                         )}
                         <ClipboardList className="w-2.5 h-2.5 shrink-0" />
-                        <span className="truncate font-medium">{(entry.item as TaskWithProfile).task_type?.name || "Taak"}</span>
+                        <span className="truncate font-medium">
+                          {hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) && (
+                            <span className="opacity-80 mr-0.5">{formatTimeRange((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time)}</span>
+                          )}
+                          {(entry.item as TaskWithProfile).task_type?.name || "Taak"}
+                        </span>
                       </div>
                     )
                   ))}
