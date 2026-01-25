@@ -26,6 +26,7 @@ import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { CustomerSelect } from "./CustomerSelect";
 
 interface CreateDryIceOrderDialogProps {
   open: boolean;
@@ -39,6 +40,7 @@ export function CreateDryIceOrderDialog({
   onCreated,
 }: CreateDryIceOrderDialogProps) {
   const [saving, setSaving] = useState(false);
+  const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [quantityKg, setQuantityKg] = useState("");
   const [productType, setProductType] = useState("blocks");
@@ -65,6 +67,7 @@ export function CreateDryIceOrderDialog({
   }, []);
 
   const resetForm = () => {
+    setCustomerId("");
     setCustomerName("");
     setQuantityKg("");
     setProductType("blocks");
@@ -101,6 +104,7 @@ export function CreateDryIceOrderDialog({
       const insertData = {
         order_number: generateOrderNumber(),
         customer_name: customerName.trim(),
+        customer_id: customerId || null,
         quantity_kg: quantity,
         product_type: productType as "blocks" | "pellets" | "sticks",
         scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
@@ -141,15 +145,15 @@ export function CreateDryIceOrderDialog({
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="customerName">
-              Klantnaam <span className="text-destructive">*</span>
+            <Label>
+              Klant <span className="text-destructive">*</span>
             </Label>
-            <Input
-              id="customerName"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Voer klantnaam in"
-              className="bg-background"
+            <CustomerSelect
+              value={customerId}
+              onValueChange={(id, name) => {
+                setCustomerId(id);
+                setCustomerName(name);
+              }}
             />
           </div>
 
@@ -239,7 +243,7 @@ export function CreateDryIceOrderDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={saving || !customerName.trim() || !quantityKg || !scheduledDate}
+            disabled={saving || !customerId || !quantityKg || !scheduledDate}
             className="bg-cyan-500 hover:bg-cyan-600"
           >
             <Plus className="h-4 w-4 mr-2" />
