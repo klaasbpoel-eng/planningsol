@@ -1104,7 +1104,12 @@ export function CalendarOverview() {
           {days.map((day, index) => {
             const dayRequests = getRequestsForDay(day);
             const dayTasks = getTasksForDay(day);
-            const allItems = [...dayRequests.map(r => ({ type: 'timeoff' as const, item: r })), ...dayTasks.map(t => ({ type: 'task' as const, item: t }))];
+            const dayDryIceOrders = getDryIceOrdersForDay(day);
+            const allItems = [
+              ...dayRequests.map(r => ({ type: 'timeoff' as const, item: r })), 
+              ...dayTasks.map(t => ({ type: 'task' as const, item: t })),
+              ...dayDryIceOrders.map(o => ({ type: 'dryice' as const, item: o }))
+            ];
             const isCurrentDay = isToday(day);
             const isDragOver = dragOverDate && isSameDay(dragOverDate, day);
             const isWeekendDay = isWeekend(day);
@@ -1136,55 +1141,76 @@ export function CalendarOverview() {
                   {format(day, "d")}
                 </div>
                 <div className="space-y-1.5">
-                  {allItems.slice(0, 3).map((entry) => (
-                    entry.type === 'timeoff' ? (
-                      <div
-                        key={(entry.item as RequestWithProfile).id}
-                        onClick={(e) => handleItemClick({ type: "timeoff", data: entry.item as RequestWithProfile }, e)}
-                        className={cn(
-                          "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer",
-                          getTypeColor((entry.item as RequestWithProfile).type, (entry.item as RequestWithProfile).status)
-                        )}
-                        title={`${getEmployeeName(entry.item as RequestWithProfile)} - ${getTypeLabel((entry.item as RequestWithProfile).type)}${(entry.item as RequestWithProfile).day_part && (entry.item as RequestWithProfile).day_part !== "full_day" ? ` (${getDayPartLabel((entry.item as RequestWithProfile).day_part)})` : ""}`}
-                      >
-                        {(entry.item as RequestWithProfile).day_part === "morning" ? (
-                          <Sun className="w-3 h-3 shrink-0" />
-                        ) : (entry.item as RequestWithProfile).day_part === "afternoon" ? (
-                          <Sunset className="w-3 h-3 shrink-0" />
-                        ) : (
-                          <Palmtree className="w-3 h-3 shrink-0" />
-                        )}
-                        <span className="truncate font-medium">{getEmployeeName(entry.item as RequestWithProfile)}</span>
-                      </div>
-                    ) : (
-                      <div
-                        key={(entry.item as TaskWithProfile).id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, entry.item as TaskWithProfile)}
-                        onDragEnd={handleDragEnd}
-                        onClick={(e) => handleItemClick({ type: "task", data: entry.item as TaskWithProfile }, e)}
-                        className={cn(
-                          "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-all hover:scale-105 cursor-pointer group",
-                          getTaskStatusColor((entry.item as TaskWithProfile).status),
-                          draggedTask?.id === (entry.item as TaskWithProfile).id && "opacity-50"
-                        )}
-                        title={`${(entry.item as TaskWithProfile).task_type?.name || "Taak"}${hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? ` (${formatTimeRange((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time)})` : ""}`}
-                      >
-                        {hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? (
-                          <Clock className="w-3 h-3 shrink-0 opacity-70" />
-                        ) : (
-                          <GripVertical className="w-3 h-3 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
-                        )}
-                        <ClipboardList className="w-3 h-3 shrink-0" />
-                        <span className="truncate font-medium">
-                          {hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) && (
-                            <span className="opacity-80 mr-1">{formatTimeRange((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time)}</span>
+                  {allItems.slice(0, 3).map((entry) => {
+                    if (entry.type === 'timeoff') {
+                      const request = entry.item as RequestWithProfile;
+                      return (
+                        <div
+                          key={request.id}
+                          onClick={(e) => handleItemClick({ type: "timeoff", data: request }, e)}
+                          className={cn(
+                            "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer",
+                            getTypeColor(request.type, request.status)
                           )}
-                          {(entry.item as TaskWithProfile).task_type?.name || "Taak"}
-                        </span>
-                      </div>
-                    )
-                  ))}
+                          title={`${getEmployeeName(request)} - ${getTypeLabel(request.type)}${request.day_part && request.day_part !== "full_day" ? ` (${getDayPartLabel(request.day_part)})` : ""}`}
+                        >
+                          {request.day_part === "morning" ? (
+                            <Sun className="w-3 h-3 shrink-0" />
+                          ) : request.day_part === "afternoon" ? (
+                            <Sunset className="w-3 h-3 shrink-0" />
+                          ) : (
+                            <Palmtree className="w-3 h-3 shrink-0" />
+                          )}
+                          <span className="truncate font-medium">{getEmployeeName(request)}</span>
+                        </div>
+                      );
+                    } else if (entry.type === 'task') {
+                      const task = entry.item as TaskWithProfile;
+                      return (
+                        <div
+                          key={task.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, task)}
+                          onDragEnd={handleDragEnd}
+                          onClick={(e) => handleItemClick({ type: "task", data: task }, e)}
+                          className={cn(
+                            "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-all hover:scale-105 cursor-pointer group",
+                            getTaskStatusColor(task.status),
+                            draggedTask?.id === task.id && "opacity-50"
+                          )}
+                          title={`${task.task_type?.name || "Taak"}${hasTimeInfo(task.start_time, task.end_time) ? ` (${formatTimeRange(task.start_time, task.end_time)})` : ""}`}
+                        >
+                          {hasTimeInfo(task.start_time, task.end_time) ? (
+                            <Clock className="w-3 h-3 shrink-0 opacity-70" />
+                          ) : (
+                            <GripVertical className="w-3 h-3 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
+                          )}
+                          <ClipboardList className="w-3 h-3 shrink-0" />
+                          <span className="truncate font-medium">
+                            {hasTimeInfo(task.start_time, task.end_time) && (
+                              <span className="opacity-80 mr-1">{formatTimeRange(task.start_time, task.end_time)}</span>
+                            )}
+                            {task.task_type?.name || "Taak"}
+                          </span>
+                        </div>
+                      );
+                    } else if (entry.type === 'dryice') {
+                      const order = entry.item as DryIceOrderWithDetails;
+                      return (
+                        <div
+                          key={order.id}
+                          className={cn(
+                            "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
+                          )}
+                          title={`${order.customer_name} - ${order.quantity_kg}kg ${order.product_type_info?.name || ""}${order.packaging_info ? ` (${order.packaging_info.name})` : ""}`}
+                        >
+                          <Snowflake className="w-3 h-3 shrink-0" />
+                          <span className="truncate font-medium">{order.customer_name}</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
                   {allItems.length > 3 && (
                     <div className="text-xs text-primary font-medium pl-1">
                       +{allItems.length - 3} meer
@@ -1232,7 +1258,12 @@ export function CalendarOverview() {
           {days.map((day, index) => {
             const dayRequests = getRequestsForDay(day);
             const dayTasks = getTasksForDay(day);
-            const allItems = [...dayRequests.map(r => ({ type: 'timeoff' as const, item: r })), ...dayTasks.map(t => ({ type: 'task' as const, item: t }))];
+            const dayDryIceOrders = getDryIceOrdersForDay(day);
+            const allItems = [
+              ...dayRequests.map(r => ({ type: 'timeoff' as const, item: r })), 
+              ...dayTasks.map(t => ({ type: 'task' as const, item: t })),
+              ...dayDryIceOrders.map(o => ({ type: 'dryice' as const, item: o }))
+            ];
             const isCurrentMonth = isSameMonth(day, currentDate);
             const isCurrentDay = isToday(day);
             const isDragOver = dragOverDate && isSameDay(dragOverDate, day);
@@ -1269,67 +1300,86 @@ export function CalendarOverview() {
                   {format(day, "d")}
                 </div>
                 <div className="space-y-1">
-                  {allItems.slice(0, 2).map((entry) => (
-                    entry.type === 'timeoff' ? (
-                      <CalendarItemPreview
-                        key={(entry.item as RequestWithProfile).id}
-                        item={entry.item as RequestWithProfile}
-                        type="timeoff"
-                        side="right"
-                        align="start"
-                      >
-                        <div
-                          onClick={(e) => handleItemClick({ type: "timeoff", data: entry.item as RequestWithProfile }, e)}
-                          className={cn(
-                            "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer",
-                            getTypeColor((entry.item as RequestWithProfile).type, (entry.item as RequestWithProfile).status)
-                          )}
+                  {allItems.slice(0, 2).map((entry) => {
+                    if (entry.type === 'timeoff') {
+                      const request = entry.item as RequestWithProfile;
+                      return (
+                        <CalendarItemPreview
+                          key={request.id}
+                          item={request}
+                          type="timeoff"
+                          side="right"
+                          align="start"
                         >
-                          {(entry.item as RequestWithProfile).day_part === "morning" ? (
-                            <Sun className="w-2.5 h-2.5 shrink-0" />
-                          ) : (entry.item as RequestWithProfile).day_part === "afternoon" ? (
-                            <Sunset className="w-2.5 h-2.5 shrink-0" />
-                          ) : (
-                            <Palmtree className="w-2.5 h-2.5 shrink-0" />
-                          )}
-                          <span className="truncate font-medium">{getEmployeeName(entry.item as RequestWithProfile)}</span>
-                        </div>
-                      </CalendarItemPreview>
-                    ) : (
-                      <CalendarItemPreview
-                        key={(entry.item as TaskWithProfile).id}
-                        item={entry.item as TaskWithProfile}
-                        type="task"
-                        side="right"
-                        align="start"
-                      >
-                        <div
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, entry.item as TaskWithProfile)}
-                          onDragEnd={handleDragEnd}
-                          onClick={(e) => handleItemClick({ type: "task", data: entry.item as TaskWithProfile }, e)}
-                          className={cn(
-                            "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-all hover:scale-105 cursor-pointer group",
-                            getTaskStatusColor((entry.item as TaskWithProfile).status),
-                            draggedTask?.id === (entry.item as TaskWithProfile).id && "opacity-50"
-                          )}
-                        >
-                          {hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) ? (
-                            <Clock className="w-2.5 h-2.5 shrink-0 opacity-70" />
-                          ) : (
-                            <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
-                          )}
-                          <ClipboardList className="w-2.5 h-2.5 shrink-0" />
-                          <span className="truncate font-medium">
-                            {hasTimeInfo((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time) && (
-                              <span className="opacity-80 mr-0.5">{formatTimeRange((entry.item as TaskWithProfile).start_time, (entry.item as TaskWithProfile).end_time)}</span>
+                          <div
+                            onClick={(e) => handleItemClick({ type: "timeoff", data: request }, e)}
+                            className={cn(
+                              "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer",
+                              getTypeColor(request.type, request.status)
                             )}
-                            {(entry.item as TaskWithProfile).task_type?.name || "Taak"}
-                          </span>
+                          >
+                            {request.day_part === "morning" ? (
+                              <Sun className="w-2.5 h-2.5 shrink-0" />
+                            ) : request.day_part === "afternoon" ? (
+                              <Sunset className="w-2.5 h-2.5 shrink-0" />
+                            ) : (
+                              <Palmtree className="w-2.5 h-2.5 shrink-0" />
+                            )}
+                            <span className="truncate font-medium">{getEmployeeName(request)}</span>
+                          </div>
+                        </CalendarItemPreview>
+                      );
+                    } else if (entry.type === 'task') {
+                      const task = entry.item as TaskWithProfile;
+                      return (
+                        <CalendarItemPreview
+                          key={task.id}
+                          item={task}
+                          type="task"
+                          side="right"
+                          align="start"
+                        >
+                          <div
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, task)}
+                            onDragEnd={handleDragEnd}
+                            onClick={(e) => handleItemClick({ type: "task", data: task }, e)}
+                            className={cn(
+                              "text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-all hover:scale-105 cursor-pointer group",
+                              getTaskStatusColor(task.status),
+                              draggedTask?.id === task.id && "opacity-50"
+                            )}
+                          >
+                            {hasTimeInfo(task.start_time, task.end_time) ? (
+                              <Clock className="w-2.5 h-2.5 shrink-0 opacity-70" />
+                            ) : (
+                              <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />
+                            )}
+                            <ClipboardList className="w-2.5 h-2.5 shrink-0" />
+                            <span className="truncate font-medium">
+                              {hasTimeInfo(task.start_time, task.end_time) && (
+                                <span className="opacity-80 mr-0.5">{formatTimeRange(task.start_time, task.end_time)}</span>
+                              )}
+                              {task.task_type?.name || "Taak"}
+                            </span>
+                          </div>
+                        </CalendarItemPreview>
+                      );
+                    } else if (entry.type === 'dryice') {
+                      const order = entry.item as DryIceOrderWithDetails;
+                      return (
+                        <div
+                          key={order.id}
+                          className="text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
+                          title={`${order.customer_name} - ${order.quantity_kg}kg${order.packaging_info ? ` (${order.packaging_info.name})` : ""}`}
+                        >
+                          <Snowflake className="w-2.5 h-2.5 shrink-0" />
+                          <span className="truncate font-medium">{order.customer_name}</span>
                         </div>
-                      </CalendarItemPreview>
-                    )
-                  ))}
+                      );
+                    }
+                    return null;
+                  })}
                   {allItems.length > 2 && (
                     <div className="text-[10px] text-primary font-semibold pl-1">
                       +{allItems.length - 2}
@@ -1369,7 +1419,12 @@ export function CalendarOverview() {
             return monthDays.some(day => isSameDay(day, dueDate));
           }) : [];
 
-          const totalItems = monthRequests.length + monthTasks.length;
+          const monthDryIceOrders = showDryIce ? filteredDryIceOrders.filter((order) => {
+            const scheduledDate = parseISO(order.scheduled_date);
+            return monthDays.some(day => isSameDay(day, scheduledDate));
+          }) : [];
+
+          const totalItems = monthRequests.length + monthTasks.length + monthDryIceOrders.length;
           const isCurrentMonth = isSameMonth(month, new Date());
 
           return (
@@ -1425,9 +1480,19 @@ export function CalendarOverview() {
                         {(task.task_type?.name || "Taak").substring(0, 15)}{(task.task_type?.name || "Taak").length > 15 ? '...' : ''}
                       </Badge>
                     ))}
-                    {totalItems > 2 && (
+                    {monthDryIceOrders.slice(0, 1).map((order) => (
+                      <Badge
+                        key={order.id}
+                        variant="secondary"
+                        className="text-[10px] px-2 py-0.5 font-medium flex items-center gap-1 w-fit bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border-cyan-500/30"
+                      >
+                        <Snowflake className="w-2.5 h-2.5" />
+                        {order.customer_name.substring(0, 12)}{order.customer_name.length > 12 ? '...' : ''}
+                      </Badge>
+                    ))}
+                    {totalItems > 3 && (
                       <div className="text-xs text-primary font-semibold">
-                        +{totalItems - 2} meer
+                        +{totalItems - 3} meer
                       </div>
                     )}
                   </div>
