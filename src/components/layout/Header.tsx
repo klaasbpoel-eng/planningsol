@@ -26,7 +26,7 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-primary-foreground shadow-lg">
+    <header className="sticky top-0 z-50 w-full bg-primary-foreground shadow-md border-b border-border/50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-3">
