@@ -20,9 +20,10 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays, Snowflake, Plus, Repeat, CheckCircle2 } from "lucide-react";
+import { CalendarDays, Snowflake, Plus, Repeat } from "lucide-react";
 import { format, addWeeks, addYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -497,17 +498,19 @@ export function CreateDryIceOrderDialog({
             )}
           </div>
 
-          {/* Already completed checkbox */}
-          <div className="flex items-center space-x-2 p-3 rounded-lg border bg-muted/30">
-            <Checkbox 
-              id="alreadyCompleted" 
+          {/* Already completed switch */}
+          <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
+            <div className="space-y-0.5">
+              <Label htmlFor="alreadyCompleted" className="font-medium">Reeds uitgevoerd</Label>
+              <p className="text-xs text-muted-foreground">
+                Markeer deze order direct als voltooid
+              </p>
+            </div>
+            <Switch
+              id="alreadyCompleted"
               checked={alreadyCompleted}
-              onCheckedChange={(checked) => setAlreadyCompleted(checked === true)}
+              onCheckedChange={setAlreadyCompleted}
             />
-            <Label htmlFor="alreadyCompleted" className="flex items-center gap-2 cursor-pointer font-normal">
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-              Reeds uitgevoerd
-            </Label>
           </div>
 
           <div className="space-y-2">
