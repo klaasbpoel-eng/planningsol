@@ -60,7 +60,7 @@ export function CategoryManagement() {
       const { data, error } = await supabase
         .from("task_types")
         .select("*")
-        .order("name");
+        .order("sort_order");
 
       if (error) throw error;
       setCategories(data || []);
