@@ -30,15 +30,17 @@ interface Customer {
 interface CustomerSelectProps {
   value: string;
   onValueChange: (value: string, customerName: string) => void;
+  defaultCustomerName?: string;
 }
 
-export function CustomerSelect({ value, onValueChange }: CustomerSelectProps) {
+export function CustomerSelect({ value, onValueChange, defaultCustomerName = "SOL Nederland" }: CustomerSelectProps) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewCustomerDialog, setShowNewCustomerDialog] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newContactPerson, setNewContactPerson] = useState("");
   const [saving, setSaving] = useState(false);
+  const [hasSetDefault, setHasSetDefault] = useState(false);
 
   const fetchCustomers = async () => {
     const { data, error } = await supabase
@@ -51,6 +53,17 @@ export function CustomerSelect({ value, onValueChange }: CustomerSelectProps) {
       console.error("Error fetching customers:", error);
     } else {
       setCustomers(data || []);
+      
+      // Set default customer if no value is set yet
+      if (!value && !hasSetDefault && data && data.length > 0) {
+        const defaultCustomer = data.find(
+          (c) => c.name.toLowerCase() === defaultCustomerName.toLowerCase()
+        );
+        if (defaultCustomer) {
+          onValueChange(defaultCustomer.id, defaultCustomer.name);
+        }
+        setHasSetDefault(true);
+      }
     }
     setLoading(false);
   };
