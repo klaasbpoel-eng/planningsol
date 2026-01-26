@@ -90,7 +90,7 @@ export function DryIcePlanning() {
       .from("dry_ice_product_types")
       .select("id, name")
       .eq("is_active", true)
-      .order("name");
+      .order("sort_order");
 
     if (!error && data) {
       setProductTypes(data);
@@ -102,7 +102,7 @@ export function DryIcePlanning() {
       .from("dry_ice_packaging")
       .select("id, name")
       .eq("is_active", true)
-      .order("name");
+      .order("sort_order");
 
     if (!error && data) {
       setPackagingOptions(data);
