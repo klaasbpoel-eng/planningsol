@@ -142,6 +142,28 @@ export function CreateGasCylinderOrderDialog({
     return `GC-${date}-${random}`;
   };
 
+  // Map gas type names to enum values
+  const mapGasTypeToEnum = (typeName: string): "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other" => {
+    const mapping: Record<string, "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other"> = {
+      "CO2": "co2",
+      "co2": "co2",
+      "Stikstof": "nitrogen",
+      "stikstof": "nitrogen",
+      "nitrogen": "nitrogen",
+      "Argon": "argon",
+      "argon": "argon",
+      "Acetyleen": "acetylene",
+      "acetyleen": "acetylene",
+      "acetylene": "acetylene",
+      "Zuurstof": "oxygen",
+      "zuurstof": "oxygen",
+      "oxygen": "oxygen",
+      "Helium": "helium",
+      "helium": "helium",
+    };
+    return mapping[typeName] || "other";
+  };
+
   const handleCreate = async () => {
     if (!customerName.trim() || !cylinderCount || !scheduledDate || !currentProfileId) {
       toast.error("Vul alle verplichte velden in");
@@ -157,11 +179,13 @@ export function CreateGasCylinderOrderDialog({
     setSaving(true);
 
     try {
+      const mappedGasType = mapGasTypeToEnum(gasType);
+      
       const insertData = {
         order_number: generateOrderNumber(),
         customer_name: customerName.trim(),
         customer_id: customerId || null,
-        gas_type: gasType as "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other",
+        gas_type: mappedGasType,
         gas_grade: gasGrade,
         cylinder_count: count,
         cylinder_size: cylinderSize,
@@ -173,6 +197,12 @@ export function CreateGasCylinderOrderDialog({
       };
       
       const { error } = await supabase.from("gas_cylinder_orders").insert(insertData);
+
+      if (error) {
+        console.error("Error creating order:", error);
+        toast.error("Fout bij aanmaken order: " + error.message);
+        return;
+      }
 
       toast.success("Vulorder aangemaakt");
       resetForm();
