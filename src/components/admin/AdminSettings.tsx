@@ -1,6 +1,7 @@
 import { CategoryManagement } from "./CategoryManagement";
 import { LeaveTypeManagement } from "./LeaveTypeManagement";
 import { GasCylinderSettings } from "./GasCylinderSettings";
+import { DryIceSettings } from "./DryIceSettings";
 import { DefaultCustomerSetting } from "./DefaultCustomerSetting";
 
 export function AdminSettings() {
@@ -9,6 +10,7 @@ export function AdminSettings() {
       <CategoryManagement />
       <LeaveTypeManagement />
       <GasCylinderSettings />
+      <DryIceSettings />
       <DefaultCustomerSetting />
     </div>
   );

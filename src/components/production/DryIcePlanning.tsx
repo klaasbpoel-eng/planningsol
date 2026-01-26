@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Settings, Box, Repeat, Edit2 } from "lucide-react";
+import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Box, Repeat, Edit2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -24,8 +24,6 @@ import { nl } from "date-fns/locale";
 import { toast } from "sonner";
 import { CreateDryIceOrderDialog } from "./CreateDryIceOrderDialog";
 import { DryIceOrderDialog } from "@/components/calendar/DryIceOrderDialog";
-import { DryIceProductTypeManager } from "./DryIceProductTypeManager";
-import { DryIcePackagingManager } from "./DryIcePackagingManager";
 import { useUserRole } from "@/hooks/useUserRole";
 import {
   AlertDialog,
@@ -79,8 +77,6 @@ export function DryIcePlanning() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<DryIceOrder | null>(null);
-  const [productTypeManagerOpen, setProductTypeManagerOpen] = useState(false);
-  const [packagingManagerOpen, setPackagingManagerOpen] = useState(false);
   const [userId, setUserId] = useState<string | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<DryIceOrder | null>(null);
@@ -377,17 +373,10 @@ export function DryIcePlanning() {
         <div className="space-y-4">
           <Card className="glass-card border-cyan-500/20">
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Package className="h-4 w-4 text-cyan-500" />
-                  Producttypen
-                </CardTitle>
-                {isAdmin && (
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setProductTypeManagerOpen(true)}>
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Package className="h-4 w-4 text-cyan-500" />
+                Producttypen
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {productTypes.length === 0 ? (
@@ -405,17 +394,10 @@ export function DryIcePlanning() {
 
           <Card className="glass-card border-cyan-500/20">
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Box className="h-4 w-4 text-cyan-500" />
-                  Verpakkingen
-                </CardTitle>
-                {isAdmin && (
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPackagingManagerOpen(true)}>
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Box className="h-4 w-4 text-cyan-500" />
+                Verpakkingen
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {packagingOptions.length === 0 ? (
@@ -459,22 +441,6 @@ export function DryIcePlanning() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onCreated={handleOrderCreated}
-      />
-
-      <DryIceProductTypeManager
-        open={productTypeManagerOpen}
-        onOpenChange={(open) => {
-          setProductTypeManagerOpen(open);
-          if (!open) fetchProductTypes();
-        }}
-      />
-
-      <DryIcePackagingManager
-        open={packagingManagerOpen}
-        onOpenChange={(open) => {
-          setPackagingManagerOpen(open);
-          if (!open) fetchPackaging();
-        }}
       />
 
       <DryIceOrderDialog
