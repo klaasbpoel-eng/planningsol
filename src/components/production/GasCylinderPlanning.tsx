@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Loader2, Trash2, Filter, CalendarIcon, X } from "lucide-react";
+import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Loader2, Trash2, Filter, CalendarIcon, X, Edit2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -31,6 +31,7 @@ import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { toast } from "sonner";
 import { CreateGasCylinderOrderDialog } from "./CreateGasCylinderOrderDialog";
+import { GasCylinderOrderDialog } from "./GasCylinderOrderDialog";
 import { useUserRole } from "@/hooks/useUserRole";
 
 interface GasCylinderOrder {
@@ -38,6 +39,7 @@ interface GasCylinderOrder {
   order_number: string;
   customer_name: string;
   gas_type: string;
+  gas_grade: string;
   cylinder_count: number;
   cylinder_size: string;
   scheduled_date: string;
@@ -55,12 +57,19 @@ export function GasCylinderPlanning() {
   const [orders, setOrders] = useState<GasCylinderOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<GasCylinderOrder | null>(null);
   const [pressureFilter, setPressureFilter] = useState<PressureFilter>("all");
   const [gasTypeFilter, setGasTypeFilter] = useState<GasTypeFilter>("all");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [userId, setUserId] = useState<string | undefined>();
   const { isAdmin } = useUserRole(userId);
+
+  const handleEditOrder = (order: GasCylinderOrder) => {
+    setSelectedOrder(order);
+    setEditDialogOpen(true);
+  };
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -352,14 +361,24 @@ export function GasCylinderPlanning() {
                         </TableCell>
                         {isAdmin && (
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => handleDelete(order.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleEditOrder(order)}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => handleDelete(order.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         )}
                       </TableRow>
@@ -452,6 +471,14 @@ export function GasCylinderPlanning() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onCreated={fetchOrders}
+      />
+
+      <GasCylinderOrderDialog
+        order={selectedOrder}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onUpdate={fetchOrders}
+        isAdmin={isAdmin}
       />
     </div>
   );
