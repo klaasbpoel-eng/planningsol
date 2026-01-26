@@ -279,7 +279,7 @@ export function CreateGasCylinderOrderDialog({
                 <SelectContent className="bg-background border shadow-lg z-50">
                   {cylinderSizes.map((size) => (
                     <SelectItem key={size.id} value={size.name}>
-                      {size.name}{size.capacity_liters ? ` (${size.capacity_liters}L)` : ""}
+                      {size.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
