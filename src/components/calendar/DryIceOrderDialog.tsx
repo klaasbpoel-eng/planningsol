@@ -33,8 +33,11 @@ import {
   Trash2,
   Building2,
   FileText,
-  RotateCcw
+  RotateCcw,
+  Repeat,
+  Infinity
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -93,6 +96,9 @@ export function DryIceOrderDialog({
   const [packagingId, setPackagingId] = useState<string>("");
   const [containerHasWheels, setContainerHasWheels] = useState(false);
   const [notes, setNotes] = useState<string>("");
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [isInfiniteRecurrence, setIsInfiniteRecurrence] = useState(false);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>();
 
   useEffect(() => {
     if (order && isEditing) {
@@ -103,6 +109,9 @@ export function DryIceOrderDialog({
       setPackagingId(order.packaging_id || "");
       setContainerHasWheels(order.container_has_wheels || false);
       setNotes(order.notes || "");
+      setIsRecurring(order.is_recurring || false);
+      setIsInfiniteRecurrence(!order.recurrence_end_date && (order.is_recurring || false));
+      setRecurrenceEndDate(order.recurrence_end_date ? parseISO(order.recurrence_end_date) : undefined);
     }
   }, [order, isEditing]);
 
@@ -115,6 +124,9 @@ export function DryIceOrderDialog({
       setPackagingId(order.packaging_id || "");
       setContainerHasWheels(order.container_has_wheels || false);
       setNotes(order.notes || "");
+      setIsRecurring(order.is_recurring || false);
+      setIsInfiniteRecurrence(!order.recurrence_end_date && (order.is_recurring || false));
+      setRecurrenceEndDate(order.recurrence_end_date ? parseISO(order.recurrence_end_date) : undefined);
     }
     setIsEditing(true);
   };
@@ -145,6 +157,10 @@ export function DryIceOrderDialog({
           packaging_id: packagingId || null,
           container_has_wheels: containerHasWheels,
           notes: notes || null,
+          is_recurring: isRecurring,
+          recurrence_end_date: isRecurring && !isInfiniteRecurrence && recurrenceEndDate 
+            ? format(recurrenceEndDate, "yyyy-MM-dd") 
+            : null,
         })
         .eq("id", order.id);
 
@@ -340,6 +356,74 @@ export function DryIceOrderDialog({
                   <Label htmlFor="containerHasWheels" className="cursor-pointer">
                     Container met wielen
                   </Label>
+                </div>
+
+                {/* Weekly recurrence */}
+                <div className="space-y-3 rounded-lg border p-3 bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="isRecurring" className="font-medium flex items-center gap-2">
+                        <Repeat className="h-4 w-4" />
+                        Wekelijks herhalen
+                      </Label>
+                      <p className="text-xs text-muted-foreground">Maak automatisch orders aan voor elke week</p>
+                    </div>
+                    <Switch
+                      id="isRecurring"
+                      checked={isRecurring}
+                      onCheckedChange={setIsRecurring}
+                    />
+                  </div>
+
+                  {isRecurring && (
+                    <div className="space-y-3 pt-2 border-t">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="isInfinite" className="font-medium flex items-center gap-2">
+                            <Infinity className="h-4 w-4" />
+                            Oneindig herhalen
+                          </Label>
+                          <p className="text-xs text-muted-foreground">Geen einddatum</p>
+                        </div>
+                        <Switch
+                          id="isInfinite"
+                          checked={isInfiniteRecurrence}
+                          onCheckedChange={setIsInfiniteRecurrence}
+                        />
+                      </div>
+
+                      {!isInfiniteRecurrence && (
+                        <div className="space-y-2">
+                          <Label>Einddatum herhaling</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !recurrenceEndDate && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarDays className="mr-2 h-4 w-4" />
+                                {recurrenceEndDate ? format(recurrenceEndDate, "d MMM yyyy", { locale: nl }) : "Selecteer einddatum"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={recurrenceEndDate}
+                                onSelect={setRecurrenceEndDate}
+                                locale={nl}
+                                disabled={(date) => scheduledDate ? date <= scheduledDate : false}
+                                initialFocus
+                                className={cn("p-3 pointer-events-auto")}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
