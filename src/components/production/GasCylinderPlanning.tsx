@@ -485,34 +485,40 @@ export function GasCylinderPlanning() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">CO₂</span>
-                  <span className="text-xs text-muted-foreground">85%</span>
-                </div>
-                <Progress value={85} className="h-2" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Stikstof (N₂)</span>
-                  <span className="text-xs text-muted-foreground">72%</span>
-                </div>
-                <Progress value={72} className="h-2" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Argon</span>
-                  <span className="text-xs text-muted-foreground">45%</span>
-                </div>
-                <Progress value={45} className="h-2" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Acetyleen</span>
-                  <span className="text-xs text-muted-foreground">30%</span>
-                </div>
-                <Progress value={30} className="h-2" />
-              </div>
+              {gasTypes.length > 0 ? (
+                gasTypes.slice(0, 6).map((type) => {
+                  // Count orders with this gas type
+                  const typeOrders = orders.filter(order => {
+                    const orderGasType = getGasTypeLabel(order.gas_type, order.notes);
+                    return orderGasType === type.name;
+                  });
+                  const percentage = orders.length > 0 
+                    ? Math.round((typeOrders.length / orders.length) * 100) 
+                    : 0;
+                  
+                  return (
+                    <div key={type.id} className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-2 h-2 rounded-full flex-shrink-0" 
+                            style={{ backgroundColor: type.color }} 
+                          />
+                          <span className="text-sm">{type.name}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {typeOrders.length} orders
+                        </span>
+                      </div>
+                      <Progress value={percentage} className="h-2" />
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-2">
+                  Geen gastypes beschikbaar
+                </p>
+              )}
             </CardContent>
           </Card>
 
