@@ -30,10 +30,9 @@ interface Customer {
 interface CustomerSelectProps {
   value: string;
   onValueChange: (value: string, customerName: string) => void;
-  defaultCustomerName?: string;
 }
 
-export function CustomerSelect({ value, onValueChange, defaultCustomerName = "SOL Nederland" }: CustomerSelectProps) {
+export function CustomerSelect({ value, onValueChange }: CustomerSelectProps) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewCustomerDialog, setShowNewCustomerDialog] = useState(false);
@@ -43,6 +42,15 @@ export function CustomerSelect({ value, onValueChange, defaultCustomerName = "SO
   const [hasSetDefault, setHasSetDefault] = useState(false);
 
   const fetchCustomers = async () => {
+    // Fetch default customer name from settings
+    const { data: settingData } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "default_customer_name")
+      .single();
+
+    const defaultCustomerName = settingData?.value || "SOL Nederland";
+
     const { data, error } = await supabase
       .from("customers")
       .select("id, name, contact_person")
