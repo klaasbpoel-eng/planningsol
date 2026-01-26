@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "react-router-dom";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import siteLogo from "@/assets/site_logo.png";
 
 interface HeaderProps {
   userEmail?: string;
@@ -30,13 +31,7 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              {isAdmin ? (
-                <Shield className="h-6 w-6 text-primary" />
-              ) : (
-                <Calendar className="h-6 w-6 text-primary" />
-              )}
-            </div>
+            <img src={siteLogo} alt="SOL Group Logo" className="h-10 w-auto" />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-bold text-primary tracking-tight">
