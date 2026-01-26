@@ -41,12 +41,14 @@ interface GasCylinderOrder {
 }
 
 type PressureFilter = "all" | "200" | "300";
+type GasTypeFilter = "all" | "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other";
 
 export function GasCylinderPlanning() {
   const [orders, setOrders] = useState<GasCylinderOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pressureFilter, setPressureFilter] = useState<PressureFilter>("all");
+  const [gasTypeFilter, setGasTypeFilter] = useState<GasTypeFilter>("all");
   const [userId, setUserId] = useState<string | undefined>();
   const { isAdmin } = useUserRole(userId);
 
@@ -101,22 +103,24 @@ export function GasCylinderPlanning() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
+  const gasTypeLabels: Record<string, string> = {
+    co2: "CO₂",
+    nitrogen: "Stikstof (N₂)",
+    argon: "Argon",
+    acetylene: "Acetyleen",
+    oxygen: "Zuurstof",
+    helium: "Helium",
+    other: "Overig",
+  };
+
   const getGasTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      co2: "CO₂",
-      nitrogen: "Stikstof (N₂)",
-      argon: "Argon",
-      acetylene: "Acetyleen",
-      oxygen: "Zuurstof",
-      helium: "Helium",
-      other: "Overig",
-    };
-    return labels[type] || type;
+    return gasTypeLabels[type] || type;
   };
 
   const filteredOrders = orders.filter(o => {
-    if (pressureFilter === "all") return true;
-    return o.pressure === parseInt(pressureFilter);
+    const matchesPressure = pressureFilter === "all" || o.pressure === parseInt(pressureFilter);
+    const matchesGasType = gasTypeFilter === "all" || o.gas_type === gasTypeFilter;
+    return matchesPressure && matchesGasType;
   });
 
   const todayCount = filteredOrders
@@ -158,11 +162,22 @@ export function GasCylinderPlanning() {
                     Geplande vulorders voor gascilinders
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Filter className="h-4 w-4 text-muted-foreground" />
+                  <Select value={gasTypeFilter} onValueChange={(v) => setGasTypeFilter(v as GasTypeFilter)}>
+                    <SelectTrigger className="w-[150px] bg-background">
+                      <SelectValue placeholder="Gastype" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border shadow-lg z-50">
+                      <SelectItem value="all">Alle gastypes</SelectItem>
+                      {Object.entries(gasTypeLabels).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Select value={pressureFilter} onValueChange={(v) => setPressureFilter(v as PressureFilter)}>
                     <SelectTrigger className="w-[140px] bg-background">
-                      <SelectValue placeholder="Druk filter" />
+                      <SelectValue placeholder="Druk" />
                     </SelectTrigger>
                     <SelectContent className="bg-background border shadow-lg z-50">
                       <SelectItem value="all">Alle drukken</SelectItem>
