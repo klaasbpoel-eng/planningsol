@@ -79,6 +79,24 @@ export function DryIcePlanning() {
     setEditDialogOpen(true);
   };
 
+  const handleEditDialogClose = (open: boolean) => {
+    setEditDialogOpen(open);
+    if (!open) {
+      setSelectedOrder(null);
+    }
+  };
+
+  const handleOrderUpdated = () => {
+    fetchOrders();
+    setEditDialogOpen(false);
+    setSelectedOrder(null);
+  };
+
+  const handleOrderCreated = () => {
+    fetchOrders();
+    setDialogOpen(false);
+  };
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUserId(data.user?.id);
@@ -419,7 +437,7 @@ export function DryIcePlanning() {
       <CreateDryIceOrderDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onCreated={fetchOrders}
+        onCreated={handleOrderCreated}
       />
 
       <DryIceProductTypeManager
@@ -463,8 +481,8 @@ export function DryIcePlanning() {
           } : null,
         } : null}
         open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        onUpdate={fetchOrders}
+        onOpenChange={handleEditDialogClose}
+        onUpdate={handleOrderUpdated}
         isAdmin={isAdmin}
         productTypes={productTypes.map(pt => ({ ...pt, description: null, is_active: true, sort_order: 0, created_at: "", updated_at: "" }))}
         packagingOptions={packagingOptions.map(pkg => ({ ...pkg, description: null, is_active: true, sort_order: 0, created_at: "", updated_at: "", capacity_kg: null }))}
