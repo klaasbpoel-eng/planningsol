@@ -49,6 +49,7 @@ interface GasCylinderOrder {
 
 type PressureFilter = "all" | "200" | "300";
 type GasTypeFilter = "all" | "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other";
+type StatusFilter = "all" | "pending" | "in_progress" | "completed" | "cancelled";
 
 export function GasCylinderPlanning() {
   const [orders, setOrders] = useState<GasCylinderOrder[]>([]);
@@ -57,6 +58,7 @@ export function GasCylinderPlanning() {
   const [pressureFilter, setPressureFilter] = useState<PressureFilter>("all");
   const [gasTypeFilter, setGasTypeFilter] = useState<GasTypeFilter>("all");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [userId, setUserId] = useState<string | undefined>();
   const { isAdmin } = useUserRole(userId);
 
@@ -125,11 +127,19 @@ export function GasCylinderPlanning() {
     return gasTypeLabels[type] || type;
   };
 
+  const statusLabels: Record<string, string> = {
+    pending: "Gepland",
+    in_progress: "Bezig",
+    completed: "Voltooid",
+    cancelled: "Geannuleerd",
+  };
+
   const filteredOrders = orders.filter(o => {
     const matchesPressure = pressureFilter === "all" || o.pressure === parseInt(pressureFilter);
     const matchesGasType = gasTypeFilter === "all" || o.gas_type === gasTypeFilter;
     const matchesDate = !dateFilter || o.scheduled_date === format(dateFilter, "yyyy-MM-dd");
-    return matchesPressure && matchesGasType && matchesDate;
+    const matchesStatus = statusFilter === "all" || o.status === statusFilter;
+    return matchesPressure && matchesGasType && matchesDate && matchesStatus;
   });
 
   const todayCount = filteredOrders
@@ -228,6 +238,17 @@ export function GasCylinderPlanning() {
                       <SelectItem value="300">300 bar</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                    <SelectTrigger className="w-[140px] bg-background">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border shadow-lg z-50">
+                      <SelectItem value="all">Alle statussen</SelectItem>
+                      {Object.entries(statusLabels).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardHeader>
@@ -240,12 +261,12 @@ export function GasCylinderPlanning() {
                 <div className="text-center py-12 text-muted-foreground">
                   <Cylinder className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="font-medium">
-                    {dateFilter || pressureFilter !== "all" || gasTypeFilter !== "all" 
+                    {dateFilter || pressureFilter !== "all" || gasTypeFilter !== "all" || statusFilter !== "all"
                       ? "Geen orders gevonden met de huidige filters" 
                       : "Geen vulorders gepland"}
                   </p>
                   <p className="text-sm">
-                    {dateFilter || pressureFilter !== "all" || gasTypeFilter !== "all"
+                    {dateFilter || pressureFilter !== "all" || gasTypeFilter !== "all" || statusFilter !== "all"
                       ? "Pas de filters aan of voeg een nieuwe order toe" 
                       : "Voeg een nieuwe vulorder toe om te beginnen"}
                   </p>
