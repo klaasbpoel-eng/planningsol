@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Box, Repeat, Edit2 } from "lucide-react";
+import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Box, Repeat, Edit2, Settings } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -256,10 +257,18 @@ export function DryIcePlanning() {
           </p>
         </div>
         {isAdmin && (
-          <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={() => setDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nieuwe productieorder
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/?tab=admin&adminTab=settings" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Instellingen
+              </Link>
+            </Button>
+            <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={() => setDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nieuwe productieorder
+            </Button>
+          </div>
         )}
       </div>
 
