@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Snowflake, Cylinder, Package, TrendingUp } from "lucide-react";
+import { Snowflake, Cylinder, Package, TrendingUp, BarChart3 } from "lucide-react";
 import { DryIcePlanning } from "./DryIcePlanning";
 import { GasCylinderPlanning } from "./GasCylinderPlanning";
+import { ProductionReports } from "./ProductionReports";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
@@ -122,7 +123,7 @@ export function ProductionPlanning() {
 
       {/* Main content tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2 bg-muted/50 backdrop-blur-sm">
+        <TabsList className="grid w-full max-w-lg grid-cols-3 bg-muted/50 backdrop-blur-sm">
           <TabsTrigger 
             value="droogijs" 
             className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white flex items-center gap-2"
@@ -137,6 +138,13 @@ export function ProductionPlanning() {
             <Cylinder className="h-4 w-4" />
             Gascilinders
           </TabsTrigger>
+          <TabsTrigger 
+            value="rapportage"
+            className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-2"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Rapportage
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="droogijs" className="mt-6">
@@ -145,6 +153,10 @@ export function ProductionPlanning() {
 
         <TabsContent value="gascilinders" className="mt-6">
           <GasCylinderPlanning />
+        </TabsContent>
+
+        <TabsContent value="rapportage" className="mt-6">
+          <ProductionReports />
         </TabsContent>
       </Tabs>
     </div>
