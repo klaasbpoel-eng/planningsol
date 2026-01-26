@@ -56,6 +56,11 @@ export function CreateGasCylinderOrderDialog({
     name: string;
     color: string;
   }>>([]);
+  const [cylinderSizes, setCylinderSizes] = useState<Array<{
+    id: string;
+    name: string;
+    capacity_liters: number | null;
+  }>>([]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -90,8 +95,26 @@ export function CreateGasCylinderOrderDialog({
         }
       }
     };
+
+    const fetchCylinderSizes = async () => {
+      const { data } = await supabase
+        .from("cylinder_sizes")
+        .select("id, name, capacity_liters")
+        .eq("is_active", true)
+        .order("sort_order");
+      
+      if (data) {
+        setCylinderSizes(data);
+        if (data.length > 0) {
+          setCylinderSize(data[0].name);
+        }
+      }
+    };
     
-    if (open) fetchGasTypes();
+    if (open) {
+      fetchGasTypes();
+      fetchCylinderSizes();
+    }
   }, [open]);
 
   const resetForm = () => {
@@ -100,7 +123,7 @@ export function CreateGasCylinderOrderDialog({
     setGasType(gasTypes.length > 0 ? gasTypes[0].name : "");
     setGasGrade("technical");
     setCylinderCount("");
-    setCylinderSize("medium");
+    setCylinderSize(cylinderSizes.length > 0 ? cylinderSizes[0].name : "");
     setScheduledDate(new Date());
     setNotes("");
     setIsCompleted(false);
@@ -251,9 +274,11 @@ export function CreateGasCylinderOrderDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="small">Klein (10L)</SelectItem>
-                  <SelectItem value="medium">Medium (20L)</SelectItem>
-                  <SelectItem value="large">Groot (50L)</SelectItem>
+                  {cylinderSizes.map((size) => (
+                    <SelectItem key={size.id} value={size.name}>
+                      {size.name}{size.capacity_liters ? ` (${size.capacity_liters}L)` : ""}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
