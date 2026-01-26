@@ -102,6 +102,25 @@ export function GasCylinderPlanning() {
     }
   };
 
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    // Optimistic update
+    setOrders(prev => prev.map(order => 
+      order.id === id ? { ...order, status: newStatus } : order
+    ));
+
+    const { error } = await supabase
+      .from("gas_cylinder_orders")
+      .update({ status: newStatus as "pending" | "in_progress" | "completed" | "cancelled" })
+      .eq("id", id);
+
+    if (error) {
+      toast.error("Fout bij bijwerken status");
+      fetchOrders(); // Revert on error
+    } else {
+      toast.success("Status bijgewerkt");
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
       pending: { variant: "secondary", label: "Gepland" },
@@ -312,7 +331,25 @@ export function GasCylinderPlanning() {
                         <TableCell>
                           {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
                         </TableCell>
-                        <TableCell>{getStatusBadge(order.status)}</TableCell>
+                        <TableCell>
+                          {isAdmin ? (
+                            <Select 
+                              value={order.status} 
+                              onValueChange={(newStatus) => handleStatusChange(order.id, newStatus)}
+                            >
+                              <SelectTrigger className="h-8 w-[130px] bg-background">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="bg-background border shadow-lg z-50">
+                                {Object.entries(statusLabels).map(([value, label]) => (
+                                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            getStatusBadge(order.status)
+                          )}
+                        </TableCell>
                         {isAdmin && (
                           <TableCell>
                             <Button
