@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Loader2, Trash2, Filter } from "lucide-react";
+import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Loader2, Trash2, Filter, CalendarIcon, X } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -9,6 +9,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -49,6 +56,7 @@ export function GasCylinderPlanning() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pressureFilter, setPressureFilter] = useState<PressureFilter>("all");
   const [gasTypeFilter, setGasTypeFilter] = useState<GasTypeFilter>("all");
+  const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [userId, setUserId] = useState<string | undefined>();
   const { isAdmin } = useUserRole(userId);
 
@@ -120,7 +128,8 @@ export function GasCylinderPlanning() {
   const filteredOrders = orders.filter(o => {
     const matchesPressure = pressureFilter === "all" || o.pressure === parseInt(pressureFilter);
     const matchesGasType = gasTypeFilter === "all" || o.gas_type === gasTypeFilter;
-    return matchesPressure && matchesGasType;
+    const matchesDate = !dateFilter || o.scheduled_date === format(dateFilter, "yyyy-MM-dd");
+    return matchesPressure && matchesGasType && matchesDate;
   });
 
   const todayCount = filteredOrders
@@ -164,6 +173,40 @@ export function GasCylinderPlanning() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Filter className="h-4 w-4 text-muted-foreground" />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-[160px] justify-start text-left font-normal bg-background",
+                          !dateFilter && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateFilter ? format(dateFilter, "d MMM yyyy", { locale: nl }) : "Alle datums"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={dateFilter}
+                        onSelect={setDateFilter}
+                        initialFocus
+                        locale={nl}
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {dateFilter && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setDateFilter(undefined)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Select value={gasTypeFilter} onValueChange={(v) => setGasTypeFilter(v as GasTypeFilter)}>
                     <SelectTrigger className="w-[150px] bg-background">
                       <SelectValue placeholder="Gastype" />
@@ -197,12 +240,14 @@ export function GasCylinderPlanning() {
                 <div className="text-center py-12 text-muted-foreground">
                   <Cylinder className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="font-medium">
-                    {pressureFilter === "all" ? "Geen vulorders gepland" : `Geen orders met ${pressureFilter} bar`}
+                    {dateFilter || pressureFilter !== "all" || gasTypeFilter !== "all" 
+                      ? "Geen orders gevonden met de huidige filters" 
+                      : "Geen vulorders gepland"}
                   </p>
                   <p className="text-sm">
-                    {pressureFilter === "all" 
-                      ? "Voeg een nieuwe vulorder toe om te beginnen" 
-                      : "Pas het filter aan of voeg een nieuwe order toe"}
+                    {dateFilter || pressureFilter !== "all" || gasTypeFilter !== "all"
+                      ? "Pas de filters aan of voeg een nieuwe order toe" 
+                      : "Voeg een nieuwe vulorder toe om te beginnen"}
                   </p>
                 </div>
               ) : (
