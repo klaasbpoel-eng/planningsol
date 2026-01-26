@@ -89,7 +89,7 @@ export function CreateDryIceOrderDialog({
       .from("dry_ice_product_types")
       .select("id, name")
       .eq("is_active", true)
-      .order("sort_order");
+      .order("name");
     if (data && data.length > 0) {
       setProductTypes(data);
       setProductTypeId(data[0].id);
