@@ -181,6 +181,12 @@ export function CreateGasCylinderOrderDialog({
     try {
       const mappedGasType = mapGasTypeToEnum(gasType);
       
+      // Store gas type name in notes for display purposes
+      const gasTypeNote = `Gastype: ${gasType}`;
+      const combinedNotes = notes.trim() 
+        ? `${gasTypeNote}\n${notes.trim()}` 
+        : gasTypeNote;
+      
       const insertData = {
         order_number: generateOrderNumber(),
         customer_name: customerName.trim(),
@@ -191,7 +197,7 @@ export function CreateGasCylinderOrderDialog({
         cylinder_size: cylinderSize,
         pressure: pressure,
         scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
-        notes: notes.trim() || null,
+        notes: combinedNotes,
         created_by: currentProfileId,
         status: isCompleted ? "completed" as const : "pending" as const,
       };

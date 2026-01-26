@@ -236,6 +236,18 @@ export function GasCylinderOrderDialog({
     other: "Overig",
   };
 
+  const getDisplayGasType = (gasTypeEnum: string, notes: string | null) => {
+    // First check if the actual gas type name is stored in notes (format: "Gastype: Name")
+    if (notes) {
+      const gasTypeMatch = notes.match(/^Gastype:\s*(.+?)(?:\n|$)/i);
+      if (gasTypeMatch) {
+        return gasTypeMatch[1].trim();
+      }
+    }
+    // Fallback to enum labels
+    return gasTypeLabels[gasTypeEnum] || gasTypeEnum;
+  };
+
   const gasGradeLabels: Record<string, string> = {
     medical: "Medisch",
     technical: "Technisch",
@@ -428,7 +440,7 @@ export function GasCylinderOrderDialog({
                       <Cylinder className="h-5 w-5 text-orange-500" />
                       <div>
                         <p className="text-xs text-muted-foreground">Gastype</p>
-                        <p className="font-medium">{gasTypeLabels[order.gas_type] || order.gas_type}</p>
+                        <p className="font-medium">{getDisplayGasType(order.gas_type, order.notes)}</p>
                       </div>
                     </div>
 
@@ -446,7 +458,7 @@ export function GasCylinderOrderDialog({
                       <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
                       <div>
                         <p className="text-xs text-muted-foreground">Opmerkingen</p>
-                        <p className="text-sm">{order.notes}</p>
+                        <p className="text-sm whitespace-pre-wrap">{order.notes.replace(/^Gastype:\s*.+?\n?/i, '').trim() || order.notes}</p>
                       </div>
                     </div>
                   )}
