@@ -22,7 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays, Snowflake, Plus, Repeat } from "lucide-react";
+import { CalendarDays, Snowflake, Plus, Repeat, CheckCircle2 } from "lucide-react";
 import { format, addWeeks, addYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -54,6 +54,7 @@ export function CreateDryIceOrderDialog({
   const [isInfiniteRecurrence, setIsInfiniteRecurrence] = useState(false);
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>(undefined);
   const [notes, setNotes] = useState("");
+  const [alreadyCompleted, setAlreadyCompleted] = useState(true);
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   
   const [productTypes, setProductTypes] = useState<{ id: string; name: string }[]>([]);
@@ -122,6 +123,7 @@ export function CreateDryIceOrderDialog({
     setIsInfiniteRecurrence(false);
     setRecurrenceEndDate(undefined);
     setNotes("");
+    setAlreadyCompleted(true);
   };
 
   const handleClose = () => {
@@ -209,6 +211,7 @@ export function CreateDryIceOrderDialog({
         recurrence_end_date: isRecurring && !isInfiniteRecurrence && recurrenceEndDate 
           ? format(recurrenceEndDate, "yyyy-MM-dd") 
           : null,
+        status: alreadyCompleted ? "completed" as const : "pending" as const,
       };
 
       // Insert all orders
@@ -492,6 +495,19 @@ export function CreateDryIceOrderDialog({
                 )}
               </div>
             )}
+          </div>
+
+          {/* Already completed checkbox */}
+          <div className="flex items-center space-x-2 p-3 rounded-lg border bg-muted/30">
+            <Checkbox 
+              id="alreadyCompleted" 
+              checked={alreadyCompleted}
+              onCheckedChange={(checked) => setAlreadyCompleted(checked === true)}
+            />
+            <Label htmlFor="alreadyCompleted" className="flex items-center gap-2 cursor-pointer font-normal">
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              Reeds uitgevoerd
+            </Label>
           </div>
 
           <div className="space-y-2">
