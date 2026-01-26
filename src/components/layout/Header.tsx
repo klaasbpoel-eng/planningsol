@@ -26,20 +26,20 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-primary shadow-lg">
+    <header className="sticky top-0 z-50 w-full bg-primary-foreground shadow-lg">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-3">
-            <div className="p-2 bg-primary-foreground/10 rounded-lg">
+            <div className="p-2 bg-primary/10 rounded-lg">
               {isAdmin ? (
-                <Shield className="h-6 w-6 text-primary-foreground" />
+                <Shield className="h-6 w-6 text-primary" />
               ) : (
-                <Calendar className="h-6 w-6 text-primary-foreground" />
+                <Calendar className="h-6 w-6 text-primary" />
               )}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold text-primary-foreground tracking-tight">
+                <h1 className="text-lg font-bold text-primary tracking-tight">
                   Verlofbeheer
                 </h1>
                 {isAdmin && (
@@ -48,7 +48,7 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
                   </Badge>
                 )}
               </div>
-              <p className="text-xs text-primary-foreground/70 hidden sm:block">
+              <p className="text-xs text-primary/70 hidden sm:block">
                 {isAdmin ? "Beheer medewerkeraanvragen" : "Plan uw vrije tijd"}
               </p>
             </div>
@@ -62,8 +62,8 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
             <Button
               variant="ghost"
               size="sm"
-              className={`text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground ${
-                location.pathname === "/kalender" ? "bg-primary-foreground/20" : ""
+              className={`text-primary hover:bg-primary/10 hover:text-primary ${
+                location.pathname === "/kalender" ? "bg-primary/20" : ""
               }`}
             >
               <CalendarDays className="h-4 w-4 mr-2" />
@@ -74,8 +74,8 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
             <Button
               variant="ghost"
               size="sm"
-              className={`text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground ${
-                location.pathname === "/productie" ? "bg-primary-foreground/20" : ""
+              className={`text-primary hover:bg-primary/10 hover:text-primary ${
+                location.pathname === "/productie" ? "bg-primary/20" : ""
               }`}
             >
               <Factory className="h-4 w-4 mr-2" />
@@ -86,8 +86,8 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
             <Button
               variant="ghost"
               size="sm"
-              className={`text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground ${
-                location.pathname === "/klanten" ? "bg-primary-foreground/20" : ""
+              className={`text-primary hover:bg-primary/10 hover:text-primary ${
+                location.pathname === "/klanten" ? "bg-primary/20" : ""
               }`}
             >
               <Building2 className="h-4 w-4 mr-2" />
@@ -99,14 +99,14 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
               variant="ghost"
               size="sm"
               onClick={onSwitchView}
-              className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+              className="text-primary hover:bg-primary/10 hover:text-primary"
             >
               <ArrowLeftRight className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Medewerkersweergave</span>
             </Button>
           )}
           {userEmail && (
-            <div className="hidden md:flex items-center gap-2 text-primary-foreground/80 text-sm">
+            <div className="hidden md:flex items-center gap-2 text-primary/80 text-sm">
               <User className="h-4 w-4" />
               <span className="max-w-[150px] truncate">{userEmail}</span>
             </div>
@@ -115,7 +115,7 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
             variant="ghost"
             size="sm"
             onClick={handleLogout}
-            className="text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+            className="text-primary hover:bg-primary/10 hover:text-primary"
           >
             <LogOut className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Uitloggen</span>

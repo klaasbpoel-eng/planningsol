@@ -32,7 +32,7 @@ export function ThemeToggle({ className, variant = "default" }: ThemeToggleProps
         size="sm"
         onClick={toggleTheme}
         className={cn(
-          "text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground relative overflow-hidden group",
+          "text-primary hover:bg-primary/10 hover:text-primary relative overflow-hidden group",
           className
         )}
       >
@@ -44,7 +44,7 @@ export function ThemeToggle({ className, variant = "default" }: ThemeToggleProps
           {theme === "dark" ? "Licht" : "Donker"}
         </span>
         {/* Ripple effect */}
-        <span className="absolute inset-0 rounded-md bg-primary-foreground/10 scale-0 group-active:scale-100 transition-transform duration-300 ease-out" />
+        <span className="absolute inset-0 rounded-md bg-primary/10 scale-0 group-active:scale-100 transition-transform duration-300 ease-out" />
       </Button>
     );
   }
