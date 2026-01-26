@@ -371,47 +371,6 @@ export function DryIcePlanning() {
 
         {/* Quick info */}
         <div className="space-y-4">
-          <Card className="glass-card border-cyan-500/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Package className="h-4 w-4 text-cyan-500" />
-                Producttypen
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {productTypes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Geen producttypen</p>
-              ) : (
-                productTypes.map((pt) => (
-                  <div key={pt.id} className="flex justify-between items-center p-2 rounded-lg bg-muted/50">
-                    <span className="text-sm">{pt.name}</span>
-                    <Badge variant="secondary">Actief</Badge>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="glass-card border-cyan-500/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Box className="h-4 w-4 text-cyan-500" />
-                Verpakkingen
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {packagingOptions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Geen verpakkingen</p>
-              ) : (
-                packagingOptions.map((pkg) => (
-                  <div key={pkg.id} className="flex justify-between items-center p-2 rounded-lg bg-muted/50">
-                    <span className="text-sm">{pkg.name}</span>
-                    <Badge variant="secondary">Actief</Badge>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
 
           <Card className="glass-card">
             <CardHeader className="pb-2">
