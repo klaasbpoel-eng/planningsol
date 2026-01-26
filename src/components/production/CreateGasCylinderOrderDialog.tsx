@@ -50,7 +50,7 @@ export function CreateGasCylinderOrderDialog({
   const [pressure, setPressure] = useState<200 | 300>(200);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [notes, setNotes] = useState("");
-  const [isCompleted, setIsCompleted] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(true);
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   const [gasTypes, setGasTypes] = useState<Array<{
     id: string;
@@ -128,7 +128,7 @@ export function CreateGasCylinderOrderDialog({
     setPressure(200);
     setScheduledDate(new Date());
     setNotes("");
-    setIsCompleted(false);
+    setIsCompleted(true);
   };
 
   const handleClose = () => {
