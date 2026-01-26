@@ -71,6 +71,24 @@ export function GasCylinderPlanning() {
     setEditDialogOpen(true);
   };
 
+  const handleEditDialogClose = (open: boolean) => {
+    setEditDialogOpen(open);
+    if (!open) {
+      setSelectedOrder(null);
+    }
+  };
+
+  const handleOrderUpdated = () => {
+    fetchOrders();
+    setEditDialogOpen(false);
+    setSelectedOrder(null);
+  };
+
+  const handleOrderCreated = () => {
+    fetchOrders();
+    setDialogOpen(false);
+  };
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUserId(data.user?.id);
@@ -470,14 +488,14 @@ export function GasCylinderPlanning() {
       <CreateGasCylinderOrderDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onCreated={fetchOrders}
+        onCreated={handleOrderCreated}
       />
 
       <GasCylinderOrderDialog
         order={selectedOrder}
         open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        onUpdate={fetchOrders}
+        onOpenChange={handleEditDialogClose}
+        onUpdate={handleOrderUpdated}
         isAdmin={isAdmin}
       />
     </div>
