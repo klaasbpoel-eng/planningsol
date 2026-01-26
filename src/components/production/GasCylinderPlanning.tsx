@@ -63,6 +63,12 @@ type PressureFilter = "all" | "200" | "300";
 type GasTypeFilter = "all" | "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other";
 type StatusFilter = "all" | "pending" | "in_progress" | "completed" | "cancelled";
 
+interface GasType {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export function GasCylinderPlanning() {
   const [orders, setOrders] = useState<GasCylinderOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,6 +82,7 @@ export function GasCylinderPlanning() {
   const [userId, setUserId] = useState<string | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<GasCylinderOrder | null>(null);
+  const [gasTypes, setGasTypes] = useState<GasType[]>([]);
   const { isAdmin } = useUserRole(userId);
 
   const handleEditOrder = (order: GasCylinderOrder) => {
@@ -109,7 +116,20 @@ export function GasCylinderPlanning() {
 
   useEffect(() => {
     fetchOrders();
+    fetchGasTypes();
   }, []);
+
+  const fetchGasTypes = async () => {
+    const { data } = await supabase
+      .from("gas_types")
+      .select("id, name, color")
+      .eq("is_active", true)
+      .order("name");
+    
+    if (data) {
+      setGasTypes(data);
+    }
+  };
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -190,8 +210,34 @@ export function GasCylinderPlanning() {
     other: "Overig",
   };
 
-  const getGasTypeLabel = (type: string) => {
-    return gasTypeLabels[type] || type;
+  const getGasTypeLabel = (gasTypeEnum: string, notes: string | null) => {
+    // First check if the actual gas type name is stored in notes (format: "Gastype: Name")
+    if (notes) {
+      const gasTypeMatch = notes.match(/^Gastype:\s*(.+?)(?:\n|$)/i);
+      if (gasTypeMatch) {
+        return gasTypeMatch[1].trim();
+      }
+    }
+    
+    // Try to find matching gas type name from loaded gas types
+    const matchingGasType = gasTypes.find(gt => {
+      const enumName = gasTypeEnum.toLowerCase();
+      const gtName = gt.name.toLowerCase();
+      return gtName === enumName || 
+             (enumName === "co2" && gtName.includes("co2")) ||
+             (enumName === "nitrogen" && gtName.includes("stikstof")) ||
+             (enumName === "argon" && gtName.includes("argon")) ||
+             (enumName === "oxygen" && gtName.includes("zuurstof")) ||
+             (enumName === "helium" && gtName.includes("helium")) ||
+             (enumName === "acetylene" && gtName.includes("acetyleen"));
+    });
+    
+    if (matchingGasType) {
+      return matchingGasType.name;
+    }
+    
+    // Fallback to enum labels
+    return gasTypeLabels[gasTypeEnum] || gasTypeEnum;
   };
 
   const statusLabels: Record<string, string> = {
@@ -373,7 +419,7 @@ export function GasCylinderPlanning() {
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">{order.order_number}</TableCell>
                         <TableCell>{order.customer_name}</TableCell>
-                        <TableCell>{getGasTypeLabel(order.gas_type)}</TableCell>
+                        <TableCell>{getGasTypeLabel(order.gas_type, order.notes)}</TableCell>
                         <TableCell>{order.cylinder_count} st.</TableCell>
                         <TableCell>{order.pressure} bar</TableCell>
                         <TableCell>
