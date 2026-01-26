@@ -217,6 +217,22 @@ export function GasCylinderPlanning() {
                       <X className="h-4 w-4" />
                     </Button>
                   )}
+                  {(dateFilter || pressureFilter !== "all" || gasTypeFilter !== "all" || statusFilter !== "all") && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9"
+                      onClick={() => {
+                        setDateFilter(undefined);
+                        setPressureFilter("all");
+                        setGasTypeFilter("all");
+                        setStatusFilter("all");
+                      }}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Wis filters
+                    </Button>
+                  )}
                   <Select value={gasTypeFilter} onValueChange={(v) => setGasTypeFilter(v as GasTypeFilter)}>
                     <SelectTrigger className="w-[150px] bg-background">
                       <SelectValue placeholder="Gastype" />
