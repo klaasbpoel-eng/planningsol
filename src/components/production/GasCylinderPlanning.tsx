@@ -1,7 +1,14 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Loader2, Trash2 } from "lucide-react";
+import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Loader2, Trash2, Filter } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -30,12 +37,16 @@ interface GasCylinderOrder {
   status: string;
   notes: string | null;
   created_at: string;
+  pressure: number;
 }
+
+type PressureFilter = "all" | "200" | "300";
 
 export function GasCylinderPlanning() {
   const [orders, setOrders] = useState<GasCylinderOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [pressureFilter, setPressureFilter] = useState<PressureFilter>("all");
   const [userId, setUserId] = useState<string | undefined>();
   const { isAdmin } = useUserRole(userId);
 
@@ -103,7 +114,12 @@ export function GasCylinderPlanning() {
     return labels[type] || type;
   };
 
-  const todayCount = orders
+  const filteredOrders = orders.filter(o => {
+    if (pressureFilter === "all") return true;
+    return o.pressure === parseInt(pressureFilter);
+  });
+
+  const todayCount = filteredOrders
     .filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd") && o.status !== "cancelled")
     .reduce((sum, o) => sum + o.cylinder_count, 0);
 
@@ -132,24 +148,47 @@ export function GasCylinderPlanning() {
         <div className="lg:col-span-2">
           <Card className="glass-card">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Vulwachtrij
-              </CardTitle>
-              <CardDescription>
-                Geplande vulorders voor gascilinders
-              </CardDescription>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Vulwachtrij
+                  </CardTitle>
+                  <CardDescription>
+                    Geplande vulorders voor gascilinders
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <Select value={pressureFilter} onValueChange={(v) => setPressureFilter(v as PressureFilter)}>
+                    <SelectTrigger className="w-[140px] bg-background">
+                      <SelectValue placeholder="Druk filter" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border shadow-lg z-50">
+                      <SelectItem value="all">Alle drukken</SelectItem>
+                      <SelectItem value="200">200 bar</SelectItem>
+                      <SelectItem value="300">300 bar</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
-              ) : orders.length === 0 ? (
+              ) : filteredOrders.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Cylinder className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="font-medium">Geen vulorders gepland</p>
-                  <p className="text-sm">Voeg een nieuwe vulorder toe om te beginnen</p>
+                  <p className="font-medium">
+                    {pressureFilter === "all" ? "Geen vulorders gepland" : `Geen orders met ${pressureFilter} bar`}
+                  </p>
+                  <p className="text-sm">
+                    {pressureFilter === "all" 
+                      ? "Voeg een nieuwe vulorder toe om te beginnen" 
+                      : "Pas het filter aan of voeg een nieuwe order toe"}
+                  </p>
                 </div>
               ) : (
                 <Table>
@@ -159,18 +198,20 @@ export function GasCylinderPlanning() {
                       <TableHead>Klant</TableHead>
                       <TableHead>Gastype</TableHead>
                       <TableHead>Aantal</TableHead>
+                      <TableHead>Druk</TableHead>
                       <TableHead>Datum</TableHead>
                       <TableHead>Status</TableHead>
                       {isAdmin && <TableHead className="w-[80px]"></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {orders.map((order) => (
+                    {filteredOrders.map((order) => (
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">{order.order_number}</TableCell>
                         <TableCell>{order.customer_name}</TableCell>
                         <TableCell>{getGasTypeLabel(order.gas_type)}</TableCell>
                         <TableCell>{order.cylinder_count} st.</TableCell>
+                        <TableCell>{order.pressure} bar</TableCell>
                         <TableCell>
                           {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
                         </TableCell>
@@ -264,7 +305,7 @@ export function GasCylinderPlanning() {
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Orders</span>
                   <span className="font-medium">
-                    {orders.filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd")).length}
+                    {filteredOrders.filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd")).length}
                   </span>
                 </div>
               </div>
