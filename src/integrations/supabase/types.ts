@@ -338,6 +338,7 @@ export type Database = {
           notes: string | null
           order_number: string
           parent_order_id: string | null
+          pressure: number
           recurrence_end_date: string | null
           scheduled_date: string
           status: Database["public"]["Enums"]["production_order_status"]
@@ -358,6 +359,7 @@ export type Database = {
           notes?: string | null
           order_number: string
           parent_order_id?: string | null
+          pressure?: number
           recurrence_end_date?: string | null
           scheduled_date: string
           status?: Database["public"]["Enums"]["production_order_status"]
@@ -378,6 +380,7 @@ export type Database = {
           notes?: string | null
           order_number?: string
           parent_order_id?: string | null
+          pressure?: number
           recurrence_end_date?: string | null
           scheduled_date?: string
           status?: Database["public"]["Enums"]["production_order_status"]

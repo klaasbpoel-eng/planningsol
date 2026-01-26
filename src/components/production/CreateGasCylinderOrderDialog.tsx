@@ -47,6 +47,7 @@ export function CreateGasCylinderOrderDialog({
   const [gasGrade, setGasGrade] = useState<"medical" | "technical">("technical");
   const [cylinderCount, setCylinderCount] = useState("");
   const [cylinderSize, setCylinderSize] = useState("medium");
+  const [pressure, setPressure] = useState<200 | 300>(200);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [notes, setNotes] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
@@ -124,6 +125,7 @@ export function CreateGasCylinderOrderDialog({
     setGasGrade("technical");
     setCylinderCount("");
     setCylinderSize(cylinderSizes.length > 0 ? cylinderSizes[0].name : "");
+    setPressure(200);
     setScheduledDate(new Date());
     setNotes("");
     setIsCompleted(false);
@@ -163,6 +165,7 @@ export function CreateGasCylinderOrderDialog({
         gas_grade: gasGrade,
         cylinder_count: count,
         cylinder_size: cylinderSize,
+        pressure: pressure,
         scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
         notes: notes.trim() || null,
         created_by: currentProfileId,
@@ -279,6 +282,19 @@ export function CreateGasCylinderOrderDialog({
                       {size.name}{size.capacity_liters ? ` (${size.capacity_liters}L)` : ""}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Druk</Label>
+              <Select value={pressure.toString()} onValueChange={(v) => setPressure(parseInt(v) as 200 | 300)}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="200">200 bar</SelectItem>
+                  <SelectItem value="300">300 bar</SelectItem>
                 </SelectContent>
               </Select>
             </div>
