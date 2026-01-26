@@ -33,6 +33,16 @@ import { toast } from "sonner";
 import { CreateGasCylinderOrderDialog } from "./CreateGasCylinderOrderDialog";
 import { GasCylinderOrderDialog } from "./GasCylinderOrderDialog";
 import { useUserRole } from "@/hooks/useUserRole";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface GasCylinderOrder {
   id: string;
@@ -64,6 +74,8 @@ export function GasCylinderPlanning() {
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [userId, setUserId] = useState<string | undefined>();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<GasCylinderOrder | null>(null);
   const { isAdmin } = useUserRole(userId);
 
   const handleEditOrder = (order: GasCylinderOrder) => {
@@ -115,11 +127,18 @@ export function GasCylinderPlanning() {
     setLoading(false);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteClick = (order: GasCylinderOrder) => {
+    setOrderToDelete(order);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!orderToDelete) return;
+    
     const { error } = await supabase
       .from("gas_cylinder_orders")
       .delete()
-      .eq("id", id);
+      .eq("id", orderToDelete.id);
 
     if (error) {
       toast.error("Fout bij verwijderen order");
@@ -127,6 +146,8 @@ export function GasCylinderPlanning() {
       toast.success("Order verwijderd");
       fetchOrders();
     }
+    setDeleteDialogOpen(false);
+    setOrderToDelete(null);
   };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
@@ -392,7 +413,7 @@ export function GasCylinderPlanning() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-destructive hover:text-destructive"
-                                onClick={() => handleDelete(order.id)}
+                                onClick={() => handleDeleteClick(order)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -498,6 +519,27 @@ export function GasCylinderPlanning() {
         onUpdate={handleOrderUpdated}
         isAdmin={isAdmin}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Order verwijderen</AlertDialogTitle>
+            <AlertDialogDescription>
+              Weet je zeker dat je order {orderToDelete?.order_number} wilt verwijderen? 
+              Deze actie kan niet ongedaan worden gemaakt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Verwijderen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
