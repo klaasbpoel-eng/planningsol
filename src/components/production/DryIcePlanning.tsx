@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Settings, Box, Repeat } from "lucide-react";
+import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Settings, Box, Repeat, Edit2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -23,6 +23,7 @@ import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { toast } from "sonner";
 import { CreateDryIceOrderDialog } from "./CreateDryIceOrderDialog";
+import { DryIceOrderDialog } from "@/components/calendar/DryIceOrderDialog";
 import { DryIceProductTypeManager } from "./DryIceProductTypeManager";
 import { DryIcePackagingManager } from "./DryIcePackagingManager";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -49,8 +50,15 @@ interface DryIceOrder {
   status: string;
   notes: string | null;
   created_at: string;
+  updated_at: string;
   is_recurring: boolean | null;
   recurrence_end_date: string | null;
+  container_has_wheels: boolean | null;
+  box_count: number | null;
+  assigned_to: string | null;
+  created_by: string;
+  customer_id: string | null;
+  parent_order_id: string | null;
 }
 
 export function DryIcePlanning() {
@@ -59,10 +67,17 @@ export function DryIcePlanning() {
   const [packagingOptions, setPackagingOptions] = useState<Packaging[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<DryIceOrder | null>(null);
   const [productTypeManagerOpen, setProductTypeManagerOpen] = useState(false);
   const [packagingManagerOpen, setPackagingManagerOpen] = useState(false);
   const [userId, setUserId] = useState<string | undefined>();
   const { isAdmin } = useUserRole(userId);
+
+  const handleEditOrder = (order: DryIceOrder) => {
+    setSelectedOrder(order);
+    setEditDialogOpen(true);
+  };
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -290,14 +305,24 @@ export function DryIcePlanning() {
                         </TableCell>
                         {isAdmin && (
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => handleDelete(order.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleEditOrder(order)}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => handleDelete(order.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         )}
                       </TableRow>
@@ -411,6 +436,38 @@ export function DryIcePlanning() {
           setPackagingManagerOpen(open);
           if (!open) fetchPackaging();
         }}
+      />
+
+      <DryIceOrderDialog
+        order={selectedOrder ? {
+          ...selectedOrder,
+          product_type: selectedOrder.product_type as "blocks" | "pellets" | "sticks",
+          status: selectedOrder.status as "pending" | "in_progress" | "completed" | "cancelled",
+          is_recurring: selectedOrder.is_recurring ?? false,
+          product_type_info: productTypes.find(p => p.id === selectedOrder.product_type_id) ? {
+            ...productTypes.find(p => p.id === selectedOrder.product_type_id)!,
+            description: null,
+            is_active: true,
+            sort_order: 0,
+            created_at: "",
+            updated_at: ""
+          } : null,
+          packaging_info: packagingOptions.find(p => p.id === selectedOrder.packaging_id) ? {
+            ...packagingOptions.find(p => p.id === selectedOrder.packaging_id)!,
+            description: null,
+            is_active: true,
+            sort_order: 0,
+            created_at: "",
+            updated_at: "",
+            capacity_kg: null
+          } : null,
+        } : null}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onUpdate={fetchOrders}
+        isAdmin={isAdmin}
+        productTypes={productTypes.map(pt => ({ ...pt, description: null, is_active: true, sort_order: 0, created_at: "", updated_at: "" }))}
+        packagingOptions={packagingOptions.map(pkg => ({ ...pkg, description: null, is_active: true, sort_order: 0, created_at: "", updated_at: "", capacity_kg: null }))}
       />
     </div>
   );
