@@ -27,6 +27,16 @@ import { DryIceOrderDialog } from "@/components/calendar/DryIceOrderDialog";
 import { DryIceProductTypeManager } from "./DryIceProductTypeManager";
 import { DryIcePackagingManager } from "./DryIcePackagingManager";
 import { useUserRole } from "@/hooks/useUserRole";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ProductType {
   id: string;
@@ -72,6 +82,8 @@ export function DryIcePlanning() {
   const [productTypeManagerOpen, setProductTypeManagerOpen] = useState(false);
   const [packagingManagerOpen, setPackagingManagerOpen] = useState(false);
   const [userId, setUserId] = useState<string | undefined>();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<DryIceOrder | null>(null);
   const { isAdmin } = useUserRole(userId);
 
   const handleEditOrder = (order: DryIceOrder) => {
@@ -149,11 +161,18 @@ export function DryIcePlanning() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteClick = (order: DryIceOrder) => {
+    setOrderToDelete(order);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!orderToDelete) return;
+    
     const { error } = await supabase
       .from("dry_ice_orders")
       .delete()
-      .eq("id", id);
+      .eq("id", orderToDelete.id);
 
     if (error) {
       toast.error("Fout bij verwijderen order");
@@ -161,6 +180,8 @@ export function DryIcePlanning() {
       toast.success("Order verwijderd");
       fetchOrders();
     }
+    setDeleteDialogOpen(false);
+    setOrderToDelete(null);
   };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
@@ -336,7 +357,7 @@ export function DryIcePlanning() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-destructive hover:text-destructive"
-                                onClick={() => handleDelete(order.id)}
+                                onClick={() => handleDeleteClick(order)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -487,6 +508,27 @@ export function DryIcePlanning() {
         productTypes={productTypes.map(pt => ({ ...pt, description: null, is_active: true, sort_order: 0, created_at: "", updated_at: "" }))}
         packagingOptions={packagingOptions.map(pkg => ({ ...pkg, description: null, is_active: true, sort_order: 0, created_at: "", updated_at: "", capacity_kg: null }))}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Order verwijderen</AlertDialogTitle>
+            <AlertDialogDescription>
+              Weet je zeker dat je order {orderToDelete?.order_number} wilt verwijderen? 
+              Deze actie kan niet ongedaan worden gemaakt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Verwijderen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
