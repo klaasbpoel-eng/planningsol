@@ -66,7 +66,7 @@ export function DryIceProductTypeManager({ open, onOpenChange }: DryIceProductTy
     const { data, error } = await supabase
       .from("dry_ice_product_types")
       .select("*")
-      .order("sort_order");
+      .order("name");
 
     if (error) {
       console.error("Error fetching product types:", error);

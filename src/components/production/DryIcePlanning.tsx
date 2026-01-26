@@ -102,7 +102,7 @@ export function DryIcePlanning() {
       .from("dry_ice_packaging")
       .select("id, name")
       .eq("is_active", true)
-      .order("sort_order");
+      .order("name");
 
     if (!error && data) {
       setPackagingOptions(data);

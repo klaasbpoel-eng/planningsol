@@ -68,7 +68,7 @@ export function DryIcePackagingManager({ open, onOpenChange }: DryIcePackagingMa
     const { data, error } = await supabase
       .from("dry_ice_packaging")
       .select("*")
-      .order("sort_order");
+      .order("name");
 
     if (error) {
       console.error("Error fetching packaging:", error);
