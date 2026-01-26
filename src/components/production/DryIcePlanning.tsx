@@ -204,18 +204,18 @@ export function DryIcePlanning() {
   };
 
   const statusLabels: Record<string, string> = {
-    pending: "Gepland",
-    in_progress: "Bezig",
-    completed: "Voltooid",
-    cancelled: "Geannuleerd",
+    pending: "pending",
+    in_progress: "in_progress",
+    completed: "completed",
+    cancelled: "cancelled",
   };
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-      pending: { variant: "secondary", label: "Gepland" },
-      in_progress: { variant: "default", label: "Bezig" },
-      completed: { variant: "outline", label: "Voltooid" },
-      cancelled: { variant: "destructive", label: "Geannuleerd" },
+      pending: { variant: "secondary", label: "pending" },
+      in_progress: { variant: "default", label: "in_progress" },
+      completed: { variant: "outline", label: "completed" },
+      cancelled: { variant: "destructive", label: "cancelled" },
     };
     const config = variants[status] || { variant: "secondary", label: status };
     return <Badge variant={config.variant}>{config.label}</Badge>;
@@ -226,13 +226,8 @@ export function DryIcePlanning() {
       const pt = productTypes.find(p => p.id === order.product_type_id);
       if (pt) return pt.name;
     }
-    // Fallback to old enum-based labels
-    const labels: Record<string, string> = {
-      blocks: "Blokken",
-      pellets: "Pellets",
-      sticks: "Sticks",
-    };
-    return labels[order.product_type] || order.product_type;
+    // Show raw database value
+    return order.product_type;
   };
 
   const getPackagingLabel = (order: DryIceOrder) => {

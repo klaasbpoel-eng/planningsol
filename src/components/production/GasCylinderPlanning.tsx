@@ -171,34 +171,34 @@ export function GasCylinderPlanning() {
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-      pending: { variant: "secondary", label: "Gepland" },
-      in_progress: { variant: "default", label: "Bezig" },
-      completed: { variant: "outline", label: "Voltooid" },
-      cancelled: { variant: "destructive", label: "Geannuleerd" },
+      pending: { variant: "secondary", label: "pending" },
+      in_progress: { variant: "default", label: "in_progress" },
+      completed: { variant: "outline", label: "completed" },
+      cancelled: { variant: "destructive", label: "cancelled" },
     };
     const config = variants[status] || { variant: "secondary", label: status };
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
   const gasTypeLabels: Record<string, string> = {
-    co2: "CO₂",
-    nitrogen: "Stikstof (N₂)",
-    argon: "Argon",
-    acetylene: "Acetyleen",
-    oxygen: "Zuurstof",
-    helium: "Helium",
-    other: "Overig",
+    co2: "co2",
+    nitrogen: "nitrogen",
+    argon: "argon",
+    acetylene: "acetylene",
+    oxygen: "oxygen",
+    helium: "helium",
+    other: "other",
   };
 
   const getGasTypeLabel = (type: string) => {
-    return gasTypeLabels[type] || type;
+    return type;
   };
 
   const statusLabels: Record<string, string> = {
-    pending: "Gepland",
-    in_progress: "Bezig",
-    completed: "Voltooid",
-    cancelled: "Geannuleerd",
+    pending: "pending",
+    in_progress: "in_progress",
+    completed: "completed",
+    cancelled: "cancelled",
   };
 
   const filteredOrders = orders.filter(o => {
