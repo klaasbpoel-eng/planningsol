@@ -71,7 +71,7 @@ export function CreateTaskDialog({
       .from("task_types")
       .select("*")
       .eq("is_active", true)
-      .order("sort_order");
+      .order("name");
 
     if (!error && data) {
       setTaskTypes(data);
