@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Calendar, LogOut, User, Shield, ArrowLeftRight, CalendarDays, Factory, Building2 } from "lucide-react";
+import { Calendar, LogOut, User, Shield, ArrowLeftRight, CalendarDays, Factory, Building2, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +93,20 @@ export function Header({ userEmail, isAdmin, onSwitchView }: HeaderProps) {
             >
               <Building2 className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Klanten</span>
+            </Button>
+          </Link>
+          <Link to="/bestellingen">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`text-primary hover:bg-primary/10 hover:text-primary ${
+                location.pathname === "/bestellingen" 
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold" 
+                  : ""
+              }`}
+            >
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Bestellingen</span>
             </Button>
           </Link>
           {isAdmin && onSwitchView && (
