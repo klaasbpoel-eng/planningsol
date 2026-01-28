@@ -37,9 +37,10 @@ interface Customer {
 interface CustomerSelectProps {
   value: string;
   onValueChange: (value: string, customerName: string) => void;
+  defaultCustomerName?: string;
 }
 
-export function CustomerSelect({ value, onValueChange }: CustomerSelectProps) {
+export function CustomerSelect({ value, onValueChange, defaultCustomerName: propDefaultCustomer }: CustomerSelectProps) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -50,13 +51,17 @@ export function CustomerSelect({ value, onValueChange }: CustomerSelectProps) {
   const [hasSetDefault, setHasSetDefault] = useState(false);
 
   const fetchCustomers = async () => {
-    const { data: settingData } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "default_customer_name")
-      .single();
-
-    const defaultCustomerName = settingData?.value || "SOL Nederland";
+    // Use prop default if provided, otherwise fetch from settings
+    let defaultCustomerName = propDefaultCustomer;
+    
+    if (!defaultCustomerName) {
+      const { data: settingData } = await supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "default_customer_name")
+        .single();
+      defaultCustomerName = settingData?.value || "SOL Nederland";
+    }
 
     const { data, error } = await supabase
       .from("customers")
@@ -71,7 +76,7 @@ export function CustomerSelect({ value, onValueChange }: CustomerSelectProps) {
       
       if (!value && !hasSetDefault && data && data.length > 0) {
         const defaultCustomer = data.find(
-          (c) => c.name.toLowerCase() === defaultCustomerName.toLowerCase()
+          (c) => c.name.toLowerCase() === defaultCustomerName!.toLowerCase()
         );
         if (defaultCustomer) {
           onValueChange(defaultCustomer.id, defaultCustomer.name);
