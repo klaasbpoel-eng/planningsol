@@ -3,6 +3,7 @@ import { LeaveTypeManagement } from "./LeaveTypeManagement";
 import { GasCylinderSettings } from "./GasCylinderSettings";
 import { DryIceSettings } from "./DryIceSettings";
 import { DefaultCustomerSetting } from "./DefaultCustomerSetting";
+import { CustomerImport } from "./CustomerImport";
 
 export function AdminSettings() {
   return (
@@ -12,6 +13,7 @@ export function AdminSettings() {
       <GasCylinderSettings />
       <DryIceSettings />
       <DefaultCustomerSetting />
+      <CustomerImport />
     </div>
   );
 }
