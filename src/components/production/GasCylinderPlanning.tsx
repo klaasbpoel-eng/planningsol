@@ -60,7 +60,6 @@ interface GasCylinderOrder {
 }
 
 type PressureFilter = "all" | "200" | "300";
-type GasTypeFilter = "all" | "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other";
 type StatusFilter = "all" | "pending" | "in_progress" | "completed" | "cancelled";
 
 interface GasType {
@@ -76,7 +75,7 @@ export function GasCylinderPlanning() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<GasCylinderOrder | null>(null);
   const [pressureFilter, setPressureFilter] = useState<PressureFilter>("all");
-  const [gasTypeFilter, setGasTypeFilter] = useState<GasTypeFilter>("all");
+  const [gasTypeFilter, setGasTypeFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [userId, setUserId] = useState<string | undefined>();
@@ -249,7 +248,15 @@ export function GasCylinderPlanning() {
 
   const filteredOrders = orders.filter(o => {
     const matchesPressure = pressureFilter === "all" || o.pressure === parseInt(pressureFilter);
-    const matchesGasType = gasTypeFilter === "all" || o.gas_type === gasTypeFilter;
+    // Match gas type filter by enum value or by checking if the gas type name matches
+    const matchesGasType = gasTypeFilter === "all" || o.gas_type === gasTypeFilter || (() => {
+      const selectedGasType = gasTypes.find(gt => gt.id === gasTypeFilter);
+      if (!selectedGasType) return false;
+      // Check if the order's gas_type enum matches the selected gas type name
+      const orderGasTypeName = getGasTypeLabel(o.gas_type, o.notes).toLowerCase();
+      return orderGasTypeName.includes(selectedGasType.name.toLowerCase()) || 
+             selectedGasType.name.toLowerCase().includes(orderGasTypeName);
+    })();
     const matchesDate = !dateFilter || o.scheduled_date === format(dateFilter, "yyyy-MM-dd");
     const matchesStatus = statusFilter === "all" || o.status === statusFilter;
     return matchesPressure && matchesGasType && matchesDate && matchesStatus;
@@ -346,14 +353,14 @@ export function GasCylinderPlanning() {
                       Wis filters
                     </Button>
                   )}
-                  <Select value={gasTypeFilter} onValueChange={(v) => setGasTypeFilter(v as GasTypeFilter)}>
+                  <Select value={gasTypeFilter} onValueChange={setGasTypeFilter}>
                     <SelectTrigger className="w-[150px] bg-background">
                       <SelectValue placeholder="Gastype" />
                     </SelectTrigger>
                     <SelectContent className="bg-background border shadow-lg z-50">
                       <SelectItem value="all">Alle gastypes</SelectItem>
-                      {Object.entries(gasTypeLabels).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      {gasTypes.map((gasType) => (
+                        <SelectItem key={gasType.id} value={gasType.id}>{gasType.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
