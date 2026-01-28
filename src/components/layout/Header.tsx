@@ -42,9 +42,7 @@ export function Header({
                     Beheerder
                   </Badge>}
               </div>
-              <p className="text-xs text-primary/70 hidden sm:block">
-                {isAdmin ? "Beheer medewerkeraanvragen" : "Plan uw vrije tijd"}
-              </p>
+              
             </div>
           </Link>
         </div>
