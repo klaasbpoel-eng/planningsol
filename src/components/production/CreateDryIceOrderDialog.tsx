@@ -11,13 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -30,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CustomerSelect } from "./CustomerSelect";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface CreateDryIceOrderDialogProps {
   open: boolean;
@@ -297,47 +291,37 @@ export function CreateDryIceOrderDialog({
 
             <div className="space-y-2">
               <Label>Producttype <span className="text-destructive">*</span></Label>
-              <Select value={productTypeId} onValueChange={setProductTypeId}>
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Selecteer type" />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  {productTypes.map((pt) => (
-                    <SelectItem key={pt.id} value={pt.id}>
-                      {pt.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={productTypes.map((pt) => ({ value: pt.id, label: pt.name }))}
+                value={productTypeId}
+                onValueChange={setProductTypeId}
+                placeholder="Selecteer type"
+                searchPlaceholder="Zoek producttype..."
+                emptyMessage="Geen producttype gevonden."
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Verpakking</Label>
-              <Select value={packagingId} onValueChange={(value) => {
-                setPackagingId(value);
-                const newPackaging = packagingOptions.find(p => p.id === value);
-                // Reset box count when changing packaging
-                if (!newPackaging?.name.toLowerCase().includes("eps")) {
-                  setBoxCount("");
-                }
-                // Reset wheels option when not kunststof
-                if (!newPackaging?.name.toLowerCase().includes("kunststof")) {
-                  setContainerHasWheels(null);
-                }
-              }}>
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Selecteer verpakking (optioneel)" />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  {packagingOptions.map((pkg) => (
-                    <SelectItem key={pkg.id} value={pkg.id}>
-                      {pkg.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={packagingOptions.map((pkg) => ({ value: pkg.id, label: pkg.name }))}
+                value={packagingId}
+                onValueChange={(value) => {
+                  setPackagingId(value);
+                  const newPackaging = packagingOptions.find(p => p.id === value);
+                  if (!newPackaging?.name.toLowerCase().includes("eps")) {
+                    setBoxCount("");
+                  }
+                  if (!newPackaging?.name.toLowerCase().includes("kunststof")) {
+                    setContainerHasWheels(null);
+                  }
+                }}
+                placeholder="Selecteer verpakking (optioneel)"
+                searchPlaceholder="Zoek verpakking..."
+                emptyMessage="Geen verpakking gevonden."
+              />
             </div>
 
             {isEpsPackaging && (
