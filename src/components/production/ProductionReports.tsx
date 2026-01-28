@@ -59,6 +59,13 @@ interface GasCylinderOrder {
   scheduled_date: string;
   status: string;
   pressure: number;
+  notes: string | null;
+}
+
+interface GasType {
+  id: string;
+  name: string;
+  color: string;
 }
 
 interface DryIceOrder {
@@ -81,11 +88,28 @@ export function ProductionReports() {
   });
   const [cylinderOrders, setCylinderOrders] = useState<GasCylinderOrder[]>([]);
   const [dryIceOrders, setDryIceOrders] = useState<DryIceOrder[]>([]);
+  const [gasTypes, setGasTypes] = useState<GasType[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
+
+  useEffect(() => {
+    fetchGasTypes();
+  }, []);
 
   useEffect(() => {
     fetchReportData();
   }, [dateRange]);
+
+  const fetchGasTypes = async () => {
+    const { data } = await supabase
+      .from("gas_types")
+      .select("id, name, color")
+      .eq("is_active", true)
+      .order("name");
+    
+    if (data) {
+      setGasTypes(data);
+    }
+  };
 
   const fetchReportData = async () => {
     setLoading(true);
@@ -221,6 +245,46 @@ export function ProductionReports() {
 
   const ordersPerDay = getOrdersPerDay();
   const gasTypeDistribution = getGasTypeDistribution();
+
+  const gasTypeLabels: Record<string, string> = {
+    co2: "CO₂",
+    nitrogen: "Stikstof (N₂)",
+    argon: "Argon",
+    acetylene: "Acetyleen",
+    oxygen: "Zuurstof",
+    helium: "Helium",
+    other: "Overig",
+  };
+
+  const getGasTypeLabel = (gasTypeEnum: string, notes: string | null) => {
+    // First check if the actual gas type name is stored in notes (format: "Gastype: Name")
+    if (notes) {
+      const gasTypeMatch = notes.match(/^Gastype:\s*(.+?)(?:\n|$)/i);
+      if (gasTypeMatch) {
+        return gasTypeMatch[1].trim();
+      }
+    }
+    
+    // Try to find matching gas type name from loaded gas types
+    const matchingGasType = gasTypes.find(gt => {
+      const enumName = gasTypeEnum.toLowerCase();
+      const gtName = gt.name.toLowerCase();
+      return gtName === enumName || 
+             (enumName === "co2" && gtName.includes("co2")) ||
+             (enumName === "nitrogen" && gtName.includes("stikstof")) ||
+             (enumName === "argon" && gtName.includes("argon")) ||
+             (enumName === "oxygen" && gtName.includes("zuurstof")) ||
+             (enumName === "helium" && gtName.includes("helium")) ||
+             (enumName === "acetylene" && gtName.includes("acetyleen"));
+    });
+    
+    if (matchingGasType) {
+      return matchingGasType.name;
+    }
+    
+    // Fallback to enum labels
+    return gasTypeLabels[gasTypeEnum] || gasTypeEnum;
+  };
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
@@ -550,7 +614,7 @@ export function ProductionReports() {
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">{order.order_number}</TableCell>
                         <TableCell>{order.customer_name}</TableCell>
-                        <TableCell>{order.gas_type}</TableCell>
+                        <TableCell>{getGasTypeLabel(order.gas_type, order.notes)}</TableCell>
                         <TableCell>{order.cylinder_count} st.</TableCell>
                         <TableCell>{order.pressure} bar</TableCell>
                         <TableCell>{format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}</TableCell>
