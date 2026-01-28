@@ -1,11 +1,4 @@
 import { useState, useEffect } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,9 +10,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Building2 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Plus, Building2, Check, ChevronsUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface Customer {
   id: string;
@@ -35,6 +42,7 @@ interface CustomerSelectProps {
 export function CustomerSelect({ value, onValueChange }: CustomerSelectProps) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
   const [showNewCustomerDialog, setShowNewCustomerDialog] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newContactPerson, setNewContactPerson] = useState("");
@@ -42,7 +50,6 @@ export function CustomerSelect({ value, onValueChange }: CustomerSelectProps) {
   const [hasSetDefault, setHasSetDefault] = useState(false);
 
   const fetchCustomers = async () => {
-    // Fetch default customer name from settings
     const { data: settingData } = await supabase
       .from("app_settings")
       .select("value")
@@ -62,7 +69,6 @@ export function CustomerSelect({ value, onValueChange }: CustomerSelectProps) {
     } else {
       setCustomers(data || []);
       
-      // Set default customer if no value is set yet
       if (!value && !hasSetDefault && data && data.length > 0) {
         const defaultCustomer = data.find(
           (c) => c.name.toLowerCase() === defaultCustomerName.toLowerCase()
@@ -113,45 +119,82 @@ export function CustomerSelect({ value, onValueChange }: CustomerSelectProps) {
     }
   };
 
-  const handleSelectChange = (customerId: string) => {
-    if (customerId === "new") {
-      setShowNewCustomerDialog(true);
-      return;
-    }
-    const customer = customers.find((c) => c.id === customerId);
-    if (customer) {
-      onValueChange(customer.id, customer.name);
-    }
-  };
+  const selectedCustomer = customers.find((c) => c.id === value);
 
   return (
     <>
-      <Select value={value} onValueChange={handleSelectChange}>
-        <SelectTrigger className="bg-background">
-          <SelectValue placeholder={loading ? "Laden..." : "Selecteer klant"} />
-        </SelectTrigger>
-        <SelectContent className="bg-background border shadow-lg z-50">
-          {customers.map((customer) => (
-            <SelectItem key={customer.id} value={customer.id}>
-              <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-                <span>{customer.name}</span>
-                {customer.contact_person && (
-                  <span className="text-muted-foreground text-sm">
-                    ({customer.contact_person})
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between bg-background"
+          >
+            {loading ? (
+              "Laden..."
+            ) : selectedCustomer ? (
+              <div className="flex items-center gap-2 truncate">
+                <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="truncate">{selectedCustomer.name}</span>
+                {selectedCustomer.contact_person && (
+                  <span className="text-muted-foreground text-sm truncate">
+                    ({selectedCustomer.contact_person})
                   </span>
                 )}
               </div>
-            </SelectItem>
-          ))}
-          <SelectItem value="new" className="text-primary">
-            <div className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              <span>Nieuwe klant toevoegen</span>
-            </div>
-          </SelectItem>
-        </SelectContent>
-      </Select>
+            ) : (
+              "Selecteer klant"
+            )}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Zoek klant..." />
+            <CommandList>
+              <CommandEmpty>Geen klant gevonden.</CommandEmpty>
+              <CommandGroup>
+                {customers.map((customer) => (
+                  <CommandItem
+                    key={customer.id}
+                    value={customer.name}
+                    onSelect={() => {
+                      onValueChange(customer.id, customer.name);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === customer.id ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <span>{customer.name}</span>
+                    {customer.contact_person && (
+                      <span className="ml-2 text-muted-foreground text-sm">
+                        ({customer.contact_person})
+                      </span>
+                    )}
+                  </CommandItem>
+                ))}
+                <CommandItem
+                  value="nieuwe-klant-toevoegen"
+                  onSelect={() => {
+                    setShowNewCustomerDialog(true);
+                    setOpen(false);
+                  }}
+                  className="text-primary"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  <span>Nieuwe klant toevoegen</span>
+                </CommandItem>
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
 
       <Dialog open={showNewCustomerDialog} onOpenChange={setShowNewCustomerDialog}>
         <DialogContent className="sm:max-w-[400px]">
