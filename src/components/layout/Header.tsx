@@ -36,7 +36,7 @@ export function Header({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-bold text-primary tracking-tight">
-                  Planner
+                  Planbord
                 </h1>
                 {isAdmin && <Badge className="bg-accent text-accent-foreground text-xs">
                     Beheerder
