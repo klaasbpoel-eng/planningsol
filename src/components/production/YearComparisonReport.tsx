@@ -69,28 +69,32 @@ export function YearComparisonReport() {
     const currentYear = selectedYear;
     const previousYear = selectedYear - 1;
 
-    // Fetch cylinder orders for both years
+    // Fetch cylinder orders for both years - use range to get all records (default limit is 1000)
     const [currentCylinderRes, previousCylinderRes, currentDryIceRes, previousDryIceRes] = await Promise.all([
       supabase
         .from("gas_cylinder_orders")
         .select("scheduled_date, cylinder_count, status")
         .gte("scheduled_date", `${currentYear}-01-01`)
-        .lte("scheduled_date", `${currentYear}-12-31`),
+        .lte("scheduled_date", `${currentYear}-12-31`)
+        .range(0, 9999),
       supabase
         .from("gas_cylinder_orders")
         .select("scheduled_date, cylinder_count, status")
         .gte("scheduled_date", `${previousYear}-01-01`)
-        .lte("scheduled_date", `${previousYear}-12-31`),
+        .lte("scheduled_date", `${previousYear}-12-31`)
+        .range(0, 9999),
       supabase
         .from("dry_ice_orders")
         .select("scheduled_date, quantity_kg, status")
         .gte("scheduled_date", `${currentYear}-01-01`)
-        .lte("scheduled_date", `${currentYear}-12-31`),
+        .lte("scheduled_date", `${currentYear}-12-31`)
+        .range(0, 9999),
       supabase
         .from("dry_ice_orders")
         .select("scheduled_date, quantity_kg, status")
         .gte("scheduled_date", `${previousYear}-01-01`)
         .lte("scheduled_date", `${previousYear}-12-31`)
+        .range(0, 9999)
     ]);
 
     // Process cylinder data
