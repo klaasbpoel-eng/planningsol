@@ -15,9 +15,11 @@ import {
   Clock,
   XCircle,
   Loader2,
-  Upload
+  Upload,
+  GitCompare
 } from "lucide-react";
 import { ExcelImportDialog } from "./ExcelImportDialog";
+import { YearComparisonReport } from "./YearComparisonReport";
 import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -469,7 +471,7 @@ export function ProductionReports() {
 
       {/* Detailed Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-lg grid-cols-3 bg-muted/50 backdrop-blur-sm">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4 bg-muted/50 backdrop-blur-sm">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Overzicht
@@ -481,6 +483,10 @@ export function ProductionReports() {
           <TabsTrigger value="dryice" className="flex items-center gap-2">
             <Snowflake className="h-4 w-4" />
             Droogijs
+          </TabsTrigger>
+          <TabsTrigger value="comparison" className="flex items-center gap-2">
+            <GitCompare className="h-4 w-4" />
+            Jaarvergelijking
           </TabsTrigger>
         </TabsList>
 
@@ -730,6 +736,10 @@ export function ProductionReports() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="comparison" className="mt-6">
+          <YearComparisonReport />
         </TabsContent>
       </Tabs>
     </div>
