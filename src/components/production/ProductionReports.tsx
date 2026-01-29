@@ -57,6 +57,7 @@ interface GasCylinderOrder {
   order_number: string;
   customer_name: string;
   gas_type: string;
+  gas_grade: "medical" | "technical";
   cylinder_count: number;
   scheduled_date: string;
   status: string;
@@ -618,6 +619,7 @@ export function ProductionReports() {
                       <TableHead>Order</TableHead>
                       <TableHead>Klant</TableHead>
                       <TableHead>Gastype</TableHead>
+                      <TableHead>M/T</TableHead>
                       <TableHead>Aantal</TableHead>
                       <TableHead>Druk</TableHead>
                       <TableHead>Datum</TableHead>
@@ -630,6 +632,11 @@ export function ProductionReports() {
                         <TableCell className="font-medium">{order.order_number}</TableCell>
                         <TableCell>{order.customer_name}</TableCell>
                         <TableCell>{getGasTypeLabel(order.gas_type, order.notes)}</TableCell>
+                        <TableCell>
+                          <Badge variant={order.gas_grade === "medical" ? "default" : "secondary"}>
+                            {order.gas_grade === "medical" ? "M" : "T"}
+                          </Badge>
+                        </TableCell>
                         <TableCell>{order.cylinder_count} st.</TableCell>
                         <TableCell>{order.pressure} bar</TableCell>
                         <TableCell>{format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}</TableCell>
