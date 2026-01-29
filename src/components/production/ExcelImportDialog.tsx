@@ -163,23 +163,58 @@ export function ExcelImportDialog({
         // Convert to JSON
         const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
         
+        // Find header row to get column indices
+        let headerRowIndex = -1;
+        let columnMap: { [key: string]: number } = {};
+        
+        for (let i = 0; i < Math.min(20, jsonData.length); i++) {
+          const row = jsonData[i];
+          if (!row) continue;
+          
+          // Look for header row with "Datum", "Gassoort", etc.
+          const rowStr = row.map(cell => String(cell || "").toLowerCase()).join("|");
+          if (rowStr.includes("datum") && rowStr.includes("gassoort")) {
+            headerRowIndex = i;
+            // Map column names to indices
+            row.forEach((cell, idx) => {
+              const cellStr = String(cell || "").toLowerCase().trim();
+              if (cellStr.includes("datum")) columnMap.date = idx;
+              if (cellStr.includes("gassoort")) columnMap.gasType = idx;
+              if (cellStr.includes("type vulling") || cellStr.includes("vulling type")) columnMap.size = idx;
+              if (cellStr === "aantal") columnMap.count = idx;
+              if (cellStr === "m/t") columnMap.grade = idx;
+              if (cellStr.includes("vulling tbv") || cellStr.includes("tbv")) columnMap.customer = idx;
+              if (cellStr.includes("opmerkingen") || cellStr.includes("opmerking")) columnMap.notes = idx;
+            });
+            break;
+          }
+        }
+        
+        // Fallback to fixed indices if header not found
+        if (headerRowIndex === -1) {
+          columnMap = { date: 0, gasType: 1, size: 2, count: 3, grade: 4, customer: 5, notes: 6 };
+        }
+        
+        console.log("Column mapping:", columnMap, "Header row:", headerRowIndex);
+        
         // Find data start (skip header rows)
         const orders: ParsedCylinderOrder[] = [];
+        const startRow = headerRowIndex > -1 ? headerRowIndex + 1 : 0;
         
-        for (let i = 0; i < jsonData.length; i++) {
+        for (let i = startRow; i < jsonData.length; i++) {
           const row = jsonData[i];
           if (!row || row.length < 5) continue;
           
           // Check if first column is a date
-          const dateValue = parseExcelDate(row[0]);
+          const dateValue = parseExcelDate(row[columnMap.date ?? 0]);
           if (!dateValue || dateValue.getFullYear() < 2020) continue;
           
-          const gasType = String(row[1] || "").trim();
-          const sizeStr = String(row[2] || "").trim();
-          const count = parseInt(String(row[3] || "0"));
-          const gradeCode = String(row[4] || "T").toUpperCase();
-          const customer = String(row[5] || "").trim();
-          const notes = String(row[6] || "").trim();
+          const gasType = String(row[columnMap.gasType ?? 1] || "").trim();
+          const sizeStr = String(row[columnMap.size ?? 2] || "").trim();
+          const count = parseInt(String(row[columnMap.count ?? 3] || "0"));
+          const gradeCode = String(row[columnMap.grade ?? 4] || "T").toUpperCase();
+          const customer = String(row[columnMap.customer ?? 5] || "").trim();
+          const notes = String(row[columnMap.notes ?? 6] || "").trim();
           
           if (!gasType || count <= 0) continue;
           
