@@ -14,8 +14,10 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  Loader2
+  Loader2,
+  Upload
 } from "lucide-react";
+import { ExcelImportDialog } from "./ExcelImportDialog";
 import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -90,6 +92,7 @@ export function ProductionReports() {
   const [dryIceOrders, setDryIceOrders] = useState<DryIceOrder[]>([]);
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchGasTypes();
@@ -316,61 +319,73 @@ export function ProductionReports() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPresetRange("week")}>
-                Deze week
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setPresetRange("month")}>
-                Deze maand
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setPresetRange("last-month")}>
-                Vorige maand
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setPresetRange("quarter")}>
-                Laatste 3 maanden
-              </Button>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setPresetRange("week")}>
+                  Deze week
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setPresetRange("month")}>
+                  Deze maand
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setPresetRange("last-month")}>
+                  Vorige maand
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setPresetRange("quarter")}>
+                  Laatste 3 maanden
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      {format(dateRange.from, "d MMM", { locale: nl })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateRange.from}
+                      onSelect={(date) => date && setDateRange(prev => ({ ...prev, from: date }))}
+                      locale={nl}
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <span className="text-muted-foreground">t/m</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      {format(dateRange.to, "d MMM", { locale: nl })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateRange.to}
+                      onSelect={(date) => date && setDateRange(prev => ({ ...prev, to: date }))}
+                      locale={nl}
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <CalendarIcon className="h-4 w-4 mr-2" />
-                    {format(dateRange.from, "d MMM", { locale: nl })}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dateRange.from}
-                    onSelect={(date) => date && setDateRange(prev => ({ ...prev, from: date }))}
-                    locale={nl}
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-              <span className="text-muted-foreground">t/m</span>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <CalendarIcon className="h-4 w-4 mr-2" />
-                    {format(dateRange.to, "d MMM", { locale: nl })}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dateRange.to}
-                    onSelect={(date) => date && setDateRange(prev => ({ ...prev, to: date }))}
-                    locale={nl}
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+            <Button onClick={() => setImportDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+              <Upload className="h-4 w-4 mr-2" />
+              Excel importeren
+            </Button>
           </div>
         </CardContent>
       </Card>
+
+      <ExcelImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImported={fetchReportData}
+      />
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
