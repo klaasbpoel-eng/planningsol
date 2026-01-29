@@ -1,0 +1,457 @@
+import { useState, useCallback } from "react";
+import * as XLSX from "xlsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { format } from "date-fns";
+
+interface ExcelImportDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onImported: () => void;
+}
+
+interface ParsedCylinderOrder {
+  date: Date;
+  gasType: string;
+  cylinderSize: string;
+  count: number;
+  grade: "medical" | "technical";
+  customer: string;
+  notes: string;
+  pressure: number;
+}
+
+interface ImportStats {
+  total: number;
+  imported: number;
+  skipped: number;
+  errors: string[];
+}
+
+export function ExcelImportDialog({
+  open,
+  onOpenChange,
+  onImported,
+}: ExcelImportDialogProps) {
+  const [file, setFile] = useState<File | null>(null);
+  const [parsedData, setParsedData] = useState<ParsedCylinderOrder[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [stats, setStats] = useState<ImportStats | null>(null);
+  const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
+  const [step, setStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
+
+  // Gas type mapping from Excel names to database enum
+  const mapGasTypeToEnum = (gasName: string): "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other" => {
+    const name = gasName.toLowerCase();
+    if (name.includes("zuurstof") || name.includes("o2")) return "oxygen";
+    if (name.includes("stikstof") || name.includes("n2")) return "nitrogen";
+    if (name.includes("argon")) return "argon";
+    if (name.includes("koolzuur") || name.includes("co2")) return "co2";
+    if (name.includes("acetyleen")) return "acetylene";
+    if (name.includes("helium")) return "helium";
+    return "other";
+  };
+
+  // Parse cylinder size from Excel format
+  const parseCylinderSize = (sizeStr: string): { size: string; pressure: number } => {
+    const str = sizeStr.toLowerCase();
+    let pressure = 200;
+    
+    if (str.includes("300 bar")) pressure = 300;
+    
+    // Extract size patterns
+    if (str.includes("dewar")) return { size: "Dewar 240L", pressure };
+    if (str.includes("pp 16x50")) return { size: "PP 16 X 50L", pressure };
+    if (str.includes("pp 16x40")) return { size: "PP 16 X 40L", pressure };
+    if (str.includes("pp 12x50")) return { size: "PP 12 X 50L", pressure };
+    if (str.includes("pp 12x40")) return { size: "PP 12 X 40L", pressure };
+    
+    // Single cylinder sizes
+    const sizeMatch = str.match(/(\d+)\s*l/i);
+    if (sizeMatch) {
+      const liters = parseInt(sizeMatch[1]);
+      if (liters <= 2) return { size: "2L", pressure };
+      if (liters <= 4) return { size: "4L", pressure };
+      if (liters <= 5) return { size: "5L", pressure };
+      if (liters <= 10) return { size: "10L", pressure };
+      if (liters <= 13) return { size: "10L", pressure }; // 13L maps to 10L
+      if (liters <= 20) return { size: "20L", pressure };
+      if (liters <= 30) return { size: "30L", pressure };
+      if (liters <= 40) return { size: "40L", pressure };
+      return { size: "50L", pressure };
+    }
+    
+    return { size: "50L", pressure };
+  };
+
+  // Parse Excel date
+  const parseExcelDate = (value: unknown): Date | null => {
+    if (!value) return null;
+    
+    // Excel serial date number
+    if (typeof value === "number") {
+      const excelEpoch = new Date(1899, 11, 30);
+      const date = new Date(excelEpoch.getTime() + value * 86400000);
+      return date;
+    }
+    
+    // String date formats
+    if (typeof value === "string") {
+      // Try parsing M/D/YY format (e.g., "1/2/25")
+      const parts = value.split("/");
+      if (parts.length === 3) {
+        const month = parseInt(parts[0]) - 1;
+        const day = parseInt(parts[1]);
+        let year = parseInt(parts[2]);
+        if (year < 100) year += 2000;
+        return new Date(year, month, day);
+      }
+      
+      // Try standard date parsing
+      const parsed = new Date(value);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+    
+    return null;
+  };
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+    
+    setFile(selectedFile);
+    
+    // Get current user profile
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+      
+      if (profile) {
+        setCurrentProfileId(profile.id);
+      }
+    }
+    
+    // Parse Excel file
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        
+        // Get first sheet (Cilinder Vullingen)
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        
+        // Convert to JSON
+        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+        
+        // Find data start (skip header rows)
+        const orders: ParsedCylinderOrder[] = [];
+        
+        for (let i = 0; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          if (!row || row.length < 5) continue;
+          
+          // Check if first column is a date
+          const dateValue = parseExcelDate(row[0]);
+          if (!dateValue || dateValue.getFullYear() < 2020) continue;
+          
+          const gasType = String(row[1] || "").trim();
+          const sizeStr = String(row[2] || "").trim();
+          const count = parseInt(String(row[3] || "0"));
+          const gradeCode = String(row[4] || "T").toUpperCase();
+          const customer = String(row[5] || "").trim();
+          const notes = String(row[6] || "").trim();
+          
+          if (!gasType || count <= 0) continue;
+          
+          const { size, pressure } = parseCylinderSize(sizeStr);
+          
+          orders.push({
+            date: dateValue,
+            gasType,
+            cylinderSize: size,
+            count,
+            grade: gradeCode === "M" ? "medical" : "technical",
+            customer: customer || "Onbekend",
+            notes,
+            pressure,
+          });
+        }
+        
+        setParsedData(orders);
+        setStep("preview");
+        toast.success(`${orders.length} orders gevonden in Excel bestand`);
+      } catch (error) {
+        console.error("Error parsing Excel:", error);
+        toast.error("Fout bij het lezen van het Excel bestand");
+      }
+    };
+    
+    reader.readAsArrayBuffer(selectedFile);
+  }, []);
+
+  const generateOrderNumber = (index: number) => {
+    const date = format(new Date(), "yyyyMMdd");
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
+    return `GC-IMP-${date}-${index.toString().padStart(4, "0")}-${random}`;
+  };
+
+  const handleImport = async () => {
+    if (!currentProfileId || parsedData.length === 0) {
+      toast.error("Geen data om te importeren");
+      return;
+    }
+    
+    setImporting(true);
+    setStep("importing");
+    setProgress(0);
+    
+    const stats: ImportStats = {
+      total: parsedData.length,
+      imported: 0,
+      skipped: 0,
+      errors: [],
+    };
+    
+    // Process in batches of 50
+    const batchSize = 50;
+    const batches = Math.ceil(parsedData.length / batchSize);
+    
+    for (let batchIndex = 0; batchIndex < batches; batchIndex++) {
+      const start = batchIndex * batchSize;
+      const end = Math.min(start + batchSize, parsedData.length);
+      const batch = parsedData.slice(start, end);
+      
+      const insertData = batch.map((order, idx) => ({
+        order_number: generateOrderNumber(start + idx),
+        customer_name: order.customer,
+        gas_type: mapGasTypeToEnum(order.gasType),
+        gas_grade: order.grade,
+        cylinder_count: order.count,
+        cylinder_size: order.cylinderSize,
+        pressure: order.pressure,
+        scheduled_date: format(order.date, "yyyy-MM-dd"),
+        notes: `Gastype: ${order.gasType}${order.notes ? `\n${order.notes}` : ""}`,
+        created_by: currentProfileId,
+        status: "completed" as const,
+      }));
+      
+      const { error } = await supabase
+        .from("gas_cylinder_orders")
+        .insert(insertData);
+      
+      if (error) {
+        console.error("Batch insert error:", error);
+        stats.errors.push(`Batch ${batchIndex + 1}: ${error.message}`);
+        stats.skipped += batch.length;
+      } else {
+        stats.imported += batch.length;
+      }
+      
+      setProgress(Math.round(((batchIndex + 1) / batches) * 100));
+    }
+    
+    setStats(stats);
+    setImporting(false);
+    setStep("done");
+    
+    if (stats.imported > 0) {
+      toast.success(`${stats.imported} orders succesvol geïmporteerd`);
+      onImported();
+    }
+  };
+
+  const handleClose = () => {
+    setFile(null);
+    setParsedData([]);
+    setProgress(0);
+    setStats(null);
+    setStep("upload");
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-500/10">
+              <FileSpreadsheet className="h-5 w-5 text-blue-500" />
+            </div>
+            <div className="flex-1">
+              <DialogTitle className="text-lg">Excel Import</DialogTitle>
+              <DialogDescription>
+                Importeer productiedata vanuit een Excel bestand
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="py-4">
+          {step === "upload" && (
+            <div className="border-2 border-dashed rounded-lg p-8 text-center">
+              <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
+              <p className="text-sm text-muted-foreground mb-4">
+                Sleep een Excel bestand hierheen of klik om te selecteren
+              </p>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileSelect}
+                className="hidden"
+                id="excel-upload"
+              />
+              <label htmlFor="excel-upload">
+                <Button variant="outline" asChild>
+                  <span>Bestand selecteren</span>
+                </Button>
+              </label>
+            </div>
+          )}
+
+          {step === "preview" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{file?.name}</span>
+                </div>
+                <Badge variant="secondary">{parsedData.length} orders</Badge>
+              </div>
+              
+              <ScrollArea className="h-[300px] rounded-md border">
+                <div className="p-4">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2">Datum</th>
+                        <th className="text-left py-2">Gastype</th>
+                        <th className="text-left py-2">Grootte</th>
+                        <th className="text-right py-2">Aantal</th>
+                        <th className="text-left py-2">Klant</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedData.slice(0, 100).map((order, idx) => (
+                        <tr key={idx} className="border-b border-muted">
+                          <td className="py-1.5">{format(order.date, "dd-MM-yyyy")}</td>
+                          <td className="py-1.5">{order.gasType}</td>
+                          <td className="py-1.5">{order.cylinderSize}</td>
+                          <td className="py-1.5 text-right">{order.count}</td>
+                          <td className="py-1.5">{order.customer}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {parsedData.length > 100 && (
+                    <p className="text-center text-sm text-muted-foreground mt-4">
+                      ... en {parsedData.length - 100} meer orders
+                    </p>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {step === "importing" && (
+            <div className="space-y-4 py-8">
+              <div className="flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+              <p className="text-center text-sm text-muted-foreground">
+                Bezig met importeren...
+              </p>
+              <Progress value={progress} className="w-full" />
+              <p className="text-center text-sm font-medium">{progress}%</p>
+            </div>
+          )}
+
+          {step === "done" && stats && (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center justify-center">
+                {stats.errors.length === 0 ? (
+                  <CheckCircle2 className="h-12 w-12 text-green-500" />
+                ) : (
+                  <AlertCircle className="h-12 w-12 text-yellow-500" />
+                )}
+              </div>
+              
+              <div className="text-center">
+                <h3 className="font-semibold text-lg">Import voltooid</h3>
+                <p className="text-sm text-muted-foreground">
+                  {stats.imported} van {stats.total} orders geïmporteerd
+                </p>
+              </div>
+              
+              <div className="flex justify-center gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{stats.imported}</div>
+                  <div className="text-xs text-muted-foreground">Geïmporteerd</div>
+                </div>
+                {stats.skipped > 0 && (
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-yellow-600">{stats.skipped}</div>
+                    <div className="text-xs text-muted-foreground">Overgeslagen</div>
+                  </div>
+                )}
+              </div>
+              
+              {stats.errors.length > 0 && (
+                <ScrollArea className="h-[100px] rounded-md border p-2">
+                  {stats.errors.map((error, idx) => (
+                    <p key={idx} className="text-xs text-destructive">{error}</p>
+                  ))}
+                </ScrollArea>
+              )}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          {step === "upload" && (
+            <Button variant="outline" onClick={handleClose}>
+              Annuleren
+            </Button>
+          )}
+          
+          {step === "preview" && (
+            <>
+              <Button variant="outline" onClick={handleClose}>
+                Annuleren
+              </Button>
+              <Button onClick={handleImport} disabled={parsedData.length === 0}>
+                <Upload className="h-4 w-4 mr-2" />
+                {parsedData.length} orders importeren
+              </Button>
+            </>
+          )}
+          
+          {step === "done" && (
+            <Button onClick={handleClose}>
+              Sluiten
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
