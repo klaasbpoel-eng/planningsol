@@ -222,7 +222,8 @@ export function GasCylinderPlanning() {
     setDeletingAll(true);
     
     try {
-      const BATCH_SIZE = 1000;
+      // Kleinere batch size om URL lengte limiet te voorkomen
+      const BATCH_SIZE = 50;
       let totalDeleted = 0;
       let hasMore = true;
       
