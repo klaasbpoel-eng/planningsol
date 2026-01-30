@@ -584,13 +584,41 @@ export function YearComparisonReport() {
 
                           return (
                             <>
-                              {categorizedGasTypes.map((category, idx) => (
-                                category.gasTypes.length > 0 && (
+                              {categorizedGasTypes.map((category, idx) => {
+                                if (category.gasTypes.length === 0) return null;
+                                const categoryIds = category.gasTypes.map(g => g.id);
+                                const allCategorySelected = categoryIds.every(id => selectedGasTypes.includes(id));
+                                const someCategorySelected = categoryIds.some(id => selectedGasTypes.includes(id));
+                                
+                                return (
                                   <div key={category.name}>
                                     {idx > 0 && <CommandSeparator />}
-                                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                                    <CommandItem
+                                      onSelect={() => {
+                                        if (allCategorySelected) {
+                                          // Deselect all in this category
+                                          setSelectedGasTypes(selectedGasTypes.filter(id => !categoryIds.includes(id)));
+                                        } else {
+                                          // Select all in this category
+                                          const newSelection = [...selectedGasTypes];
+                                          categoryIds.forEach(id => {
+                                            if (!newSelection.includes(id)) {
+                                              newSelection.push(id);
+                                            }
+                                          });
+                                          setSelectedGasTypes(newSelection);
+                                        }
+                                      }}
+                                      className="text-xs font-semibold text-muted-foreground"
+                                    >
+                                      <Checkbox
+                                        checked={allCategorySelected}
+                                        className="mr-2"
+                                        // Show indeterminate state when some but not all are selected
+                                        data-state={someCategorySelected && !allCategorySelected ? "indeterminate" : allCategorySelected ? "checked" : "unchecked"}
+                                      />
                                       {category.name}
-                                    </div>
+                                    </CommandItem>
                                     {category.gasTypes.map((gasType) => (
                                       <CommandItem
                                         key={gasType.id}
@@ -602,6 +630,7 @@ export function YearComparisonReport() {
                                             setSelectedGasTypes([...selectedGasTypes, gasType.id]);
                                           }
                                         }}
+                                        className="pl-6"
                                       >
                                         <Checkbox
                                           checked={selectedGasTypes.includes(gasType.id)}
@@ -615,39 +644,66 @@ export function YearComparisonReport() {
                                       </CommandItem>
                                     ))}
                                   </div>
-                                )
-                              ))}
-                              {uncategorized.length > 0 && (
-                                <div>
-                                  <CommandSeparator />
-                                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                                    Overige
-                                  </div>
-                                  {uncategorized.map((gasType) => (
+                                );
+                              })}
+                              {uncategorized.length > 0 && (() => {
+                                const uncategorizedIds = uncategorized.map(g => g.id);
+                                const allUncategorizedSelected = uncategorizedIds.every(id => selectedGasTypes.includes(id));
+                                const someUncategorizedSelected = uncategorizedIds.some(id => selectedGasTypes.includes(id));
+                                
+                                return (
+                                  <div>
+                                    <CommandSeparator />
                                     <CommandItem
-                                      key={gasType.id}
-                                      value={gasType.name}
                                       onSelect={() => {
-                                        if (selectedGasTypes.includes(gasType.id)) {
-                                          setSelectedGasTypes(selectedGasTypes.filter(id => id !== gasType.id));
+                                        if (allUncategorizedSelected) {
+                                          setSelectedGasTypes(selectedGasTypes.filter(id => !uncategorizedIds.includes(id)));
                                         } else {
-                                          setSelectedGasTypes([...selectedGasTypes, gasType.id]);
+                                          const newSelection = [...selectedGasTypes];
+                                          uncategorizedIds.forEach(id => {
+                                            if (!newSelection.includes(id)) {
+                                              newSelection.push(id);
+                                            }
+                                          });
+                                          setSelectedGasTypes(newSelection);
                                         }
                                       }}
+                                      className="text-xs font-semibold text-muted-foreground"
                                     >
                                       <Checkbox
-                                        checked={selectedGasTypes.includes(gasType.id)}
+                                        checked={allUncategorizedSelected}
                                         className="mr-2"
+                                        data-state={someUncategorizedSelected && !allUncategorizedSelected ? "indeterminate" : allUncategorizedSelected ? "checked" : "unchecked"}
                                       />
-                                      <div
-                                        className="w-2.5 h-2.5 rounded-full mr-2"
-                                        style={{ backgroundColor: gasType.color }}
-                                      />
-                                      <span>{gasType.name}</span>
+                                      Overige
                                     </CommandItem>
-                                  ))}
-                                </div>
-                              )}
+                                    {uncategorized.map((gasType) => (
+                                      <CommandItem
+                                        key={gasType.id}
+                                        value={gasType.name}
+                                        onSelect={() => {
+                                          if (selectedGasTypes.includes(gasType.id)) {
+                                            setSelectedGasTypes(selectedGasTypes.filter(id => id !== gasType.id));
+                                          } else {
+                                            setSelectedGasTypes([...selectedGasTypes, gasType.id]);
+                                          }
+                                        }}
+                                        className="pl-6"
+                                      >
+                                        <Checkbox
+                                          checked={selectedGasTypes.includes(gasType.id)}
+                                          className="mr-2"
+                                        />
+                                        <div
+                                          className="w-2.5 h-2.5 rounded-full mr-2"
+                                          style={{ backgroundColor: gasType.color }}
+                                        />
+                                        <span>{gasType.name}</span>
+                                      </CommandItem>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
                             </>
                           );
                         })()}
