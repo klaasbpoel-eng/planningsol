@@ -54,6 +54,7 @@ interface GasCylinderOrder {
   order_number: string;
   customer_name: string;
   gas_type: string;
+  gas_type_id: string | null;
   gas_grade: string;
   cylinder_count: number;
   cylinder_size: string;
@@ -61,6 +62,17 @@ interface GasCylinderOrder {
   status: string;
   notes: string | null;
   pressure: number;
+  gas_type_ref?: {
+    id: string;
+    name: string;
+    color: string;
+  } | null;
+}
+
+interface GasType {
+  id: string;
+  name: string;
+  color: string;
 }
 
 interface GasCylinderOrderDialogProps {
@@ -87,18 +99,45 @@ export function GasCylinderOrderDialog({
   const [status, setStatus] = useState<string>("");
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>();
   const [cylinderCount, setCylinderCount] = useState<string>("");
-  const [gasType, setGasType] = useState<string>("");
+  const [gasTypeId, setGasTypeId] = useState<string>("");
   const [gasGrade, setGasGrade] = useState<string>("");
   const [cylinderSize, setCylinderSize] = useState<string>("");
   const [pressure, setPressure] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+  const [gasTypes, setGasTypes] = useState<GasType[]>([]);
+  const [cylinderSizes, setCylinderSizes] = useState<Array<{ id: string; name: string }>>([]);
+
+  useEffect(() => {
+    const fetchGasTypes = async () => {
+      const { data } = await supabase
+        .from("gas_types")
+        .select("id, name, color")
+        .eq("is_active", true)
+        .order("name");
+      if (data) setGasTypes(data);
+    };
+    
+    const fetchCylinderSizes = async () => {
+      const { data } = await supabase
+        .from("cylinder_sizes")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("capacity_liters", { ascending: true });
+      if (data) setCylinderSizes(data);
+    };
+    
+    if (open) {
+      fetchGasTypes();
+      fetchCylinderSizes();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (order && isEditing) {
       setStatus(order.status);
       setScheduledDate(parseISO(order.scheduled_date));
       setCylinderCount(order.cylinder_count.toString());
-      setGasType(order.gas_type);
+      setGasTypeId(order.gas_type_id || "");
       setGasGrade(order.gas_grade);
       setCylinderSize(order.cylinder_size);
       setPressure(order.pressure.toString());
@@ -111,7 +150,7 @@ export function GasCylinderOrderDialog({
       setStatus(order.status);
       setScheduledDate(parseISO(order.scheduled_date));
       setCylinderCount(order.cylinder_count.toString());
-      setGasType(order.gas_type);
+      setGasTypeId(order.gas_type_id || "");
       setGasGrade(order.gas_grade);
       setCylinderSize(order.cylinder_size);
       setPressure(order.pressure.toString());
@@ -122,6 +161,28 @@ export function GasCylinderOrderDialog({
 
   const cancelEditing = () => {
     setIsEditing(false);
+  };
+
+  // Map gas type name to enum value
+  const mapGasTypeToEnum = (typeName: string): "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other" => {
+    const mapping: Record<string, "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other"> = {
+      "CO2": "co2",
+      "co2": "co2",
+      "Stikstof": "nitrogen",
+      "stikstof": "nitrogen",
+      "nitrogen": "nitrogen",
+      "Argon": "argon",
+      "argon": "argon",
+      "Acetyleen": "acetylene",
+      "acetyleen": "acetylene",
+      "acetylene": "acetylene",
+      "Zuurstof": "oxygen",
+      "zuurstof": "oxygen",
+      "oxygen": "oxygen",
+      "Helium": "helium",
+      "helium": "helium",
+    };
+    return mapping[typeName] || "other";
   };
 
   const handleSave = async () => {
@@ -142,13 +203,18 @@ export function GasCylinderOrderDialog({
     setSaving(true);
 
     try {
+      // Get the selected gas type to map to enum
+      const selectedGasType = gasTypes.find(t => t.id === gasTypeId);
+      const mappedGasType = selectedGasType ? mapGasTypeToEnum(selectedGasType.name) : order.gas_type;
+      
       const { error } = await supabase
         .from("gas_cylinder_orders")
         .update({
           status: status as "pending" | "in_progress" | "completed" | "cancelled",
           scheduled_date: scheduledDate ? format(scheduledDate, "yyyy-MM-dd") : order.scheduled_date,
           cylinder_count: count,
-          gas_type: gasType as "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other",
+          gas_type: mappedGasType as "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other",
+          gas_type_id: gasTypeId || null,
           gas_grade: gasGrade as "medical" | "technical",
           cylinder_size: cylinderSize,
           pressure: pressureValue,
@@ -236,16 +302,43 @@ export function GasCylinderOrderDialog({
     other: "Overig",
   };
 
-  const getDisplayGasType = (gasTypeEnum: string, notes: string | null) => {
-    // First check if the actual gas type name is stored in notes (format: "Gastype: Name")
-    if (notes) {
-      const gasTypeMatch = notes.match(/^Gastype:\s*(.+?)(?:\n|$)/i);
+  const getDisplayGasType = (orderData: GasCylinderOrder) => {
+    // First priority: use gas_type_ref from joined data
+    if (orderData.gas_type_ref?.name) {
+      return orderData.gas_type_ref.name;
+    }
+    
+    // Fallback: find matching gas type from loaded types
+    if (orderData.gas_type_id) {
+      const matchingType = gasTypes.find(gt => gt.id === orderData.gas_type_id);
+      if (matchingType) {
+        return matchingType.name;
+      }
+    }
+    
+    // Legacy fallback: check notes for "Gastype: Name" format
+    if (orderData.notes) {
+      const gasTypeMatch = orderData.notes.match(/^Gastype:\s*(.+?)(?:\n|$)/i);
       if (gasTypeMatch) {
         return gasTypeMatch[1].trim();
       }
     }
-    // Fallback to enum labels
-    return gasTypeLabels[gasTypeEnum] || gasTypeEnum;
+    
+    // Final fallback to enum labels
+    return gasTypeLabels[orderData.gas_type] || orderData.gas_type;
+  };
+
+  const getGasTypeColor = (orderData: GasCylinderOrder): string => {
+    if (orderData.gas_type_ref?.color) {
+      return orderData.gas_type_ref.color;
+    }
+    if (orderData.gas_type_id) {
+      const matchingType = gasTypes.find(gt => gt.id === orderData.gas_type_id);
+      if (matchingType) {
+        return matchingType.color;
+      }
+    }
+    return "#6b7280";
   };
 
   const gasGradeLabels: Record<string, string> = {
@@ -323,13 +416,21 @@ export function GasCylinderOrderDialog({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Gastype</Label>
-                    <Select value={gasType} onValueChange={setGasType}>
+                    <Select value={gasTypeId} onValueChange={setGasTypeId}>
                       <SelectTrigger className="bg-background">
-                        <SelectValue />
+                        <SelectValue placeholder="Selecteer gastype" />
                       </SelectTrigger>
                       <SelectContent className="bg-background border shadow-lg z-50">
-                        {Object.entries(gasTypeLabels).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>{label}</SelectItem>
+                        {gasTypes.map((type) => (
+                          <SelectItem key={type.id} value={type.id}>
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-2 h-2 rounded-full flex-shrink-0" 
+                                style={{ backgroundColor: type.color }} 
+                              />
+                              {type.name}
+                            </div>
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -437,10 +538,13 @@ export function GasCylinderOrderDialog({
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                      <Cylinder className="h-5 w-5 text-orange-500" />
+                      <div 
+                        className="w-3 h-3 rounded-full flex-shrink-0" 
+                        style={{ backgroundColor: getGasTypeColor(order) }} 
+                      />
                       <div>
                         <p className="text-xs text-muted-foreground">Gastype</p>
-                        <p className="font-medium">{getDisplayGasType(order.gas_type, order.notes)}</p>
+                        <p className="font-medium">{getDisplayGasType(order)}</p>
                       </div>
                     </div>
 
