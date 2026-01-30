@@ -20,6 +20,7 @@ import {
   AreaChart,
   Area,
   ReferenceLine,
+  Cell,
 } from "recharts";
 
 interface MonthlyData {
@@ -32,6 +33,24 @@ interface MonthlyData {
 }
 
 interface YearlyTotals {
+  currentYear: number;
+  previousYear: number;
+  change: number;
+  changePercent: number;
+}
+
+interface GasTypeMonthlyData {
+  gas_type_id: string;
+  gas_type_name: string;
+  gas_type_color: string;
+  months: number[];
+  total: number;
+}
+
+interface GasTypeYearComparison {
+  gas_type_id: string;
+  gas_type_name: string;
+  gas_type_color: string;
   currentYear: number;
   previousYear: number;
   change: number;
@@ -52,6 +71,7 @@ export function YearComparisonReport() {
   const [dryIceTotals, setDryIceTotals] = useState<YearlyTotals | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [highlightSignificant, setHighlightSignificant] = useState(false);
+  const [gasTypeComparison, setGasTypeComparison] = useState<GasTypeYearComparison[]>([]);
 
   const isSignificantGrowth = (percent: number) => percent > 10 || percent < -10;
 
@@ -78,11 +98,20 @@ export function YearComparisonReport() {
     const previousYear = selectedYear - 1;
 
     // Use database function to get aggregated monthly totals - bypasses the 1000 row limit
-    const [currentCylinderRes, previousCylinderRes, currentDryIceRes, previousDryIceRes] = await Promise.all([
+    const [
+      currentCylinderRes, 
+      previousCylinderRes, 
+      currentDryIceRes, 
+      previousDryIceRes,
+      currentGasTypeRes,
+      previousGasTypeRes
+    ] = await Promise.all([
       supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "cylinder" }),
       supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "cylinder" }),
       supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "dry_ice" }),
-      supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "dry_ice" })
+      supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "dry_ice" }),
+      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: currentYear }),
+      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: previousYear })
     ]);
 
     // Process cylinder data from aggregated results
@@ -101,7 +130,77 @@ export function YearComparisonReport() {
     setDryIceData(dryIceMonthly);
     setDryIceTotals(calculateTotals(dryIceMonthly));
 
+    // Process gas type comparison data
+    const gasTypeData = processGasTypeComparison(
+      currentGasTypeRes.data || [],
+      previousGasTypeRes.data || []
+    );
+    setGasTypeComparison(gasTypeData);
+
     setLoading(false);
+  };
+
+  const processGasTypeComparison = (
+    currentData: { gas_type_id: string; gas_type_name: string; gas_type_color: string; total_cylinders: number }[],
+    previousData: { gas_type_id: string; gas_type_name: string; gas_type_color: string; total_cylinders: number }[]
+  ): GasTypeYearComparison[] => {
+    // Group by gas type and sum totals
+    const currentMap = new Map<string, { name: string; color: string; total: number }>();
+    const previousMap = new Map<string, { name: string; color: string; total: number }>();
+
+    currentData.forEach(item => {
+      if (!item.gas_type_id) return;
+      const existing = currentMap.get(item.gas_type_id);
+      if (existing) {
+        existing.total += Number(item.total_cylinders) || 0;
+      } else {
+        currentMap.set(item.gas_type_id, {
+          name: item.gas_type_name || "Onbekend",
+          color: item.gas_type_color || "#94a3b8",
+          total: Number(item.total_cylinders) || 0
+        });
+      }
+    });
+
+    previousData.forEach(item => {
+      if (!item.gas_type_id) return;
+      const existing = previousMap.get(item.gas_type_id);
+      if (existing) {
+        existing.total += Number(item.total_cylinders) || 0;
+      } else {
+        previousMap.set(item.gas_type_id, {
+          name: item.gas_type_name || "Onbekend",
+          color: item.gas_type_color || "#94a3b8",
+          total: Number(item.total_cylinders) || 0
+        });
+      }
+    });
+
+    // Merge both years
+    const allGasTypeIds = new Set([...currentMap.keys(), ...previousMap.keys()]);
+    const result: GasTypeYearComparison[] = [];
+
+    allGasTypeIds.forEach(id => {
+      const current = currentMap.get(id);
+      const previous = previousMap.get(id);
+      const currentTotal = current?.total || 0;
+      const previousTotal = previous?.total || 0;
+      const change = currentTotal - previousTotal;
+      const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
+
+      result.push({
+        gas_type_id: id,
+        gas_type_name: current?.name || previous?.name || "Onbekend",
+        gas_type_color: current?.color || previous?.color || "#94a3b8",
+        currentYear: currentTotal,
+        previousYear: previousTotal,
+        change,
+        changePercent
+      });
+    });
+
+    // Sort by current year total descending
+    return result.sort((a, b) => b.currentYear - a.currentYear);
   };
 
   const processMonthlyDataFromAggregated = (
@@ -410,6 +509,103 @@ export function YearComparisonReport() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Gas Type Year Comparison */}
+      {gasTypeComparison.length > 0 && (
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Cylinder className="h-5 w-5 text-orange-500" />
+              Cilinders per gastype
+            </CardTitle>
+            <CardDescription>
+              Jaarvergelijking {selectedYear} vs {selectedYear - 1} per gastype
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Bar Chart */}
+              <div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart
+                    data={gasTypeComparison}
+                    layout="vertical"
+                    margin={{ left: 80 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis type="number" className="text-xs" />
+                    <YAxis 
+                      type="category" 
+                      dataKey="gas_type_name" 
+                      className="text-xs"
+                      width={75}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--background))',
+                        border: '1px solid hsl(var(--border))'
+                      }}
+                      formatter={(value: number, name: string) => [
+                        value.toLocaleString(),
+                        name === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()
+                      ]}
+                    />
+                    <Legend
+                      formatter={(value) => value === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()}
+                    />
+                    <Bar dataKey="previousYear" name="previousYear" fill="#94a3b8" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="currentYear" name="currentYear" radius={[0, 4, 4, 0]}>
+                      {gasTypeComparison.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.gas_type_color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Details Table */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-muted-foreground mb-3">
+                  Overzicht per gastype
+                </div>
+                <div className="space-y-2 max-h-[280px] overflow-y-auto">
+                  {gasTypeComparison.map((gasType) => (
+                    <div 
+                      key={gasType.gas_type_id}
+                      className="flex items-center justify-between p-3 rounded-lg border bg-card/50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: gasType.gas_type_color }}
+                        />
+                        <span className="font-medium">{gasType.gas_type_name}</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="text-right">
+                          <div className="font-medium">{gasType.currentYear.toLocaleString()}</div>
+                          <div className="text-xs text-muted-foreground">
+                            vs {gasType.previousYear.toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 min-w-[80px] justify-end">
+                          {getTrendIcon(gasType.changePercent)}
+                          <Badge 
+                            variant={gasType.changePercent >= 0 ? "default" : "destructive"}
+                            className="text-xs"
+                          >
+                            {gasType.changePercent >= 0 ? "+" : ""}{gasType.changePercent.toFixed(1)}%
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Monthly Comparison Charts */}
       <div className="grid grid-cols-1 gap-6">

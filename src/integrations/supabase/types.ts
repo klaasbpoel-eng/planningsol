@@ -1036,6 +1036,16 @@ export type Database = {
       }
     }
     Functions: {
+      get_monthly_cylinder_totals_by_gas_type: {
+        Args: { p_year: number }
+        Returns: {
+          gas_type_color: string
+          gas_type_id: string
+          gas_type_name: string
+          month: number
+          total_cylinders: number
+        }[]
+      }
       get_monthly_order_totals: {
         Args: { p_order_type: string; p_year: number }
         Returns: {
