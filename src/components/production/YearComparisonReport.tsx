@@ -558,29 +558,97 @@ export function YearComparisonReport() {
                           {selectedGasTypes.length === gasTypes.length ? "Deselecteer alles" : "Selecteer alles"}
                         </CommandItem>
                         <CommandSeparator />
-                        {gasTypes.map((gasType) => (
-                          <CommandItem
-                            key={gasType.id}
-                            value={gasType.name}
-                            onSelect={() => {
-                              if (selectedGasTypes.includes(gasType.id)) {
-                                setSelectedGasTypes(selectedGasTypes.filter(id => id !== gasType.id));
-                              } else {
-                                setSelectedGasTypes([...selectedGasTypes, gasType.id]);
-                              }
-                            }}
-                          >
-                            <Checkbox
-                              checked={selectedGasTypes.includes(gasType.id)}
-                              className="mr-2"
-                            />
-                            <div
-                              className="w-2.5 h-2.5 rounded-full mr-2"
-                              style={{ backgroundColor: gasType.color }}
-                            />
-                            <span>{gasType.name}</span>
-                          </CommandItem>
-                        ))}
+                        {/* Categorized gas types */}
+                        {(() => {
+                          // Define categories with gas type name patterns
+                          const categories = [
+                            { name: "Industriële gassen", patterns: ["CO2", "Argon 4.8", "Argon 5.0", "Zuurstof", "Stikstof 4.8", "Stikstof 5.0", "Lucht"] },
+                            { name: "Lasgassen (Weldmix)", patterns: ["Weldmix"] },
+                            { name: "Medische gassen", patterns: ["Alisol", "Med.Device"] },
+                            { name: "Speciale mengsels", patterns: ["Carbogeen", "EnerMix"] },
+                          ];
+
+                          // Group gas types by category
+                          const categorizedGasTypes = categories.map(category => ({
+                            ...category,
+                            gasTypes: gasTypes.filter(gt => 
+                              category.patterns.some(pattern => gt.name.includes(pattern))
+                            ),
+                          }));
+
+                          // Find uncategorized gas types
+                          const categorizedIds = categorizedGasTypes.flatMap(c => c.gasTypes.map(g => g.id));
+                          const uncategorized = gasTypes.filter(gt => !categorizedIds.includes(gt.id));
+
+                          return (
+                            <>
+                              {categorizedGasTypes.map((category, idx) => (
+                                category.gasTypes.length > 0 && (
+                                  <div key={category.name}>
+                                    {idx > 0 && <CommandSeparator />}
+                                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                                      {category.name}
+                                    </div>
+                                    {category.gasTypes.map((gasType) => (
+                                      <CommandItem
+                                        key={gasType.id}
+                                        value={gasType.name}
+                                        onSelect={() => {
+                                          if (selectedGasTypes.includes(gasType.id)) {
+                                            setSelectedGasTypes(selectedGasTypes.filter(id => id !== gasType.id));
+                                          } else {
+                                            setSelectedGasTypes([...selectedGasTypes, gasType.id]);
+                                          }
+                                        }}
+                                      >
+                                        <Checkbox
+                                          checked={selectedGasTypes.includes(gasType.id)}
+                                          className="mr-2"
+                                        />
+                                        <div
+                                          className="w-2.5 h-2.5 rounded-full mr-2"
+                                          style={{ backgroundColor: gasType.color }}
+                                        />
+                                        <span>{gasType.name}</span>
+                                      </CommandItem>
+                                    ))}
+                                  </div>
+                                )
+                              ))}
+                              {uncategorized.length > 0 && (
+                                <div>
+                                  <CommandSeparator />
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                                    Overige
+                                  </div>
+                                  {uncategorized.map((gasType) => (
+                                    <CommandItem
+                                      key={gasType.id}
+                                      value={gasType.name}
+                                      onSelect={() => {
+                                        if (selectedGasTypes.includes(gasType.id)) {
+                                          setSelectedGasTypes(selectedGasTypes.filter(id => id !== gasType.id));
+                                        } else {
+                                          setSelectedGasTypes([...selectedGasTypes, gasType.id]);
+                                        }
+                                      }}
+                                    >
+                                      <Checkbox
+                                        checked={selectedGasTypes.includes(gasType.id)}
+                                        className="mr-2"
+                                      />
+                                      <div
+                                        className="w-2.5 h-2.5 rounded-full mr-2"
+                                        style={{ backgroundColor: gasType.color }}
+                                      />
+                                      <span>{gasType.name}</span>
+                                    </CommandItem>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </CommandGroup>
                     </CommandList>
                   </Command>
