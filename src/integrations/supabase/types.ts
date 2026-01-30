@@ -399,6 +399,7 @@ export type Database = {
           cylinder_size: string
           gas_grade: Database["public"]["Enums"]["gas_grade"]
           gas_type: Database["public"]["Enums"]["gas_type"]
+          gas_type_id: string | null
           id: string
           is_recurring: boolean | null
           notes: string | null
@@ -420,6 +421,7 @@ export type Database = {
           cylinder_size?: string
           gas_grade?: Database["public"]["Enums"]["gas_grade"]
           gas_type?: Database["public"]["Enums"]["gas_type"]
+          gas_type_id?: string | null
           id?: string
           is_recurring?: boolean | null
           notes?: string | null
@@ -441,6 +443,7 @@ export type Database = {
           cylinder_size?: string
           gas_grade?: Database["public"]["Enums"]["gas_grade"]
           gas_type?: Database["public"]["Enums"]["gas_type"]
+          gas_type_id?: string | null
           id?: string
           is_recurring?: boolean | null
           notes?: string | null
@@ -486,6 +489,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gas_cylinder_orders_gas_type_id_fkey"
+            columns: ["gas_type_id"]
+            isOneToOne: false
+            referencedRelation: "gas_types"
             referencedColumns: ["id"]
           },
           {

@@ -43,7 +43,7 @@ export function CreateGasCylinderOrderDialog({
   const [saving, setSaving] = useState(false);
   const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
-  const [gasType, setGasType] = useState("");
+  const [gasTypeId, setGasTypeId] = useState("");
   const [gasGrade, setGasGrade] = useState<"medical" | "technical">("technical");
   const [cylinderCount, setCylinderCount] = useState("");
   const [cylinderSize, setCylinderSize] = useState("medium");
@@ -91,8 +91,8 @@ export function CreateGasCylinderOrderDialog({
       
       if (data) {
         setGasTypes(data);
-        if (data.length > 0 && !gasType) {
-          setGasType(data[0].name);
+        if (data.length > 0 && !gasTypeId) {
+          setGasTypeId(data[0].id);
         }
       }
     };
@@ -121,7 +121,7 @@ export function CreateGasCylinderOrderDialog({
   const resetForm = () => {
     setCustomerId("");
     setCustomerName("");
-    setGasType(gasTypes.length > 0 ? gasTypes[0].name : "");
+    setGasTypeId(gasTypes.length > 0 ? gasTypes[0].id : "");
     setGasGrade("technical");
     setCylinderCount("");
     setCylinderSize(cylinderSizes.length > 0 ? cylinderSizes[0].name : "");
@@ -140,6 +140,11 @@ export function CreateGasCylinderOrderDialog({
     const date = format(new Date(), "yyyyMMdd");
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
     return `GC-${date}-${random}`;
+  };
+
+  // Get selected gas type details
+  const getSelectedGasType = () => {
+    return gasTypes.find(t => t.id === gasTypeId);
   };
 
   // Map gas type names to enum values
@@ -179,13 +184,15 @@ export function CreateGasCylinderOrderDialog({
     setSaving(true);
 
     try {
-      const mappedGasType = mapGasTypeToEnum(gasType);
+      const selectedGasType = getSelectedGasType();
+      const mappedGasType = selectedGasType ? mapGasTypeToEnum(selectedGasType.name) : "other";
       
       const insertData = {
         order_number: generateOrderNumber(),
         customer_name: customerName.trim(),
         customer_id: customerId || null,
         gas_type: mappedGasType,
+        gas_type_id: gasTypeId || null,
         gas_grade: gasGrade,
         cylinder_count: count,
         cylinder_size: cylinderSize,
@@ -251,13 +258,13 @@ export function CreateGasCylinderOrderDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Gastype</Label>
-              <Select value={gasType} onValueChange={setGasType}>
+              <Select value={gasTypeId} onValueChange={setGasTypeId}>
                 <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Selecteer gastype" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
                   {gasTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.name}>
+                    <SelectItem key={type.id} value={type.id}>
                       <div className="flex items-center gap-2">
                         <div 
                           className="w-2 h-2 rounded-full flex-shrink-0" 
