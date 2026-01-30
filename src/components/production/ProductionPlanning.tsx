@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Snowflake, Cylinder, Package, TrendingUp, BarChart3 } from "lucide-react";
 import { DryIcePlanning } from "./DryIcePlanning";
 import { GasCylinderPlanning } from "./GasCylinderPlanning";
 import { ProductionReports } from "./ProductionReports";
+import { TopCustomersWidget } from "./TopCustomersWidget";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
@@ -67,7 +68,7 @@ export function ProductionPlanning() {
   return (
     <div className="space-y-6">
       {/* Quick stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="glass-card">
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
@@ -119,6 +120,9 @@ export function ProductionPlanning() {
             <p className="text-xs text-muted-foreground">Alle niveaus op peil</p>
           </CardContent>
         </Card>
+
+        {/* Top 5 Customers Widget */}
+        <TopCustomersWidget />
       </div>
 
       {/* Main content tabs */}
