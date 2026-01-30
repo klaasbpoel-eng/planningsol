@@ -49,6 +49,7 @@ interface GasCylinderOrder {
   order_number: string;
   customer_name: string;
   gas_type: string;
+  gas_type_id: string | null;
   gas_grade: string;
   cylinder_count: number;
   cylinder_size: string;
@@ -57,6 +58,11 @@ interface GasCylinderOrder {
   notes: string | null;
   created_at: string;
   pressure: number;
+  gas_type_ref?: {
+    id: string;
+    name: string;
+    color: string;
+  } | null;
 }
 
 type PressureFilter = "all" | "200" | "300";
@@ -160,7 +166,10 @@ export function GasCylinderPlanning() {
     
     const { data, error } = await supabase
       .from("gas_cylinder_orders")
-      .select("*")
+      .select(`
+        *,
+        gas_type_ref:gas_types(id, name, color)
+      `)
       .gte("scheduled_date", startDate)
       .lte("scheduled_date", endDate)
       .order("scheduled_date", { ascending: true });
@@ -169,7 +178,7 @@ export function GasCylinderPlanning() {
       console.error("Error fetching orders:", error);
       toast.error("Fout bij ophalen orders");
     } else {
-      setOrders(data || []);
+      setOrders((data as GasCylinderOrder[]) || []);
     }
     setLoading(false);
   };
@@ -243,34 +252,56 @@ export function GasCylinderPlanning() {
     other: "Overig",
   };
 
-  const getGasTypeLabel = (gasTypeEnum: string, notes: string | null) => {
-    // First check if the actual gas type name is stored in notes (format: "Gastype: Name")
-    if (notes) {
-      const gasTypeMatch = notes.match(/^Gastype:\s*(.+?)(?:\n|$)/i);
+  const getGasTypeLabel = (order: GasCylinderOrder) => {
+    // First priority: use gas_type_ref from the joined gas_types table
+    if (order.gas_type_ref?.name) {
+      return order.gas_type_ref.name;
+    }
+    
+    // Fallback: Try to find matching gas type from loaded gas types using gas_type_id
+    if (order.gas_type_id) {
+      const matchingGasType = gasTypes.find(gt => gt.id === order.gas_type_id);
+      if (matchingGasType) {
+        return matchingGasType.name;
+      }
+    }
+    
+    // Legacy fallback: check notes for "Gastype: Name" format (for old imported data)
+    if (order.notes) {
+      const gasTypeMatch = order.notes.match(/^Gastype:\s*(.+?)(?:\n|$)/i);
       if (gasTypeMatch) {
         return gasTypeMatch[1].trim();
       }
     }
     
-    // Try to find matching gas type name from loaded gas types
-    const matchingGasType = gasTypes.find(gt => {
-      const enumName = gasTypeEnum.toLowerCase();
-      const gtName = gt.name.toLowerCase();
-      return gtName === enumName || 
-             (enumName === "co2" && gtName.includes("co2")) ||
-             (enumName === "nitrogen" && gtName.includes("stikstof")) ||
-             (enumName === "argon" && gtName.includes("argon")) ||
-             (enumName === "oxygen" && gtName.includes("zuurstof")) ||
-             (enumName === "helium" && gtName.includes("helium")) ||
-             (enumName === "acetylene" && gtName.includes("acetyleen"));
-    });
-    
-    if (matchingGasType) {
-      return matchingGasType.name;
+    // Final fallback: use enum labels
+    const gasTypeLabels: Record<string, string> = {
+      co2: "CO₂",
+      nitrogen: "Stikstof (N₂)",
+      argon: "Argon",
+      acetylene: "Acetyleen",
+      oxygen: "Zuurstof",
+      helium: "Helium",
+      other: "Overig",
+    };
+    return gasTypeLabels[order.gas_type] || order.gas_type;
+  };
+
+  const getGasTypeColor = (order: GasCylinderOrder): string => {
+    // First priority: use gas_type_ref from the joined gas_types table
+    if (order.gas_type_ref?.color) {
+      return order.gas_type_ref.color;
     }
     
-    // Fallback to enum labels
-    return gasTypeLabels[gasTypeEnum] || gasTypeEnum;
+    // Fallback: Try to find matching gas type from loaded gas types using gas_type_id
+    if (order.gas_type_id) {
+      const matchingGasType = gasTypes.find(gt => gt.id === order.gas_type_id);
+      if (matchingGasType) {
+        return matchingGasType.color;
+      }
+    }
+    
+    return "#6b7280"; // default gray
   };
 
   const statusLabels: Record<string, string> = {
@@ -282,12 +313,12 @@ export function GasCylinderPlanning() {
 
   const filteredOrders = orders.filter(o => {
     const matchesPressure = pressureFilter === "all" || o.pressure === parseInt(pressureFilter);
-    // Match gas type filter by enum value or by checking if the gas type name matches
-    const matchesGasType = gasTypeFilter === "all" || o.gas_type === gasTypeFilter || (() => {
+    // Match gas type filter by gas_type_id or by checking if the gas type name matches
+    const matchesGasType = gasTypeFilter === "all" || o.gas_type_id === gasTypeFilter || (() => {
       const selectedGasType = gasTypes.find(gt => gt.id === gasTypeFilter);
       if (!selectedGasType) return false;
-      // Check if the order's gas_type enum matches the selected gas type name
-      const orderGasTypeName = getGasTypeLabel(o.gas_type, o.notes).toLowerCase();
+      // Check if the order's gas_type matches the selected gas type name
+      const orderGasTypeName = getGasTypeLabel(o).toLowerCase();
       return orderGasTypeName.includes(selectedGasType.name.toLowerCase()) || 
              selectedGasType.name.toLowerCase().includes(orderGasTypeName);
     })();
@@ -505,7 +536,15 @@ export function GasCylinderPlanning() {
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">{order.order_number}</TableCell>
                         <TableCell>{order.customer_name}</TableCell>
-                        <TableCell>{getGasTypeLabel(order.gas_type, order.notes)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-2 h-2 rounded-full flex-shrink-0" 
+                              style={{ backgroundColor: getGasTypeColor(order) }} 
+                            />
+                            {getGasTypeLabel(order)}
+                          </div>
+                        </TableCell>
                         <TableCell>{order.cylinder_count} st.</TableCell>
                         <TableCell>{order.pressure} bar</TableCell>
                         <TableCell>
@@ -573,11 +612,10 @@ export function GasCylinderPlanning() {
             <CardContent className="space-y-3">
               {gasTypes.length > 0 ? (
                 gasTypes.slice(0, 6).map((type) => {
-                  // Count orders with this gas type
-                  const typeOrders = orders.filter(order => {
-                    const orderGasType = getGasTypeLabel(order.gas_type, order.notes);
-                    return orderGasType === type.name;
-                  });
+                  // Count orders with this gas type using gas_type_id
+                  const typeOrders = orders.filter(order => 
+                    order.gas_type_id === type.id || order.gas_type_ref?.id === type.id
+                  );
                   const percentage = orders.length > 0 
                     ? Math.round((typeOrders.length / orders.length) * 100) 
                     : 0;
