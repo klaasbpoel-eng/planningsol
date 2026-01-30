@@ -1053,6 +1053,15 @@ export type Database = {
           total_value: number
         }[]
       }
+      get_yearly_totals_by_customer: {
+        Args: { p_year: number }
+        Returns: {
+          customer_id: string
+          customer_name: string
+          total_cylinders: number
+          total_dry_ice_kg: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -65,6 +65,19 @@ interface MonthlyGasTypeChartData {
   [key: string]: number | string; // Dynamic keys for each gas type
 }
 
+interface CustomerComparison {
+  customer_id: string | null;
+  customer_name: string;
+  currentCylinders: number;
+  previousCylinders: number;
+  cylinderChange: number;
+  cylinderChangePercent: number;
+  currentDryIce: number;
+  previousDryIce: number;
+  dryIceChange: number;
+  dryIceChangePercent: number;
+}
+
 const MONTH_NAMES = [
   "Jan", "Feb", "Mrt", "Apr", "Mei", "Jun",
   "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"
@@ -84,6 +97,8 @@ export function YearComparisonReport() {
   const [selectedGasTypes, setSelectedGasTypes] = useState<string[]>([]);
   const [monthlyGasTypeData, setMonthlyGasTypeData] = useState<{ current: MonthlyGasTypeChartData[]; previous: MonthlyGasTypeChartData[] }>({ current: [], previous: [] });
   const [gasTypeInfo, setGasTypeInfo] = useState<Map<string, { name: string; color: string }>>(new Map());
+  const [customerComparison, setCustomerComparison] = useState<CustomerComparison[]>([]);
+  const [customerSortBy, setCustomerSortBy] = useState<"cylinders" | "dryIce" | "total">("total");
 
   const isSignificantGrowth = (percent: number) => percent > 10 || percent < -10;
 
@@ -131,14 +146,18 @@ export function YearComparisonReport() {
       currentDryIceRes, 
       previousDryIceRes,
       currentGasTypeRes,
-      previousGasTypeRes
+      previousGasTypeRes,
+      currentCustomerRes,
+      previousCustomerRes
     ] = await Promise.all([
       supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "cylinder" }),
       supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "cylinder" }),
       supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "dry_ice" }),
       supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "dry_ice" }),
       supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: currentYear }),
-      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: previousYear })
+      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: previousYear }),
+      supabase.rpc("get_yearly_totals_by_customer", { p_year: currentYear }),
+      supabase.rpc("get_yearly_totals_by_customer", { p_year: previousYear })
     ]);
 
     // Process cylinder data from aggregated results
@@ -166,7 +185,84 @@ export function YearComparisonReport() {
     setMonthlyGasTypeData(monthlyData);
     setGasTypeInfo(typeInfo);
 
+    // Process customer comparison data
+    const customerData = processCustomerComparison(
+      currentCustomerRes.data || [],
+      previousCustomerRes.data || []
+    );
+    setCustomerComparison(customerData);
+
     setLoading(false);
+  };
+
+  const processCustomerComparison = (
+    currentData: { customer_id: string | null; customer_name: string; total_cylinders: number; total_dry_ice_kg: number }[],
+    previousData: { customer_id: string | null; customer_name: string; total_cylinders: number; total_dry_ice_kg: number }[]
+  ): CustomerComparison[] => {
+    // Create maps for quick lookup
+    const currentMap = new Map<string, { cylinders: number; dryIce: number }>();
+    const previousMap = new Map<string, { cylinders: number; dryIce: number }>();
+
+    currentData.forEach(item => {
+      const key = item.customer_id || item.customer_name;
+      currentMap.set(key, {
+        cylinders: Number(item.total_cylinders) || 0,
+        dryIce: Number(item.total_dry_ice_kg) || 0
+      });
+    });
+
+    previousData.forEach(item => {
+      const key = item.customer_id || item.customer_name;
+      previousMap.set(key, {
+        cylinders: Number(item.total_cylinders) || 0,
+        dryIce: Number(item.total_dry_ice_kg) || 0
+      });
+    });
+
+    // Get all unique customer keys
+    const allCustomers = new Map<string, string>();
+    currentData.forEach(item => {
+      const key = item.customer_id || item.customer_name;
+      allCustomers.set(key, item.customer_name);
+    });
+    previousData.forEach(item => {
+      const key = item.customer_id || item.customer_name;
+      if (!allCustomers.has(key)) {
+        allCustomers.set(key, item.customer_name);
+      }
+    });
+
+    const result: CustomerComparison[] = [];
+
+    allCustomers.forEach((name, key) => {
+      const current = currentMap.get(key) || { cylinders: 0, dryIce: 0 };
+      const previous = previousMap.get(key) || { cylinders: 0, dryIce: 0 };
+
+      const cylinderChange = current.cylinders - previous.cylinders;
+      const cylinderChangePercent = previous.cylinders > 0 
+        ? ((cylinderChange / previous.cylinders) * 100) 
+        : (current.cylinders > 0 ? 100 : 0);
+
+      const dryIceChange = current.dryIce - previous.dryIce;
+      const dryIceChangePercent = previous.dryIce > 0 
+        ? ((dryIceChange / previous.dryIce) * 100) 
+        : (current.dryIce > 0 ? 100 : 0);
+
+      result.push({
+        customer_id: key.includes('-') ? key : null,
+        customer_name: name,
+        currentCylinders: current.cylinders,
+        previousCylinders: previous.cylinders,
+        cylinderChange,
+        cylinderChangePercent,
+        currentDryIce: current.dryIce,
+        previousDryIce: previous.dryIce,
+        dryIceChange,
+        dryIceChangePercent
+      });
+    });
+
+    return result;
   };
 
   const processGasTypeData = (
@@ -1351,6 +1447,187 @@ export function YearComparisonReport() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Customer Comparison */}
+      {customerComparison.length > 0 && (
+        <Card className="glass-card">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Users className="h-5 w-5 text-purple-500" />
+                  Vergelijking per klant
+                </CardTitle>
+                <CardDescription>
+                  Productietotalen per klant — {selectedYear} vs {selectedYear - 1}
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm text-muted-foreground">Sorteer op:</Label>
+                <Select value={customerSortBy} onValueChange={(v) => setCustomerSortBy(v as "cylinders" | "dryIce" | "total")}>
+                  <SelectTrigger className="w-36">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="total">Totaal</SelectItem>
+                    <SelectItem value="cylinders">Cilinders</SelectItem>
+                    <SelectItem value="dryIce">Droogijs</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              // Sort customers based on selected criteria
+              const sortedCustomers = [...customerComparison].sort((a, b) => {
+                switch (customerSortBy) {
+                  case "cylinders":
+                    return b.currentCylinders - a.currentCylinders;
+                  case "dryIce":
+                    return b.currentDryIce - a.currentDryIce;
+                  case "total":
+                  default:
+                    return (b.currentCylinders + b.currentDryIce) - (a.currentCylinders + a.currentDryIce);
+                }
+              });
+
+              // Take top 15 for the chart
+              const topCustomers = sortedCustomers.slice(0, 15);
+
+              return (
+                <div className="space-y-6">
+                  {/* Customer Chart */}
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart 
+                      data={topCustomers} 
+                      layout="vertical" 
+                      margin={{ left: 120, right: 20 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis type="number" className="text-xs" />
+                      <YAxis 
+                        type="category" 
+                        dataKey="customer_name" 
+                        className="text-xs"
+                        width={115}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--background))',
+                          border: '1px solid hsl(var(--border))'
+                        }}
+                        formatter={(value: number, name: string) => {
+                          const label = name === "currentCylinders" ? `Cilinders ${selectedYear}` :
+                                        name === "previousCylinders" ? `Cilinders ${selectedYear - 1}` :
+                                        name === "currentDryIce" ? `Droogijs ${selectedYear} (kg)` :
+                                        `Droogijs ${selectedYear - 1} (kg)`;
+                          return [value.toLocaleString(), label];
+                        }}
+                      />
+                      <Legend 
+                        formatter={(value) => {
+                          if (value === "currentCylinders") return `Cilinders ${selectedYear}`;
+                          if (value === "previousCylinders") return `Cilinders ${selectedYear - 1}`;
+                          if (value === "currentDryIce") return `Droogijs ${selectedYear}`;
+                          if (value === "previousDryIce") return `Droogijs ${selectedYear - 1}`;
+                          return value;
+                        }}
+                      />
+                      {customerSortBy !== "dryIce" && (
+                        <>
+                          <Bar dataKey="previousCylinders" name="previousCylinders" fill="#94a3b8" radius={[0, 4, 4, 0]} />
+                          <Bar dataKey="currentCylinders" name="currentCylinders" fill="#f97316" radius={[0, 4, 4, 0]} />
+                        </>
+                      )}
+                      {customerSortBy !== "cylinders" && (
+                        <>
+                          <Bar dataKey="previousDryIce" name="previousDryIce" fill="#64748b" radius={[0, 4, 4, 0]} />
+                          <Bar dataKey="currentDryIce" name="currentDryIce" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+                        </>
+                      )}
+                    </BarChart>
+                  </ResponsiveContainer>
+
+                  {/* Customer Details Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-2 font-medium">Klant</th>
+                          <th className="text-right py-3 px-2 font-medium" colSpan={3}>Cilinders</th>
+                          <th className="text-right py-3 px-2 font-medium" colSpan={3}>Droogijs (kg)</th>
+                        </tr>
+                        <tr className="border-b text-muted-foreground">
+                          <th></th>
+                          <th className="text-right py-2 px-2 text-xs">{selectedYear}</th>
+                          <th className="text-right py-2 px-2 text-xs">{selectedYear - 1}</th>
+                          <th className="text-right py-2 px-2 text-xs">Δ%</th>
+                          <th className="text-right py-2 px-2 text-xs">{selectedYear}</th>
+                          <th className="text-right py-2 px-2 text-xs">{selectedYear - 1}</th>
+                          <th className="text-right py-2 px-2 text-xs">Δ%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedCustomers.map((customer) => {
+                          const cylinderSignificant = isSignificantGrowth(customer.cylinderChangePercent);
+                          const dryIceSignificant = isSignificantGrowth(customer.dryIceChangePercent);
+                          
+                          return (
+                            <tr 
+                              key={customer.customer_id || customer.customer_name} 
+                              className="border-b hover:bg-muted/50"
+                            >
+                              <td className="py-3 px-2 font-medium max-w-[200px] truncate">
+                                {customer.customer_name}
+                              </td>
+                              <td className="text-right py-3 px-2">
+                                {customer.currentCylinders.toLocaleString()}
+                              </td>
+                              <td className="text-right py-3 px-2 text-muted-foreground">
+                                {customer.previousCylinders.toLocaleString()}
+                              </td>
+                              <td className={`text-right py-3 px-2 ${getChangeColor(customer.cylinderChangePercent)}`}>
+                                {customer.cylinderChangePercent >= 0 ? "+" : ""}{customer.cylinderChangePercent.toFixed(1)}%
+                                {cylinderSignificant && (
+                                  <span className="ml-1">
+                                    {customer.cylinderChangePercent > 0 ? 
+                                      <TrendingUp className="h-3 w-3 inline" /> : 
+                                      <TrendingDown className="h-3 w-3 inline" />
+                                    }
+                                  </span>
+                                )}
+                              </td>
+                              <td className="text-right py-3 px-2">
+                                {customer.currentDryIce.toLocaleString()}
+                              </td>
+                              <td className="text-right py-3 px-2 text-muted-foreground">
+                                {customer.previousDryIce.toLocaleString()}
+                              </td>
+                              <td className={`text-right py-3 px-2 ${getChangeColor(customer.dryIceChangePercent)}`}>
+                                {customer.dryIceChangePercent >= 0 ? "+" : ""}{customer.dryIceChangePercent.toFixed(1)}%
+                                {dryIceSignificant && (
+                                  <span className="ml-1">
+                                    {customer.dryIceChangePercent > 0 ? 
+                                      <TrendingUp className="h-3 w-3 inline" /> : 
+                                      <TrendingDown className="h-3 w-3 inline" />
+                                    }
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
