@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GasTypeMultiSelect } from "./GasTypeMultiSelect";
+import { CustomerMultiSelect } from "./CustomerMultiSelect";
 import {
   BarChart,
   Bar,
@@ -100,6 +101,7 @@ export function YearComparisonReport() {
   const [gasTypeInfo, setGasTypeInfo] = useState<Map<string, { name: string; color: string }>>(new Map());
   const [customerComparison, setCustomerComparison] = useState<CustomerComparison[]>([]);
   const [customerSortBy, setCustomerSortBy] = useState<"cylinders" | "dryIce" | "total">("total");
+  const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
 
   const isSignificantGrowth = (percent: number) => percent > 10 || percent < -10;
 
@@ -510,22 +512,45 @@ export function YearComparisonReport() {
             </div>
           </div>
 
-          {/* Gas Type Filter */}
-          {gasTypes.length > 0 && (
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                Filter op gastype (cilinders)
-              </Label>
-              <GasTypeMultiSelect
-                gasTypes={gasTypes}
-                selectedGasTypes={selectedGasTypes}
-                onSelectionChange={setSelectedGasTypes}
-                placeholder="Alle gastypes"
-                className="w-full"
-              />
-            </div>
-          )}
+          {/* Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Gas Type Filter */}
+            {gasTypes.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  Filter op gastype (cilinders)
+                </Label>
+                <GasTypeMultiSelect
+                  gasTypes={gasTypes}
+                  selectedGasTypes={selectedGasTypes}
+                  onSelectionChange={setSelectedGasTypes}
+                  placeholder="Alle gastypes"
+                  className="w-full"
+                />
+              </div>
+            )}
+
+            {/* Customer Filter */}
+            {customerComparison.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Filter op klant
+                </Label>
+                <CustomerMultiSelect
+                  customers={customerComparison.map(c => ({ 
+                    id: c.customer_id, 
+                    name: c.customer_name 
+                  }))}
+                  selectedCustomers={selectedCustomers}
+                  onSelectionChange={setSelectedCustomers}
+                  placeholder="Alle klanten"
+                  className="w-full"
+                />
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -1441,8 +1466,16 @@ export function YearComparisonReport() {
           </CardHeader>
           <CardContent>
             {(() => {
+              // Filter customers based on selection
+              const filteredCustomers = selectedCustomers.length === 0 
+                ? customerComparison 
+                : customerComparison.filter(c => {
+                    const customerKey = c.customer_id || c.customer_name;
+                    return selectedCustomers.includes(customerKey);
+                  });
+
               // Sort customers based on selected criteria
-              const sortedCustomers = [...customerComparison].sort((a, b) => {
+              const sortedCustomers = [...filteredCustomers].sort((a, b) => {
                 switch (customerSortBy) {
                   case "cylinders":
                     return b.currentCylinders - a.currentCylinders;
