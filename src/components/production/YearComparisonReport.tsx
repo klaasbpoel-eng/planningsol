@@ -589,6 +589,7 @@ export function YearComparisonReport() {
                                 const categoryIds = category.gasTypes.map(g => g.id);
                                 const allCategorySelected = categoryIds.every(id => selectedGasTypes.includes(id));
                                 const someCategorySelected = categoryIds.some(id => selectedGasTypes.includes(id));
+                                const selectedInCategory = categoryIds.filter(id => selectedGasTypes.includes(id)).length;
                                 
                                 return (
                                   <div key={category.name}>
@@ -617,7 +618,12 @@ export function YearComparisonReport() {
                                         // Show indeterminate state when some but not all are selected
                                         data-state={someCategorySelected && !allCategorySelected ? "indeterminate" : allCategorySelected ? "checked" : "unchecked"}
                                       />
-                                      {category.name}
+                                      <span className="flex-1">{category.name}</span>
+                                      {selectedInCategory > 0 && (
+                                        <Badge variant="secondary" className="ml-2 text-xs px-1.5 py-0">
+                                          {selectedInCategory}/{categoryIds.length}
+                                        </Badge>
+                                      )}
                                     </CommandItem>
                                     {category.gasTypes.map((gasType) => (
                                       <CommandItem
@@ -650,6 +656,7 @@ export function YearComparisonReport() {
                                 const uncategorizedIds = uncategorized.map(g => g.id);
                                 const allUncategorizedSelected = uncategorizedIds.every(id => selectedGasTypes.includes(id));
                                 const someUncategorizedSelected = uncategorizedIds.some(id => selectedGasTypes.includes(id));
+                                const selectedInUncategorized = uncategorizedIds.filter(id => selectedGasTypes.includes(id)).length;
                                 
                                 return (
                                   <div>
@@ -675,7 +682,12 @@ export function YearComparisonReport() {
                                         className="mr-2"
                                         data-state={someUncategorizedSelected && !allUncategorizedSelected ? "indeterminate" : allUncategorizedSelected ? "checked" : "unchecked"}
                                       />
-                                      Overige
+                                      <span className="flex-1">Overige</span>
+                                      {selectedInUncategorized > 0 && (
+                                        <Badge variant="secondary" className="ml-2 text-xs px-1.5 py-0">
+                                          {selectedInUncategorized}/{uncategorizedIds.length}
+                                        </Badge>
+                                      )}
                                     </CommandItem>
                                     {uncategorized.map((gasType) => (
                                       <CommandItem
