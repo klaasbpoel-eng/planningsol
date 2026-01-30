@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users, ChevronsUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
   BarChart,
   Bar,
@@ -512,56 +514,70 @@ export function YearComparisonReport() {
           {/* Gas Type Filter */}
           {gasTypes.length > 0 && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm text-muted-foreground flex items-center gap-2">
-                  <Filter className="h-4 w-4" />
-                  Filter op gastype (cilinders)
-                </Label>
-                {selectedGasTypes.length > 0 && (
+              <Label className="text-sm text-muted-foreground flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Filter op gastype (cilinders)
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedGasTypes([])}
-                    className="h-7 text-xs"
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between bg-background"
                   >
-                    <X className="h-3 w-3 mr-1" />
-                    Wis filter
+                    <span className="truncate">
+                      {selectedGasTypes.length === 0
+                        ? "Alle gastypes"
+                        : selectedGasTypes.length === 1
+                        ? gasTypes.find(g => g.id === selectedGasTypes[0])?.name || "1 geselecteerd"
+                        : `${selectedGasTypes.length} gastypes geselecteerd`}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {gasTypes.map((gasType) => (
-                  <label
-                    key={gasType.id}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer transition-colors ${
-                      selectedGasTypes.includes(gasType.id)
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:bg-muted/50"
-                    }`}
-                  >
-                    <Checkbox
-                      checked={selectedGasTypes.includes(gasType.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedGasTypes([...selectedGasTypes, gasType.id]);
-                        } else {
-                          setSelectedGasTypes(selectedGasTypes.filter(id => id !== gasType.id));
-                        }
-                      }}
-                    />
-                    <div
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: gasType.color }}
-                    />
-                    <span className="text-sm">{gasType.name}</span>
-                  </label>
-                ))}
-              </div>
-              {selectedGasTypes.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  {selectedGasTypes.length} gastype{selectedGasTypes.length !== 1 ? 's' : ''} geselecteerd
-                </p>
-              )}
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Zoek gastype..." />
+                    <CommandList>
+                      <CommandEmpty>Geen gastypes gevonden.</CommandEmpty>
+                      <CommandGroup>
+                        {selectedGasTypes.length > 0 && (
+                          <CommandItem
+                            onSelect={() => setSelectedGasTypes([])}
+                            className="text-muted-foreground"
+                          >
+                            <X className="mr-2 h-4 w-4" />
+                            Wis selectie
+                          </CommandItem>
+                        )}
+                        {gasTypes.map((gasType) => (
+                          <CommandItem
+                            key={gasType.id}
+                            value={gasType.name}
+                            onSelect={() => {
+                              if (selectedGasTypes.includes(gasType.id)) {
+                                setSelectedGasTypes(selectedGasTypes.filter(id => id !== gasType.id));
+                              } else {
+                                setSelectedGasTypes([...selectedGasTypes, gasType.id]);
+                              }
+                            }}
+                          >
+                            <Checkbox
+                              checked={selectedGasTypes.includes(gasType.id)}
+                              className="mr-2"
+                            />
+                            <div
+                              className="w-2.5 h-2.5 rounded-full mr-2"
+                              style={{ backgroundColor: gasType.color }}
+                            />
+                            <span>{gasType.name}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           )}
         </CardContent>
