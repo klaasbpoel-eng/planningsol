@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -137,6 +137,21 @@ export function YearComparisonReport() {
     return { currentYear, previousYear, change, changePercent };
   };
 
+  const getGrowthHighlights = (data: MonthlyData[]) => {
+    // Filter months with data (at least one of the years has values)
+    const validMonths = data.filter(m => m.currentYear > 0 || m.previousYear > 0);
+    
+    if (validMonths.length === 0) {
+      return { best: null, worst: null };
+    }
+
+    const sorted = [...validMonths].sort((a, b) => b.changePercent - a.changePercent);
+    return {
+      best: sorted[0],
+      worst: sorted[sorted.length - 1]
+    };
+  };
+
   const getTrendIcon = (changePercent: number) => {
     if (changePercent > 5) return <TrendingUp className="h-4 w-4 text-green-500" />;
     if (changePercent < -5) return <TrendingDown className="h-4 w-4 text-red-500" />;
@@ -264,6 +279,132 @@ export function YearComparisonReport() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Growth Highlights Summary */}
+      <Card className="glass-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Award className="h-5 w-5 text-yellow-500" />
+            Groei Highlights
+          </CardTitle>
+          <CardDescription>
+            Beste en slechtste maanden qua groei t.o.v. {selectedYear - 1}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Cylinder Highlights */}
+            <div className="space-y-4">
+              <h4 className="font-medium flex items-center gap-2">
+                <Cylinder className="h-4 w-4 text-orange-500" />
+                Cilinders
+              </h4>
+              {(() => {
+                const highlights = getGrowthHighlights(cylinderData);
+                return (
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Best Month */}
+                    <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                      <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 mb-1">
+                        <TrendingUp className="h-4 w-4" />
+                        <span className="text-xs font-medium">Beste maand</span>
+                      </div>
+                      {highlights.best ? (
+                        <>
+                          <p className="text-lg font-bold">{highlights.best.monthName}</p>
+                          <p className="text-sm text-green-600 dark:text-green-400">
+                            {highlights.best.changePercent >= 0 ? "+" : ""}{highlights.best.changePercent.toFixed(1)}%
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {highlights.best.currentYear.toLocaleString()} vs {highlights.best.previousYear.toLocaleString()}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Geen data</p>
+                      )}
+                    </div>
+                    {/* Worst Month */}
+                    <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                      <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400 mb-1">
+                        <TrendingDown className="h-4 w-4" />
+                        <span className="text-xs font-medium">Slechtste maand</span>
+                      </div>
+                      {highlights.worst ? (
+                        <>
+                          <p className="text-lg font-bold">{highlights.worst.monthName}</p>
+                          <p className="text-sm text-red-600 dark:text-red-400">
+                            {highlights.worst.changePercent >= 0 ? "+" : ""}{highlights.worst.changePercent.toFixed(1)}%
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {highlights.worst.currentYear.toLocaleString()} vs {highlights.worst.previousYear.toLocaleString()}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Geen data</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Dry Ice Highlights */}
+            <div className="space-y-4">
+              <h4 className="font-medium flex items-center gap-2">
+                <Snowflake className="h-4 w-4 text-cyan-500" />
+                Droogijs
+              </h4>
+              {(() => {
+                const highlights = getGrowthHighlights(dryIceData);
+                return (
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Best Month */}
+                    <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                      <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 mb-1">
+                        <TrendingUp className="h-4 w-4" />
+                        <span className="text-xs font-medium">Beste maand</span>
+                      </div>
+                      {highlights.best ? (
+                        <>
+                          <p className="text-lg font-bold">{highlights.best.monthName}</p>
+                          <p className="text-sm text-green-600 dark:text-green-400">
+                            {highlights.best.changePercent >= 0 ? "+" : ""}{highlights.best.changePercent.toFixed(1)}%
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {highlights.best.currentYear.toLocaleString()} kg vs {highlights.best.previousYear.toLocaleString()} kg
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Geen data</p>
+                      )}
+                    </div>
+                    {/* Worst Month */}
+                    <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                      <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400 mb-1">
+                        <TrendingDown className="h-4 w-4" />
+                        <span className="text-xs font-medium">Slechtste maand</span>
+                      </div>
+                      {highlights.worst ? (
+                        <>
+                          <p className="text-lg font-bold">{highlights.worst.monthName}</p>
+                          <p className="text-sm text-red-600 dark:text-red-400">
+                            {highlights.worst.changePercent >= 0 ? "+" : ""}{highlights.worst.changePercent.toFixed(1)}%
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {highlights.worst.currentYear.toLocaleString()} kg vs {highlights.worst.previousYear.toLocaleString()} kg
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Geen data</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Monthly Comparison Charts */}
       <div className="grid grid-cols-1 gap-6">
