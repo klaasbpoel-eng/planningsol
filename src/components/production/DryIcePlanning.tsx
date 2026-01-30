@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Box, Repeat, Edit2 } from "lucide-react";
+import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Box, Repeat, Edit2, AlertTriangle } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -80,6 +80,8 @@ export function DryIcePlanning() {
   const [userId, setUserId] = useState<string | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<DryIceOrder | null>(null);
+  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   const { isAdmin } = useUserRole(userId);
 
   const handleEditOrder = (order: DryIceOrder) => {
@@ -180,6 +182,35 @@ export function DryIcePlanning() {
     setOrderToDelete(null);
   };
 
+  const handleDeleteAllClick = () => {
+    setDeleteAllDialogOpen(true);
+  };
+
+  const handleConfirmDeleteAll = async () => {
+    setDeletingAll(true);
+    
+    try {
+      const { error } = await supabase
+        .from("dry_ice_orders")
+        .delete()
+        .gte("id", "00000000-0000-0000-0000-000000000000"); // Delete all rows
+
+      if (error) {
+        toast.error("Fout bij verwijderen van alle orders");
+        console.error("Error deleting all orders:", error);
+      } else {
+        toast.success("Alle droogijs orders zijn verwijderd");
+        fetchOrders();
+      }
+    } catch (err) {
+      toast.error("Fout bij verwijderen van alle orders");
+      console.error("Error:", err);
+    } finally {
+      setDeletingAll(false);
+      setDeleteAllDialogOpen(false);
+    }
+  };
+
   const handleStatusChange = async (id: string, newStatus: string) => {
     // Optimistic update
     setOrders(prev => prev.map(order => 
@@ -256,10 +287,20 @@ export function DryIcePlanning() {
           </p>
         </div>
         {isAdmin && (
-          <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={() => setDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nieuwe productieorder
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteAllClick}
+              disabled={orders.length === 0}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Alle orders verwijderen
+            </Button>
+            <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={() => setDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nieuwe productieorder
+            </Button>
+          </div>
         )}
       </div>
 
@@ -450,6 +491,42 @@ export function DryIcePlanning() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Verwijderen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Alle droogijs orders verwijderen
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                <strong>Let op!</strong> Je staat op het punt om <strong>ALLE {orders.length} droogijs orders</strong> uit de database te verwijderen.
+              </p>
+              <p>
+                Deze actie is <strong>permanent</strong> en kan <strong>niet</strong> ongedaan worden gemaakt.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingAll}>Annuleren</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDeleteAll}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deletingAll}
+            >
+              {deletingAll ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Verwijderen...
+                </>
+              ) : (
+                "Ja, verwijder alles"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
