@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   BarChart,
   Bar,
@@ -72,6 +74,8 @@ export function YearComparisonReport() {
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [highlightSignificant, setHighlightSignificant] = useState(false);
   const [gasTypeComparison, setGasTypeComparison] = useState<GasTypeYearComparison[]>([]);
+  const [gasTypes, setGasTypes] = useState<{ id: string; name: string; color: string }[]>([]);
+  const [selectedGasTypes, setSelectedGasTypes] = useState<string[]>([]);
 
   const isSignificantGrowth = (percent: number) => percent > 10 || percent < -10;
 
@@ -83,7 +87,22 @@ export function YearComparisonReport() {
       years.push(y);
     }
     setAvailableYears(years);
+    
+    // Fetch gas types for filter
+    fetchGasTypes();
   }, []);
+
+  const fetchGasTypes = async () => {
+    const { data } = await supabase
+      .from("gas_types")
+      .select("id, name, color")
+      .eq("is_active", true)
+      .order("sort_order");
+    
+    if (data) {
+      setGasTypes(data);
+    }
+  };
 
   useEffect(() => {
     if (selectedYear) {
@@ -289,25 +308,83 @@ export function YearComparisonReport() {
             Vergelijk productiedata per maand met het voorgaande jaar
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">Vergelijk jaar:</span>
-            <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {availableYears.map(year => (
-                  <SelectItem key={year} value={year.toString()}>
-                    {year}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <span className="text-sm text-muted-foreground">
-              vs {selectedYear - 1}
-            </span>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Vergelijk jaar:</span>
+              <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map(year => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                vs {selectedYear - 1}
+              </span>
+            </div>
           </div>
+
+          {/* Gas Type Filter */}
+          {gasTypes.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  Filter op gastype (cilinders)
+                </Label>
+                {selectedGasTypes.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedGasTypes([])}
+                    className="h-7 text-xs"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Wis filter
+                  </Button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {gasTypes.map((gasType) => (
+                  <label
+                    key={gasType.id}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer transition-colors ${
+                      selectedGasTypes.includes(gasType.id)
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:bg-muted/50"
+                    }`}
+                  >
+                    <Checkbox
+                      checked={selectedGasTypes.includes(gasType.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedGasTypes([...selectedGasTypes, gasType.id]);
+                        } else {
+                          setSelectedGasTypes(selectedGasTypes.filter(id => id !== gasType.id));
+                        }
+                      }}
+                    />
+                    <div
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: gasType.color }}
+                    />
+                    <span className="text-sm">{gasType.name}</span>
+                  </label>
+                ))}
+              </div>
+              {selectedGasTypes.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedGasTypes.length} gastype{selectedGasTypes.length !== 1 ? 's' : ''} geselecteerd
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -517,18 +594,38 @@ export function YearComparisonReport() {
             <CardTitle className="text-lg flex items-center gap-2">
               <Cylinder className="h-5 w-5 text-orange-500" />
               Cilinders per gastype
+              {selectedGasTypes.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {selectedGasTypes.length} gefilterd
+                </Badge>
+              )}
             </CardTitle>
             <CardDescription>
               Jaarvergelijking {selectedYear} vs {selectedYear - 1} per gastype
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {(() => {
+              // Filter gas type comparison based on selected gas types
+              const filteredGasTypeComparison = selectedGasTypes.length > 0
+                ? gasTypeComparison.filter(gt => selectedGasTypes.includes(gt.gas_type_id))
+                : gasTypeComparison;
+
+              if (filteredGasTypeComparison.length === 0) {
+                return (
+                  <div className="flex items-center justify-center py-8 text-muted-foreground">
+                    Geen data voor geselecteerde gastypes
+                  </div>
+                );
+              }
+
+              return (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Bar Chart */}
               <div>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart
-                    data={gasTypeComparison}
+                    data={filteredGasTypeComparison}
                     layout="vertical"
                     margin={{ left: 80 }}
                   >
@@ -555,7 +652,7 @@ export function YearComparisonReport() {
                     />
                     <Bar dataKey="previousYear" name="previousYear" fill="#94a3b8" radius={[0, 4, 4, 0]} />
                     <Bar dataKey="currentYear" name="currentYear" radius={[0, 4, 4, 0]}>
-                      {gasTypeComparison.map((entry, index) => (
+                      {filteredGasTypeComparison.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.gas_type_color} />
                       ))}
                     </Bar>
@@ -569,7 +666,7 @@ export function YearComparisonReport() {
                   Overzicht per gastype
                 </div>
                 <div className="space-y-2 max-h-[280px] overflow-y-auto">
-                  {gasTypeComparison.map((gasType) => (
+                  {filteredGasTypeComparison.map((gasType) => (
                     <div 
                       key={gasType.gas_type_id}
                       className="flex items-center justify-between p-3 rounded-lg border bg-card/50"
@@ -603,6 +700,8 @@ export function YearComparisonReport() {
                 </div>
               </div>
             </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
