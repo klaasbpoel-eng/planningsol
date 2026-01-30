@@ -86,6 +86,7 @@ export function GasCylinderPlanning() {
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
   const [sortColumn, setSortColumn] = useState<SortColumn>("scheduled_date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
   const { isAdmin } = useUserRole(userId);
 
   const handleSort = (column: SortColumn) => {
@@ -138,7 +139,7 @@ export function GasCylinderPlanning() {
   useEffect(() => {
     fetchOrders();
     fetchGasTypes();
-  }, []);
+  }, [yearFilter]);
 
   const fetchGasTypes = async () => {
     const { data } = await supabase
@@ -154,9 +155,14 @@ export function GasCylinderPlanning() {
 
   const fetchOrders = async () => {
     setLoading(true);
+    const startDate = `${yearFilter}-01-01`;
+    const endDate = `${yearFilter}-12-31`;
+    
     const { data, error } = await supabase
       .from("gas_cylinder_orders")
       .select("*")
+      .gte("scheduled_date", startDate)
+      .lte("scheduled_date", endDate)
       .order("scheduled_date", { ascending: true });
 
     if (error) {
@@ -167,6 +173,12 @@ export function GasCylinderPlanning() {
     }
     setLoading(false);
   };
+
+  // Generate available years (2022 to current year + 1)
+  const availableYears = Array.from(
+    { length: new Date().getFullYear() - 2021 + 1 },
+    (_, i) => 2022 + i
+  );
 
   const handleDeleteClick = (order: GasCylinderOrder) => {
     setOrderToDelete(order);
@@ -379,7 +391,7 @@ export function GasCylinderPlanning() {
                       <X className="h-4 w-4" />
                     </Button>
                   )}
-                  {(dateFilter || pressureFilter !== "all" || gasTypeFilter !== "all" || statusFilter !== "all") && (
+                  {(dateFilter || pressureFilter !== "all" || gasTypeFilter !== "all" || statusFilter !== "all" || yearFilter !== new Date().getFullYear()) && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -389,12 +401,23 @@ export function GasCylinderPlanning() {
                         setPressureFilter("all");
                         setGasTypeFilter("all");
                         setStatusFilter("all");
+                        setYearFilter(new Date().getFullYear());
                       }}
                     >
                       <X className="h-4 w-4 mr-1" />
                       Wis filters
                     </Button>
                   )}
+                  <Select value={yearFilter.toString()} onValueChange={(v) => setYearFilter(parseInt(v))}>
+                    <SelectTrigger className="w-[100px] bg-background">
+                      <SelectValue placeholder="Jaar" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border shadow-lg z-50">
+                      {availableYears.map((year) => (
+                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Select value={gasTypeFilter} onValueChange={setGasTypeFilter}>
                     <SelectTrigger className="w-[150px] bg-background">
                       <SelectValue placeholder="Gastype" />
