@@ -568,17 +568,19 @@ export function YearComparisonReport() {
                             { name: "Speciale mengsels", patterns: ["Carbogeen", "EnerMix"] },
                           ];
 
-                          // Group gas types by category
+                          // Group gas types by category and sort alphabetically
                           const categorizedGasTypes = categories.map(category => ({
                             ...category,
-                            gasTypes: gasTypes.filter(gt => 
-                              category.patterns.some(pattern => gt.name.includes(pattern))
-                            ),
+                            gasTypes: gasTypes
+                              .filter(gt => category.patterns.some(pattern => gt.name.includes(pattern)))
+                              .sort((a, b) => a.name.localeCompare(b.name, 'nl')),
                           }));
 
-                          // Find uncategorized gas types
+                          // Find uncategorized gas types and sort alphabetically
                           const categorizedIds = categorizedGasTypes.flatMap(c => c.gasTypes.map(g => g.id));
-                          const uncategorized = gasTypes.filter(gt => !categorizedIds.includes(gt.id));
+                          const uncategorized = gasTypes
+                            .filter(gt => !categorizedIds.includes(gt.id))
+                            .sort((a, b) => a.name.localeCompare(b.name, 'nl'));
 
                           return (
                             <>
