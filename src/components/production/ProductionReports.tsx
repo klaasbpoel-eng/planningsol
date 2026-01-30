@@ -191,6 +191,17 @@ export function ProductionReports() {
     totalKg: dryIceOrders.filter(o => o.status !== "cancelled").reduce((sum, o) => sum + Number(o.quantity_kg), 0)
   };
 
+  // Gas type labels mapping (defined early for use in distribution calculation)
+  const gasTypeLabels: Record<string, string> = {
+    co2: "CO₂",
+    nitrogen: "Stikstof (N₂)",
+    argon: "Argon",
+    acetylene: "Acetyleen",
+    oxygen: "Zuurstof",
+    helium: "Helium",
+    other: "Overig",
+  };
+
   // Prepare chart data - orders per day
   const getOrdersPerDay = () => {
     const dayMap = new Map<string, { date: string; cylinders: number; dryIce: number }>();
@@ -275,16 +286,6 @@ export function ProductionReports() {
 
   const ordersPerDay = getOrdersPerDay();
   const gasTypeDistribution = getGasTypeDistribution();
-
-  const gasTypeLabels: Record<string, string> = {
-    co2: "CO₂",
-    nitrogen: "Stikstof (N₂)",
-    argon: "Argon",
-    acetylene: "Acetyleen",
-    oxygen: "Zuurstof",
-    helium: "Helium",
-    other: "Overig",
-  };
 
   // Get gas type label - prioritize gas_type_ref from join, then gas_type_id lookup
   const getGasTypeLabel = (order: GasCylinderOrder) => {
