@@ -542,24 +542,21 @@ export function YearComparisonReport() {
                       <CommandEmpty>Geen gastypes gevonden.</CommandEmpty>
                       <CommandGroup>
                         <CommandItem
-                          onSelect={() => setSelectedGasTypes(gasTypes.map(g => g.id))}
+                          onSelect={() => {
+                            if (selectedGasTypes.length === gasTypes.length) {
+                              setSelectedGasTypes([]);
+                            } else {
+                              setSelectedGasTypes(gasTypes.map(g => g.id));
+                            }
+                          }}
                           className="text-primary font-medium"
                         >
                           <Checkbox
                             checked={selectedGasTypes.length === gasTypes.length}
                             className="mr-2"
                           />
-                          Selecteer alles
+                          {selectedGasTypes.length === gasTypes.length ? "Deselecteer alles" : "Selecteer alles"}
                         </CommandItem>
-                        {selectedGasTypes.length > 0 && (
-                          <CommandItem
-                            onSelect={() => setSelectedGasTypes([])}
-                            className="text-muted-foreground"
-                          >
-                            <X className="mr-2 h-4 w-4" />
-                            Wis selectie
-                          </CommandItem>
-                        )}
                         {gasTypes.map((gasType) => (
                           <CommandItem
                             key={gasType.id}
