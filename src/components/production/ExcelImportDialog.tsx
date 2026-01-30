@@ -41,6 +41,11 @@ interface ImportStats {
   errors: string[];
 }
 
+interface GasType {
+  id: string;
+  name: string;
+}
+
 export function ExcelImportDialog({
   open,
   onOpenChange,
@@ -53,8 +58,44 @@ export function ExcelImportDialog({
   const [stats, setStats] = useState<ImportStats | null>(null);
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   const [step, setStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
+  const [gasTypes, setGasTypes] = useState<GasType[]>([]);
 
-  // Gas type mapping from Excel names to database enum
+  // Fetch gas types when dialog opens
+  const fetchGasTypes = async () => {
+    const { data } = await supabase
+      .from("gas_types")
+      .select("id, name")
+      .eq("is_active", true);
+    if (data) setGasTypes(data);
+  };
+
+  // Match gas type name to ID from the gas_types table
+  const matchGasTypeId = (gasName: string): string | null => {
+    const name = gasName.toLowerCase();
+    
+    // Try to find a matching gas type by name
+    const match = gasTypes.find(gt => {
+      const gtName = gt.name.toLowerCase();
+      // Check for exact match or partial match
+      if (gtName === name) return true;
+      if (name.includes(gtName) || gtName.includes(name)) return true;
+      // Check for common Dutch names
+      if (name.includes("zuurstof") && gtName.includes("zuurstof")) return true;
+      if (name.includes("stikstof") && gtName.includes("stikstof")) return true;
+      if (name.includes("argon") && gtName.includes("argon")) return true;
+      if (name.includes("koolzuur") && gtName.includes("koolzuur")) return true;
+      if (name.includes("acetyleen") && gtName.includes("acetyleen")) return true;
+      if (name.includes("helium") && gtName.includes("helium")) return true;
+      if ((name.includes("o2") || name.includes("oxygen")) && (gtName.includes("zuurstof") || gtName.includes("o2"))) return true;
+      if ((name.includes("n2") || name.includes("nitrogen")) && (gtName.includes("stikstof") || gtName.includes("n2"))) return true;
+      if ((name.includes("co2") || name.includes("carbon")) && (gtName.includes("koolzuur") || gtName.includes("co2"))) return true;
+      return false;
+    });
+    
+    return match?.id || null;
+  };
+
+  // Gas type mapping from Excel names to database enum (for legacy support)
   const mapGasTypeToEnum = (gasName: string): "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other" => {
     const name = gasName.toLowerCase();
     if (name.includes("zuurstof") || name.includes("o2")) return "oxygen";
@@ -134,6 +175,9 @@ export function ExcelImportDialog({
     if (!selectedFile) return;
     
     setFile(selectedFile);
+    
+    // Fetch gas types for matching
+    await fetchGasTypes();
     
     // Get current user profile
     const { data: { user } } = await supabase.auth.getUser();
@@ -280,12 +324,13 @@ export function ExcelImportDialog({
         order_number: generateOrderNumber(start + idx),
         customer_name: order.customer,
         gas_type: mapGasTypeToEnum(order.gasType),
+        gas_type_id: matchGasTypeId(order.gasType),
         gas_grade: order.grade,
         cylinder_count: order.count,
         cylinder_size: order.cylinderSize,
         pressure: order.pressure,
         scheduled_date: format(order.date, "yyyy-MM-dd"),
-        notes: `Gastype: ${order.gasType}${order.notes ? `\n${order.notes}` : ""}`,
+        notes: order.notes || null,
         created_by: currentProfileId,
         status: "completed" as const,
       }));
