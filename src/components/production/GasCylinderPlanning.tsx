@@ -222,20 +222,41 @@ export function GasCylinderPlanning() {
     setDeletingAll(true);
     
     try {
-      const { error } = await supabase
-        .from("gas_cylinder_orders")
-        .delete()
-        .gte("id", "00000000-0000-0000-0000-000000000000"); // Delete all rows
-
-      if (error) {
-        toast.error("Fout bij verwijderen van alle orders");
-        console.error("Error deleting all orders:", error);
-      } else {
-        toast.success("Alle vulorders zijn verwijderd");
-        fetchOrders();
+      const BATCH_SIZE = 1000;
+      let totalDeleted = 0;
+      let hasMore = true;
+      
+      while (hasMore) {
+        // Haal een batch IDs op
+        const { data: batch, error: fetchError } = await supabase
+          .from("gas_cylinder_orders")
+          .select("id")
+          .limit(BATCH_SIZE);
+        
+        if (fetchError) throw fetchError;
+        if (!batch || batch.length === 0) {
+          hasMore = false;
+          break;
+        }
+        
+        const ids = batch.map(order => order.id);
+        
+        // Verwijder deze batch
+        const { error: deleteError } = await supabase
+          .from("gas_cylinder_orders")
+          .delete()
+          .in("id", ids);
+        
+        if (deleteError) throw deleteError;
+        
+        totalDeleted += batch.length;
+        hasMore = batch.length === BATCH_SIZE;
       }
+      
+      toast.success(`Alle ${totalDeleted} vulorders zijn verwijderd`);
+      fetchOrders();
     } catch (err) {
-      toast.error("Fout bij verwijderen van alle orders");
+      toast.error("Fout bij verwijderen van orders");
       console.error("Error:", err);
     } finally {
       setDeletingAll(false);
