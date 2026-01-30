@@ -69,48 +69,26 @@ export function YearComparisonReport() {
     const currentYear = selectedYear;
     const previousYear = selectedYear - 1;
 
-    // Fetch cylinder orders for both years - use range to get all records (default limit is 1000)
+    // Use database function to get aggregated monthly totals - bypasses the 1000 row limit
     const [currentCylinderRes, previousCylinderRes, currentDryIceRes, previousDryIceRes] = await Promise.all([
-      supabase
-        .from("gas_cylinder_orders")
-        .select("scheduled_date, cylinder_count, status")
-        .gte("scheduled_date", `${currentYear}-01-01`)
-        .lte("scheduled_date", `${currentYear}-12-31`)
-        .range(0, 9999),
-      supabase
-        .from("gas_cylinder_orders")
-        .select("scheduled_date, cylinder_count, status")
-        .gte("scheduled_date", `${previousYear}-01-01`)
-        .lte("scheduled_date", `${previousYear}-12-31`)
-        .range(0, 9999),
-      supabase
-        .from("dry_ice_orders")
-        .select("scheduled_date, quantity_kg, status")
-        .gte("scheduled_date", `${currentYear}-01-01`)
-        .lte("scheduled_date", `${currentYear}-12-31`)
-        .range(0, 9999),
-      supabase
-        .from("dry_ice_orders")
-        .select("scheduled_date, quantity_kg, status")
-        .gte("scheduled_date", `${previousYear}-01-01`)
-        .lte("scheduled_date", `${previousYear}-12-31`)
-        .range(0, 9999)
+      supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "cylinder" }),
+      supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "cylinder" }),
+      supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "dry_ice" }),
+      supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "dry_ice" })
     ]);
 
-    // Process cylinder data
-    const cylinderMonthly = processMonthlyData(
+    // Process cylinder data from aggregated results
+    const cylinderMonthly = processMonthlyDataFromAggregated(
       currentCylinderRes.data || [],
-      previousCylinderRes.data || [],
-      "cylinder_count"
+      previousCylinderRes.data || []
     );
     setCylinderData(cylinderMonthly);
     setCylinderTotals(calculateTotals(cylinderMonthly));
 
-    // Process dry ice data
-    const dryIceMonthly = processMonthlyData(
+    // Process dry ice data from aggregated results
+    const dryIceMonthly = processMonthlyDataFromAggregated(
       currentDryIceRes.data || [],
-      previousDryIceRes.data || [],
-      "quantity_kg"
+      previousDryIceRes.data || []
     );
     setDryIceData(dryIceMonthly);
     setDryIceTotals(calculateTotals(dryIceMonthly));
@@ -118,26 +96,19 @@ export function YearComparisonReport() {
     setLoading(false);
   };
 
-  const processMonthlyData = (
-    currentData: any[],
-    previousData: any[],
-    valueField: string
+  const processMonthlyDataFromAggregated = (
+    currentData: { month: number; total_value: number }[],
+    previousData: { month: number; total_value: number }[]
   ): MonthlyData[] => {
     const monthlyData: MonthlyData[] = [];
 
+    // Create lookup maps for quick access
+    const currentMap = new Map(currentData.map(d => [d.month, Number(d.total_value) || 0]));
+    const previousMap = new Map(previousData.map(d => [d.month, Number(d.total_value) || 0]));
+
     for (let month = 1; month <= 12; month++) {
-      const currentMonthData = currentData.filter(order => {
-        const orderMonth = new Date(order.scheduled_date).getMonth() + 1;
-        return orderMonth === month && order.status !== "cancelled";
-      });
-
-      const previousMonthData = previousData.filter(order => {
-        const orderMonth = new Date(order.scheduled_date).getMonth() + 1;
-        return orderMonth === month && order.status !== "cancelled";
-      });
-
-      const currentValue = currentMonthData.reduce((sum, o) => sum + Number(o[valueField] || 0), 0);
-      const previousValue = previousMonthData.reduce((sum, o) => sum + Number(o[valueField] || 0), 0);
+      const currentValue = currentMap.get(month) || 0;
+      const previousValue = previousMap.get(month) || 0;
       const change = currentValue - previousValue;
       const changePercent = previousValue > 0 ? ((change / previousValue) * 100) : (currentValue > 0 ? 100 : 0);
 

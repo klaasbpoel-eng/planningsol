@@ -1026,6 +1026,13 @@ export type Database = {
       }
     }
     Functions: {
+      get_monthly_order_totals: {
+        Args: { p_order_type: string; p_year: number }
+        Returns: {
+          month: number
+          total_value: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
