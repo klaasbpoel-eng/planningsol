@@ -59,6 +59,12 @@ interface GasTypeYearComparison {
   changePercent: number;
 }
 
+interface MonthlyGasTypeChartData {
+  monthName: string;
+  month: number;
+  [key: string]: number | string; // Dynamic keys for each gas type
+}
+
 const MONTH_NAMES = [
   "Jan", "Feb", "Mrt", "Apr", "Mei", "Jun",
   "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"
@@ -76,6 +82,8 @@ export function YearComparisonReport() {
   const [gasTypeComparison, setGasTypeComparison] = useState<GasTypeYearComparison[]>([]);
   const [gasTypes, setGasTypes] = useState<{ id: string; name: string; color: string }[]>([]);
   const [selectedGasTypes, setSelectedGasTypes] = useState<string[]>([]);
+  const [monthlyGasTypeData, setMonthlyGasTypeData] = useState<{ current: MonthlyGasTypeChartData[]; previous: MonthlyGasTypeChartData[] }>({ current: [], previous: [] });
+  const [gasTypeInfo, setGasTypeInfo] = useState<Map<string, { name: string; color: string }>>(new Map());
 
   const isSignificantGrowth = (percent: number) => percent > 10 || percent < -10;
 
@@ -150,64 +158,111 @@ export function YearComparisonReport() {
     setDryIceTotals(calculateTotals(dryIceMonthly));
 
     // Process gas type comparison data
-    const gasTypeData = processGasTypeComparison(
+    const { comparison: gasTypeData, monthlyData, typeInfo } = processGasTypeData(
       currentGasTypeRes.data || [],
       previousGasTypeRes.data || []
     );
     setGasTypeComparison(gasTypeData);
+    setMonthlyGasTypeData(monthlyData);
+    setGasTypeInfo(typeInfo);
 
     setLoading(false);
   };
 
-  const processGasTypeComparison = (
-    currentData: { gas_type_id: string; gas_type_name: string; gas_type_color: string; total_cylinders: number }[],
-    previousData: { gas_type_id: string; gas_type_name: string; gas_type_color: string; total_cylinders: number }[]
-  ): GasTypeYearComparison[] => {
-    // Group by gas type and sum totals
-    const currentMap = new Map<string, { name: string; color: string; total: number }>();
-    const previousMap = new Map<string, { name: string; color: string; total: number }>();
+  const processGasTypeData = (
+    currentData: { month: number; gas_type_id: string; gas_type_name: string; gas_type_color: string; total_cylinders: number }[],
+    previousData: { month: number; gas_type_id: string; gas_type_name: string; gas_type_color: string; total_cylinders: number }[]
+  ) => {
+    // Build gas type info map
+    const typeInfo = new Map<string, { name: string; color: string }>();
+    
+    // Process for yearly comparison
+    const currentYearMap = new Map<string, { name: string; color: string; total: number }>();
+    const previousYearMap = new Map<string, { name: string; color: string; total: number }>();
+
+    // Build monthly data structures
+    const currentMonthlyMap = new Map<number, Map<string, number>>();
+    const previousMonthlyMap = new Map<number, Map<string, number>>();
+
+    // Initialize months
+    for (let m = 1; m <= 12; m++) {
+      currentMonthlyMap.set(m, new Map());
+      previousMonthlyMap.set(m, new Map());
+    }
 
     currentData.forEach(item => {
       if (!item.gas_type_id) return;
-      const existing = currentMap.get(item.gas_type_id);
+      
+      // Store type info
+      if (!typeInfo.has(item.gas_type_id)) {
+        typeInfo.set(item.gas_type_id, {
+          name: item.gas_type_name || "Onbekend",
+          color: item.gas_type_color || "#94a3b8"
+        });
+      }
+      
+      // Yearly totals
+      const existing = currentYearMap.get(item.gas_type_id);
       if (existing) {
         existing.total += Number(item.total_cylinders) || 0;
       } else {
-        currentMap.set(item.gas_type_id, {
+        currentYearMap.set(item.gas_type_id, {
           name: item.gas_type_name || "Onbekend",
           color: item.gas_type_color || "#94a3b8",
           total: Number(item.total_cylinders) || 0
         });
+      }
+      
+      // Monthly data
+      const monthMap = currentMonthlyMap.get(item.month);
+      if (monthMap) {
+        monthMap.set(item.gas_type_id, (monthMap.get(item.gas_type_id) || 0) + Number(item.total_cylinders));
       }
     });
 
     previousData.forEach(item => {
       if (!item.gas_type_id) return;
-      const existing = previousMap.get(item.gas_type_id);
+      
+      // Store type info
+      if (!typeInfo.has(item.gas_type_id)) {
+        typeInfo.set(item.gas_type_id, {
+          name: item.gas_type_name || "Onbekend",
+          color: item.gas_type_color || "#94a3b8"
+        });
+      }
+      
+      // Yearly totals
+      const existing = previousYearMap.get(item.gas_type_id);
       if (existing) {
         existing.total += Number(item.total_cylinders) || 0;
       } else {
-        previousMap.set(item.gas_type_id, {
+        previousYearMap.set(item.gas_type_id, {
           name: item.gas_type_name || "Onbekend",
           color: item.gas_type_color || "#94a3b8",
           total: Number(item.total_cylinders) || 0
         });
       }
+      
+      // Monthly data
+      const monthMap = previousMonthlyMap.get(item.month);
+      if (monthMap) {
+        monthMap.set(item.gas_type_id, (monthMap.get(item.gas_type_id) || 0) + Number(item.total_cylinders));
+      }
     });
 
-    // Merge both years
-    const allGasTypeIds = new Set([...currentMap.keys(), ...previousMap.keys()]);
-    const result: GasTypeYearComparison[] = [];
+    // Build yearly comparison
+    const allGasTypeIds = new Set([...currentYearMap.keys(), ...previousYearMap.keys()]);
+    const comparison: GasTypeYearComparison[] = [];
 
     allGasTypeIds.forEach(id => {
-      const current = currentMap.get(id);
-      const previous = previousMap.get(id);
+      const current = currentYearMap.get(id);
+      const previous = previousYearMap.get(id);
       const currentTotal = current?.total || 0;
       const previousTotal = previous?.total || 0;
       const change = currentTotal - previousTotal;
       const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
 
-      result.push({
+      comparison.push({
         gas_type_id: id,
         gas_type_name: current?.name || previous?.name || "Onbekend",
         gas_type_color: current?.color || previous?.color || "#94a3b8",
@@ -218,8 +273,36 @@ export function YearComparisonReport() {
       });
     });
 
-    // Sort by current year total descending
-    return result.sort((a, b) => b.currentYear - a.currentYear);
+    comparison.sort((a, b) => b.currentYear - a.currentYear);
+
+    // Build monthly chart data
+    const currentMonthlyData: MonthlyGasTypeChartData[] = [];
+    const previousMonthlyData: MonthlyGasTypeChartData[] = [];
+
+    for (let m = 1; m <= 12; m++) {
+      const currentEntry: MonthlyGasTypeChartData = { 
+        monthName: MONTH_NAMES[m - 1], 
+        month: m 
+      };
+      const previousEntry: MonthlyGasTypeChartData = { 
+        monthName: MONTH_NAMES[m - 1], 
+        month: m 
+      };
+
+      allGasTypeIds.forEach(id => {
+        currentEntry[id] = currentMonthlyMap.get(m)?.get(id) || 0;
+        previousEntry[id] = previousMonthlyMap.get(m)?.get(id) || 0;
+      });
+
+      currentMonthlyData.push(currentEntry);
+      previousMonthlyData.push(previousEntry);
+    }
+
+    return { 
+      comparison, 
+      monthlyData: { current: currentMonthlyData, previous: previousMonthlyData },
+      typeInfo
+    };
   };
 
   const processMonthlyDataFromAggregated = (
@@ -700,6 +783,120 @@ export function YearComparisonReport() {
                 </div>
               </div>
             </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Monthly Gas Type Breakdown */}
+      {gasTypeComparison.length > 0 && (
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Cylinder className="h-5 w-5 text-orange-500" />
+              Maandelijkse breakdown per gastype
+              {selectedGasTypes.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {selectedGasTypes.length} gefilterd
+                </Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Cilinders per maand uitgesplitst per gastype — {selectedYear} vs {selectedYear - 1}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              // Get all gas type IDs to display
+              const displayGasTypes = selectedGasTypes.length > 0 
+                ? gasTypeComparison.filter(gt => selectedGasTypes.includes(gt.gas_type_id))
+                : gasTypeComparison;
+
+              if (displayGasTypes.length === 0) {
+                return (
+                  <div className="flex items-center justify-center py-8 text-muted-foreground">
+                    Geen data voor geselecteerde gastypes
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-6">
+                  {/* Current Year Chart */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-3">{selectedYear}</h4>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={monthlyGasTypeData.current}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="monthName" className="text-xs" />
+                        <YAxis className="text-xs" />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--background))',
+                            border: '1px solid hsl(var(--border))'
+                          }}
+                          formatter={(value: number, name: string) => {
+                            const info = gasTypeInfo.get(name);
+                            return [value.toLocaleString(), info?.name || name];
+                          }}
+                        />
+                        <Legend 
+                          formatter={(value) => {
+                            const info = gasTypeInfo.get(value);
+                            return info?.name || value;
+                          }}
+                        />
+                        {displayGasTypes.map((gasType) => (
+                          <Bar 
+                            key={gasType.gas_type_id}
+                            dataKey={gasType.gas_type_id} 
+                            name={gasType.gas_type_id}
+                            stackId="a"
+                            fill={gasType.gas_type_color}
+                          />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Previous Year Chart */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-3">{selectedYear - 1}</h4>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={monthlyGasTypeData.previous}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="monthName" className="text-xs" />
+                        <YAxis className="text-xs" />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--background))',
+                            border: '1px solid hsl(var(--border))'
+                          }}
+                          formatter={(value: number, name: string) => {
+                            const info = gasTypeInfo.get(name);
+                            return [value.toLocaleString(), info?.name || name];
+                          }}
+                        />
+                        <Legend 
+                          formatter={(value) => {
+                            const info = gasTypeInfo.get(value);
+                            return info?.name || value;
+                          }}
+                        />
+                        {displayGasTypes.map((gasType) => (
+                          <Bar 
+                            key={gasType.gas_type_id}
+                            dataKey={gasType.gas_type_id} 
+                            name={gasType.gas_type_id}
+                            stackId="a"
+                            fill={gasType.gas_type_color}
+                          />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
               );
             })()}
           </CardContent>
