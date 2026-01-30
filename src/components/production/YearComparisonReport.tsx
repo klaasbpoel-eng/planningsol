@@ -15,6 +15,9 @@ import {
   Legend,
   LineChart,
   Line,
+  AreaChart,
+  Area,
+  ReferenceLine,
 } from "recharts";
 
 interface MonthlyData {
@@ -339,54 +342,152 @@ export function YearComparisonReport() {
         </Card>
       </div>
 
-      {/* Growth Trend Line Chart */}
+      {/* Growth Trend Area Chart */}
       <Card className="glass-card">
         <CardHeader>
-          <CardTitle className="text-lg">Procentuele groei per maand</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Groeipercentage per maand
+          </CardTitle>
           <CardDescription>
-            Verandering t.o.v. {selectedYear - 1}
+            Procentuele verandering t.o.v. {selectedYear - 1} — boven 0% = groei, onder 0% = daling
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart
               data={cylinderData.map((c, i) => ({
                 monthName: c.monthName,
-                cylinders: c.changePercent,
-                dryIce: dryIceData[i]?.changePercent || 0
+                cylinders: parseFloat(c.changePercent.toFixed(1)),
+                dryIce: parseFloat((dryIceData[i]?.changePercent || 0).toFixed(1))
               }))}
             >
+              <defs>
+                <linearGradient id="colorCylinders" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="colorDryIce" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="monthName" className="text-xs" />
-              <YAxis className="text-xs" tickFormatter={(v) => `${v}%`} />
+              <YAxis 
+                className="text-xs" 
+                tickFormatter={(v) => `${v}%`}
+                domain={['dataMin - 10', 'dataMax + 10']}
+              />
+              <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
               <Tooltip
                 contentStyle={{
                   backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))'
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '8px'
                 }}
-                formatter={(value: number) => [`${value.toFixed(1)}%`]}
+                formatter={(value: number, name: string) => [
+                  `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`,
+                  name
+                ]}
+                labelFormatter={(label) => `Maand: ${label}`}
               />
               <Legend />
-              <Line
+              <Area
                 type="monotone"
                 dataKey="cylinders"
                 name="Cilinders"
                 stroke="#f97316"
                 strokeWidth={2}
-                dot={{ fill: "#f97316" }}
+                fillOpacity={1}
+                fill="url(#colorCylinders)"
               />
-              <Line
+              <Area
                 type="monotone"
                 dataKey="dryIce"
                 name="Droogijs"
                 stroke="#06b6d4"
                 strokeWidth={2}
-                dot={{ fill: "#06b6d4" }}
+                fillOpacity={1}
+                fill="url(#colorDryIce)"
               />
-            </LineChart>
+            </AreaChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      {/* Growth Line Chart Detail */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="glass-card border-orange-500/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Cylinder className="h-4 w-4 text-orange-500" />
+              Cilinders groeitrend
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={cylinderData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="monthName" className="text-xs" tick={{ fontSize: 10 }} />
+                <YAxis className="text-xs" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} />
+                <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))'
+                  }}
+                  formatter={(value: number) => [`${value >= 0 ? '+' : ''}${value.toFixed(1)}%`, 'Groei']}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="changePercent"
+                  name="Groei %"
+                  stroke="#f97316"
+                  strokeWidth={2}
+                  dot={{ fill: "#f97316", r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-cyan-500/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Snowflake className="h-4 w-4 text-cyan-500" />
+              Droogijs groeitrend
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={dryIceData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="monthName" className="text-xs" tick={{ fontSize: 10 }} />
+                <YAxis className="text-xs" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} />
+                <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))'
+                  }}
+                  formatter={(value: number) => [`${value >= 0 ? '+' : ''}${value.toFixed(1)}%`, 'Groei']}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="changePercent"
+                  name="Groei %"
+                  stroke="#06b6d4"
+                  strokeWidth={2}
+                  dot={{ fill: "#06b6d4", r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Monthly Details Table */}
       <Card className="glass-card">
