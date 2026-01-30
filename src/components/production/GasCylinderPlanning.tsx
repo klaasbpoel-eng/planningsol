@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Loader2, Trash2, Filter, CalendarIcon, X, Edit2 } from "lucide-react";
+import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Loader2, Trash2, Filter, CalendarIcon, X, Edit2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -61,6 +61,8 @@ interface GasCylinderOrder {
 
 type PressureFilter = "all" | "200" | "300";
 type StatusFilter = "all" | "pending" | "in_progress" | "completed" | "cancelled";
+type SortColumn = "order_number" | "customer_name" | "gas_type" | "cylinder_count" | "pressure" | "scheduled_date" | "status";
+type SortDirection = "asc" | "desc";
 
 interface GasType {
   id: string;
@@ -82,7 +84,27 @@ export function GasCylinderPlanning() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<GasCylinderOrder | null>(null);
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
+  const [sortColumn, setSortColumn] = useState<SortColumn>("scheduled_date");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const { isAdmin } = useUserRole(userId);
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    }
+    return sortDirection === "asc" 
+      ? <ArrowUp className="h-4 w-4 ml-1" />
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
 
   const handleEditOrder = (order: GasCylinderOrder) => {
     setSelectedOrder(order);
@@ -262,6 +284,26 @@ export function GasCylinderPlanning() {
     return matchesPressure && matchesGasType && matchesDate && matchesStatus;
   });
 
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    let comparison = 0;
+    switch (sortColumn) {
+      case "order_number":
+      case "customer_name":
+      case "gas_type":
+      case "status":
+        comparison = (a[sortColumn] || "").localeCompare(b[sortColumn] || "");
+        break;
+      case "cylinder_count":
+      case "pressure":
+        comparison = a[sortColumn] - b[sortColumn];
+        break;
+      case "scheduled_date":
+        comparison = new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime();
+        break;
+    }
+    return sortDirection === "asc" ? comparison : -comparison;
+  });
+
   const todayCount = filteredOrders
     .filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd") && o.status !== "cancelled")
     .reduce((sum, o) => sum + o.cylinder_count, 0);
@@ -411,18 +453,32 @@ export function GasCylinderPlanning() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Order</TableHead>
-                      <TableHead>Klant</TableHead>
-                      <TableHead>Gastype</TableHead>
-                      <TableHead>Aantal</TableHead>
-                      <TableHead>Druk</TableHead>
-                      <TableHead>Datum</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("order_number")}>
+                        <div className="flex items-center">Order<SortIcon column="order_number" /></div>
+                      </TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("customer_name")}>
+                        <div className="flex items-center">Klant<SortIcon column="customer_name" /></div>
+                      </TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("gas_type")}>
+                        <div className="flex items-center">Gastype<SortIcon column="gas_type" /></div>
+                      </TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("cylinder_count")}>
+                        <div className="flex items-center">Aantal<SortIcon column="cylinder_count" /></div>
+                      </TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("pressure")}>
+                        <div className="flex items-center">Druk<SortIcon column="pressure" /></div>
+                      </TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("scheduled_date")}>
+                        <div className="flex items-center">Datum<SortIcon column="scheduled_date" /></div>
+                      </TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("status")}>
+                        <div className="flex items-center">Status<SortIcon column="status" /></div>
+                      </TableHead>
                       {isAdmin && <TableHead className="w-[80px]"></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredOrders.map((order) => (
+                    {sortedOrders.map((order) => (
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">{order.order_number}</TableCell>
                         <TableCell>{order.customer_name}</TableCell>
