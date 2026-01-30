@@ -128,13 +128,15 @@ export function ProductionReports() {
         .select("*")
         .gte("scheduled_date", fromDate)
         .lte("scheduled_date", toDate)
-        .order("scheduled_date", { ascending: true }),
+        .order("scheduled_date", { ascending: true })
+        .range(0, 9999),
       supabase
         .from("dry_ice_orders")
         .select("*")
         .gte("scheduled_date", fromDate)
         .lte("scheduled_date", toDate)
         .order("scheduled_date", { ascending: true })
+        .range(0, 9999)
     ]);
 
     if (cylinderRes.data) setCylinderOrders(cylinderRes.data);
