@@ -4,6 +4,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   BarChart,
   Bar,
@@ -49,6 +51,9 @@ export function YearComparisonReport() {
   const [cylinderTotals, setCylinderTotals] = useState<YearlyTotals | null>(null);
   const [dryIceTotals, setDryIceTotals] = useState<YearlyTotals | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [highlightSignificant, setHighlightSignificant] = useState(false);
+
+  const isSignificantGrowth = (percent: number) => percent > 10 || percent < -10;
 
   useEffect(() => {
     // Generate years from 2024 to current year + 1
@@ -633,8 +638,22 @@ export function YearComparisonReport() {
       {/* Monthly Details Table */}
       <Card className="glass-card">
         <CardHeader>
-          <CardTitle className="text-lg">Maandelijks overzicht</CardTitle>
-          <CardDescription>Gedetailleerde vergelijking per maand</CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle className="text-lg">Maandelijks overzicht</CardTitle>
+              <CardDescription>Gedetailleerde vergelijking per maand</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="highlight-significant"
+                checked={highlightSignificant}
+                onCheckedChange={setHighlightSignificant}
+              />
+              <Label htmlFor="highlight-significant" className="text-sm cursor-pointer">
+                Markeer significante groei (&gt;10% of &lt;-10%)
+              </Label>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -658,17 +677,44 @@ export function YearComparisonReport() {
               <tbody>
                 {cylinderData.map((cylinder, i) => {
                   const dryIce = dryIceData[i];
+                  const cylinderSignificant = isSignificantGrowth(cylinder.changePercent);
+                  const dryIceSignificant = isSignificantGrowth(dryIce?.changePercent || 0);
+                  const rowHighlight = highlightSignificant && (cylinderSignificant || dryIceSignificant);
+                  
                   return (
-                    <tr key={cylinder.month} className="border-b hover:bg-muted/50">
-                      <td className="py-3 px-2 font-medium">{cylinder.monthName}</td>
-                      <td className="text-right py-3 px-2">{cylinder.currentYear.toLocaleString()}</td>
+                    <tr 
+                      key={cylinder.month} 
+                      className={`border-b hover:bg-muted/50 ${
+                        rowHighlight 
+                          ? cylinderSignificant && cylinder.changePercent > 10 || dryIceSignificant && (dryIce?.changePercent || 0) > 10
+                            ? "bg-green-500/10"
+                            : "bg-red-500/10"
+                          : ""
+                      }`}
+                    >
+                      <td className="py-3 px-2 font-medium">
+                        {cylinder.monthName}
+                        {highlightSignificant && (cylinderSignificant || dryIceSignificant) && (
+                          <Badge 
+                            variant={cylinder.changePercent > 10 || (dryIce?.changePercent || 0) > 10 ? "default" : "destructive"} 
+                            className="ml-2 text-[10px] px-1.5 py-0"
+                          >
+                            Significant
+                          </Badge>
+                        )}
+                      </td>
+                      <td className={`text-right py-3 px-2 ${highlightSignificant && cylinderSignificant ? "font-semibold" : ""}`}>
+                        {cylinder.currentYear.toLocaleString()}
+                      </td>
                       <td className="text-right py-3 px-2 text-muted-foreground">{cylinder.previousYear.toLocaleString()}</td>
-                      <td className={`text-right py-3 px-2 ${getChangeColor(cylinder.changePercent)}`}>
+                      <td className={`text-right py-3 px-2 ${getChangeColor(cylinder.changePercent)} ${highlightSignificant && cylinderSignificant ? "font-bold" : ""}`}>
                         {cylinder.changePercent >= 0 ? "+" : ""}{cylinder.changePercent.toFixed(1)}%
                       </td>
-                      <td className="text-right py-3 px-2">{dryIce?.currentYear.toLocaleString() || 0}</td>
+                      <td className={`text-right py-3 px-2 ${highlightSignificant && dryIceSignificant ? "font-semibold" : ""}`}>
+                        {dryIce?.currentYear.toLocaleString() || 0}
+                      </td>
                       <td className="text-right py-3 px-2 text-muted-foreground">{dryIce?.previousYear.toLocaleString() || 0}</td>
-                      <td className={`text-right py-3 px-2 ${getChangeColor(dryIce?.changePercent || 0)}`}>
+                      <td className={`text-right py-3 px-2 ${getChangeColor(dryIce?.changePercent || 0)} ${highlightSignificant && dryIceSignificant ? "font-bold" : ""}`}>
                         {(dryIce?.changePercent || 0) >= 0 ? "+" : ""}{(dryIce?.changePercent || 0).toFixed(1)}%
                       </td>
                     </tr>
