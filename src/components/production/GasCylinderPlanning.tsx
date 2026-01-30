@@ -32,6 +32,7 @@ import { nl } from "date-fns/locale";
 import { toast } from "sonner";
 import { CreateGasCylinderOrderDialog } from "./CreateGasCylinderOrderDialog";
 import { GasCylinderOrderDialog } from "./GasCylinderOrderDialog";
+import { GasTypeMultiSelect } from "./GasTypeMultiSelect";
 import { useUserRole } from "@/hooks/useUserRole";
 import {
   AlertDialog,
@@ -83,7 +84,7 @@ export function GasCylinderPlanning() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<GasCylinderOrder | null>(null);
   const [pressureFilter, setPressureFilter] = useState<PressureFilter>("all");
-  const [gasTypeFilter, setGasTypeFilter] = useState<string>("all");
+  const [gasTypeFilter, setGasTypeFilter] = useState<string[]>([]);
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [userId, setUserId] = useState<string | undefined>();
@@ -366,15 +367,8 @@ export function GasCylinderPlanning() {
 
   const filteredOrders = orders.filter(o => {
     const matchesPressure = pressureFilter === "all" || o.pressure === parseInt(pressureFilter);
-    // Match gas type filter by gas_type_id or by checking if the gas type name matches
-    const matchesGasType = gasTypeFilter === "all" || o.gas_type_id === gasTypeFilter || (() => {
-      const selectedGasType = gasTypes.find(gt => gt.id === gasTypeFilter);
-      if (!selectedGasType) return false;
-      // Check if the order's gas_type matches the selected gas type name
-      const orderGasTypeName = getGasTypeLabel(o).toLowerCase();
-      return orderGasTypeName.includes(selectedGasType.name.toLowerCase()) || 
-             selectedGasType.name.toLowerCase().includes(orderGasTypeName);
-    })();
+    // Match gas type filter - empty array means all, otherwise check if the order's gas_type_id is in the selected list
+    const matchesGasType = gasTypeFilter.length === 0 || (o.gas_type_id && gasTypeFilter.includes(o.gas_type_id));
     const matchesDate = !dateFilter || o.scheduled_date === format(dateFilter, "yyyy-MM-dd");
     const matchesStatus = statusFilter === "all" || o.status === statusFilter;
     return matchesPressure && matchesGasType && matchesDate && matchesStatus;
@@ -485,7 +479,7 @@ export function GasCylinderPlanning() {
                       <X className="h-4 w-4" />
                     </Button>
                   )}
-                  {(dateFilter || pressureFilter !== "all" || gasTypeFilter !== "all" || statusFilter !== "all" || yearFilter !== new Date().getFullYear()) && (
+                  {(dateFilter || pressureFilter !== "all" || gasTypeFilter.length > 0 || statusFilter !== "all" || yearFilter !== new Date().getFullYear()) && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -493,7 +487,7 @@ export function GasCylinderPlanning() {
                       onClick={() => {
                         setDateFilter(undefined);
                         setPressureFilter("all");
-                        setGasTypeFilter("all");
+                        setGasTypeFilter([]);
                         setStatusFilter("all");
                         setYearFilter(new Date().getFullYear());
                       }}
@@ -512,17 +506,13 @@ export function GasCylinderPlanning() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Select value={gasTypeFilter} onValueChange={setGasTypeFilter}>
-                    <SelectTrigger className="w-[150px] bg-background">
-                      <SelectValue placeholder="Gastype" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-background border shadow-lg z-50">
-                      <SelectItem value="all">Alle gastypes</SelectItem>
-                      {gasTypes.map((gasType) => (
-                        <SelectItem key={gasType.id} value={gasType.id}>{gasType.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <GasTypeMultiSelect
+                    gasTypes={gasTypes}
+                    selectedGasTypes={gasTypeFilter}
+                    onSelectionChange={setGasTypeFilter}
+                    placeholder="Alle gastypes"
+                    className="w-[180px]"
+                  />
                   <Select value={pressureFilter} onValueChange={(v) => setPressureFilter(v as PressureFilter)}>
                     <SelectTrigger className="w-[140px] bg-background">
                       <SelectValue placeholder="Druk" />
@@ -556,12 +546,12 @@ export function GasCylinderPlanning() {
                 <div className="text-center py-12 text-muted-foreground">
                   <Cylinder className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="font-medium">
-                    {dateFilter || pressureFilter !== "all" || gasTypeFilter !== "all" || statusFilter !== "all"
+                    {dateFilter || pressureFilter !== "all" || gasTypeFilter.length > 0 || statusFilter !== "all"
                       ? "Geen orders gevonden met de huidige filters" 
                       : "Geen vulorders gepland"}
                   </p>
                   <p className="text-sm">
-                    {dateFilter || pressureFilter !== "all" || gasTypeFilter !== "all" || statusFilter !== "all"
+                    {dateFilter || pressureFilter !== "all" || gasTypeFilter.length > 0 || statusFilter !== "all"
                       ? "Pas de filters aan of voeg een nieuwe order toe" 
                       : "Voeg een nieuwe vulorder toe om te beginnen"}
                   </p>
