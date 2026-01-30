@@ -541,6 +541,16 @@ export function YearComparisonReport() {
                     <CommandList>
                       <CommandEmpty>Geen gastypes gevonden.</CommandEmpty>
                       <CommandGroup>
+                        <CommandItem
+                          onSelect={() => setSelectedGasTypes(gasTypes.map(g => g.id))}
+                          className="text-primary font-medium"
+                        >
+                          <Checkbox
+                            checked={selectedGasTypes.length === gasTypes.length}
+                            className="mr-2"
+                          />
+                          Selecteer alles
+                        </CommandItem>
                         {selectedGasTypes.length > 0 && (
                           <CommandItem
                             onSelect={() => setSelectedGasTypes([])}
