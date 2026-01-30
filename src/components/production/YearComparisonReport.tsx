@@ -789,6 +789,126 @@ export function YearComparisonReport() {
         </Card>
       )}
 
+      {/* Combined Year Comparison per Gas Type */}
+      {gasTypeComparison.length > 0 && (
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Cylinder className="h-5 w-5 text-orange-500" />
+              Gecombineerde jaarvergelijking per gastype
+              {selectedGasTypes.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {selectedGasTypes.length} gefilterd
+                </Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Beide jaren naast elkaar per gastype — {selectedYear} vs {selectedYear - 1}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              // Get all gas type IDs to display
+              const displayGasTypes = selectedGasTypes.length > 0 
+                ? gasTypeComparison.filter(gt => selectedGasTypes.includes(gt.gas_type_id))
+                : gasTypeComparison;
+
+              if (displayGasTypes.length === 0) {
+                return (
+                  <div className="flex items-center justify-center py-8 text-muted-foreground">
+                    Geen data voor geselecteerde gastypes
+                  </div>
+                );
+              }
+
+              // Build combined data for grouped bar chart
+              const combinedData = displayGasTypes.map(gasType => ({
+                name: gasType.gas_type_name,
+                color: gasType.gas_type_color,
+                currentYear: gasType.currentYear,
+                previousYear: gasType.previousYear,
+                changePercent: gasType.changePercent
+              }));
+
+              return (
+                <div className="space-y-6">
+                  {/* Combined Grouped Bar Chart */}
+                  <ResponsiveContainer width="100%" height={350}>
+                    <BarChart data={combinedData} margin={{ bottom: 60 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis 
+                        dataKey="name" 
+                        className="text-xs"
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                        interval={0}
+                      />
+                      <YAxis className="text-xs" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--background))',
+                          border: '1px solid hsl(var(--border))'
+                        }}
+                        formatter={(value: number, name: string) => [
+                          value.toLocaleString(),
+                          name === "currentYear" ? `${selectedYear}` : `${selectedYear - 1}`
+                        ]}
+                        labelFormatter={(label) => label}
+                      />
+                      <Legend 
+                        formatter={(value) => value === "currentYear" ? `${selectedYear}` : `${selectedYear - 1}`}
+                        verticalAlign="top"
+                      />
+                      <Bar 
+                        dataKey="previousYear" 
+                        name="previousYear" 
+                        fill="#94a3b8" 
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar 
+                        dataKey="currentYear" 
+                        name="currentYear" 
+                        radius={[4, 4, 0, 0]}
+                      >
+                        {combinedData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+
+                  {/* Growth Summary per Gas Type */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+                    {displayGasTypes.map((gasType) => (
+                      <div 
+                        key={gasType.gas_type_id}
+                        className="p-3 rounded-lg border bg-card/50 text-center"
+                      >
+                        <div 
+                          className="w-3 h-3 rounded-full mx-auto mb-2"
+                          style={{ backgroundColor: gasType.gas_type_color }}
+                        />
+                        <p className="text-xs font-medium truncate mb-1">{gasType.gas_type_name}</p>
+                        <div className="flex items-center justify-center gap-1">
+                          {getTrendIcon(gasType.changePercent)}
+                          <span className={`text-sm font-bold ${getChangeColor(gasType.changePercent)}`}>
+                            {gasType.changePercent >= 0 ? "+" : ""}{gasType.changePercent.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-1">
+                          {gasType.currentYear.toLocaleString()} vs {gasType.previousYear.toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Monthly Gas Type Breakdown */}
       {gasTypeComparison.length > 0 && (
         <Card className="glass-card">
