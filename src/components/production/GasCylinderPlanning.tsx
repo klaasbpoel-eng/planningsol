@@ -68,6 +68,7 @@ interface GasCylinderOrder {
 
 type PressureFilter = "all" | "200" | "300";
 type StatusFilter = "all" | "pending" | "in_progress" | "completed" | "cancelled";
+type GradeFilter = "all" | "medical" | "technical";
 type SortColumn = "order_number" | "customer_name" | "gas_type" | "cylinder_count" | "pressure" | "scheduled_date" | "status";
 type SortDirection = "asc" | "desc";
 
@@ -87,6 +88,8 @@ export function GasCylinderPlanning() {
   const [gasTypeFilter, setGasTypeFilter] = useState<string[]>([]);
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [gradeFilter, setGradeFilter] = useState<GradeFilter>("all");
+  const [customerFilter, setCustomerFilter] = useState<string>("all");
   const [userId, setUserId] = useState<string | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<GasCylinderOrder | null>(null);
@@ -96,6 +99,9 @@ export function GasCylinderPlanning() {
   const [sortColumn, setSortColumn] = useState<SortColumn>("scheduled_date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
+  
+  // Unique customers from orders for filtering
+  const uniqueCustomers = [...new Set(orders.map(o => o.customer_name))].sort();
   const { isAdmin } = useUserRole(userId);
 
   const handleSort = (column: SortColumn) => {
@@ -371,7 +377,9 @@ export function GasCylinderPlanning() {
     const matchesGasType = gasTypeFilter.length === 0 || (o.gas_type_id && gasTypeFilter.includes(o.gas_type_id));
     const matchesDate = !dateFilter || o.scheduled_date === format(dateFilter, "yyyy-MM-dd");
     const matchesStatus = statusFilter === "all" || o.status === statusFilter;
-    return matchesPressure && matchesGasType && matchesDate && matchesStatus;
+    const matchesGrade = gradeFilter === "all" || o.gas_grade === gradeFilter;
+    const matchesCustomer = customerFilter === "all" || o.customer_name === customerFilter;
+    return matchesPressure && matchesGasType && matchesDate && matchesStatus && matchesGrade && matchesCustomer;
   });
 
   const sortedOrders = [...filteredOrders].sort((a, b) => {
@@ -479,7 +487,7 @@ export function GasCylinderPlanning() {
                       <X className="h-4 w-4" />
                     </Button>
                   )}
-                  {(dateFilter || pressureFilter !== "all" || gasTypeFilter.length > 0 || statusFilter !== "all" || yearFilter !== new Date().getFullYear()) && (
+                  {(dateFilter || pressureFilter !== "all" || gasTypeFilter.length > 0 || statusFilter !== "all" || gradeFilter !== "all" || customerFilter !== "all" || yearFilter !== new Date().getFullYear()) && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -489,6 +497,8 @@ export function GasCylinderPlanning() {
                         setPressureFilter("all");
                         setGasTypeFilter([]);
                         setStatusFilter("all");
+                        setGradeFilter("all");
+                        setCustomerFilter("all");
                         setYearFilter(new Date().getFullYear());
                       }}
                     >
@@ -563,23 +573,93 @@ export function GasCylinderPlanning() {
                       <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("order_number")}>
                         <div className="flex items-center">Order<SortIcon column="order_number" /></div>
                       </TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("customer_name")}>
-                        <div className="flex items-center">Klant<SortIcon column="customer_name" /></div>
+                      <TableHead>
+                        <div className="space-y-1">
+                          <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("customer_name")}>
+                            Klant<SortIcon column="customer_name" />
+                          </div>
+                          <Select value={customerFilter} onValueChange={(v) => setCustomerFilter(v)}>
+                            <SelectTrigger className="h-7 text-xs bg-background w-full">
+                              <SelectValue placeholder="Alle" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-background border shadow-lg z-50 max-h-[300px]">
+                              <SelectItem value="all">Alle klanten</SelectItem>
+                              {uniqueCustomers.map((customer) => (
+                                <SelectItem key={customer} value={customer}>{customer}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("gas_type")}>
-                        <div className="flex items-center">Gastype<SortIcon column="gas_type" /></div>
+                      <TableHead>
+                        <div className="space-y-1">
+                          <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("gas_type")}>
+                            Gastype<SortIcon column="gas_type" />
+                          </div>
+                          <GasTypeMultiSelect
+                            gasTypes={gasTypes}
+                            selectedGasTypes={gasTypeFilter}
+                            onSelectionChange={setGasTypeFilter}
+                            placeholder="Alle"
+                            className="h-7 text-xs w-full"
+                          />
+                        </div>
+                      </TableHead>
+                      <TableHead>
+                        <div className="space-y-1">
+                          <span className="text-xs text-muted-foreground">M/T</span>
+                          <Select value={gradeFilter} onValueChange={(v) => setGradeFilter(v as GradeFilter)}>
+                            <SelectTrigger className="h-7 text-xs bg-background w-full">
+                              <SelectValue placeholder="Alle" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-background border shadow-lg z-50">
+                              <SelectItem value="all">Alle</SelectItem>
+                              <SelectItem value="medical">M</SelectItem>
+                              <SelectItem value="technical">T</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </TableHead>
                       <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("cylinder_count")}>
                         <div className="flex items-center">Aantal<SortIcon column="cylinder_count" /></div>
                       </TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("pressure")}>
-                        <div className="flex items-center">Druk<SortIcon column="pressure" /></div>
+                      <TableHead>
+                        <div className="space-y-1">
+                          <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("pressure")}>
+                            Druk<SortIcon column="pressure" />
+                          </div>
+                          <Select value={pressureFilter} onValueChange={(v) => setPressureFilter(v as PressureFilter)}>
+                            <SelectTrigger className="h-7 text-xs bg-background w-full">
+                              <SelectValue placeholder="Alle" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-background border shadow-lg z-50">
+                              <SelectItem value="all">Alle</SelectItem>
+                              <SelectItem value="200">200</SelectItem>
+                              <SelectItem value="300">300</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </TableHead>
                       <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("scheduled_date")}>
                         <div className="flex items-center">Datum<SortIcon column="scheduled_date" /></div>
                       </TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("status")}>
-                        <div className="flex items-center">Status<SortIcon column="status" /></div>
+                      <TableHead>
+                        <div className="space-y-1">
+                          <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("status")}>
+                            Status<SortIcon column="status" />
+                          </div>
+                          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                            <SelectTrigger className="h-7 text-xs bg-background w-full">
+                              <SelectValue placeholder="Alle" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-background border shadow-lg z-50">
+                              <SelectItem value="all">Alle</SelectItem>
+                              {Object.entries(statusLabels).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>{label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </TableHead>
                       {isAdmin && <TableHead className="w-[80px]"></TableHead>}
                     </TableRow>
@@ -597,6 +677,11 @@ export function GasCylinderPlanning() {
                             />
                             {getGasTypeLabel(order)}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {order.gas_grade === "medical" ? "M" : "T"}
+                          </Badge>
                         </TableCell>
                         <TableCell>{order.cylinder_count} st.</TableCell>
                         <TableCell>{order.pressure} bar</TableCell>
