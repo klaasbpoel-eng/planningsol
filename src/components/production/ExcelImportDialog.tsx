@@ -69,30 +69,33 @@ export function ExcelImportDialog({
     if (data) setGasTypes(data);
   };
 
-  // Match gas type name to ID from the gas_types table
+  // Match gas type name to ID from the gas_types table using priority-based matching
   const matchGasTypeId = (gasName: string): string | null => {
-    const name = gasName.toLowerCase();
+    const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+    const normalizedInput = normalize(gasName);
     
-    // Try to find a matching gas type by name
-    const match = gasTypes.find(gt => {
-      const gtName = gt.name.toLowerCase();
-      // Check for exact match or partial match
-      if (gtName === name) return true;
-      if (name.includes(gtName) || gtName.includes(name)) return true;
-      // Check for common Dutch names
-      if (name.includes("zuurstof") && gtName.includes("zuurstof")) return true;
-      if (name.includes("stikstof") && gtName.includes("stikstof")) return true;
-      if (name.includes("argon") && gtName.includes("argon")) return true;
-      if (name.includes("koolzuur") && gtName.includes("koolzuur")) return true;
-      if (name.includes("acetyleen") && gtName.includes("acetyleen")) return true;
-      if (name.includes("helium") && gtName.includes("helium")) return true;
-      if ((name.includes("o2") || name.includes("oxygen")) && (gtName.includes("zuurstof") || gtName.includes("o2"))) return true;
-      if ((name.includes("n2") || name.includes("nitrogen")) && (gtName.includes("stikstof") || gtName.includes("n2"))) return true;
-      if ((name.includes("co2") || name.includes("carbon")) && (gtName.includes("koolzuur") || gtName.includes("co2"))) return true;
-      return false;
+    // Prioriteit 1: Exacte match (genormaliseerd)
+    const exactMatch = gasTypes.find(gt => normalize(gt.name) === normalizedInput);
+    if (exactMatch) return exactMatch.id;
+    
+    // Prioriteit 2: Één bevat de andere volledig (kies de beste match op lengte-verschil)
+    const containsMatches = gasTypes.filter(gt => {
+      const gtNorm = normalize(gt.name);
+      return normalizedInput.includes(gtNorm) || gtNorm.includes(normalizedInput);
     });
     
-    return match?.id || null;
+    if (containsMatches.length > 0) {
+      // Sorteer op lengte-verschil (kleinste verschil = beste match)
+      containsMatches.sort((a, b) => {
+        const diffA = Math.abs(normalize(a.name).length - normalizedInput.length);
+        const diffB = Math.abs(normalize(b.name).length - normalizedInput.length);
+        return diffA - diffB;
+      });
+      return containsMatches[0].id;
+    }
+    
+    // Geen match gevonden - retourneer null in plaats van incorrecte match
+    return null;
   };
 
   // Gas type mapping from Excel names to database enum (for legacy support)
