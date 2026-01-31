@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Loader2, Trash2, Filter, CalendarIcon, X, Edit2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Loader2, Trash2, Filter, CalendarIcon, X, Edit2, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { CreateGasCylinderOrderDialog } from "./CreateGasCylinderOrderDialog";
 import { GasCylinderOrderDialog } from "./GasCylinderOrderDialog";
 import { GasTypeMultiSelect } from "./GasTypeMultiSelect";
+import { ExcelImportDialog } from "./ExcelImportDialog";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import {
   AlertDialog,
@@ -106,6 +107,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
   const [sortColumn, setSortColumn] = useState<SortColumn>("scheduled_date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   
   // Unique customers from orders for filtering
   const uniqueCustomers = [...new Set(orders.map(o => o.customer_name))].sort();
@@ -471,10 +473,16 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
             </Button>
           )}
           {permissions?.canCreateOrders && (
-            <Button className="bg-orange-500 hover:bg-orange-600" onClick={() => setDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nieuwe vulorder
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Excel import
+              </Button>
+              <Button className="bg-orange-500 hover:bg-orange-600" onClick={() => setDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nieuwe vulorder
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -970,6 +978,15 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ExcelImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImported={() => {
+          fetchOrders();
+          onDataChanged?.();
+        }}
+      />
     </div>
   );
 }

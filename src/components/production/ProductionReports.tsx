@@ -15,10 +15,8 @@ import {
   Clock,
   XCircle,
   Loader2,
-  Upload,
   GitCompare
 } from "lucide-react";
-import { ExcelImportDialog } from "./ExcelImportDialog";
 import { YearComparisonReport } from "./YearComparisonReport";
 import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -106,7 +104,6 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
   const [dryIceOrders, setDryIceOrders] = useState<DryIceOrder[]>([]);
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchGasTypes();
@@ -417,22 +414,9 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
                 </Popover>
               </div>
             </div>
-            <Button onClick={() => setImportDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
-              <Upload className="h-4 w-4 mr-2" />
-              Excel importeren
-            </Button>
           </div>
         </CardContent>
       </Card>
-
-      <ExcelImportDialog
-        open={importDialogOpen}
-        onOpenChange={setImportDialogOpen}
-        onImported={() => {
-          fetchReportData();
-          onDataChanged?.();
-        }}
-      />
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
