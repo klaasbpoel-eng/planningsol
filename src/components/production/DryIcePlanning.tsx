@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Box, Repeat, Edit2, AlertTriangle, Filter, X, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Box, Repeat, Edit2, AlertTriangle, Filter, X, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -24,6 +24,7 @@ import { nl } from "date-fns/locale";
 import { toast } from "sonner";
 import { CreateDryIceOrderDialog } from "./CreateDryIceOrderDialog";
 import { DryIceOrderDialog } from "@/components/calendar/DryIceOrderDialog";
+import { DryIceExcelImportDialog } from "./DryIceExcelImportDialog";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import {
   AlertDialog,
@@ -94,6 +95,7 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
   const [deleteYearCount, setDeleteYearCount] = useState<number | null>(null);
   const [loadingDeleteCount, setLoadingDeleteCount] = useState(false);
   const [dailyCapacity, setDailyCapacity] = useState<number>(500);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   
   // Filter states
   const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
@@ -457,10 +459,16 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
             </Button>
           )}
           {permissions?.canCreateOrders && (
-            <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={() => setDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nieuwe productieorder
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Excel import
+              </Button>
+              <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={() => setDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nieuwe productieorder
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -816,6 +824,15 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <DryIceExcelImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImported={() => {
+          fetchOrders();
+          onDataChanged?.();
+        }}
+      />
     </div>
   );
 }
