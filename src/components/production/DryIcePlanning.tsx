@@ -538,9 +538,6 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("order_number")}>
-                        <div className="flex items-center">Order<SortIcon column="order_number" /></div>
-                      </TableHead>
                       <TableHead>
                         <div className="space-y-1">
                           <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("customer_name")}>
@@ -607,9 +604,9 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
                   <TableBody>
                     {sortedOrders.map((order) => (
                       <TableRow key={order.id}>
-                        <TableCell className="font-medium">
+                        <TableCell>
                           <div className="flex items-center gap-2">
-                            {order.order_number}
+                            {order.customer_name}
                             {order.is_recurring && (
                               <span title="Onderdeel van herhalende reeks" className="text-cyan-500">
                                 <Repeat className="h-3.5 w-3.5" />
@@ -617,7 +614,6 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>{order.customer_name}</TableCell>
                         <TableCell>{getProductTypeLabel(order)}</TableCell>
                         <TableCell>{formatNumber(order.quantity_kg, 0)} kg</TableCell>
                         <TableCell>
