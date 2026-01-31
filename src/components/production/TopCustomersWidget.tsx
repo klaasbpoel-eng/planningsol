@@ -67,7 +67,7 @@ export function TopCustomersWidget() {
       });
 
       const top5 = enriched
-        .sort((a, b) => b.totalVolume - a.totalVolume)
+        .sort((a, b) => b.total_cylinders - a.total_cylinders)
         .slice(0, 5);
 
       setCustomers(top5);
