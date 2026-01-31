@@ -1,79 +1,89 @@
 
+# Plan: Fix Diameter Matching in Dry Ice Excel Import
 
-# Plan: Fix Excel Import - Niet alle orders worden geimporteerd
+## Probleem
 
-## Probleem Geidentificeerd
+De huidige `matchProductTypeId` functie matcht diameters incorrect door een logische fout in de matching condities.
 
-Uit de console logs blijkt dat de import faalt door **duplicate key violations** op de `order_number` kolom:
-
+### Huidige Code (fout)
+```typescript
+if (diameterStr.includes("09") || diameterStr.includes("9 mm")) {
+  return ptName.includes("9") || ptName.includes("pellet"); // ❌ "pellet" matcht BEIDE types!
+}
+if (diameterStr.includes("03") || diameterStr.includes("3 mm")) {
+  return ptName.includes("3") || ptName.includes("pellet"); // ❌ "pellet" matcht BEIDE types!
+}
 ```
-"duplicate key value violates unique constraint \"gas_cylinder_orders_order_number_key\""
-```
 
-### Hoofdoorzaken
-
-1. **Zwakke ordernummer-generatie**: De huidige functie `generateOrderNumber` gebruikt:
-   - `Math.random() * 1000` = slechts 1000 mogelijke random waarden
-   - Bij 6000+ records is collision vrijwel gegarandeerd (birthday paradox)
-   
-2. **Batch-level foutafhandeling**: Als 1 record in een batch van 50 faalt, wordt de hele batch overgeslagen
-
-3. **Geen conflict-resolutie**: Er is geen retry-mechanisme voor gefaalde records
+### Het Probleem
+- Excel bevat waarden zoals `"09 mm."` en `"03 mm."`
+- Database product types: `"Pellets 3mm"` en `"Pellets 9mm"`
+- De voorwaarde `ptName.includes("pellet")` matcht **beide** product types
+- Resultaat: het **eerste** product type in de array wordt altijd teruggegeven, ongeacht de werkelijke diameter
 
 ---
 
 ## Oplossing
 
-### 1. Verbeterde ordernummer-generatie
+Vervang de huidige matching logica met een robuustere aanpak:
 
-Vervang de huidige methode door een gegarandeerd unieke combinatie:
-- Datum + index + UUID-fragment (8 karakters)
-- Format: `GC-IMP-{datum}-{index}-{uuid8}`
+1. **Extract numerieke diameter**: Haal het getal uit de Excel waarde (bijv. "09 mm." → 9)
+2. **Directe match op nummer**: Zoek product type dat dit nummer bevat
+3. **Prioriteer exacte match**: Geef voorrang aan "9mm" match boven "pellet" match
 
+### Nieuwe Code
 ```typescript
-const generateOrderNumber = (index: number) => {
-  const date = format(new Date(), "yyyyMMdd");
-  const uuid = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
-  return `GC-IMP-${date}-${index.toString().padStart(5, "0")}-${uuid}`;
+const matchProductTypeId = (diameter: string): string | null => {
+  const diameterStr = diameter.toLowerCase().trim();
+  
+  // Extract numeric value (e.g., "09 mm." → "9", "03 mm." → "3")
+  const numericMatch = diameterStr.match(/(\d+)/);
+  if (!numericMatch) {
+    return productTypes[0]?.id || null;
+  }
+  
+  const numericValue = parseInt(numericMatch[1], 10).toString(); // "09" → "9"
+  
+  // Find product type containing this number
+  const match = productTypes.find(pt => {
+    const ptName = pt.name.toLowerCase();
+    // Check for exact numeric match in product name
+    return ptName.includes(numericValue + "mm") || 
+           ptName.includes(numericValue + " mm") ||
+           ptName.includes(numericValue);
+  });
+  
+  return match?.id || productTypes[0]?.id || null;
 };
 ```
-
-### 2. Verbeterde foutafhandeling met retry
-
-Bij een duplicate key error:
-1. Detecteer welke specifieke records het probleem veroorzaken
-2. Genereer nieuwe ordernummers voor die records
-3. Probeer opnieuw
-
-### 3. Conflict handling via upsert (optioneel)
-
-Als alternatief kan de insert worden omgezet naar een upsert met `onConflict` handling.
 
 ---
 
 ## Technische Wijzigingen
 
-### Bestand: `src/components/production/ExcelImportDialog.tsx`
+### Bestand: `src/components/production/DryIceExcelImportDialog.tsx`
 
-**Wijziging 1 - Ordernummer generatie (regel 291-295)**:
-- Vervang `Math.random()` door `crypto.randomUUID()`
-- Vergroot de index padding van 4 naar 5 cijfers voor toekomstige groei
+**Wijziging 1 - Nieuwe `matchProductTypeId` functie (regels 94-112)**:
+- Verwijder de foutieve `|| ptName.includes("pellet")` condities
+- Gebruik regex om numerieke diameter te extraheren
+- Converteer leading zeros (bijv. "09" → "9")
+- Match op specifiek nummer in product type naam
 
-**Wijziging 2 - Batch insert met retry (regel 318-350)**:
-- Voeg retry-logica toe voor batches die falen
-- Bij duplicate key error: regenereer ordernummers en probeer opnieuw
-- Fallback: individuele inserts voor problematische records
+---
 
-**Wijziging 3 - Gedetailleerdere foutrapportage**:
-- Track welke specifieke records succesvol zijn
-- Toon informatievere foutmeldingen aan de gebruiker
+## Voorbeeld Matching
+
+| Excel Waarde | Geëxtraheerd Nummer | Match Product Type |
+|--------------|---------------------|-------------------|
+| "09 mm."     | 9                   | "Pellets 9mm" ✓   |
+| "03 mm."     | 3                   | "Pellets 3mm" ✓   |
+| "9 mm"       | 9                   | "Pellets 9mm" ✓   |
+| "3mm"        | 3                   | "Pellets 3mm" ✓   |
 
 ---
 
 ## Verwacht Resultaat
 
-- **100% van de orders** wordt succesvol geimporteerd (mits data valide is)
-- Geen duplicate key errors meer bij normale imports
-- Robuuste foutafhandeling bij edge cases
-- Duidelijke feedback over import-status
-
+- **100% correcte diameter matching** bij import
+- Robuust tegen verschillende invoerformaten (met/zonder leading zero, spaties, punten)
+- Fallback naar eerste product type als geen match gevonden wordt
