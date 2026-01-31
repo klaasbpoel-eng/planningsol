@@ -294,7 +294,6 @@ export function UserApprovalManagement() {
   const createUserMutation = useMutation({
     mutationFn: async (data: typeof createForm) => {
       if (!data.email) throw new Error("E-mail is verplicht");
-      if (!data.full_name) throw new Error("Naam is verplicht");
 
       // Create profile with intended_role (will be assigned when user signs up)
       const { data: newProfile, error: profileError } = await supabase
@@ -698,13 +697,12 @@ export function UserApprovalManagement() {
           <form onSubmit={handleCreateSubmit}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="create-name">Naam *</Label>
+                <Label htmlFor="create-name">Naam</Label>
                 <Input
                   id="create-name"
                   value={createForm.full_name}
                   onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })}
                   placeholder="Volledige naam"
-                  required
                 />
               </div>
               <div className="space-y-2">
