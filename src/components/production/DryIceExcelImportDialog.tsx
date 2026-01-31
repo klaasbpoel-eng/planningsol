@@ -12,10 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Label } from "@/components/ui/label";
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, Snowflake } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { CustomerSelect } from "./CustomerSelect";
 
 interface DryIceExcelImportDialogProps {
   open: boolean;
@@ -63,6 +65,8 @@ export function DryIceExcelImportDialog({
   const [step, setStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [packagingOptions, setPackagingOptions] = useState<Packaging[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  const [selectedCustomerName, setSelectedCustomerName] = useState<string>("");
 
   useEffect(() => {
     if (open) {
@@ -314,7 +318,8 @@ export function DryIceExcelImportDialog({
       
       const createInsertData = () => batch.map((order, idx) => ({
         order_number: generateOrderNumber(start + idx),
-        customer_name: "Import", // Generic customer name for imported data
+        customer_id: selectedCustomerId || null,
+        customer_name: selectedCustomerName || "Import",
         product_type: "pellets" as const, // Default enum value
         product_type_id: matchProductTypeId(order.productType),
         packaging_id: matchPackagingId(order.packagingCapacity),
@@ -350,7 +355,8 @@ export function DryIceExcelImportDialog({
             const order = batch[i];
             const singleInsert = {
               order_number: generateOrderNumber(start + i),
-              customer_name: "Import",
+              customer_id: selectedCustomerId || null,
+              customer_name: selectedCustomerName || "Import",
               product_type: "pellets" as const,
               product_type_id: matchProductTypeId(order.productType),
               packaging_id: matchPackagingId(order.packagingCapacity),
@@ -410,6 +416,8 @@ export function DryIceExcelImportDialog({
     setProgress(0);
     setStats(null);
     setStep("upload");
+    setSelectedCustomerId("");
+    setSelectedCustomerName("");
     onOpenChange(false);
   };
 
@@ -476,6 +484,20 @@ export function DryIceExcelImportDialog({
                   <Badge variant="secondary">{parsedData.length} orders</Badge>
                   <Badge variant="outline">{totalKg.toLocaleString()} kg totaal</Badge>
                 </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Klant voor geïmporteerde orders</Label>
+                <CustomerSelect
+                  value={selectedCustomerId}
+                  onValueChange={(id, name) => {
+                    setSelectedCustomerId(id);
+                    setSelectedCustomerName(name);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Alle geïmporteerde orders worden aan deze klant gekoppeld
+                </p>
               </div>
               
               <ScrollArea className="h-[300px] rounded-md border">
