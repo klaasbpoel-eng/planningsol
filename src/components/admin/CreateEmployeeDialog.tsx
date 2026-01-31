@@ -41,6 +41,7 @@ export function CreateEmployeeDialog({ trigger }: CreateEmployeeDialogProps) {
   const createEmployeeMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       // Create profile directly (without auth user - admin creating employee)
+      // The intended_role is stored and will be applied when the user registers
       const { data: newProfile, error: profileError } = await supabase
         .from("profiles")
         .insert({
@@ -49,14 +50,12 @@ export function CreateEmployeeDialog({ trigger }: CreateEmployeeDialogProps) {
           department: data.department || null,
           job_title: data.job_title || null,
           is_approved: true, // Automatically approved when admin creates
-        })
+          intended_role: data.role !== "user" ? data.role : null, // Store intended role for assignment on registration
+        } as any)
         .select()
         .single();
 
       if (profileError) throw profileError;
-
-      // Note: Role assignment will happen when the user registers and links to this profile
-      // For now, we store the intended role in a separate step when user registers
       
       return newProfile;
     },
