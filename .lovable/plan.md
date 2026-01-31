@@ -1,103 +1,27 @@
 
-# Plan: Oplossen van delete timeout en database functie fouten
+# Plan: Fix Top 5 Klanten Widget
 
-## Probleemanalyse
+## Probleem Geidentificeerd
 
-Na onderzoek heb ik twee problemen gevonden:
+De "Top 5 Klanten" widget toont "Geen klantdata beschikbaar" omdat de database functie `get_yearly_totals_by_customer` een fout geeft.
 
-### 1. Delete Timeout voor Cilinder Orders
-- De database bevat **24.495 gas cylinder orders**
-- Het verwijderen van zoveel records in één keer veroorzaakt een statement timeout (de standaard limiet is 8 seconden)
-- De huidige code probeert alle records tegelijk te verwijderen wat faalt bij grote datasets
+**Foutmelding**: `column reference "customer_id" is ambiguous - It could refer to either a PL/pgSQL variable or a table column`
 
-### 2. Klant Vergelijking Functie Fout (bijkomend probleem)
-- De `get_yearly_totals_by_customer` database functie geeft een fout: "FULL JOIN is only supported with merge-joinable or hash-joinable join conditions"
-- Dit komt door een `FULL OUTER JOIN` met een `OR` conditie die niet wordt ondersteund door PostgreSQL
+**Oorzaak**: In PostgreSQL PL/pgSQL functies, wanneer je `RETURNS TABLE(customer_id uuid, customer_name text, ...)` definieert, worden deze kolomnamen ook als variabelen aangemaakt binnen de functie. Wanneer je dan `SELECT customer_id` schrijft in een query binnen de functie, weet PostgreSQL niet of je de tabelkolom of de functievariabele bedoelt.
 
 ## Oplossing
 
-### Stap 1: Batch Delete Implementatie
-De `handleConfirmDeleteAll` functie in `GasCylinderPlanning.tsx` aanpassen om orders in batches van ~5000 te verwijderen:
+De database functie moet worden aangepast zodat alle verwijzingen naar tabelkolommen expliciet de tabelnaam of alias gebruiken.
 
-```text
-+-------------------+      +-------------------+      +-------------------+
-| Ophalen order IDs | ---> | Verwijder batch 1 | ---> | Verwijder batch 2 | ---> ...
-| (eerste X)        |      | (5000 orders)     |      | (5000 orders)     |
-+-------------------+      +-------------------+      +-------------------+
-```
+### Database Migratie
 
-**Wijzigingen:**
-- Orders ophalen met paginering
-- Verwijderen in meerdere kleine batches
-- Voortgang tonen aan de gebruiker
+Een nieuwe migratie zal de functie vervangen met een versie waarin alle kolomreferenties ondubbelzinnig zijn gemaakt door:
 
-### Stap 2: Database Functie Repareren
-De `get_yearly_totals_by_customer` functie herschrijven met een `UNION ALL` benadering in plaats van `FULL OUTER JOIN` met `OR`:
+1. **Tabel-aliassen toevoegen**: Elke tabel krijgt een korte alias (bijv. `gco` voor gas_cylinder_orders, `dio` voor dry_ice_orders)
+2. **Expliciet prefix gebruiken**: Alle kolommen worden voorafgegaan door hun tabelalias (bijv. `gco.customer_id` in plaats van alleen `customer_id`)
+3. **GROUP BY met alias**: Ook de GROUP BY clausules gebruiken de tabel-aliassen
 
-**Nieuwe aanpak:**
-1. Verzamel alle unieke klant-combinaties uit beide tabellen
-2. Join de totalen per tabel afzonderlijk
-3. Combineer de resultaten
-
----
-
-## Technische Details
-
-### Bestand 1: `src/components/production/GasCylinderPlanning.tsx`
-
-De `handleConfirmDeleteAll` functie wijzigen naar een batch-delete aanpak:
-
-```typescript
-const handleConfirmDeleteAll = async () => {
-  setDeletingAll(true);
-  
-  try {
-    const BATCH_SIZE = 1000;
-    let totalDeleted = 0;
-    let hasMore = true;
-    
-    while (hasMore) {
-      // Haal een batch IDs op
-      const { data: batch, error: fetchError } = await supabase
-        .from("gas_cylinder_orders")
-        .select("id")
-        .limit(BATCH_SIZE);
-      
-      if (fetchError) throw fetchError;
-      if (!batch || batch.length === 0) {
-        hasMore = false;
-        break;
-      }
-      
-      const ids = batch.map(order => order.id);
-      
-      // Verwijder deze batch
-      const { error: deleteError } = await supabase
-        .from("gas_cylinder_orders")
-        .delete()
-        .in("id", ids);
-      
-      if (deleteError) throw deleteError;
-      
-      totalDeleted += batch.length;
-      hasMore = batch.length === BATCH_SIZE;
-    }
-    
-    toast.success(`Alle ${totalDeleted} vulorders zijn verwijderd`);
-    fetchOrders();
-  } catch (err) {
-    toast.error("Fout bij verwijderen van orders");
-    console.error("Error:", err);
-  } finally {
-    setDeletingAll(false);
-    setDeleteAllDialogOpen(false);
-  }
-};
-```
-
-### Database Migratie: Fix `get_yearly_totals_by_customer`
-
-Vervang de FULL OUTER JOIN met OR door een UNION-gebaseerde aanpak:
+### Aangepaste Functie
 
 ```sql
 CREATE OR REPLACE FUNCTION public.get_yearly_totals_by_customer(p_year integer)
@@ -114,63 +38,52 @@ AS $$
 BEGIN
   RETURN QUERY
   WITH all_customers AS (
-    -- Alle unieke klanten uit beide tabellen
-    SELECT DISTINCT 
-      COALESCE(gco.customer_id, dio.customer_id) as cid,
-      COALESCE(gco.customer_name, dio.customer_name) as cname
-    FROM (
-      SELECT customer_id, customer_name 
-      FROM gas_cylinder_orders 
-      WHERE scheduled_date >= make_date(p_year, 1, 1)
-        AND scheduled_date <= make_date(p_year, 12, 31)
-    ) gco
-    FULL OUTER JOIN (
-      SELECT customer_id, customer_name 
-      FROM dry_ice_orders 
-      WHERE scheduled_date >= make_date(p_year, 1, 1)
-        AND scheduled_date <= make_date(p_year, 12, 31)
-    ) dio ON gco.customer_id = dio.customer_id
+    SELECT DISTINCT gco.customer_id as cid, gco.customer_name as cname
+    FROM gas_cylinder_orders gco
+    WHERE gco.scheduled_date >= make_date(p_year, 1, 1)
+      AND gco.scheduled_date <= make_date(p_year, 12, 31)
+    UNION
+    SELECT DISTINCT dio.customer_id as cid, dio.customer_name as cname
+    FROM dry_ice_orders dio
+    WHERE dio.scheduled_date >= make_date(p_year, 1, 1)
+      AND dio.scheduled_date <= make_date(p_year, 12, 31)
   ),
   cylinder_totals AS (
-    SELECT customer_id as cid, customer_name as cname,
-      COALESCE(SUM(cylinder_count), 0)::bigint as cylinders
-    FROM gas_cylinder_orders
-    WHERE scheduled_date >= make_date(p_year, 1, 1)
-      AND scheduled_date <= make_date(p_year, 12, 31)
-    GROUP BY customer_id, customer_name
+    SELECT gco.customer_id as cid, gco.customer_name as cname,
+      COALESCE(SUM(gco.cylinder_count), 0)::bigint as cylinders
+    FROM gas_cylinder_orders gco
+    WHERE gco.scheduled_date >= make_date(p_year, 1, 1)
+      AND gco.scheduled_date <= make_date(p_year, 12, 31)
+    GROUP BY gco.customer_id, gco.customer_name
   ),
   dry_ice_totals AS (
-    SELECT customer_id as cid, customer_name as cname,
-      COALESCE(SUM(quantity_kg), 0)::numeric as dry_ice
-    FROM dry_ice_orders
-    WHERE scheduled_date >= make_date(p_year, 1, 1)
-      AND scheduled_date <= make_date(p_year, 12, 31)
-    GROUP BY customer_id, customer_name
+    SELECT dio.customer_id as cid, dio.customer_name as cname,
+      COALESCE(SUM(dio.quantity_kg), 0)::numeric as dry_ice
+    FROM dry_ice_orders dio
+    WHERE dio.scheduled_date >= make_date(p_year, 1, 1)
+      AND dio.scheduled_date <= make_date(p_year, 12, 31)
+    GROUP BY dio.customer_id, dio.customer_name
   )
   SELECT 
-    ac.cid as customer_id,
-    ac.cname as customer_name,
-    COALESCE(ct.cylinders, 0) as total_cylinders,
-    COALESCE(dt.dry_ice, 0) as total_dry_ice_kg
+    ac.cid,
+    ac.cname,
+    COALESCE(ct.cylinders, 0)::bigint,
+    COALESCE(dt.dry_ice, 0)::numeric
   FROM all_customers ac
-  LEFT JOIN cylinder_totals ct ON ac.cid = ct.cid
-  LEFT JOIN dry_ice_totals dt ON ac.cid = dt.cid
+  LEFT JOIN cylinder_totals ct ON ac.cid = ct.cid AND ac.cname = ct.cname
+  LEFT JOIN dry_ice_totals dt ON ac.cid = dt.cid AND ac.cname = dt.cname
   ORDER BY (COALESCE(ct.cylinders, 0) + COALESCE(dt.dry_ice, 0)) DESC;
 END;
 $$;
 ```
 
----
+## Stappen
 
-## Samenvatting Wijzigingen
+| Stap | Actie |
+|------|-------|
+| 1 | Database migratie uitvoeren met gecorrigeerde functie |
+| 2 | Functie testen om te verifiëren dat de data correct wordt opgehaald |
 
-| Component | Actie |
-|-----------|-------|
-| `GasCylinderPlanning.tsx` | Batch delete implementeren (1000 per keer) |
-| `DryIcePlanning.tsx` | Zelfde batch delete logica toevoegen |
-| Database functie | `get_yearly_totals_by_customer` herschrijven zonder OR in FULL JOIN |
+## Geen Frontend Wijzigingen Nodig
 
-## Verwacht Resultaat
-- Verwijderen van alle orders werkt betrouwbaar, ongeacht het aantal
-- Klant vergelijking in rapportages werkt correct
-- Voortgang wordt getoond tijdens het verwijderen
+De `TopCustomersWidget.tsx` component is correct geïmplementeerd - het probleem zit volledig in de database functie. Na de fix zal de widget automatisch de klantdata correct weergeven.
