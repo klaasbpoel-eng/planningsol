@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { toast } from "sonner";
+import { formatNumber } from "@/lib/utils";
 import { CreateDryIceOrderDialog } from "./CreateDryIceOrderDialog";
 import { DryIceOrderDialog } from "@/components/calendar/DryIceOrderDialog";
 import { DryIceExcelImportDialog } from "./DryIceExcelImportDialog";
@@ -618,7 +619,7 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
                         </TableCell>
                         <TableCell>{order.customer_name}</TableCell>
                         <TableCell>{getProductTypeLabel(order)}</TableCell>
-                        <TableCell>{order.quantity_kg} kg</TableCell>
+                        <TableCell>{formatNumber(order.quantity_kg, 0)} kg</TableCell>
                         <TableCell>
                           {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
                         </TableCell>

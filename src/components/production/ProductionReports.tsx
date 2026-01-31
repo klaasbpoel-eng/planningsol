@@ -20,7 +20,7 @@ import {
 import { YearComparisonReport } from "./YearComparisonReport";
 import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { nl } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Table,
@@ -464,7 +464,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dryIceStats.totalKg} kg</div>
+            <div className="text-2xl font-bold">{formatNumber(dryIceStats.totalKg, 0)} kg</div>
           </CardContent>
         </Card>
 
@@ -705,7 +705,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
                 Droogijs orders
               </CardTitle>
               <CardDescription>
-                {dryIceStats.total} orders | {dryIceStats.totalKg} kg totaal
+                {dryIceStats.total} orders | {formatNumber(dryIceStats.totalKg, 0)} kg totaal
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -727,7 +727,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
                         <TableCell className="font-medium">{order.order_number}</TableCell>
                         <TableCell>{order.customer_name}</TableCell>
                         <TableCell>{order.product_type}</TableCell>
-                        <TableCell>{order.quantity_kg} kg</TableCell>
+                        <TableCell>{formatNumber(order.quantity_kg, 0)} kg</TableCell>
                         <TableCell>{format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}</TableCell>
                         <TableCell>{getStatusBadge(order.status)}</TableCell>
                       </TableRow>
