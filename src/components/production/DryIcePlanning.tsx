@@ -228,6 +228,7 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
     } else {
       toast.success("Order verwijderd");
       fetchOrders();
+      onDataChanged?.();
     }
     setDeleteDialogOpen(false);
     setOrderToDelete(null);
@@ -275,6 +276,7 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
       
       toast.success(`Alle ${totalDeleted} droogijs orders zijn verwijderd`);
       fetchOrders();
+      onDataChanged?.();
     } catch (err) {
       toast.error("Fout bij verwijderen van orders");
       console.error("Error:", err);
