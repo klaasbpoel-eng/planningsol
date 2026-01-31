@@ -23,6 +23,11 @@ interface GasTypeData {
   months: number[];
 }
 
+interface YearData {
+  year: number;
+  gasTypes: GasTypeData[];
+}
+
 interface CumulativeChartData {
   month: number;
   monthName: string;
@@ -36,13 +41,14 @@ const MONTH_NAMES = [
 
 export function CumulativeGasTypeChart() {
   const [loading, setLoading] = useState(true);
-  const [gasTypeData, setGasTypeData] = useState<GasTypeData[]>([]);
+  const [yearData, setYearData] = useState<YearData[]>([]);
   const [selectedGasTypes, setSelectedGasTypes] = useState<string[]>([]);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedYear1, setSelectedYear1] = useState<number>(new Date().getFullYear());
+  const [selectedYear2, setSelectedYear2] = useState<number>(new Date().getFullYear() - 1);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [allGasTypes, setAllGasTypes] = useState<{ id: string; name: string; color: string }[]>([]);
 
   useEffect(() => {
-    // Generate available years
     const currentYear = new Date().getFullYear();
     const years: number[] = [];
     for (let y = currentYear; y >= 2017; y--) {
@@ -52,54 +58,68 @@ export function CumulativeGasTypeChart() {
   }, []);
 
   useEffect(() => {
-    fetchGasTypeData();
-  }, [selectedYear]);
+    fetchBothYearsData();
+  }, [selectedYear1, selectedYear2]);
 
-  const fetchGasTypeData = async () => {
+  const fetchBothYearsData = async () => {
     setLoading(true);
 
-    const { data, error } = await supabase.rpc("get_monthly_cylinder_totals_by_gas_type", {
-      p_year: selectedYear
-    });
+    const [result1, result2] = await Promise.all([
+      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: selectedYear1 }),
+      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: selectedYear2 })
+    ]);
 
-    if (error) {
-      console.error("Error fetching gas type data:", error);
-      setLoading(false);
-      return;
-    }
+    const processData = (data: any[]): GasTypeData[] => {
+      const gasTypeMap = new Map<string, GasTypeData>();
 
-    // Process data into gas type structure
-    const gasTypeMap = new Map<string, GasTypeData>();
+      data?.forEach((item: { month: number; gas_type_id: string; gas_type_name: string; gas_type_color: string; total_cylinders: number }) => {
+        if (!item.gas_type_id) return;
 
-    data?.forEach((item: { month: number; gas_type_id: string; gas_type_name: string; gas_type_color: string; total_cylinders: number }) => {
-      if (!item.gas_type_id) return;
+        if (!gasTypeMap.has(item.gas_type_id)) {
+          gasTypeMap.set(item.gas_type_id, {
+            id: item.gas_type_id,
+            name: item.gas_type_name || "Onbekend",
+            color: item.gas_type_color || "#94a3b8",
+            months: new Array(12).fill(0)
+          });
+        }
 
-      if (!gasTypeMap.has(item.gas_type_id)) {
-        gasTypeMap.set(item.gas_type_id, {
-          id: item.gas_type_id,
-          name: item.gas_type_name || "Onbekend",
-          color: item.gas_type_color || "#94a3b8",
-          months: new Array(12).fill(0)
-        });
-      }
-
-      const gasType = gasTypeMap.get(item.gas_type_id)!;
-      gasType.months[item.month - 1] = Number(item.total_cylinders) || 0;
-    });
-
-    const allGasTypes = Array.from(gasTypeMap.values())
-      .filter(gt => gt.months.some(v => v > 0))
-      .sort((a, b) => {
-        const totalA = a.months.reduce((sum, v) => sum + v, 0);
-        const totalB = b.months.reduce((sum, v) => sum + v, 0);
-        return totalB - totalA;
+        const gasType = gasTypeMap.get(item.gas_type_id)!;
+        gasType.months[item.month - 1] = Number(item.total_cylinders) || 0;
       });
 
-    setGasTypeData(allGasTypes);
+      return Array.from(gasTypeMap.values());
+    };
 
-    // Default: select top 5 gas types
+    const year1Data = processData(result1.data || []);
+    const year2Data = processData(result2.data || []);
+
+    // Collect all unique gas types from both years
+    const gasTypeMap = new Map<string, { id: string; name: string; color: string }>();
+    [...year1Data, ...year2Data].forEach(gt => {
+      if (!gasTypeMap.has(gt.id)) {
+        gasTypeMap.set(gt.id, { id: gt.id, name: gt.name, color: gt.color });
+      }
+    });
+
+    const allTypes = Array.from(gasTypeMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    setAllGasTypes(allTypes);
+
+    setYearData([
+      { year: selectedYear1, gasTypes: year1Data },
+      { year: selectedYear2, gasTypes: year2Data }
+    ]);
+
+    // Default: select top 5 gas types by total volume
     if (selectedGasTypes.length === 0) {
-      setSelectedGasTypes(allGasTypes.slice(0, 5).map(gt => gt.id));
+      const totals = allTypes.map(gt => {
+        const y1 = year1Data.find(d => d.id === gt.id);
+        const y2 = year2Data.find(d => d.id === gt.id);
+        const total = (y1?.months.reduce((a, b) => a + b, 0) || 0) + (y2?.months.reduce((a, b) => a + b, 0) || 0);
+        return { id: gt.id, total };
+      }).sort((a, b) => b.total - a.total);
+
+      setSelectedGasTypes(totals.slice(0, 5).map(t => t.id));
     }
 
     setLoading(false);
@@ -115,21 +135,25 @@ export function CumulativeGasTypeChart() {
       };
 
       selectedGasTypes.forEach(gasTypeId => {
-        const gasType = gasTypeData.find(gt => gt.id === gasTypeId);
-        if (gasType) {
-          let cumulative = 0;
-          for (let i = 0; i <= m; i++) {
-            cumulative += gasType.months[i];
+        yearData.forEach(yd => {
+          const gasType = yd.gasTypes.find(gt => gt.id === gasTypeId);
+          if (gasType) {
+            let cumulative = 0;
+            for (let i = 0; i <= m; i++) {
+              cumulative += gasType.months[i];
+            }
+            entry[`${gasTypeId}_${yd.year}`] = cumulative;
+          } else {
+            entry[`${gasTypeId}_${yd.year}`] = 0;
           }
-          entry[gasTypeId] = cumulative;
-        }
+        });
       });
 
       chartData.push(entry);
     }
 
     return chartData;
-  }, [gasTypeData, selectedGasTypes]);
+  }, [yearData, selectedGasTypes]);
 
   const toggleGasType = (gasTypeId: string) => {
     setSelectedGasTypes(prev => {
@@ -142,7 +166,7 @@ export function CumulativeGasTypeChart() {
   };
 
   const selectAllGasTypes = () => {
-    setSelectedGasTypes(gasTypeData.map(gt => gt.id));
+    setSelectedGasTypes(allGasTypes.map(gt => gt.id));
   };
 
   const clearGasTypes = () => {
@@ -150,7 +174,7 @@ export function CumulativeGasTypeChart() {
   };
 
   const getGasTypeInfo = (id: string) => {
-    return gasTypeData.find(gt => gt.id === id);
+    return allGasTypes.find(gt => gt.id === id);
   };
 
   if (loading) {
@@ -171,26 +195,43 @@ export function CumulativeGasTypeChart() {
             <CardTitle className="text-lg flex items-center gap-2">
               <Cylinder className="h-5 w-5 text-orange-500" />
               <LineChartIcon className="h-4 w-4" />
-              Cilinders per gastype cumulatief
+              Cilinders per gastype — jaarvergelijking
             </CardTitle>
             <CardDescription>
-              Cumulatieve productie per maand — per gastype
+              Cumulatieve productie per maand — vergelijk twee jaren
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
-            <Label className="text-sm text-muted-foreground">Jaar:</Label>
-            <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-              <SelectTrigger className="w-24">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {availableYears.map(year => (
-                  <SelectItem key={year} value={year.toString()}>
-                    {year}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-muted-foreground">Jaar 1:</Label>
+              <Select value={selectedYear1.toString()} onValueChange={(v) => setSelectedYear1(parseInt(v))}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map(year => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-muted-foreground">Jaar 2:</Label>
+              <Select value={selectedYear2.toString()} onValueChange={(v) => setSelectedYear2(parseInt(v))}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map(year => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -216,7 +257,7 @@ export function CumulativeGasTypeChart() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {gasTypeData.map(gasType => {
+            {allGasTypes.map(gasType => {
               const isSelected = selectedGasTypes.includes(gasType.id);
               return (
                 <Badge
@@ -234,6 +275,18 @@ export function CumulativeGasTypeChart() {
                 </Badge>
               );
             })}
+          </div>
+        </div>
+
+        {/* Legend for years */}
+        <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-0.5 bg-current" />
+            <span>{selectedYear1} (doorgetrokken)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-0.5 bg-current border-dashed border-t-2 border-current" style={{ borderStyle: 'dashed' }} />
+            <span>{selectedYear2} (gestreept)</span>
           </div>
         </div>
 
@@ -257,32 +310,46 @@ export function CumulativeGasTypeChart() {
                   borderRadius: '8px'
                 }}
                 formatter={(value: number, name: string) => {
-                  const info = getGasTypeInfo(name);
-                  return [value.toLocaleString(), info?.name || name];
+                  const [gasTypeId, year] = name.split('_');
+                  const info = getGasTypeInfo(gasTypeId);
+                  return [value.toLocaleString(), `${info?.name || gasTypeId} (${year})`];
                 }}
                 labelFormatter={(label) => `Maand: ${label}`}
               />
               <Legend 
                 formatter={(value) => {
-                  const info = getGasTypeInfo(value);
-                  return info?.name || value;
+                  const [gasTypeId, year] = value.split('_');
+                  const info = getGasTypeInfo(gasTypeId);
+                  return `${info?.name || gasTypeId} (${year})`;
                 }}
               />
-              {selectedGasTypes.map(gasTypeId => {
+              {selectedGasTypes.flatMap(gasTypeId => {
                 const info = getGasTypeInfo(gasTypeId);
-                return (
+                return [
                   <Line
-                    key={gasTypeId}
+                    key={`${gasTypeId}_${selectedYear1}`}
                     type="monotone"
-                    dataKey={gasTypeId}
-                    name={gasTypeId}
+                    dataKey={`${gasTypeId}_${selectedYear1}`}
+                    name={`${gasTypeId}_${selectedYear1}`}
                     stroke={info?.color || "#94a3b8"}
                     strokeWidth={2}
                     dot={{ fill: info?.color || "#94a3b8", r: 3 }}
                     activeDot={{ r: 5 }}
                     connectNulls
+                  />,
+                  <Line
+                    key={`${gasTypeId}_${selectedYear2}`}
+                    type="monotone"
+                    dataKey={`${gasTypeId}_${selectedYear2}`}
+                    name={`${gasTypeId}_${selectedYear2}`}
+                    stroke={info?.color || "#94a3b8"}
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    dot={{ fill: info?.color || "#94a3b8", r: 3, strokeDasharray: "0" }}
+                    activeDot={{ r: 5 }}
+                    connectNulls
                   />
-                );
+                ];
               })}
             </LineChart>
           </ResponsiveContainer>
@@ -299,38 +366,46 @@ export function CumulativeGasTypeChart() {
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-2 px-2 font-medium">Gastype</th>
+                  <th className="text-left py-2 px-2 font-medium">Jaar</th>
                   {MONTH_NAMES.map(month => (
                     <th key={month} className="text-right py-2 px-1 font-medium text-xs">{month}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {selectedGasTypes.map(gasTypeId => {
-                  const gasType = gasTypeData.find(gt => gt.id === gasTypeId);
-                  if (!gasType) return null;
+                {selectedGasTypes.flatMap(gasTypeId => {
+                  const info = getGasTypeInfo(gasTypeId);
+                  
+                  return yearData.map((yd, yIdx) => {
+                    const gasType = yd.gasTypes.find(gt => gt.id === gasTypeId);
+                    let cumulative = 0;
+                    const cumulativeValues = (gasType?.months || new Array(12).fill(0)).map(v => {
+                      cumulative += v;
+                      return cumulative;
+                    });
 
-                  let cumulative = 0;
-                  const cumulativeValues = gasType.months.map(v => {
-                    cumulative += v;
-                    return cumulative;
-                  });
-
-                  return (
-                    <tr key={gasTypeId} className="border-b hover:bg-muted/50">
-                      <td className="py-2 px-2 font-medium">
-                        <span 
-                          className="inline-block w-3 h-3 rounded-full mr-2"
-                          style={{ backgroundColor: gasType.color }}
-                        />
-                        {gasType.name}
-                      </td>
-                      {cumulativeValues.map((value, i) => (
-                        <td key={i} className="text-right py-2 px-1 text-xs">
-                          {value > 0 ? value.toLocaleString() : "-"}
+                    return (
+                      <tr key={`${gasTypeId}_${yd.year}`} className="border-b hover:bg-muted/50">
+                        {yIdx === 0 && (
+                          <td className="py-2 px-2 font-medium" rowSpan={2}>
+                            <span 
+                              className="inline-block w-3 h-3 rounded-full mr-2"
+                              style={{ backgroundColor: info?.color }}
+                            />
+                            {info?.name}
+                          </td>
+                        )}
+                        <td className="py-2 px-2 text-muted-foreground">
+                          {yd.year}
                         </td>
-                      ))}
-                    </tr>
-                  );
+                        {cumulativeValues.map((value, i) => (
+                          <td key={i} className="text-right py-2 px-1 text-xs">
+                            {value > 0 ? value.toLocaleString() : "-"}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  });
                 })}
               </tbody>
             </table>
