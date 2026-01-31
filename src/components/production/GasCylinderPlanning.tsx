@@ -100,6 +100,8 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
   const [deleteYear, setDeleteYear] = useState<number>(new Date().getFullYear());
+  const [deleteYearCount, setDeleteYearCount] = useState<number | null>(null);
+  const [loadingDeleteCount, setLoadingDeleteCount] = useState(false);
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
   const [sortColumn, setSortColumn] = useState<SortColumn>("scheduled_date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -229,8 +231,32 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
     setOrderToDelete(null);
   };
 
+  const fetchDeleteYearCount = async (year: number) => {
+    setLoadingDeleteCount(true);
+    const startDate = `${year}-01-01`;
+    const endDate = `${year}-12-31`;
+    
+    const { count, error } = await supabase
+      .from("gas_cylinder_orders")
+      .select("*", { count: "exact", head: true })
+      .gte("scheduled_date", startDate)
+      .lte("scheduled_date", endDate);
+    
+    if (!error) {
+      setDeleteYearCount(count || 0);
+    }
+    setLoadingDeleteCount(false);
+  };
+
+  const handleDeleteYearChange = (year: number) => {
+    setDeleteYear(year);
+    fetchDeleteYearCount(year);
+  };
+
   const handleDeleteAllClick = () => {
-    setDeleteYear(new Date().getFullYear());
+    const currentYear = new Date().getFullYear();
+    setDeleteYear(currentYear);
+    fetchDeleteYearCount(currentYear);
     setDeleteAllDialogOpen(true);
   };
 
@@ -893,7 +919,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
               </p>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-foreground">Jaar:</span>
-                <Select value={deleteYear.toString()} onValueChange={(v) => setDeleteYear(parseInt(v))}>
+                <Select value={deleteYear.toString()} onValueChange={(v) => handleDeleteYearChange(parseInt(v))}>
                   <SelectTrigger className="w-[120px] bg-background">
                     <SelectValue placeholder="Selecteer jaar" />
                   </SelectTrigger>
@@ -903,6 +929,22 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="p-3 bg-muted/50 rounded-lg border">
+                {loadingDeleteCount ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Aantal orders laden...
+                  </div>
+                ) : deleteYearCount === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Er zijn geen vulorders in {deleteYear}.
+                  </p>
+                ) : (
+                  <p className="text-sm">
+                    <strong className="text-destructive">{deleteYearCount}</strong> vulorders zullen worden verwijderd.
+                  </p>
+                )}
               </div>
               <p className="text-destructive font-medium">
                 Deze actie is permanent en kan niet ongedaan worden gemaakt.
@@ -914,7 +956,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
             <AlertDialogAction 
               onClick={handleConfirmDeleteAll}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deletingAll}
+              disabled={deletingAll || deleteYearCount === 0}
             >
               {deletingAll ? (
                 <>
@@ -922,7 +964,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
                   Verwijderen...
                 </>
               ) : (
-                `Verwijder orders van ${deleteYear}`
+                `Verwijder ${deleteYearCount || 0} orders`
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
