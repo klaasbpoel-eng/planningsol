@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { Dashboard } from "@/components/dashboard/Dashboard";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
+import { PendingApproval } from "@/components/auth/PendingApproval";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useApprovalStatus } from "@/hooks/useApprovalStatus";
 import { Loader2 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
@@ -12,6 +14,7 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [showAdminView, setShowAdminView] = useState(true);
   const { isAdmin, loading: roleLoading } = useUserRole(user?.id);
+  const { isApproved, loading: approvalLoading } = useApprovalStatus(user?.id);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -29,7 +32,7 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading || roleLoading) {
+  if (loading || roleLoading || approvalLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -39,6 +42,11 @@ const Index = () => {
 
   if (!user) {
     return <AuthForm />;
+  }
+
+  // Check approval status - admins bypass this check
+  if (!isApproved && !isAdmin) {
+    return <PendingApproval />;
   }
 
   if (isAdmin && showAdminView) {
