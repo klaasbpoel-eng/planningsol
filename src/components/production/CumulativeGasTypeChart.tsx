@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Cylinder, LineChart as LineChartIcon } from "lucide-react";
+import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LineChart,
@@ -125,6 +125,42 @@ export function CumulativeGasTypeChart() {
     setLoading(false);
   };
 
+  const getGasTypeInfo = (id: string) => {
+    return allGasTypes.find(gt => gt.id === id);
+  };
+
+  // Calculate growth/decline percentages per gas type
+  const growthData = useMemo(() => {
+    return selectedGasTypes.map(gasTypeId => {
+      const info = allGasTypes.find(gt => gt.id === gasTypeId);
+      const year1DataItem = yearData.find(yd => yd.year === selectedYear1);
+      const year2DataItem = yearData.find(yd => yd.year === selectedYear2);
+      
+      const gasType1 = year1DataItem?.gasTypes.find(gt => gt.id === gasTypeId);
+      const gasType2 = year2DataItem?.gasTypes.find(gt => gt.id === gasTypeId);
+      
+      const total1 = gasType1?.months.reduce((a, b) => a + b, 0) || 0;
+      const total2 = gasType2?.months.reduce((a, b) => a + b, 0) || 0;
+      
+      let percentChange = 0;
+      if (total2 > 0) {
+        percentChange = ((total1 - total2) / total2) * 100;
+      } else if (total1 > 0) {
+        percentChange = 100;
+      }
+      
+      return {
+        id: gasTypeId,
+        name: info?.name || gasTypeId,
+        color: info?.color || "#94a3b8",
+        total1,
+        total2,
+        difference: total1 - total2,
+        percentChange
+      };
+    });
+  }, [selectedGasTypes, yearData, selectedYear1, selectedYear2, allGasTypes]);
+
   const cumulativeChartData = useMemo(() => {
     const chartData: CumulativeChartData[] = [];
 
@@ -171,10 +207,6 @@ export function CumulativeGasTypeChart() {
 
   const clearGasTypes = () => {
     setSelectedGasTypes([]);
-  };
-
-  const getGasTypeInfo = (id: string) => {
-    return allGasTypes.find(gt => gt.id === id);
   };
 
   if (loading) {
@@ -277,6 +309,51 @@ export function CumulativeGasTypeChart() {
             })}
           </div>
         </div>
+
+        {/* Growth/Decline Indicators */}
+        {selectedGasTypes.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {growthData.map(item => (
+              <div 
+                key={item.id}
+                className="flex items-center justify-between p-3 rounded-lg border bg-card"
+              >
+                <div className="flex items-center gap-2">
+                  <span 
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span className="font-medium text-sm truncate max-w-[120px]">{item.name}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="text-right text-xs text-muted-foreground">
+                    <div>{item.total1.toLocaleString()} ({selectedYear1})</div>
+                    <div>{item.total2.toLocaleString()} ({selectedYear2})</div>
+                  </div>
+                  <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                    item.percentChange > 0 
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
+                      : item.percentChange < 0 
+                        ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                        : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {item.percentChange > 0 ? (
+                      <TrendingUp className="h-3 w-3" />
+                    ) : item.percentChange < 0 ? (
+                      <TrendingDown className="h-3 w-3" />
+                    ) : (
+                      <Minus className="h-3 w-3" />
+                    )}
+                    <span>
+                      {item.percentChange > 0 ? '+' : ''}
+                      {item.percentChange.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Legend for years */}
         <div className="flex items-center gap-4 text-sm">
