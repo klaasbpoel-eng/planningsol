@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Cylinder, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Cylinder, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -57,8 +57,10 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [editingSize, setEditingSize] = useState<CylinderSize | null>(null);
   const [sizeToDelete, setSizeToDelete] = useState<CylinderSize | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   
   // Sort state
   const [sortColumn, setSortColumn] = useState<SortColumn>("capacity_liters");
@@ -197,6 +199,29 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (cylinderSizes.length === 0) return;
+
+    setBulkDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("cylinder_sizes")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all
+
+      if (error) throw error;
+      
+      toast.success(`${cylinderSizes.length} cilinderinhouden verwijderd`);
+      fetchCylinderSizes();
+      setBulkDeleteDialogOpen(false);
+    } catch (error) {
+      console.error("Error bulk deleting cylinder sizes:", error);
+      toast.error("Fout bij verwijderen van cilinderinhouden");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -216,7 +241,16 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
           </DialogHeader>
 
           <div className="py-4">
-            <div className="flex justify-end mb-4">
+            <div className="flex justify-between mb-4">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setBulkDeleteDialogOpen(true)}
+                disabled={cylinderSizes.length === 0}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Alles verwijderen ({cylinderSizes.length})
+              </Button>
               <Button size="sm" onClick={() => openEditDialog(null)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nieuwe cilinderinhoud
@@ -406,6 +440,32 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Verwijderen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Alle cilinderinhouden verwijderen?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Weet je zeker dat je <strong>alle {cylinderSizes.length} cilinderinhouden</strong> wilt verwijderen?
+              Dit kan niet ongedaan worden gemaakt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Annuleren</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleting ? "Verwijderen..." : `Ja, verwijder alles (${cylinderSizes.length})`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

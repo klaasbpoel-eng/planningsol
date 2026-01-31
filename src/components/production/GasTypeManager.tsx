@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Flame, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Flame, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -57,8 +57,10 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState<GasType | null>(null);
   const [typeToDelete, setTypeToDelete] = useState<GasType | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   
   // Sort state
   const [sortColumn, setSortColumn] = useState<SortColumn>("name");
@@ -208,6 +210,29 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (gasTypes.length === 0) return;
+
+    setBulkDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("gas_types")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all
+
+      if (error) throw error;
+      
+      toast.success(`${gasTypes.length} gastypes verwijderd`);
+      fetchGasTypes();
+      setBulkDeleteDialogOpen(false);
+    } catch (error) {
+      console.error("Error bulk deleting gas types:", error);
+      toast.error("Fout bij verwijderen van gastypes");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -227,7 +252,16 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
           </DialogHeader>
 
           <div className="py-4">
-            <div className="flex justify-end mb-4">
+            <div className="flex justify-between mb-4">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setBulkDeleteDialogOpen(true)}
+                disabled={gasTypes.length === 0}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Alles verwijderen ({gasTypes.length})
+              </Button>
               <Button size="sm" onClick={() => openEditDialog(null)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nieuw gastype
@@ -450,6 +484,32 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Verwijderen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Alle gastypes verwijderen?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Weet je zeker dat je <strong>alle {gasTypes.length} gastypes</strong> wilt verwijderen?
+              Dit kan niet ongedaan worden gemaakt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Annuleren</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleting ? "Verwijderen..." : `Ja, verwijder alles (${gasTypes.length})`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
