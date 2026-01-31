@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Check, X, Clock, UserCheck, Loader2, Users, Pencil, Trash2, Shield } from "lucide-react";
+import { Check, X, Clock, UserCheck, Loader2, Users, Pencil, Trash2, Shield, UserPlus } from "lucide-react";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import {
@@ -71,11 +71,21 @@ const ROLE_COLORS: Record<string, string> = {
   user: "bg-gray-500/10 text-gray-600",
 };
 
+const initialCreateForm = {
+  full_name: "",
+  email: "",
+  department: "",
+  job_title: "",
+  role: "user" as string,
+};
+
 export function UserApprovalManagement() {
   const queryClient = useQueryClient();
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [actionType, setActionType] = useState<ActionType>(null);
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [createForm, setCreateForm] = useState(initialCreateForm);
   const [editForm, setEditForm] = useState({
     full_name: "",
     email: "",
@@ -281,6 +291,40 @@ export function UserApprovalManagement() {
     },
   });
 
+  const createUserMutation = useMutation({
+    mutationFn: async (data: typeof createForm) => {
+      if (!data.email) throw new Error("E-mail is verplicht");
+      if (!data.full_name) throw new Error("Naam is verplicht");
+
+      // Create profile with intended_role (will be assigned when user signs up)
+      const { data: newProfile, error: profileError } = await supabase
+        .from("profiles")
+        .insert({
+          email: data.email,
+          full_name: data.full_name,
+          department: data.department || null,
+          job_title: data.job_title || null,
+          is_approved: true, // Pre-approved by admin
+          intended_role: data.role !== "user" ? data.role : null,
+        })
+        .select()
+        .single();
+
+      if (profileError) throw profileError;
+      return newProfile;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-users"] });
+      queryClient.invalidateQueries({ queryKey: ["pending-users"] });
+      toast.success("Gebruiker aangemaakt. Wanneer deze persoon zich registreert met dit e-mailadres, wordt de rol automatisch toegewezen.");
+      setIsCreateDialogOpen(false);
+      setCreateForm(initialCreateForm);
+    },
+    onError: (error) => {
+      toast.error("Fout bij aanmaken: " + error.message);
+    },
+  });
+
   const closeDialogs = () => {
     setSelectedProfile(null);
     setActionType(null);
@@ -316,6 +360,11 @@ export function UserApprovalManagement() {
       userId: editingProfile.user_id,
       data: editForm 
     });
+  };
+
+  const handleCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createUserMutation.mutate(createForm);
   };
 
   const isLoading = pendingLoading || usersLoading;
@@ -404,14 +453,20 @@ export function UserApprovalManagement() {
 
       {/* All users management */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Alle gebruikers
-          </CardTitle>
-          <CardDescription>
-            Beheer alle geregistreerde gebruikers en hun rollen
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Alle gebruikers
+            </CardTitle>
+            <CardDescription>
+              Beheer alle geregistreerde gebruikers en hun rollen
+            </CardDescription>
+          </div>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Nieuwe gebruiker
+          </Button>
         </CardHeader>
         <CardContent>
           {allUsers && allUsers.length > 0 ? (
@@ -625,6 +680,90 @@ export function UserApprovalManagement() {
               <Button type="submit" disabled={updateMutation.isPending}>
                 {updateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Opslaan
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create New User Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nieuwe gebruiker aanmaken</DialogTitle>
+            <DialogDescription>
+              Maak een vooraf goedgekeurd profiel aan. Wanneer de gebruiker zich registreert met dit e-mailadres, wordt het account automatisch gekoppeld en de rol toegewezen.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateSubmit}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-name">Naam *</Label>
+                <Input
+                  id="create-name"
+                  value={createForm.full_name}
+                  onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })}
+                  placeholder="Volledige naam"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-email">E-mail *</Label>
+                <Input
+                  id="create-email"
+                  type="email"
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                  placeholder="E-mailadres"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-department">Afdeling</Label>
+                <Input
+                  id="create-department"
+                  value={createForm.department}
+                  onChange={(e) => setCreateForm({ ...createForm, department: e.target.value })}
+                  placeholder="Afdeling"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-job-title">Functie</Label>
+                <Input
+                  id="create-job-title"
+                  value={createForm.job_title}
+                  onChange={(e) => setCreateForm({ ...createForm, job_title: e.target.value })}
+                  placeholder="Functietitel"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-role">Rol</Label>
+                <Select
+                  value={createForm.role}
+                  onValueChange={(value) => setCreateForm({ ...createForm, role: value })}
+                >
+                  <SelectTrigger id="create-role">
+                    <SelectValue placeholder="Selecteer een rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">Gebruiker</SelectItem>
+                    <SelectItem value="operator">Operator</SelectItem>
+                    <SelectItem value="supervisor">Supervisor</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => {
+                setIsCreateDialogOpen(false);
+                setCreateForm(initialCreateForm);
+              }}>
+                Annuleren
+              </Button>
+              <Button type="submit" disabled={createUserMutation.isPending}>
+                {createUserMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Aanmaken
               </Button>
             </DialogFooter>
           </form>
