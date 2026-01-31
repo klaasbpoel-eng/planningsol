@@ -90,6 +90,7 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
   const [orderToDelete, setOrderToDelete] = useState<DryIceOrder | null>(null);
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [deleteYear, setDeleteYear] = useState<number>(new Date().getFullYear());
   
   // Filter states
   const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
@@ -235,6 +236,7 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
   };
 
   const handleDeleteAllClick = () => {
+    setDeleteYear(new Date().getFullYear());
     setDeleteAllDialogOpen(true);
   };
 
@@ -242,16 +244,21 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
     setDeletingAll(true);
     
     try {
+      const startDate = `${deleteYear}-01-01`;
+      const endDate = `${deleteYear}-12-31`;
+      
       // Kleinere batch size om URL lengte limiet te voorkomen
       const BATCH_SIZE = 50;
       let totalDeleted = 0;
       let hasMore = true;
       
       while (hasMore) {
-        // Haal een batch IDs op
+        // Haal een batch IDs op voor het geselecteerde jaar
         const { data: batch, error: fetchError } = await supabase
           .from("dry_ice_orders")
           .select("id")
+          .gte("scheduled_date", startDate)
+          .lte("scheduled_date", endDate)
           .limit(BATCH_SIZE);
         
         if (fetchError) throw fetchError;
@@ -274,7 +281,7 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
         hasMore = batch.length === BATCH_SIZE;
       }
       
-      toast.success(`Alle ${totalDeleted} droogijs orders zijn verwijderd`);
+      toast.success(`Alle ${totalDeleted} droogijs orders van ${deleteYear} zijn verwijderd`);
       fetchOrders();
       onDataChanged?.();
     } catch (err) {
@@ -708,14 +715,27 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-destructive flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
-              Alle droogijs orders verwijderen
+              Droogijs orders verwijderen per jaar
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
+            <AlertDialogDescription className="space-y-4">
               <p>
-                <strong>Let op!</strong> Je staat op het punt om <strong>ALLE {orders.length} droogijs orders</strong> uit de database te verwijderen.
+                Selecteer het jaar waarvan je alle droogijs orders wilt verwijderen.
               </p>
-              <p>
-                Deze actie is <strong>permanent</strong> en kan <strong>niet</strong> ongedaan worden gemaakt.
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-foreground">Jaar:</span>
+                <Select value={deleteYear.toString()} onValueChange={(v) => setDeleteYear(parseInt(v))}>
+                  <SelectTrigger className="w-[120px] bg-background">
+                    <SelectValue placeholder="Selecteer jaar" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border shadow-lg z-50">
+                    {availableYears.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-destructive font-medium">
+                Deze actie is permanent en kan niet ongedaan worden gemaakt.
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -732,7 +752,7 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
                   Verwijderen...
                 </>
               ) : (
-                "Ja, verwijder alles"
+                `Verwijder orders van ${deleteYear}`
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
