@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { GasTypeMultiSelect } from "./GasTypeMultiSelect";
 import { CustomerMultiSelect } from "./CustomerMultiSelect";
 import { CumulativeYearChart } from "./CumulativeYearChart";
+import { CumulativeGasTypeChart } from "./CumulativeGasTypeChart";
 import {
   BarChart,
   Bar,
@@ -633,6 +634,9 @@ export function YearComparisonReport() {
         <CumulativeYearChart type="cylinders" />
         <CumulativeYearChart type="dryIce" />
       </div>
+
+      {/* Cumulative Gas Type Chart */}
+      <CumulativeGasTypeChart />
 
       {/* Growth Highlights Summary */}
       <Card className="glass-card">
