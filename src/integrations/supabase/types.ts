@@ -72,6 +72,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "customer_products_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_limited"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "customer_products_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
@@ -253,6 +260,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dry_ice_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_limited"
             referencedColumns: ["id"]
           },
           {
@@ -492,6 +506,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "gas_cylinder_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_limited"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "gas_cylinder_orders_gas_type_id_fkey"
             columns: ["gas_type_id"]
             isOneToOne: false
@@ -675,6 +696,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_limited"
             referencedColumns: ["id"]
           },
         ]
@@ -1033,6 +1061,24 @@ export type Database = {
       }
     }
     Views: {
+      customers_limited: {
+        Row: {
+          id: string | null
+          is_active: boolean | null
+          name: string | null
+        }
+        Insert: {
+          id?: string | null
+          is_active?: boolean | null
+          name?: string | null
+        }
+        Update: {
+          id?: string | null
+          is_active?: boolean | null
+          name?: string | null
+        }
+        Relationships: []
+      }
       profiles_limited: {
         Row: {
           department: string | null
