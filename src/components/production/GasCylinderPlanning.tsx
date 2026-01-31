@@ -33,7 +33,7 @@ import { toast } from "sonner";
 import { CreateGasCylinderOrderDialog } from "./CreateGasCylinderOrderDialog";
 import { GasCylinderOrderDialog } from "./GasCylinderOrderDialog";
 import { GasTypeMultiSelect } from "./GasTypeMultiSelect";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -102,7 +102,7 @@ export function GasCylinderPlanning() {
   
   // Unique customers from orders for filtering
   const uniqueCustomers = [...new Set(orders.map(o => o.customer_name))].sort();
-  const { isAdmin } = useUserRole(userId);
+  const { permissions } = useUserPermissions(userId);
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -418,8 +418,8 @@ export function GasCylinderPlanning() {
             Beheer vulorders voor gascilinders
           </p>
         </div>
-        {isAdmin && (
-          <div className="flex gap-2">
+        <div className="flex gap-2">
+          {permissions?.canDeleteOrders && (
             <Button 
               variant="destructive" 
               onClick={handleDeleteAllClick}
@@ -428,12 +428,14 @@ export function GasCylinderPlanning() {
               <Trash2 className="h-4 w-4 mr-2" />
               Alle orders verwijderen
             </Button>
+          )}
+          {permissions?.canCreateOrders && (
             <Button className="bg-orange-500 hover:bg-orange-600" onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Nieuwe vulorder
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -658,7 +660,7 @@ export function GasCylinderPlanning() {
                           </Select>
                         </div>
                       </TableHead>
-                      {isAdmin && <TableHead className="w-[80px]"></TableHead>}
+                      {(permissions?.canEditOrders || permissions?.canDeleteOrders) && <TableHead className="w-[80px]"></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -685,7 +687,7 @@ export function GasCylinderPlanning() {
                           {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
                         </TableCell>
                         <TableCell>
-                          {isAdmin ? (
+                          {permissions?.canEditOrders ? (
                             <Select 
                               value={order.status} 
                               onValueChange={(newStatus) => handleStatusChange(order.id, newStatus)}
@@ -703,7 +705,7 @@ export function GasCylinderPlanning() {
                             getStatusBadge(order.status)
                           )}
                         </TableCell>
-                        {isAdmin && (
+                        {(permissions?.canEditOrders || permissions?.canDeleteOrders) && (
                           <TableCell>
                             <div className="flex items-center gap-1">
                               <Button
@@ -827,7 +829,7 @@ export function GasCylinderPlanning() {
         open={editDialogOpen}
         onOpenChange={handleEditDialogClose}
         onUpdate={handleOrderUpdated}
-        isAdmin={isAdmin}
+        canEdit={permissions?.canEditOrders}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

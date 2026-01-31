@@ -7,15 +7,34 @@ import { Link, useLocation } from "react-router-dom";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import siteLogo from "@/assets/site_logo.png";
+import type { AppRole } from "@/hooks/useUserPermissions";
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  supervisor: "Supervisor",
+  operator: "Operator",
+  user: "Gebruiker",
+};
+
+const ROLE_COLORS: Record<string, string> = {
+  admin: "bg-red-500/10 text-red-600 border-red-200",
+  supervisor: "bg-purple-500/10 text-purple-600 border-purple-200",
+  operator: "bg-blue-500/10 text-blue-600 border-blue-200",
+  user: "bg-gray-500/10 text-gray-600 border-gray-200",
+};
+
 interface HeaderProps {
   userEmail?: string;
   isAdmin?: boolean;
   onSwitchView?: () => void;
+  role?: AppRole;
 }
+
 export function Header({
   userEmail,
   isAdmin,
-  onSwitchView
+  onSwitchView,
+  role = "user",
 }: HeaderProps) {
   const location = useLocation();
   const handleLogout = async () => {
@@ -38,9 +57,9 @@ export function Header({
                 <h1 className="text-lg font-bold text-primary tracking-tight">
                   Planner
                 </h1>
-                {isAdmin && <Badge className="bg-accent text-accent-foreground text-xs">
-                    Beheerder
-                  </Badge>}
+                <Badge variant="outline" className={`text-xs ${ROLE_COLORS[role] || ROLE_COLORS.user}`}>
+                  {ROLE_LABELS[role] || "Gebruiker"}
+                </Badge>
               </div>
               
             </div>

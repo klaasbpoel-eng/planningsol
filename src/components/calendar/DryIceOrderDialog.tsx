@@ -70,6 +70,7 @@ interface DryIceOrderDialogProps {
   onOpenChange: (open: boolean) => void;
   onUpdate: () => void;
   isAdmin?: boolean;
+  canEdit?: boolean;
   productTypes?: DryIceProductType[];
   packagingOptions?: DryIcePackaging[];
 }
@@ -80,9 +81,12 @@ export function DryIceOrderDialog({
   onOpenChange, 
   onUpdate,
   isAdmin = false,
+  canEdit,
   productTypes = [],
   packagingOptions = []
 }: DryIceOrderDialogProps) {
+  // Use canEdit if provided, otherwise fall back to isAdmin for backwards compatibility
+  const hasEditPermission = canEdit !== undefined ? canEdit : isAdmin;
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -532,7 +536,7 @@ export function DryIceOrderDialog({
               </>
             ) : (
               <>
-                {isAdmin && (
+                {hasEditPermission && (
                   <>
                     <Button 
                       variant="destructive" 
@@ -547,7 +551,7 @@ export function DryIceOrderDialog({
                     </Button>
                   </>
                 )}
-                {!isAdmin && (
+                {!hasEditPermission && (
                   <Button variant="outline" onClick={handleClose}>
                     Sluiten
                   </Button>

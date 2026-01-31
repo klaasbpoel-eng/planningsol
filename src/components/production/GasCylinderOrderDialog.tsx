@@ -81,6 +81,7 @@ interface GasCylinderOrderDialogProps {
   onOpenChange: (open: boolean) => void;
   onUpdate: () => void;
   isAdmin?: boolean;
+  canEdit?: boolean;
 }
 
 export function GasCylinderOrderDialog({ 
@@ -89,7 +90,10 @@ export function GasCylinderOrderDialog({
   onOpenChange, 
   onUpdate,
   isAdmin = false,
+  canEdit,
 }: GasCylinderOrderDialogProps) {
+  // Use canEdit if provided, otherwise fall back to isAdmin for backwards compatibility
+  const hasEditPermission = canEdit !== undefined ? canEdit : isAdmin;
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -585,7 +589,7 @@ export function GasCylinderOrderDialog({
               </>
             ) : (
               <>
-                {isAdmin && (
+                {hasEditPermission && (
                   <>
                     <Button 
                       variant="destructive" 
@@ -600,7 +604,7 @@ export function GasCylinderOrderDialog({
                     </Button>
                   </>
                 )}
-                {!isAdmin && (
+                {!hasEditPermission && (
                   <Button variant="outline" onClick={handleClose}>
                     Sluiten
                   </Button>

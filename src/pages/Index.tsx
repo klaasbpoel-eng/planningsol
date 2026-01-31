@@ -4,7 +4,7 @@ import { AuthForm } from "@/components/auth/AuthForm";
 import { Dashboard } from "@/components/dashboard/Dashboard";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { PendingApproval } from "@/components/auth/PendingApproval";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
 import { Loader2 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
@@ -13,7 +13,7 @@ const Index = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAdminView, setShowAdminView] = useState(true);
-  const { isAdmin, loading: roleLoading } = useUserRole(user?.id);
+  const { role, permissions, loading: permissionsLoading, isAdmin } = useUserPermissions(user?.id);
   const { isApproved, loading: approvalLoading } = useApprovalStatus(user?.id);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading || roleLoading || approvalLoading) {
+  if (loading || permissionsLoading || approvalLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -49,11 +49,14 @@ const Index = () => {
     return <PendingApproval />;
   }
 
+  // Show admin dashboard for admins who want to see it
   if (isAdmin && showAdminView) {
     return (
       <AdminDashboard 
         userEmail={user.email} 
         onSwitchView={() => setShowAdminView(false)} 
+        permissions={permissions}
+        role={role}
       />
     );
   }
@@ -63,6 +66,8 @@ const Index = () => {
       userEmail={user.email} 
       isAdmin={isAdmin}
       onSwitchToAdmin={() => setShowAdminView(true)}
+      permissions={permissions}
+      role={role}
     />
   );
 };
