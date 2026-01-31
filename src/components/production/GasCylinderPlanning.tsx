@@ -747,37 +747,45 @@ export function GasCylinderPlanning() {
             </CardHeader>
             <CardContent className="space-y-3">
               {gasTypes.length > 0 ? (
-                gasTypes.slice(0, 6).map((type) => {
-                  // Get orders with this gas type using gas_type_id
-                  const typeOrders = orders.filter(order => 
-                    order.gas_type_id === type.id || order.gas_type_ref?.id === type.id
-                  );
-                  // Sum total cylinders for this gas type
-                  const totalCylinders = typeOrders.reduce((sum, order) => sum + order.cylinder_count, 0);
-                  // Calculate total cylinders across all orders for percentage
+                (() => {
+                  // Calculate total cylinders across all orders
                   const allCylinders = orders.reduce((sum, order) => sum + order.cylinder_count, 0);
-                  const percentage = allCylinders > 0 
-                    ? Math.round((totalCylinders / allCylinders) * 100) 
-                    : 0;
                   
-                  return (
-                    <div key={type.id} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-2 h-2 rounded-full flex-shrink-0" 
-                            style={{ backgroundColor: type.color }} 
-                          />
-                          <span className="text-sm">{type.name}</span>
+                  // Calculate cylinder count per gas type and sort
+                  const gasTypeStats = gasTypes.map((type) => {
+                    const typeOrders = orders.filter(order => 
+                      order.gas_type_id === type.id || order.gas_type_ref?.id === type.id
+                    );
+                    const totalCylinders = typeOrders.reduce((sum, order) => sum + order.cylinder_count, 0);
+                    return { ...type, totalCylinders };
+                  })
+                  .sort((a, b) => b.totalCylinders - a.totalCylinders)
+                  .slice(0, 6);
+
+                  return gasTypeStats.map((type) => {
+                    const percentage = allCylinders > 0 
+                      ? Math.round((type.totalCylinders / allCylinders) * 100) 
+                      : 0;
+                    
+                    return (
+                      <div key={type.id} className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-2 h-2 rounded-full flex-shrink-0" 
+                              style={{ backgroundColor: type.color }} 
+                            />
+                            <span className="text-sm">{type.name}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {type.totalCylinders} cilinders
+                          </span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {totalCylinders} cilinders
-                        </span>
+                        <Progress value={percentage} className="h-2" />
                       </div>
-                      <Progress value={percentage} className="h-2" />
-                    </div>
-                  );
-                })
+                    );
+                  });
+                })()
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-2">
                   Geen gastypes beschikbaar
