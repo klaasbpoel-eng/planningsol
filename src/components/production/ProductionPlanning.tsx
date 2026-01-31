@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Snowflake, Cylinder, Package, TrendingUp, BarChart3 } from "lucide-react";
@@ -14,9 +14,15 @@ export function ProductionPlanning() {
   const [dryIceToday, setDryIceToday] = useState(0);
   const [cylindersToday, setCylindersToday] = useState(0);
   const [weekOrders, setWeekOrders] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     fetchStats();
+  }, [refreshKey]);
+
+  const handleDataChanged = useCallback(() => {
+    // Increment refreshKey to trigger re-fetch of all stats and reports
+    setRefreshKey(prev => prev + 1);
   }, []);
 
   const fetchStats = async () => {
@@ -122,7 +128,7 @@ export function ProductionPlanning() {
         </Card>
 
         {/* Top 5 Customers Widget */}
-        <TopCustomersWidget />
+        <TopCustomersWidget refreshKey={refreshKey} />
       </div>
 
       {/* Main content tabs */}
@@ -152,15 +158,15 @@ export function ProductionPlanning() {
         </TabsList>
 
         <TabsContent value="droogijs" className="mt-6">
-          <DryIcePlanning />
+          <DryIcePlanning onDataChanged={handleDataChanged} />
         </TabsContent>
 
         <TabsContent value="gascilinders" className="mt-6">
-          <GasCylinderPlanning />
+          <GasCylinderPlanning onDataChanged={handleDataChanged} />
         </TabsContent>
 
         <TabsContent value="rapportage" className="mt-6">
-          <ProductionReports />
+          <ProductionReports refreshKey={refreshKey} onDataChanged={handleDataChanged} />
         </TabsContent>
       </Tabs>
     </div>

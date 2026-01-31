@@ -91,7 +91,12 @@ interface DryIceOrder {
 
 const COLORS = ['#06b6d4', '#f97316', '#22c55e', '#ef4444', '#8b5cf6', '#eab308'];
 
-export function ProductionReports() {
+interface ProductionReportsProps {
+  refreshKey?: number;
+  onDataChanged?: () => void;
+}
+
+export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionReportsProps) {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>({
     from: startOfMonth(new Date()),
@@ -102,6 +107,14 @@ export function ProductionReports() {
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+
+  useEffect(() => {
+    fetchGasTypes();
+  }, []);
+
+  useEffect(() => {
+    fetchReportData();
+  }, [dateRange, refreshKey]);
 
   useEffect(() => {
     fetchGasTypes();
@@ -415,7 +428,10 @@ export function ProductionReports() {
       <ExcelImportDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
-        onImported={fetchReportData}
+        onImported={() => {
+          fetchReportData();
+          onDataChanged?.();
+        }}
       />
 
       {/* Quick Stats */}
