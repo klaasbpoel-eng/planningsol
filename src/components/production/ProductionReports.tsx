@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   AreaChart,
   Area,
@@ -104,6 +105,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
   const [dryIceOrders, setDryIceOrders] = useState<DryIceOrder[]>([]);
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
+  const [productionChartView, setProductionChartView] = useState<"both" | "cylinders" | "dryIce">("both");
 
   useEffect(() => {
     fetchGasTypes();
@@ -521,9 +523,33 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
         <TabsContent value="overview" className="mt-6 space-y-6">
           {/* Production Chart */}
           <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="text-lg">Productie per dag</CardTitle>
-              <CardDescription>Overzicht van cilinders en droogijs orders</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div>
+                <CardTitle className="text-lg">Productie per dag</CardTitle>
+                <CardDescription>
+                  {productionChartView === "both" && "Overzicht van cilinders en droogijs orders"}
+                  {productionChartView === "cylinders" && "Overzicht van cilinder orders"}
+                  {productionChartView === "dryIce" && "Overzicht van droogijs orders"}
+                </CardDescription>
+              </div>
+              <ToggleGroup 
+                type="single" 
+                value={productionChartView} 
+                onValueChange={(value) => value && setProductionChartView(value as "both" | "cylinders" | "dryIce")}
+                className="bg-muted/50 rounded-md p-1"
+              >
+                <ToggleGroupItem value="both" aria-label="Beide" className="text-xs px-3 data-[state=on]:bg-background">
+                  Beide
+                </ToggleGroupItem>
+                <ToggleGroupItem value="cylinders" aria-label="Cilinders" className="text-xs px-3 data-[state=on]:bg-orange-500 data-[state=on]:text-white">
+                  <Cylinder className="h-3 w-3 mr-1" />
+                  Cilinders
+                </ToggleGroupItem>
+                <ToggleGroupItem value="dryIce" aria-label="Droogijs" className="text-xs px-3 data-[state=on]:bg-cyan-500 data-[state=on]:text-white">
+                  <Snowflake className="h-3 w-3 mr-1" />
+                  Droogijs
+                </ToggleGroupItem>
+              </ToggleGroup>
             </CardHeader>
             <CardContent>
               {ordersPerDay.length > 0 ? (
@@ -539,24 +565,28 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
                       }} 
                     />
                     <Legend />
-                    <Area 
-                      type="monotone" 
-                      dataKey="cylinders" 
-                      name="Cilinders" 
-                      stackId="1" 
-                      stroke="#f97316" 
-                      fill="#f97316" 
-                      fillOpacity={0.6} 
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="dryIce" 
-                      name="Droogijs (kg)" 
-                      stackId="2" 
-                      stroke="#06b6d4" 
-                      fill="#06b6d4" 
-                      fillOpacity={0.6} 
-                    />
+                    {(productionChartView === "both" || productionChartView === "cylinders") && (
+                      <Area 
+                        type="monotone" 
+                        dataKey="cylinders" 
+                        name="Cilinders" 
+                        stackId="1" 
+                        stroke="#f97316" 
+                        fill="#f97316" 
+                        fillOpacity={0.6} 
+                      />
+                    )}
+                    {(productionChartView === "both" || productionChartView === "dryIce") && (
+                      <Area 
+                        type="monotone" 
+                        dataKey="dryIce" 
+                        name="Droogijs (kg)" 
+                        stackId="2" 
+                        stroke="#06b6d4" 
+                        fill="#06b6d4" 
+                        fillOpacity={0.6} 
+                      />
+                    )}
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
