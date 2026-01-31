@@ -93,6 +93,7 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
   const [deleteYear, setDeleteYear] = useState<number>(new Date().getFullYear());
   const [deleteYearCount, setDeleteYearCount] = useState<number | null>(null);
   const [loadingDeleteCount, setLoadingDeleteCount] = useState(false);
+  const [dailyCapacity, setDailyCapacity] = useState<number>(500);
   
   // Filter states
   const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
@@ -166,7 +167,20 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
     fetchOrders();
     fetchProductTypes();
     fetchPackaging();
+    fetchDailyCapacity();
   }, [yearFilter]);
+
+  const fetchDailyCapacity = async () => {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "dry_ice_daily_capacity_kg")
+      .maybeSingle();
+
+    if (data?.value) {
+      setDailyCapacity(Number(data.value));
+    }
+  };
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -661,7 +675,7 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Dagcapaciteit</span>
-                  <span className="font-medium">500 kg</span>
+                  <span className="font-medium">{dailyCapacity} kg</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Vandaag gepland</span>
@@ -669,7 +683,9 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Beschikbaar</span>
-                  <span className="font-medium text-green-500">{500 - todayTotal} kg</span>
+                  <span className={`font-medium ${dailyCapacity - todayTotal >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {dailyCapacity - todayTotal} kg
+                  </span>
                 </div>
               </div>
             </CardContent>
