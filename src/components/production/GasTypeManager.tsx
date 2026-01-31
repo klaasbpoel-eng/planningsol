@@ -215,19 +215,34 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
 
     setBulkDeleting(true);
     try {
+      // First, clear references in gas_cylinder_orders
+      const { error: clearError } = await supabase
+        .from("gas_cylinder_orders")
+        .update({ gas_type_id: null })
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+
+      if (clearError) {
+        console.error("Error clearing gas type references:", clearError);
+        // Continue anyway - some references may not exist
+      }
+
       const { error } = await supabase
         .from("gas_types")
         .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all
+        .neq("id", "00000000-0000-0000-0000-000000000000");
 
       if (error) throw error;
       
       toast.success(`${gasTypes.length} gastypes verwijderd`);
       fetchGasTypes();
       setBulkDeleteDialogOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error bulk deleting gas types:", error);
-      toast.error("Fout bij verwijderen van gastypes");
+      if (error?.code === "23503") {
+        toast.error("Kan niet verwijderen: gastypes worden nog gebruikt door orders");
+      } else {
+        toast.error("Fout bij verwijderen van gastypes");
+      }
     } finally {
       setBulkDeleting(false);
     }
@@ -236,7 +251,14 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent 
+          className="sm:max-w-[600px]"
+          onInteractOutside={(e) => {
+            if (bulkDeleteDialogOpen || deleteDialogOpen || editDialogOpen) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-orange-500/10">
@@ -256,7 +278,13 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={() => setBulkDeleteDialogOpen(true)}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onOpenChange(false); // Close main dialog first
+                  setTimeout(() => setBulkDeleteDialogOpen(true), 100); // Then open confirm dialog
+                }}
                 disabled={gasTypes.length === 0}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
@@ -490,7 +518,16 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
       </AlertDialog>
 
       {/* Bulk Delete Confirmation */}
-      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+      <AlertDialog 
+        open={bulkDeleteDialogOpen} 
+        onOpenChange={(isOpen) => {
+          setBulkDeleteDialogOpen(isOpen);
+          if (!isOpen) {
+            // Reopen main dialog when alert is closed
+            onOpenChange(true);
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">

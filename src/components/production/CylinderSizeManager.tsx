@@ -207,16 +207,20 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
       const { error } = await supabase
         .from("cylinder_sizes")
         .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all
+        .neq("id", "00000000-0000-0000-0000-000000000000");
 
       if (error) throw error;
       
       toast.success(`${cylinderSizes.length} cilinderinhouden verwijderd`);
       fetchCylinderSizes();
       setBulkDeleteDialogOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error bulk deleting cylinder sizes:", error);
-      toast.error("Fout bij verwijderen van cilinderinhouden");
+      if (error?.code === "23503") {
+        toast.error("Kan niet verwijderen: cilinderinhouden worden nog gebruikt");
+      } else {
+        toast.error("Fout bij verwijderen van cilinderinhouden");
+      }
     } finally {
       setBulkDeleting(false);
     }
@@ -225,7 +229,14 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent 
+          className="sm:max-w-[600px]"
+          onInteractOutside={(e) => {
+            if (bulkDeleteDialogOpen || deleteDialogOpen || editDialogOpen) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-blue-500/10">
@@ -245,7 +256,13 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={() => setBulkDeleteDialogOpen(true)}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onOpenChange(false); // Close main dialog first
+                  setTimeout(() => setBulkDeleteDialogOpen(true), 100); // Then open confirm dialog
+                }}
                 disabled={cylinderSizes.length === 0}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
@@ -446,7 +463,16 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
       </AlertDialog>
 
       {/* Bulk Delete Confirmation */}
-      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+      <AlertDialog 
+        open={bulkDeleteDialogOpen} 
+        onOpenChange={(isOpen) => {
+          setBulkDeleteDialogOpen(isOpen);
+          if (!isOpen) {
+            // Reopen main dialog when alert is closed
+            onOpenChange(true);
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
