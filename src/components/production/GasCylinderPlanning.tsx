@@ -222,6 +222,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
     } else {
       toast.success("Order verwijderd");
       fetchOrders();
+      onDataChanged?.();
     }
     setDeleteDialogOpen(false);
     setOrderToDelete(null);
@@ -269,6 +270,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
       
       toast.success(`Alle ${totalDeleted} vulorders zijn verwijderd`);
       fetchOrders();
+      onDataChanged?.();
     } catch (err) {
       toast.error("Fout bij verwijderen van orders");
       console.error("Error:", err);
