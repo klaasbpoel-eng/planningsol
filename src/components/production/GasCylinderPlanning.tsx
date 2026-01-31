@@ -266,44 +266,16 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
     setDeletingAll(true);
     
     try {
-      const startDate = `${deleteYear}-01-01`;
-      const endDate = `${deleteYear}-12-31`;
+      // Roep server-side RPC functie aan voor snelle bulk delete
+      const { data, error } = await supabase
+        .rpc('bulk_delete_orders_by_year', {
+          p_year: deleteYear,
+          p_order_type: 'cylinder'
+        });
       
-      // Kleinere batch size om URL lengte limiet te voorkomen
-      const BATCH_SIZE = 50;
-      let totalDeleted = 0;
-      let hasMore = true;
+      if (error) throw error;
       
-      while (hasMore) {
-        // Haal een batch IDs op voor het geselecteerde jaar
-        const { data: batch, error: fetchError } = await supabase
-          .from("gas_cylinder_orders")
-          .select("id")
-          .gte("scheduled_date", startDate)
-          .lte("scheduled_date", endDate)
-          .limit(BATCH_SIZE);
-        
-        if (fetchError) throw fetchError;
-        if (!batch || batch.length === 0) {
-          hasMore = false;
-          break;
-        }
-        
-        const ids = batch.map(order => order.id);
-        
-        // Verwijder deze batch
-        const { error: deleteError } = await supabase
-          .from("gas_cylinder_orders")
-          .delete()
-          .in("id", ids);
-        
-        if (deleteError) throw deleteError;
-        
-        totalDeleted += batch.length;
-        hasMore = batch.length === BATCH_SIZE;
-      }
-      
-      toast.success(`Alle ${totalDeleted} vulorders van ${deleteYear} zijn verwijderd`);
+      toast.success(`Alle ${data} vulorders van ${deleteYear} zijn verwijderd`);
       fetchOrders();
       onDataChanged?.();
     } catch (err) {

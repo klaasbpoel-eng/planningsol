@@ -1105,6 +1105,10 @@ export type Database = {
       }
     }
     Functions: {
+      bulk_delete_orders_by_year: {
+        Args: { p_order_type: string; p_year: number }
+        Returns: number
+      }
       get_monthly_cylinder_totals_by_gas_type: {
         Args: { p_year: number }
         Returns: {
