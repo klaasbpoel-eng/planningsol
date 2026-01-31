@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GasTypeMultiSelect } from "./GasTypeMultiSelect";
 import { CustomerMultiSelect } from "./CustomerMultiSelect";
+import { CumulativeYearChart } from "./CumulativeYearChart";
 import {
   BarChart,
   Bar,
@@ -625,6 +626,12 @@ export function YearComparisonReport() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Cumulative Year Charts */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <CumulativeYearChart type="cylinders" />
+        <CumulativeYearChart type="dryIce" />
       </div>
 
       {/* Growth Highlights Summary */}
