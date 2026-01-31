@@ -91,6 +91,8 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
   const [deleteYear, setDeleteYear] = useState<number>(new Date().getFullYear());
+  const [deleteYearCount, setDeleteYearCount] = useState<number | null>(null);
+  const [loadingDeleteCount, setLoadingDeleteCount] = useState(false);
   
   // Filter states
   const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
@@ -235,8 +237,32 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
     setOrderToDelete(null);
   };
 
+  const fetchDeleteYearCount = async (year: number) => {
+    setLoadingDeleteCount(true);
+    const startDate = `${year}-01-01`;
+    const endDate = `${year}-12-31`;
+    
+    const { count, error } = await supabase
+      .from("dry_ice_orders")
+      .select("*", { count: "exact", head: true })
+      .gte("scheduled_date", startDate)
+      .lte("scheduled_date", endDate);
+    
+    if (!error) {
+      setDeleteYearCount(count || 0);
+    }
+    setLoadingDeleteCount(false);
+  };
+
+  const handleDeleteYearChange = (year: number) => {
+    setDeleteYear(year);
+    fetchDeleteYearCount(year);
+  };
+
   const handleDeleteAllClick = () => {
-    setDeleteYear(new Date().getFullYear());
+    const currentYear = new Date().getFullYear();
+    setDeleteYear(currentYear);
+    fetchDeleteYearCount(currentYear);
     setDeleteAllDialogOpen(true);
   };
 
@@ -723,7 +749,7 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
               </p>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-foreground">Jaar:</span>
-                <Select value={deleteYear.toString()} onValueChange={(v) => setDeleteYear(parseInt(v))}>
+                <Select value={deleteYear.toString()} onValueChange={(v) => handleDeleteYearChange(parseInt(v))}>
                   <SelectTrigger className="w-[120px] bg-background">
                     <SelectValue placeholder="Selecteer jaar" />
                   </SelectTrigger>
@@ -733,6 +759,22 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="p-3 bg-muted/50 rounded-lg border">
+                {loadingDeleteCount ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Aantal orders laden...
+                  </div>
+                ) : deleteYearCount === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Er zijn geen droogijs orders in {deleteYear}.
+                  </p>
+                ) : (
+                  <p className="text-sm">
+                    <strong className="text-destructive">{deleteYearCount}</strong> droogijs orders zullen worden verwijderd.
+                  </p>
+                )}
               </div>
               <p className="text-destructive font-medium">
                 Deze actie is permanent en kan niet ongedaan worden gemaakt.
@@ -744,7 +786,7 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
             <AlertDialogAction 
               onClick={handleConfirmDeleteAll}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deletingAll}
+              disabled={deletingAll || deleteYearCount === 0}
             >
               {deletingAll ? (
                 <>
@@ -752,7 +794,7 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
                   Verwijderen...
                 </>
               ) : (
-                `Verwijder orders van ${deleteYear}`
+                `Verwijder ${deleteYearCount || 0} orders`
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
