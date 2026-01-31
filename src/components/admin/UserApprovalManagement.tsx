@@ -293,13 +293,14 @@ export function UserApprovalManagement() {
 
   const createUserMutation = useMutation({
     mutationFn: async (data: typeof createForm) => {
+      if (!data.email) throw new Error("E-mail is verplicht");
       if (!data.full_name) throw new Error("Naam is verplicht");
 
       // Create profile with intended_role (will be assigned when user signs up)
       const { data: newProfile, error: profileError } = await supabase
         .from("profiles")
         .insert({
-          email: data.email || null,
+          email: data.email,
           full_name: data.full_name,
           department: data.department || null,
           job_title: data.job_title || null,
@@ -315,10 +316,7 @@ export function UserApprovalManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-users"] });
       queryClient.invalidateQueries({ queryKey: ["pending-users"] });
-      const message = createForm.email 
-        ? "Gebruiker aangemaakt. Wanneer deze persoon zich registreert met dit e-mailadres, wordt de rol automatisch toegewezen."
-        : "Gebruiker aangemaakt.";
-      toast.success(message);
+      toast.success("Gebruiker aangemaakt. Wanneer deze persoon zich registreert met dit e-mailadres, wordt de rol automatisch toegewezen.");
       setIsCreateDialogOpen(false);
       setCreateForm(initialCreateForm);
     },
@@ -694,7 +692,7 @@ export function UserApprovalManagement() {
           <DialogHeader>
             <DialogTitle>Nieuwe gebruiker aanmaken</DialogTitle>
             <DialogDescription>
-              Maak een vooraf goedgekeurd profiel aan. Indien een e-mailadres is opgegeven, wordt het account automatisch gekoppeld wanneer de gebruiker zich registreert.
+              Maak een vooraf goedgekeurd profiel aan. Wanneer de gebruiker zich registreert met dit e-mailadres, wordt het account automatisch gekoppeld en de rol toegewezen.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateSubmit}>
@@ -710,13 +708,14 @@ export function UserApprovalManagement() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="create-email">E-mail</Label>
+                <Label htmlFor="create-email">E-mail *</Label>
                 <Input
                   id="create-email"
                   type="email"
                   value={createForm.email}
                   onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                  placeholder="E-mailadres (optioneel)"
+                  placeholder="E-mailadres"
+                  required
                 />
               </div>
               <div className="space-y-2">
