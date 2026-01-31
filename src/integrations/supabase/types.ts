@@ -733,7 +733,6 @@ export type Database = {
           full_name: string | null
           hire_date: string | null
           id: string
-          intended_role: string | null
           is_approved: boolean
           job_title: string | null
           location: string | null
@@ -756,7 +755,6 @@ export type Database = {
           full_name?: string | null
           hire_date?: string | null
           id?: string
-          intended_role?: string | null
           is_approved?: boolean
           job_title?: string | null
           location?: string | null
@@ -779,7 +777,6 @@ export type Database = {
           full_name?: string | null
           hire_date?: string | null
           id?: string
-          intended_role?: string | null
           is_approved?: boolean
           job_title?: string | null
           location?: string | null

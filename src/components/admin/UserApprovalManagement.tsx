@@ -8,8 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Check, X, Clock, UserCheck, Loader2, Users, Pencil, Trash2, Shield, UserPlus } from "lucide-react";
-import { CreateEmployeeDialog } from "./CreateEmployeeDialog";
+import { Check, X, Clock, UserCheck, Loader2, Users, Pencil, Trash2, Shield } from "lucide-react";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import {
@@ -405,17 +404,14 @@ export function UserApprovalManagement() {
 
       {/* All users management */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Alle gebruikers
-            </CardTitle>
-            <CardDescription className="mt-1.5">
-              Beheer alle geregistreerde gebruikers en hun rollen
-            </CardDescription>
-          </div>
-          <CreateEmployeeDialog />
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Alle gebruikers
+          </CardTitle>
+          <CardDescription>
+            Beheer alle geregistreerde gebruikers en hun rollen
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {allUsers && allUsers.length > 0 ? (
