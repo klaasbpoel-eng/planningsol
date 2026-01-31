@@ -24,7 +24,7 @@ import { nl } from "date-fns/locale";
 import { toast } from "sonner";
 import { CreateDryIceOrderDialog } from "./CreateDryIceOrderDialog";
 import { DryIceOrderDialog } from "@/components/calendar/DryIceOrderDialog";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -95,7 +95,7 @@ export function DryIcePlanning() {
   const [sortColumn, setSortColumn] = useState<SortColumn>("scheduled_date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   
-  const { isAdmin } = useUserRole(userId);
+  const { permissions } = useUserPermissions(userId);
 
   // Unique customers from orders for filtering
   const uniqueCustomers = [...new Set(orders.map(o => o.customer_name))].sort();
@@ -390,8 +390,8 @@ export function DryIcePlanning() {
             Beheer productieorders voor droogijs
           </p>
         </div>
-        {isAdmin && (
-          <div className="flex gap-2">
+        <div className="flex gap-2">
+          {permissions?.canDeleteOrders && (
             <Button 
               variant="destructive" 
               onClick={handleDeleteAllClick}
@@ -400,12 +400,14 @@ export function DryIcePlanning() {
               <Trash2 className="h-4 w-4 mr-2" />
               Alle orders verwijderen
             </Button>
+          )}
+          {permissions?.canCreateOrders && (
             <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Nieuwe productieorder
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -535,7 +537,7 @@ export function DryIcePlanning() {
                           </Select>
                         </div>
                       </TableHead>
-                      {isAdmin && <TableHead className="w-[80px]"></TableHead>}
+                      {(permissions?.canEditOrders || permissions?.canDeleteOrders) && <TableHead className="w-[80px]"></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -558,7 +560,7 @@ export function DryIcePlanning() {
                           {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
                         </TableCell>
                         <TableCell>
-                          {isAdmin ? (
+                          {permissions?.canEditOrders ? (
                             <Select 
                               value={order.status} 
                               onValueChange={(newStatus) => handleStatusChange(order.id, newStatus)}
@@ -576,7 +578,7 @@ export function DryIcePlanning() {
                             getStatusBadge(order.status)
                           )}
                         </TableCell>
-                        {isAdmin && (
+                        {(permissions?.canEditOrders || permissions?.canDeleteOrders) && (
                           <TableCell>
                             <div className="flex items-center gap-1">
                               <Button
@@ -667,7 +669,7 @@ export function DryIcePlanning() {
         open={editDialogOpen}
         onOpenChange={handleEditDialogClose}
         onUpdate={handleOrderUpdated}
-        isAdmin={isAdmin}
+        canEdit={permissions?.canEditOrders}
         productTypes={productTypes.map(pt => ({ ...pt, description: null, is_active: true, sort_order: 0, created_at: "", updated_at: "" }))}
         packagingOptions={packagingOptions.map(pkg => ({ ...pkg, description: null, is_active: true, sort_order: 0, created_at: "", updated_at: "", capacity_kg: null }))}
       />

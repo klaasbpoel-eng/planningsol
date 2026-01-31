@@ -6,8 +6,10 @@ import { TimeOffCalendar } from "@/components/time-off/TimeOffCalendar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CalendarCheck, Clock, XCircle, Shield } from "lucide-react";
+import { Loader2, CalendarCheck, Clock, XCircle, Shield, Factory, Users2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import type { Database } from "@/integrations/supabase/types";
+import type { RolePermissions, AppRole } from "@/hooks/useUserPermissions";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 
@@ -15,11 +17,21 @@ interface DashboardProps {
   userEmail?: string;
   isAdmin?: boolean;
   onSwitchToAdmin?: () => void;
+  permissions?: RolePermissions;
+  role?: AppRole;
 }
 
-export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin }: DashboardProps) {
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  supervisor: "Supervisor",
+  operator: "Operator",
+  user: "Gebruiker",
+};
+
+export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, role }: DashboardProps) {
   const [requests, setRequests] = useState<TimeOffRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   const fetchRequests = async () => {
     try {
@@ -61,12 +73,12 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin }: DashboardProp
 
   return (
     <div className="min-h-screen bg-background">
-      <Header userEmail={userEmail} />
+      <Header userEmail={userEmail} role={role} />
       
       <main className="container mx-auto px-4 py-8">
-        {/* Admin Switch Button */}
-        {isAdmin && onSwitchToAdmin && (
-          <div className="mb-6">
+        {/* Role-based action buttons */}
+        <div className="flex flex-wrap gap-3 mb-6">
+          {isAdmin && onSwitchToAdmin && (
             <Button
               onClick={onSwitchToAdmin}
               className="bg-accent hover:bg-accent/90 text-accent-foreground"
@@ -74,8 +86,28 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin }: DashboardProp
               <Shield className="h-4 w-4 mr-2" />
               Naar Beheerderspaneel
             </Button>
-          </div>
-        )}
+          )}
+          
+          {permissions?.canViewOrders && (
+            <Button
+              onClick={() => navigate("/productie")}
+              variant="outline"
+            >
+              <Factory className="h-4 w-4 mr-2" />
+              Productieplanning
+            </Button>
+          )}
+          
+          {permissions?.canViewCustomers && (
+            <Button
+              onClick={() => navigate("/klanten")}
+              variant="outline"
+            >
+              <Users2 className="h-4 w-4 mr-2" />
+              Klanten
+            </Button>
+          )}
+        </div>
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -119,7 +151,9 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin }: DashboardProp
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <TimeOffRequestForm onSuccess={fetchRequests} />
+            {permissions?.canManageOwnTimeOff && (
+              <TimeOffRequestForm onSuccess={fetchRequests} />
+            )}
             <TimeOffRequestList requests={requests} onDelete={fetchRequests} />
           </div>
           <div className="lg:col-span-1">

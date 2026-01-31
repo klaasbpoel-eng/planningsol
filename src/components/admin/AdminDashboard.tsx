@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, CalendarCheck, Clock, XCircle, Users, CalendarDays, ListChecks, UserCog, ClipboardList, Settings } from "lucide-react";
 import { parseISO, isWithinInterval, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
+import type { RolePermissions, AppRole } from "@/hooks/useUserPermissions";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -23,9 +24,11 @@ interface RequestWithProfile extends TimeOffRequest {
 interface AdminDashboardProps {
   userEmail?: string;
   onSwitchView: () => void;
+  permissions?: RolePermissions;
+  role?: AppRole;
 }
 
-export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps) {
+export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: AdminDashboardProps) {
   const [requests, setRequests] = useState<RequestWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FilterState>({
@@ -146,7 +149,7 @@ export function AdminDashboard({ userEmail, onSwitchView }: AdminDashboardProps)
 
   return (
     <div className="min-h-screen bg-background">
-      <Header userEmail={userEmail} isAdmin onSwitchView={onSwitchView} />
+      <Header userEmail={userEmail} isAdmin onSwitchView={onSwitchView} role={role} />
       
       <main className="container mx-auto px-4 py-8">
         {/* Filters */}
