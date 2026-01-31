@@ -440,7 +440,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{cylinderStats.totalCylinders}</div>
+            <div className="text-2xl font-bold">{formatNumber(cylinderStats.totalCylinders, 0)}</div>
           </CardContent>
         </Card>
 
@@ -531,7 +531,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
                   <AreaChart data={ordersPerDay}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="displayDate" className="text-xs" />
-                    <YAxis className="text-xs" />
+                    <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
                     <Tooltip 
                       contentStyle={{ 
                         backgroundColor: 'hsl(var(--background))', 
@@ -613,7 +613,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
                   <ResponsiveContainer width="100%" height={250}>
                     <BarChart data={getCustomerRanking("cylinder")} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis type="number" className="text-xs" />
+                      <XAxis type="number" className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
                       <YAxis dataKey="name" type="category" width={120} className="text-xs" />
                       <Tooltip 
                         contentStyle={{ 
@@ -754,7 +754,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={getCustomerRanking("dryIce")} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis type="number" className="text-xs" />
+                    <XAxis type="number" className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
                     <YAxis dataKey="name" type="category" width={120} className="text-xs" />
                     <Tooltip 
                       contentStyle={{ 

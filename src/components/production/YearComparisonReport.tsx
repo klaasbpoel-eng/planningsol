@@ -939,7 +939,7 @@ export function YearComparisonReport() {
                         height={80}
                         interval={0}
                       />
-                      <YAxis className="text-xs" />
+                      <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: 'hsl(var(--background))',
@@ -1045,7 +1045,7 @@ export function YearComparisonReport() {
                       <BarChart data={monthlyGasTypeData.current}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis dataKey="monthName" className="text-xs" />
-                        <YAxis className="text-xs" />
+                        <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: 'hsl(var(--background))',
@@ -1082,7 +1082,7 @@ export function YearComparisonReport() {
                       <BarChart data={monthlyGasTypeData.previous}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis dataKey="monthName" className="text-xs" />
-                        <YAxis className="text-xs" />
+                        <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: 'hsl(var(--background))',
@@ -1136,7 +1136,7 @@ export function YearComparisonReport() {
               <BarChart data={cylinderData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="monthName" className="text-xs" />
-                <YAxis className="text-xs" />
+                <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: 'hsl(var(--background))',
@@ -1173,7 +1173,7 @@ export function YearComparisonReport() {
               <BarChart data={dryIceData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="monthName" className="text-xs" />
-                <YAxis className="text-xs" />
+                <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: 'hsl(var(--background))',
