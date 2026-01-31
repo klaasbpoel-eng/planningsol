@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Cylinder, Snowflake, LineChart as LineChartIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { formatNumber } from "@/lib/utils";
 import {
   LineChart,
   Line,
@@ -255,7 +256,7 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
               />
               <YAxis 
                 className="text-xs"
-                tickFormatter={(value) => value.toLocaleString()}
+                tickFormatter={(value) => formatNumber(value, 0)}
               />
               <Tooltip
                 contentStyle={{
@@ -264,7 +265,7 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
                   borderRadius: '8px'
                 }}
                 formatter={(value: number, name: string) => [
-                  value.toLocaleString() + (type === "dryIce" ? " kg" : ""),
+                  formatNumber(value, 0) + (type === "dryIce" ? " kg" : ""),
                   name
                 ]}
                 labelFormatter={(label) => `Maand: ${label}`}
@@ -325,7 +326,7 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
                       </td>
                       {cumulativeValues.map((value, i) => (
                         <td key={i} className="text-right py-2 px-1 text-xs">
-                          {value > 0 ? value.toLocaleString() : "-"}
+                          {value > 0 ? formatNumber(value, 0) : "-"}
                         </td>
                       ))}
                     </tr>

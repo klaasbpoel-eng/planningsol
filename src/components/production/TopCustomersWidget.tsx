@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 
 interface CustomerData {
   customer_id: string | null;
@@ -146,9 +146,9 @@ export function TopCustomersWidget({ refreshKey = 0, isRefreshing = false }: Top
                 <div className="min-w-0">
                   <p className="font-medium text-sm truncate">{customer.customer_name}</p>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{customer.total_cylinders} cil.</span>
+                    <span>{formatNumber(customer.total_cylinders, 0)} cil.</span>
                     <span>•</span>
-                    <span>{customer.total_dry_ice_kg.toFixed(0)} kg</span>
+                    <span>{formatNumber(customer.total_dry_ice_kg, 0)} kg</span>
                   </div>
                 </div>
               </div>

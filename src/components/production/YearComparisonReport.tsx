@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { formatNumber } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -572,17 +573,17 @@ export function YearComparisonReport() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">{selectedYear}</p>
-                    <p className="text-2xl font-bold">{cylinderTotals.currentYear.toLocaleString()}</p>
+                    <p className="text-2xl font-bold">{formatNumber(cylinderTotals.currentYear, 0)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">{selectedYear - 1}</p>
-                    <p className="text-2xl font-bold text-muted-foreground">{cylinderTotals.previousYear.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-muted-foreground">{formatNumber(cylinderTotals.previousYear, 0)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {getTrendIcon(cylinderTotals.changePercent)}
                   <span className={`font-medium ${getChangeColor(cylinderTotals.changePercent)}`}>
-                    {cylinderTotals.change >= 0 ? "+" : ""}{cylinderTotals.change.toLocaleString()}
+                    {cylinderTotals.change >= 0 ? "+" : ""}{formatNumber(cylinderTotals.change, 0)}
                   </span>
                   <Badge variant={cylinderTotals.changePercent >= 0 ? "default" : "destructive"}>
                     {cylinderTotals.changePercent >= 0 ? "+" : ""}{cylinderTotals.changePercent.toFixed(1)}%
@@ -607,17 +608,17 @@ export function YearComparisonReport() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">{selectedYear}</p>
-                    <p className="text-2xl font-bold">{dryIceTotals.currentYear.toLocaleString()}</p>
+                    <p className="text-2xl font-bold">{formatNumber(dryIceTotals.currentYear, 0)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">{selectedYear - 1}</p>
-                    <p className="text-2xl font-bold text-muted-foreground">{dryIceTotals.previousYear.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-muted-foreground">{formatNumber(dryIceTotals.previousYear, 0)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {getTrendIcon(dryIceTotals.changePercent)}
                   <span className={`font-medium ${getChangeColor(dryIceTotals.changePercent)}`}>
-                    {dryIceTotals.change >= 0 ? "+" : ""}{dryIceTotals.change.toLocaleString()} kg
+                    {dryIceTotals.change >= 0 ? "+" : ""}{formatNumber(dryIceTotals.change, 0)} kg
                   </span>
                   <Badge variant={dryIceTotals.changePercent >= 0 ? "default" : "destructive"}>
                     {dryIceTotals.changePercent >= 0 ? "+" : ""}{dryIceTotals.changePercent.toFixed(1)}%
@@ -674,7 +675,7 @@ export function YearComparisonReport() {
                             {highlights.best.changePercent >= 0 ? "+" : ""}{highlights.best.changePercent.toFixed(1)}%
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {highlights.best.currentYear.toLocaleString()} vs {highlights.best.previousYear.toLocaleString()}
+                            {formatNumber(highlights.best.currentYear, 0)} vs {formatNumber(highlights.best.previousYear, 0)}
                           </p>
                         </>
                       ) : (
@@ -694,7 +695,7 @@ export function YearComparisonReport() {
                             {highlights.worst.changePercent >= 0 ? "+" : ""}{highlights.worst.changePercent.toFixed(1)}%
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {highlights.worst.currentYear.toLocaleString()} vs {highlights.worst.previousYear.toLocaleString()}
+                            {formatNumber(highlights.worst.currentYear, 0)} vs {formatNumber(highlights.worst.previousYear, 0)}
                           </p>
                         </>
                       ) : (
@@ -729,7 +730,7 @@ export function YearComparisonReport() {
                             {highlights.best.changePercent >= 0 ? "+" : ""}{highlights.best.changePercent.toFixed(1)}%
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {highlights.best.currentYear.toLocaleString()} kg vs {highlights.best.previousYear.toLocaleString()} kg
+                            {formatNumber(highlights.best.currentYear, 0)} kg vs {formatNumber(highlights.best.previousYear, 0)} kg
                           </p>
                         </>
                       ) : (
@@ -749,7 +750,7 @@ export function YearComparisonReport() {
                             {highlights.worst.changePercent >= 0 ? "+" : ""}{highlights.worst.changePercent.toFixed(1)}%
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {highlights.worst.currentYear.toLocaleString()} kg vs {highlights.worst.previousYear.toLocaleString()} kg
+                            {formatNumber(highlights.worst.currentYear, 0)} kg vs {formatNumber(highlights.worst.previousYear, 0)} kg
                           </p>
                         </>
                       ) : (
@@ -820,7 +821,7 @@ export function YearComparisonReport() {
                         border: '1px solid hsl(var(--border))'
                       }}
                       formatter={(value: number, name: string) => [
-                        value.toLocaleString(),
+                        formatNumber(value, 0),
                         name === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()
                       ]}
                     />
@@ -857,9 +858,9 @@ export function YearComparisonReport() {
                       </div>
                       <div className="flex items-center gap-4 text-sm">
                         <div className="text-right">
-                          <div className="font-medium">{gasType.currentYear.toLocaleString()}</div>
+                          <div className="font-medium">{formatNumber(gasType.currentYear, 0)}</div>
                           <div className="text-xs text-muted-foreground">
-                            vs {gasType.previousYear.toLocaleString()}
+                            vs {formatNumber(gasType.previousYear, 0)}
                           </div>
                         </div>
                         <div className="flex items-center gap-1 min-w-[80px] justify-end">
@@ -945,7 +946,7 @@ export function YearComparisonReport() {
                           border: '1px solid hsl(var(--border))'
                         }}
                         formatter={(value: number, name: string) => [
-                          value.toLocaleString(),
+                          formatNumber(value, 0),
                           name === "currentYear" ? `${selectedYear}` : `${selectedYear - 1}`
                         ]}
                         labelFormatter={(label) => label}
@@ -991,7 +992,7 @@ export function YearComparisonReport() {
                           </span>
                         </div>
                         <div className="text-[10px] text-muted-foreground mt-1">
-                          {gasType.currentYear.toLocaleString()} vs {gasType.previousYear.toLocaleString()}
+                          {formatNumber(gasType.currentYear, 0)} vs {formatNumber(gasType.previousYear, 0)}
                         </div>
                       </div>
                     ))}
@@ -1052,7 +1053,7 @@ export function YearComparisonReport() {
                           }}
                           formatter={(value: number, name: string) => {
                             const info = gasTypeInfo.get(name);
-                            return [value.toLocaleString(), info?.name || name];
+                            return [formatNumber(value, 0), info?.name || name];
                           }}
                         />
                         <Legend 
@@ -1089,7 +1090,7 @@ export function YearComparisonReport() {
                           }}
                           formatter={(value: number, name: string) => {
                             const info = gasTypeInfo.get(name);
-                            return [value.toLocaleString(), info?.name || name];
+                            return [formatNumber(value, 0), info?.name || name];
                           }}
                         />
                         <Legend 
@@ -1142,7 +1143,7 @@ export function YearComparisonReport() {
                     border: '1px solid hsl(var(--border))'
                   }}
                   formatter={(value: number, name: string) => [
-                    value.toLocaleString(),
+                    formatNumber(value, 0),
                     name === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()
                   ]}
                 />
@@ -1179,7 +1180,7 @@ export function YearComparisonReport() {
                     border: '1px solid hsl(var(--border))'
                   }}
                   formatter={(value: number, name: string) => [
-                    value.toLocaleString() + " kg",
+                    formatNumber(value, 0) + " kg",
                     name === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()
                   ]}
                 />
@@ -1410,16 +1411,16 @@ export function YearComparisonReport() {
                         )}
                       </td>
                       <td className={`text-right py-3 px-2 ${highlightSignificant && cylinderSignificant ? "font-semibold" : ""}`}>
-                        {cylinder.currentYear.toLocaleString()}
+                        {formatNumber(cylinder.currentYear, 0)}
                       </td>
-                      <td className="text-right py-3 px-2 text-muted-foreground">{cylinder.previousYear.toLocaleString()}</td>
+                      <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(cylinder.previousYear, 0)}</td>
                       <td className={`text-right py-3 px-2 ${getChangeColor(cylinder.changePercent)} ${highlightSignificant && cylinderSignificant ? "font-bold" : ""}`}>
                         {cylinder.changePercent >= 0 ? "+" : ""}{cylinder.changePercent.toFixed(1)}%
                       </td>
                       <td className={`text-right py-3 px-2 ${highlightSignificant && dryIceSignificant ? "font-semibold" : ""}`}>
-                        {dryIce?.currentYear.toLocaleString() || 0}
+                        {formatNumber(dryIce?.currentYear || 0, 0)}
                       </td>
-                      <td className="text-right py-3 px-2 text-muted-foreground">{dryIce?.previousYear.toLocaleString() || 0}</td>
+                      <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(dryIce?.previousYear || 0, 0)}</td>
                       <td className={`text-right py-3 px-2 ${getChangeColor(dryIce?.changePercent || 0)} ${highlightSignificant && dryIceSignificant ? "font-bold" : ""}`}>
                         {(dryIce?.changePercent || 0) >= 0 ? "+" : ""}{(dryIce?.changePercent || 0).toFixed(1)}%
                       </td>
@@ -1429,13 +1430,13 @@ export function YearComparisonReport() {
                 {/* Totals row */}
                 <tr className="bg-muted/30 font-bold">
                   <td className="py-3 px-2">Totaal</td>
-                  <td className="text-right py-3 px-2">{cylinderTotals?.currentYear.toLocaleString()}</td>
-                  <td className="text-right py-3 px-2 text-muted-foreground">{cylinderTotals?.previousYear.toLocaleString()}</td>
+                  <td className="text-right py-3 px-2">{formatNumber(cylinderTotals?.currentYear || 0, 0)}</td>
+                  <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(cylinderTotals?.previousYear || 0, 0)}</td>
                   <td className={`text-right py-3 px-2 ${getChangeColor(cylinderTotals?.changePercent || 0)}`}>
                     {(cylinderTotals?.changePercent || 0) >= 0 ? "+" : ""}{(cylinderTotals?.changePercent || 0).toFixed(1)}%
                   </td>
-                  <td className="text-right py-3 px-2">{dryIceTotals?.currentYear.toLocaleString()}</td>
-                  <td className="text-right py-3 px-2 text-muted-foreground">{dryIceTotals?.previousYear.toLocaleString()}</td>
+                  <td className="text-right py-3 px-2">{formatNumber(dryIceTotals?.currentYear || 0, 0)}</td>
+                  <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(dryIceTotals?.previousYear || 0, 0)}</td>
                   <td className={`text-right py-3 px-2 ${getChangeColor(dryIceTotals?.changePercent || 0)}`}>
                     {(dryIceTotals?.changePercent || 0) >= 0 ? "+" : ""}{(dryIceTotals?.changePercent || 0).toFixed(1)}%
                   </td>
