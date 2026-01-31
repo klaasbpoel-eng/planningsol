@@ -290,8 +290,8 @@ export function ExcelImportDialog({
 
   const generateOrderNumber = (index: number) => {
     const date = format(new Date(), "yyyyMMdd");
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
-    return `GC-IMP-${date}-${index.toString().padStart(4, "0")}-${random}`;
+    const uuid = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+    return `GC-IMP-${date}-${index.toString().padStart(5, "0")}-${uuid}`;
   };
 
   const handleImport = async () => {
@@ -320,7 +320,7 @@ export function ExcelImportDialog({
       const end = Math.min(start + batchSize, parsedData.length);
       const batch = parsedData.slice(start, end);
       
-      const insertData = batch.map((order, idx) => ({
+      const createInsertData = () => batch.map((order, idx) => ({
         order_number: generateOrderNumber(start + idx),
         customer_name: order.customer,
         gas_type: mapGasTypeToEnum(order.gasType),
@@ -335,9 +335,63 @@ export function ExcelImportDialog({
         status: "completed" as const,
       }));
       
-      const { error } = await supabase
+      let insertData = createInsertData();
+      let { error } = await supabase
         .from("gas_cylinder_orders")
         .insert(insertData);
+      
+      // Retry with new order numbers if duplicate key error
+      if (error?.message?.includes("duplicate key")) {
+        console.log(`Batch ${batchIndex + 1}: Duplicate key detected, retrying with new order numbers...`);
+        insertData = createInsertData();
+        const retryResult = await supabase
+          .from("gas_cylinder_orders")
+          .insert(insertData);
+        error = retryResult.error;
+        
+        // If still failing, try individual inserts as fallback
+        if (error?.message?.includes("duplicate key")) {
+          console.log(`Batch ${batchIndex + 1}: Retry failed, falling back to individual inserts...`);
+          let batchSuccess = 0;
+          let batchFailed = 0;
+          
+          for (let i = 0; i < batch.length; i++) {
+            const order = batch[i];
+            const singleInsert = {
+              order_number: generateOrderNumber(start + i),
+              customer_name: order.customer,
+              gas_type: mapGasTypeToEnum(order.gasType),
+              gas_type_id: matchGasTypeId(order.gasType),
+              gas_grade: order.grade,
+              cylinder_count: order.count,
+              cylinder_size: order.cylinderSize,
+              pressure: order.pressure,
+              scheduled_date: format(order.date, "yyyy-MM-dd"),
+              notes: order.notes || null,
+              created_by: currentProfileId,
+              status: "completed" as const,
+            };
+            
+            const { error: singleError } = await supabase
+              .from("gas_cylinder_orders")
+              .insert(singleInsert);
+            
+            if (singleError) {
+              batchFailed++;
+            } else {
+              batchSuccess++;
+            }
+          }
+          
+          stats.imported += batchSuccess;
+          stats.skipped += batchFailed;
+          if (batchFailed > 0) {
+            stats.errors.push(`Batch ${batchIndex + 1}: ${batchFailed} records konden niet worden geïmporteerd`);
+          }
+          setProgress(Math.round(((batchIndex + 1) / batches) * 100));
+          continue;
+        }
+      }
       
       if (error) {
         console.error("Batch insert error:", error);
