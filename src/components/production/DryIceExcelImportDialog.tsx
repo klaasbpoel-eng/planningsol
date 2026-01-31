@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, Snowflake } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { formatNumber } from "@/lib/utils";
 import { format } from "date-fns";
 import { CustomerSelect } from "./CustomerSelect";
 
@@ -486,7 +487,7 @@ export function DryIceExcelImportDialog({
                 </div>
                 <div className="flex gap-2">
                   <Badge variant="secondary">{parsedData.length} orders</Badge>
-                  <Badge variant="outline">{totalKg.toLocaleString()} kg totaal</Badge>
+                  <Badge variant="outline">{formatNumber(totalKg, 0)} kg totaal</Badge>
                 </div>
               </div>
               
@@ -522,7 +523,7 @@ export function DryIceExcelImportDialog({
                           <tr key={`header-${month}`} className="bg-muted/50">
                             <td colSpan={4} className="py-2 px-2 font-medium">{month}</td>
                             <td className="py-2 text-right font-medium">
-                              {monthOrders.reduce((sum, o) => sum + o.totalKg, 0).toLocaleString()} kg
+                              {formatNumber(monthOrders.reduce((sum, o) => sum + o.totalKg, 0), 0)} kg
                             </td>
                           </tr>
                           {monthOrders.slice(0, 10).map((order, i) => (
@@ -535,7 +536,7 @@ export function DryIceExcelImportDialog({
                               </td>
                               <td className="py-1.5 pr-4 text-right">{order.packagingCapacity} kg</td>
                               <td className="py-1.5 pr-4 text-right">{order.boxCount}</td>
-                              <td className="py-1.5 text-right font-medium">{order.totalKg.toLocaleString()}</td>
+                              <td className="py-1.5 text-right font-medium">{formatNumber(order.totalKg, 0)}</td>
                             </tr>
                           ))}
                           {monthOrders.length > 10 && (

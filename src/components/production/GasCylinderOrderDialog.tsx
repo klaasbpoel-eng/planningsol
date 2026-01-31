@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { formatNumber } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -535,7 +536,7 @@ export function GasCylinderOrderDialog({
                       <Hash className="h-5 w-5 text-muted-foreground" />
                       <div>
                         <p className="text-xs text-muted-foreground">Aantal</p>
-                        <p className="font-medium">{order.cylinder_count} stuks</p>
+                        <p className="font-medium">{formatNumber(order.cylinder_count, 0)} stuks</p>
                       </div>
                     </div>
                   </div>

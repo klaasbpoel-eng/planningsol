@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -730,8 +730,8 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
                             {order.gas_grade === "medical" ? "M" : "T"}
                           </Badge>
                         </TableCell>
-                        <TableCell>{order.cylinder_count} st.</TableCell>
-                        <TableCell>{order.pressure} bar</TableCell>
+                        <TableCell>{formatNumber(order.cylinder_count, 0)} st.</TableCell>
+                        <TableCell>{formatNumber(order.pressure, 0)} bar</TableCell>
                         <TableCell>
                           {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
                         </TableCell>

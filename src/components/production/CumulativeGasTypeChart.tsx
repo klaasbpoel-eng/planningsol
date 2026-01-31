@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { formatNumber } from "@/lib/utils";
 import {
   LineChart,
   Line,
@@ -329,8 +330,8 @@ export function CumulativeGasTypeChart() {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="text-right text-xs text-muted-foreground">
-                    <div>{item.total1.toLocaleString()} ({selectedYear1})</div>
-                    <div>{item.total2.toLocaleString()} ({selectedYear2})</div>
+                    <div>{formatNumber(item.total1, 0)} ({selectedYear1})</div>
+                    <div>{formatNumber(item.total2, 0)} ({selectedYear2})</div>
                   </div>
                   <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
                     item.percentChange > 0 
@@ -380,7 +381,7 @@ export function CumulativeGasTypeChart() {
               />
               <YAxis 
                 className="text-xs"
-                tickFormatter={(value) => value.toLocaleString()}
+                tickFormatter={(value) => formatNumber(value, 0)}
               />
               <Tooltip
                 contentStyle={{
@@ -391,7 +392,7 @@ export function CumulativeGasTypeChart() {
                 formatter={(value: number, name: string) => {
                   const [gasTypeId, year] = name.split('_');
                   const info = getGasTypeInfo(gasTypeId);
-                  return [value.toLocaleString(), `${info?.name || gasTypeId} (${year})`];
+                  return [formatNumber(value, 0), `${info?.name || gasTypeId} (${year})`];
                 }}
                 labelFormatter={(label) => `Maand: ${label}`}
               />
@@ -479,7 +480,7 @@ export function CumulativeGasTypeChart() {
                         </td>
                         {cumulativeValues.map((value, i) => (
                           <td key={i} className="text-right py-2 px-1 text-xs">
-                            {value > 0 ? value.toLocaleString() : "-"}
+                            {value > 0 ? formatNumber(value, 0) : "-"}
                           </td>
                         ))}
                       </tr>

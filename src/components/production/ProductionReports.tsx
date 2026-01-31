@@ -679,8 +679,8 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
                             {order.gas_grade === "medical" ? "M" : "T"}
                           </Badge>
                         </TableCell>
-                        <TableCell>{order.cylinder_count} st.</TableCell>
-                        <TableCell>{order.pressure} bar</TableCell>
+                        <TableCell>{formatNumber(order.cylinder_count, 0)} st.</TableCell>
+                        <TableCell>{formatNumber(order.pressure, 0)} bar</TableCell>
                         <TableCell>{format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}</TableCell>
                         <TableCell>{getStatusBadge(order.status)}</TableCell>
                       </TableRow>
