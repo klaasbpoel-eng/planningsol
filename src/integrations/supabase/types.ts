@@ -721,6 +721,8 @@ export type Database = {
       profiles: {
         Row: {
           address: string | null
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
           date_of_birth: string | null
           department: string | null
@@ -731,6 +733,7 @@ export type Database = {
           full_name: string | null
           hire_date: string | null
           id: string
+          is_approved: boolean
           job_title: string | null
           location: string | null
           manager_id: string | null
@@ -740,6 +743,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           date_of_birth?: string | null
           department?: string | null
@@ -750,6 +755,7 @@ export type Database = {
           full_name?: string | null
           hire_date?: string | null
           id?: string
+          is_approved?: boolean
           job_title?: string | null
           location?: string | null
           manager_id?: string | null
@@ -759,6 +765,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           date_of_birth?: string | null
           department?: string | null
@@ -769,6 +777,7 @@ export type Database = {
           full_name?: string | null
           hire_date?: string | null
           id?: string
+          is_approved?: boolean
           job_title?: string | null
           location?: string | null
           manager_id?: string | null
@@ -777,6 +786,20 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_limited"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_manager_id_fkey"
             columns: ["manager_id"]
@@ -1070,6 +1093,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      is_user_approved: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user"
