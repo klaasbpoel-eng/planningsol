@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Check, X, Clock, UserCheck, Loader2, Users, Pencil, Trash2 } from "lucide-react";
+import { Check, X, Clock, UserCheck, Loader2, Users, Pencil, Trash2, Shield } from "lucide-react";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import {
@@ -29,6 +29,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Profile {
   id: string;
@@ -42,7 +49,27 @@ interface Profile {
   job_title: string | null;
 }
 
+interface UserRole {
+  id: string;
+  user_id: string;
+  role: "admin" | "user" | "operator" | "supervisor";
+}
+
 type ActionType = "approve" | "reject" | "delete" | null;
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  supervisor: "Supervisor",
+  operator: "Operator",
+  user: "Gebruiker",
+};
+
+const ROLE_COLORS: Record<string, string> = {
+  admin: "bg-red-500/10 text-red-600",
+  supervisor: "bg-purple-500/10 text-purple-600",
+  operator: "bg-blue-500/10 text-blue-600",
+  user: "bg-gray-500/10 text-gray-600",
+};
 
 export function UserApprovalManagement() {
   const queryClient = useQueryClient();
@@ -54,6 +81,7 @@ export function UserApprovalManagement() {
     email: "",
     department: "",
     job_title: "",
+    role: "user" as string,
   });
 
   const { data: pendingUsers, isLoading: pendingLoading } = useQuery({
@@ -85,8 +113,26 @@ export function UserApprovalManagement() {
     },
   });
 
+  const { data: userRoles } = useQuery({
+    queryKey: ["user-roles"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("id, user_id, role");
+
+      if (error) throw error;
+      return data as UserRole[];
+    },
+  });
+
+  const getUserRole = (userId: string | null): string => {
+    if (!userId || !userRoles) return "user";
+    const role = userRoles.find((r) => r.user_id === userId);
+    return role?.role || "user";
+  };
+
   const approveMutation = useMutation({
-    mutationFn: async (profileId: string) => {
+    mutationFn: async ({ profileId, role }: { profileId: string; role: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
@@ -96,7 +142,17 @@ export function UserApprovalManagement() {
         .eq("user_id", user.id)
         .single();
 
-      const { error } = await supabase
+      // Get the user_id of the profile being approved
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("id", profileId)
+        .single();
+
+      if (!profileData?.user_id) throw new Error("User ID not found");
+
+      // Approve the profile
+      const { error: approveError } = await supabase
         .from("profiles")
         .update({
           is_approved: true,
@@ -105,11 +161,35 @@ export function UserApprovalManagement() {
         })
         .eq("id", profileId);
 
-      if (error) throw error;
+      if (approveError) throw approveError;
+
+      // Assign role if not 'user' (default)
+      if (role !== "user") {
+        // Check if role already exists
+        const { data: existingRole } = await supabase
+          .from("user_roles")
+          .select("id")
+          .eq("user_id", profileData.user_id)
+          .maybeSingle();
+
+        if (existingRole) {
+          const { error: roleError } = await supabase
+            .from("user_roles")
+            .update({ role: role as any })
+            .eq("user_id", profileData.user_id);
+          if (roleError) throw roleError;
+        } else {
+          const { error: roleError } = await supabase
+            .from("user_roles")
+            .insert({ user_id: profileData.user_id, role: role as any });
+          if (roleError) throw roleError;
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pending-users"] });
       queryClient.invalidateQueries({ queryKey: ["all-users"] });
+      queryClient.invalidateQueries({ queryKey: ["user-roles"] });
       toast.success("Gebruiker goedgekeurd");
       closeDialogs();
     },
@@ -130,6 +210,7 @@ export function UserApprovalManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pending-users"] });
       queryClient.invalidateQueries({ queryKey: ["all-users"] });
+      queryClient.invalidateQueries({ queryKey: ["user-roles"] });
       toast.success("Gebruiker verwijderd");
       closeDialogs();
     },
@@ -139,8 +220,9 @@ export function UserApprovalManagement() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ profileId, data }: { profileId: string; data: typeof editForm }) => {
-      const { error } = await supabase
+    mutationFn: async ({ profileId, userId, data }: { profileId: string; userId: string | null; data: typeof editForm }) => {
+      // Update profile
+      const { error: profileError } = await supabase
         .from("profiles")
         .update({
           full_name: data.full_name || null,
@@ -150,11 +232,47 @@ export function UserApprovalManagement() {
         })
         .eq("id", profileId);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
+
+      // Update role if user_id exists
+      if (userId) {
+        // Check if role record exists
+        const { data: existingRole } = await supabase
+          .from("user_roles")
+          .select("id")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (data.role === "user") {
+          // Remove role record if setting to 'user' (default)
+          if (existingRole) {
+            const { error: deleteError } = await supabase
+              .from("user_roles")
+              .delete()
+              .eq("user_id", userId);
+            if (deleteError) throw deleteError;
+          }
+        } else {
+          // Insert or update role
+          if (existingRole) {
+            const { error: roleError } = await supabase
+              .from("user_roles")
+              .update({ role: data.role as any })
+              .eq("user_id", userId);
+            if (roleError) throw roleError;
+          } else {
+            const { error: roleError } = await supabase
+              .from("user_roles")
+              .insert({ user_id: userId, role: data.role as any });
+            if (roleError) throw roleError;
+          }
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pending-users"] });
       queryClient.invalidateQueries({ queryKey: ["all-users"] });
+      queryClient.invalidateQueries({ queryKey: ["user-roles"] });
       toast.success("Gebruiker bijgewerkt");
       setEditingProfile(null);
     },
@@ -166,16 +284,17 @@ export function UserApprovalManagement() {
   const closeDialogs = () => {
     setSelectedProfile(null);
     setActionType(null);
+    setEditForm({ ...editForm, role: "user" });
   };
 
-  const handleAction = () => {
+  const handleApprove = () => {
     if (!selectedProfile) return;
-    
-    if (actionType === "approve") {
-      approveMutation.mutate(selectedProfile.id);
-    } else if (actionType === "reject" || actionType === "delete") {
-      deleteMutation.mutate(selectedProfile.id);
-    }
+    approveMutation.mutate({ profileId: selectedProfile.id, role: editForm.role });
+  };
+
+  const handleDelete = () => {
+    if (!selectedProfile) return;
+    deleteMutation.mutate(selectedProfile.id);
   };
 
   const openEditDialog = (profile: Profile) => {
@@ -185,13 +304,18 @@ export function UserApprovalManagement() {
       email: profile.email || "",
       department: profile.department || "",
       job_title: profile.job_title || "",
+      role: getUserRole(profile.user_id),
     });
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProfile) return;
-    updateMutation.mutate({ profileId: editingProfile.id, data: editForm });
+    updateMutation.mutate({ 
+      profileId: editingProfile.id, 
+      userId: editingProfile.user_id,
+      data: editForm 
+    });
   };
 
   const isLoading = pendingLoading || usersLoading;
@@ -246,6 +370,7 @@ export function UserApprovalManagement() {
                           onClick={() => {
                             setSelectedProfile(user);
                             setActionType("approve");
+                            setEditForm({ ...editForm, role: "user" });
                           }}
                         >
                           <Check className="h-4 w-4 mr-1" />
@@ -285,7 +410,7 @@ export function UserApprovalManagement() {
             Alle gebruikers
           </CardTitle>
           <CardDescription>
-            Beheer alle geregistreerde gebruikers
+            Beheer alle geregistreerde gebruikers en hun rollen
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -296,55 +421,63 @@ export function UserApprovalManagement() {
                   <TableHead>Naam</TableHead>
                   <TableHead>E-mail</TableHead>
                   <TableHead>Afdeling</TableHead>
-                  <TableHead>Functie</TableHead>
+                  <TableHead>Rol</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Acties</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {allUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      {user.full_name || "Onbekend"}
-                    </TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>{user.department || "-"}</TableCell>
-                    <TableCell>{user.job_title || "-"}</TableCell>
-                    <TableCell>
-                      {user.is_approved ? (
-                        <Badge variant="secondary" className="bg-green-500/10 text-green-600">
-                          Actief
+                {allUsers.map((user) => {
+                  const role = getUserRole(user.user_id);
+                  return (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">
+                        {user.full_name || "Onbekend"}
+                      </TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>{user.department || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={ROLE_COLORS[role] || ROLE_COLORS.user}>
+                          <Shield className="h-3 w-3 mr-1" />
+                          {ROLE_LABELS[role] || "Gebruiker"}
                         </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="bg-amber-500/10 text-amber-600">
-                          Wachtend
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openEditDialog(user)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => {
-                            setSelectedProfile(user);
-                            setActionType("delete");
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        {user.is_approved ? (
+                          <Badge variant="secondary" className="bg-green-500/10 text-green-600">
+                            Actief
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-amber-500/10 text-amber-600">
+                            Wachtend
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openEditDialog(user)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => {
+                              setSelectedProfile(user);
+                              setActionType("delete");
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           ) : (
@@ -356,33 +489,64 @@ export function UserApprovalManagement() {
         </CardContent>
       </Card>
 
-      {/* Confirmation Dialog */}
-      <AlertDialog open={!!selectedProfile && !!actionType} onOpenChange={closeDialogs}>
+      {/* Approve Dialog with Role Selection */}
+      <Dialog open={actionType === "approve" && !!selectedProfile} onOpenChange={closeDialogs}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gebruiker goedkeuren</DialogTitle>
+            <DialogDescription>
+              Kies een rol voor {selectedProfile?.full_name || selectedProfile?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="approve-role">Rol toewijzen</Label>
+            <Select
+              value={editForm.role}
+              onValueChange={(value) => setEditForm({ ...editForm, role: value })}
+            >
+              <SelectTrigger id="approve-role" className="mt-2">
+                <SelectValue placeholder="Selecteer een rol" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="user">Gebruiker</SelectItem>
+                <SelectItem value="operator">Operator</SelectItem>
+                <SelectItem value="supervisor">Supervisor</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDialogs}>
+              Annuleren
+            </Button>
+            <Button onClick={handleApprove} disabled={approveMutation.isPending}>
+              {approveMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Goedkeuren
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete/Reject Confirmation Dialog */}
+      <AlertDialog open={(actionType === "reject" || actionType === "delete") && !!selectedProfile} onOpenChange={closeDialogs}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {actionType === "approve" && "Gebruiker goedkeuren?"}
-              {actionType === "reject" && "Gebruiker afwijzen?"}
-              {actionType === "delete" && "Gebruiker verwijderen?"}
+              {actionType === "reject" ? "Gebruiker afwijzen?" : "Gebruiker verwijderen?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {actionType === "approve" &&
-                `Weet u zeker dat u ${selectedProfile?.full_name || selectedProfile?.email} wilt goedkeuren? De gebruiker krijgt hierna toegang tot het systeem.`}
-              {actionType === "reject" &&
-                `Weet u zeker dat u ${selectedProfile?.full_name || selectedProfile?.email} wilt afwijzen? Het account wordt verwijderd.`}
-              {actionType === "delete" &&
-                `Weet u zeker dat u ${selectedProfile?.full_name || selectedProfile?.email} wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`}
+              {actionType === "reject"
+                ? `Weet u zeker dat u ${selectedProfile?.full_name || selectedProfile?.email} wilt afwijzen? Het account wordt verwijderd.`
+                : `Weet u zeker dat u ${selectedProfile?.full_name || selectedProfile?.email} wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuleren</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleAction}
-              className={actionType !== "approve" ? "bg-destructive hover:bg-destructive/90" : ""}
+              onClick={handleDelete}
+              className="bg-destructive hover:bg-destructive/90"
             >
-              {actionType === "approve" && "Goedkeuren"}
-              {actionType === "reject" && "Afwijzen"}
-              {actionType === "delete" && "Verwijderen"}
+              {actionType === "reject" ? "Afwijzen" : "Verwijderen"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -394,7 +558,7 @@ export function UserApprovalManagement() {
           <DialogHeader>
             <DialogTitle>Gebruiker bewerken</DialogTitle>
             <DialogDescription>
-              Pas de gegevens van deze gebruiker aan
+              Pas de gegevens en rol van deze gebruiker aan
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleEditSubmit}>
@@ -435,6 +599,23 @@ export function UserApprovalManagement() {
                   onChange={(e) => setEditForm({ ...editForm, job_title: e.target.value })}
                   placeholder="Functietitel"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-role">Rol</Label>
+                <Select
+                  value={editForm.role}
+                  onValueChange={(value) => setEditForm({ ...editForm, role: value })}
+                >
+                  <SelectTrigger id="edit-role">
+                    <SelectValue placeholder="Selecteer een rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">Gebruiker</SelectItem>
+                    <SelectItem value="operator">Operator</SelectItem>
+                    <SelectItem value="supervisor">Supervisor</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <DialogFooter>

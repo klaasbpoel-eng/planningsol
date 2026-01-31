@@ -1076,6 +1076,7 @@ export type Database = {
           total_value: number
         }[]
       }
+      get_user_role: { Args: { _user_id: string }; Returns: string }
       get_yearly_totals_by_customer: {
         Args: { p_year: number }
         Returns: {
@@ -1096,7 +1097,7 @@ export type Database = {
       is_user_approved: { Args: never; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "operator" | "supervisor"
       dry_ice_product_type: "blocks" | "pellets" | "sticks"
       gas_grade: "medical" | "technical"
       gas_type:
@@ -1241,7 +1242,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "operator", "supervisor"],
       dry_ice_product_type: ["blocks", "pellets", "sticks"],
       gas_grade: ["medical", "technical"],
       gas_type: [
