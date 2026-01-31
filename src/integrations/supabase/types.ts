@@ -1036,7 +1036,6 @@ export type Database = {
       profiles_limited: {
         Row: {
           department: string | null
-          email: string | null
           full_name: string | null
           id: string | null
           job_title: string | null
@@ -1044,7 +1043,6 @@ export type Database = {
         }
         Insert: {
           department?: string | null
-          email?: string | null
           full_name?: string | null
           id?: string | null
           job_title?: string | null
@@ -1052,7 +1050,6 @@ export type Database = {
         }
         Update: {
           department?: string | null
-          email?: string | null
           full_name?: string | null
           id?: string | null
           job_title?: string | null
@@ -1089,6 +1086,7 @@ export type Database = {
           total_dry_ice_kg: number
         }[]
       }
+      has_elevated_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
