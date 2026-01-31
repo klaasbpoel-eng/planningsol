@@ -1,89 +1,79 @@
 
-# Plan: Fix Top 5 Klanten Widget
+
+# Plan: Fix Excel Import - Niet alle orders worden geimporteerd
 
 ## Probleem Geidentificeerd
 
-De "Top 5 Klanten" widget toont "Geen klantdata beschikbaar" omdat de database functie `get_yearly_totals_by_customer` een fout geeft.
+Uit de console logs blijkt dat de import faalt door **duplicate key violations** op de `order_number` kolom:
 
-**Foutmelding**: `column reference "customer_id" is ambiguous - It could refer to either a PL/pgSQL variable or a table column`
+```
+"duplicate key value violates unique constraint \"gas_cylinder_orders_order_number_key\""
+```
 
-**Oorzaak**: In PostgreSQL PL/pgSQL functies, wanneer je `RETURNS TABLE(customer_id uuid, customer_name text, ...)` definieert, worden deze kolomnamen ook als variabelen aangemaakt binnen de functie. Wanneer je dan `SELECT customer_id` schrijft in een query binnen de functie, weet PostgreSQL niet of je de tabelkolom of de functievariabele bedoelt.
+### Hoofdoorzaken
+
+1. **Zwakke ordernummer-generatie**: De huidige functie `generateOrderNumber` gebruikt:
+   - `Math.random() * 1000` = slechts 1000 mogelijke random waarden
+   - Bij 6000+ records is collision vrijwel gegarandeerd (birthday paradox)
+   
+2. **Batch-level foutafhandeling**: Als 1 record in een batch van 50 faalt, wordt de hele batch overgeslagen
+
+3. **Geen conflict-resolutie**: Er is geen retry-mechanisme voor gefaalde records
+
+---
 
 ## Oplossing
 
-De database functie moet worden aangepast zodat alle verwijzingen naar tabelkolommen expliciet de tabelnaam of alias gebruiken.
+### 1. Verbeterde ordernummer-generatie
 
-### Database Migratie
+Vervang de huidige methode door een gegarandeerd unieke combinatie:
+- Datum + index + UUID-fragment (8 karakters)
+- Format: `GC-IMP-{datum}-{index}-{uuid8}`
 
-Een nieuwe migratie zal de functie vervangen met een versie waarin alle kolomreferenties ondubbelzinnig zijn gemaakt door:
-
-1. **Tabel-aliassen toevoegen**: Elke tabel krijgt een korte alias (bijv. `gco` voor gas_cylinder_orders, `dio` voor dry_ice_orders)
-2. **Expliciet prefix gebruiken**: Alle kolommen worden voorafgegaan door hun tabelalias (bijv. `gco.customer_id` in plaats van alleen `customer_id`)
-3. **GROUP BY met alias**: Ook de GROUP BY clausules gebruiken de tabel-aliassen
-
-### Aangepaste Functie
-
-```sql
-CREATE OR REPLACE FUNCTION public.get_yearly_totals_by_customer(p_year integer)
-RETURNS TABLE(
-  customer_id uuid,
-  customer_name text,
-  total_cylinders bigint,
-  total_dry_ice_kg numeric
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-BEGIN
-  RETURN QUERY
-  WITH all_customers AS (
-    SELECT DISTINCT gco.customer_id as cid, gco.customer_name as cname
-    FROM gas_cylinder_orders gco
-    WHERE gco.scheduled_date >= make_date(p_year, 1, 1)
-      AND gco.scheduled_date <= make_date(p_year, 12, 31)
-    UNION
-    SELECT DISTINCT dio.customer_id as cid, dio.customer_name as cname
-    FROM dry_ice_orders dio
-    WHERE dio.scheduled_date >= make_date(p_year, 1, 1)
-      AND dio.scheduled_date <= make_date(p_year, 12, 31)
-  ),
-  cylinder_totals AS (
-    SELECT gco.customer_id as cid, gco.customer_name as cname,
-      COALESCE(SUM(gco.cylinder_count), 0)::bigint as cylinders
-    FROM gas_cylinder_orders gco
-    WHERE gco.scheduled_date >= make_date(p_year, 1, 1)
-      AND gco.scheduled_date <= make_date(p_year, 12, 31)
-    GROUP BY gco.customer_id, gco.customer_name
-  ),
-  dry_ice_totals AS (
-    SELECT dio.customer_id as cid, dio.customer_name as cname,
-      COALESCE(SUM(dio.quantity_kg), 0)::numeric as dry_ice
-    FROM dry_ice_orders dio
-    WHERE dio.scheduled_date >= make_date(p_year, 1, 1)
-      AND dio.scheduled_date <= make_date(p_year, 12, 31)
-    GROUP BY dio.customer_id, dio.customer_name
-  )
-  SELECT 
-    ac.cid,
-    ac.cname,
-    COALESCE(ct.cylinders, 0)::bigint,
-    COALESCE(dt.dry_ice, 0)::numeric
-  FROM all_customers ac
-  LEFT JOIN cylinder_totals ct ON ac.cid = ct.cid AND ac.cname = ct.cname
-  LEFT JOIN dry_ice_totals dt ON ac.cid = dt.cid AND ac.cname = dt.cname
-  ORDER BY (COALESCE(ct.cylinders, 0) + COALESCE(dt.dry_ice, 0)) DESC;
-END;
-$$;
+```typescript
+const generateOrderNumber = (index: number) => {
+  const date = format(new Date(), "yyyyMMdd");
+  const uuid = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+  return `GC-IMP-${date}-${index.toString().padStart(5, "0")}-${uuid}`;
+};
 ```
 
-## Stappen
+### 2. Verbeterde foutafhandeling met retry
 
-| Stap | Actie |
-|------|-------|
-| 1 | Database migratie uitvoeren met gecorrigeerde functie |
-| 2 | Functie testen om te verifiëren dat de data correct wordt opgehaald |
+Bij een duplicate key error:
+1. Detecteer welke specifieke records het probleem veroorzaken
+2. Genereer nieuwe ordernummers voor die records
+3. Probeer opnieuw
 
-## Geen Frontend Wijzigingen Nodig
+### 3. Conflict handling via upsert (optioneel)
 
-De `TopCustomersWidget.tsx` component is correct geïmplementeerd - het probleem zit volledig in de database functie. Na de fix zal de widget automatisch de klantdata correct weergeven.
+Als alternatief kan de insert worden omgezet naar een upsert met `onConflict` handling.
+
+---
+
+## Technische Wijzigingen
+
+### Bestand: `src/components/production/ExcelImportDialog.tsx`
+
+**Wijziging 1 - Ordernummer generatie (regel 291-295)**:
+- Vervang `Math.random()` door `crypto.randomUUID()`
+- Vergroot de index padding van 4 naar 5 cijfers voor toekomstige groei
+
+**Wijziging 2 - Batch insert met retry (regel 318-350)**:
+- Voeg retry-logica toe voor batches die falen
+- Bij duplicate key error: regenereer ordernummers en probeer opnieuw
+- Fallback: individuele inserts voor problematische records
+
+**Wijziging 3 - Gedetailleerdere foutrapportage**:
+- Track welke specifieke records succesvol zijn
+- Toon informatievere foutmeldingen aan de gebruiker
+
+---
+
+## Verwacht Resultaat
+
+- **100% van de orders** wordt succesvol geimporteerd (mits data valide is)
+- Geen duplicate key errors meer bij normale imports
+- Robuuste foutafhandeling bij edge cases
+- Duidelijke feedback over import-status
+
