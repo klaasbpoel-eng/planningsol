@@ -748,12 +748,16 @@ export function GasCylinderPlanning() {
             <CardContent className="space-y-3">
               {gasTypes.length > 0 ? (
                 gasTypes.slice(0, 6).map((type) => {
-                  // Count orders with this gas type using gas_type_id
+                  // Get orders with this gas type using gas_type_id
                   const typeOrders = orders.filter(order => 
                     order.gas_type_id === type.id || order.gas_type_ref?.id === type.id
                   );
-                  const percentage = orders.length > 0 
-                    ? Math.round((typeOrders.length / orders.length) * 100) 
+                  // Sum total cylinders for this gas type
+                  const totalCylinders = typeOrders.reduce((sum, order) => sum + order.cylinder_count, 0);
+                  // Calculate total cylinders across all orders for percentage
+                  const allCylinders = orders.reduce((sum, order) => sum + order.cylinder_count, 0);
+                  const percentage = allCylinders > 0 
+                    ? Math.round((totalCylinders / allCylinders) * 100) 
                     : 0;
                   
                   return (
@@ -767,7 +771,7 @@ export function GasCylinderPlanning() {
                           <span className="text-sm">{type.name}</span>
                         </div>
                         <span className="text-xs text-muted-foreground">
-                          {typeOrders.length} orders
+                          {totalCylinders} cilinders
                         </span>
                       </div>
                       <Progress value={percentage} className="h-2" />
