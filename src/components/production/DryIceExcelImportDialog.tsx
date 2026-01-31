@@ -95,17 +95,21 @@ export function DryIceExcelImportDialog({
   const matchProductTypeId = (diameter: string): string | null => {
     const diameterStr = diameter.toLowerCase().trim();
     
-    // Try to find matching product type
+    // Extract numeric value (e.g., "09 mm." → "9", "03 mm." → "3")
+    const numericMatch = diameterStr.match(/(\d+)/);
+    if (!numericMatch) {
+      return productTypes[0]?.id || null;
+    }
+    
+    const numericValue = parseInt(numericMatch[1], 10).toString(); // "09" → "9"
+    
+    // Find product type containing this number
     const match = productTypes.find(pt => {
       const ptName = pt.name.toLowerCase();
-      // Match patterns like "09 mm", "9mm", "3 mm", "03 mm"
-      if (diameterStr.includes("09") || diameterStr.includes("9 mm")) {
-        return ptName.includes("9") || ptName.includes("pellet");
-      }
-      if (diameterStr.includes("03") || diameterStr.includes("3 mm")) {
-        return ptName.includes("3") || ptName.includes("pellet");
-      }
-      return ptName === diameterStr;
+      // Check for exact numeric match in product name
+      return ptName.includes(numericValue + "mm") || 
+             ptName.includes(numericValue + " mm") ||
+             ptName.includes(numericValue);
     });
     
     return match?.id || productTypes[0]?.id || null;
