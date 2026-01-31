@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 interface CustomerData {
   customer_id: string | null;
@@ -18,9 +19,10 @@ interface CustomerData {
 
 interface TopCustomersWidgetProps {
   refreshKey?: number;
+  isRefreshing?: boolean;
 }
 
-export function TopCustomersWidget({ refreshKey = 0 }: TopCustomersWidgetProps) {
+export function TopCustomersWidget({ refreshKey = 0, isRefreshing = false }: TopCustomersWidgetProps) {
   const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -116,7 +118,10 @@ export function TopCustomersWidget({ refreshKey = 0 }: TopCustomersWidgetProps) 
   }
 
   return (
-    <Card className="glass-card">
+    <Card className={cn(
+      "glass-card transition-all duration-300",
+      isRefreshing && "animate-pulse ring-2 ring-primary/30"
+    )}>
       <CardHeader className="pb-2">
         <CardDescription className="flex items-center gap-2">
           <Trophy className="h-4 w-4 text-yellow-500" />

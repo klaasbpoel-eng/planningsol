@@ -8,6 +8,7 @@ import { ProductionReports } from "./ProductionReports";
 import { TopCustomersWidget } from "./TopCustomersWidget";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export function ProductionPlanning() {
   const [activeTab, setActiveTab] = useState("droogijs");
@@ -15,9 +16,19 @@ export function ProductionPlanning() {
   const [cylindersToday, setCylindersToday] = useState(0);
   const [weekOrders, setWeekOrders] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     fetchStats();
+  }, [refreshKey]);
+
+  // Trigger refresh animation when refreshKey changes (but not on initial load)
+  useEffect(() => {
+    if (refreshKey > 0) {
+      setIsRefreshing(true);
+      const timer = setTimeout(() => setIsRefreshing(false), 600);
+      return () => clearTimeout(timer);
+    }
   }, [refreshKey]);
 
   const handleDataChanged = useCallback(() => {
@@ -75,7 +86,10 @@ export function ProductionPlanning() {
     <div className="space-y-6">
       {/* Quick stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className="glass-card">
+        <Card className={cn(
+          "glass-card transition-all duration-300",
+          isRefreshing && "animate-pulse ring-2 ring-primary/30"
+        )}>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <Snowflake className="h-4 w-4 text-cyan-500" />
@@ -88,7 +102,10 @@ export function ProductionPlanning() {
           </CardContent>
         </Card>
         
-        <Card className="glass-card">
+        <Card className={cn(
+          "glass-card transition-all duration-300",
+          isRefreshing && "animate-pulse ring-2 ring-primary/30"
+        )}>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <Cylinder className="h-4 w-4 text-orange-500" />
@@ -101,7 +118,10 @@ export function ProductionPlanning() {
           </CardContent>
         </Card>
         
-        <Card className="glass-card">
+        <Card className={cn(
+          "glass-card transition-all duration-300",
+          isRefreshing && "animate-pulse ring-2 ring-primary/30"
+        )}>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <Package className="h-4 w-4 text-green-500" />
@@ -114,7 +134,10 @@ export function ProductionPlanning() {
           </CardContent>
         </Card>
         
-        <Card className="glass-card">
+        <Card className={cn(
+          "glass-card transition-all duration-300",
+          isRefreshing && "animate-pulse ring-2 ring-primary/30"
+        )}>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-blue-500" />
@@ -128,7 +151,7 @@ export function ProductionPlanning() {
         </Card>
 
         {/* Top 5 Customers Widget */}
-        <TopCustomersWidget refreshKey={refreshKey} />
+        <TopCustomersWidget refreshKey={refreshKey} isRefreshing={isRefreshing} />
       </div>
 
       {/* Main content tabs */}
