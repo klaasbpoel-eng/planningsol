@@ -73,7 +73,11 @@ interface DryIceOrder {
   parent_order_id: string | null;
 }
 
-export function DryIcePlanning() {
+interface DryIcePlanningProps {
+  onDataChanged?: () => void;
+}
+
+export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
   const [orders, setOrders] = useState<DryIceOrder[]>([]);
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [packagingOptions, setPackagingOptions] = useState<Packaging[]>([]);
@@ -140,11 +144,13 @@ export function DryIcePlanning() {
     fetchOrders();
     setEditDialogOpen(false);
     setSelectedOrder(null);
+    onDataChanged?.();
   };
 
   const handleOrderCreated = () => {
     fetchOrders();
     setDialogOpen(false);
+    onDataChanged?.();
   };
 
   useEffect(() => {

@@ -78,7 +78,11 @@ interface GasType {
   color: string;
 }
 
-export function GasCylinderPlanning() {
+interface GasCylinderPlanningProps {
+  onDataChanged?: () => void;
+}
+
+export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps) {
   const [orders, setOrders] = useState<GasCylinderOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -138,11 +142,13 @@ export function GasCylinderPlanning() {
     fetchOrders();
     setEditDialogOpen(false);
     setSelectedOrder(null);
+    onDataChanged?.();
   };
 
   const handleOrderCreated = () => {
     fetchOrders();
     setDialogOpen(false);
+    onDataChanged?.();
   };
 
   useEffect(() => {

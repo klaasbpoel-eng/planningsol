@@ -16,13 +16,17 @@ interface CustomerData {
   changePercent: number;
 }
 
-export function TopCustomersWidget() {
+interface TopCustomersWidgetProps {
+  refreshKey?: number;
+}
+
+export function TopCustomersWidget({ refreshKey = 0 }: TopCustomersWidgetProps) {
   const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchTopCustomers();
-  }, []);
+  }, [refreshKey]);
 
   const fetchTopCustomers = async () => {
     try {
