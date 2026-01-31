@@ -570,9 +570,6 @@ export function GasCylinderPlanning() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("order_number")}>
-                        <div className="flex items-center">Order<SortIcon column="order_number" /></div>
-                      </TableHead>
                       <TableHead>
                         <div className="space-y-1">
                           <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("customer_name")}>
@@ -667,7 +664,6 @@ export function GasCylinderPlanning() {
                   <TableBody>
                     {sortedOrders.map((order) => (
                       <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.order_number}</TableCell>
                         <TableCell>{order.customer_name}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
