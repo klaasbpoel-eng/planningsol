@@ -193,6 +193,17 @@ export function CumulativeGasTypeChart() {
     });
   };
 
+  const selectTopFive = () => {
+    const totals = allGasTypes.map(gt => {
+      const y1 = yearData.find(yd => yd.year === selectedYear1)?.gasTypes.find(d => d.id === gt.id);
+      const y2 = yearData.find(yd => yd.year === selectedYear2)?.gasTypes.find(d => d.id === gt.id);
+      const total = (y1?.months.reduce((a, b) => a + b, 0) || 0) + (y2?.months.reduce((a, b) => a + b, 0) || 0);
+      return { id: gt.id, total };
+    }).sort((a, b) => b.total - a.total);
+
+    setSelectedGasTypes(totals.slice(0, 5).map(t => t.id));
+  };
+
   const selectAllGasTypes = () => {
     setSelectedGasTypes(allGasTypes.map(gt => gt.id));
   };
@@ -265,6 +276,13 @@ export function CumulativeGasTypeChart() {
           <div className="flex items-center justify-between">
             <Label className="text-sm text-muted-foreground">Selecteer gastypes</Label>
             <div className="flex gap-2">
+              <button 
+                onClick={selectTopFive}
+                className="text-xs text-primary hover:underline font-medium"
+              >
+                Top 5
+              </button>
+              <span className="text-muted-foreground">|</span>
               <button 
                 onClick={selectAllGasTypes}
                 className="text-xs text-primary hover:underline"
