@@ -1733,11 +1733,11 @@ export function CalendarOverview() {
   };
 
   return (
-    <Card className="shadow-2xl border-0 bg-card/90 backdrop-blur-xl overflow-hidden">
+    <div className="flex-1 flex flex-col bg-card/90 backdrop-blur-xl overflow-hidden">
       {/* Decorative gradient bar */}
-      <div className="h-1.5 w-full gradient-primary" />
+      <div className="h-1 w-full gradient-primary flex-shrink-0" />
       
-      <CardHeader className="pb-6 pt-6">
+      <div className="flex-shrink-0 px-4 py-4 border-b border-border/50">
         <div className="flex flex-col gap-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -1863,9 +1863,9 @@ export function CalendarOverview() {
             <ChevronRight className="h-5 w-5" />
           </Button>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="pt-0">
+      <div className="flex-1 overflow-auto px-4 pb-4">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="relative">
@@ -1964,7 +1964,7 @@ export function CalendarOverview() {
             </div>
           </div>
         )}
-      </CardContent>
+      </div>
       
       {/* Calendar Item Dialog */}
       <CalendarItemDialog
@@ -2057,6 +2057,6 @@ export function CalendarOverview() {
         onCreate={handleTaskCreated}
         initialDate={createDate}
       />
-    </Card>
+    </div>
   );
 }
