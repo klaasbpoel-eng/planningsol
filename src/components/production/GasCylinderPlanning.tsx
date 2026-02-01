@@ -191,15 +191,11 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
     }
   };
 
-  const fetchOrders = async () => {
-    setLoading(true);
-    
-    // Calculate date range based on month filter
-    const monthStr = String(monthFilter).padStart(2, '0');
-    const startDate = `${yearFilter}-${monthStr}-01`;
-    // Get last day of the month
-    const lastDay = new Date(yearFilter, monthFilter, 0).getDate();
-    const endDate = `${yearFilter}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
+  const fetchMonthData = async (year: number, month: number) => {
+    const monthStr = String(month).padStart(2, '0');
+    const startDate = `${year}-${monthStr}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
     
     const { data, error } = await supabase
       .from("gas_cylinder_orders")
@@ -210,14 +206,39 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
       .gte("scheduled_date", startDate)
       .lte("scheduled_date", endDate)
       .order("scheduled_date", { ascending: true })
-      .limit(5000); // Verhoogd van standaard 1000 naar 5000 voor maandelijkse data
-
+      .limit(5000);
+    
     if (error) {
+      console.error(`Error fetching orders for month ${month}:`, error);
+      return [];
+    }
+    return (data as GasCylinderOrder[]) || [];
+  };
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    
+    try {
+      if (monthFilter === 0) {
+        // Hele jaar: laad alle 12 maanden parallel
+        const monthPromises = Array.from({ length: 12 }, (_, i) => 
+          fetchMonthData(yearFilter, i + 1)
+        );
+        const allMonthData = await Promise.all(monthPromises);
+        const combinedOrders = allMonthData.flat().sort((a, b) => 
+          new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime()
+        );
+        setOrders(combinedOrders);
+      } else {
+        // Specifieke maand
+        const data = await fetchMonthData(yearFilter, monthFilter);
+        setOrders(data);
+      }
+    } catch (error) {
       console.error("Error fetching orders:", error);
       toast.error("Fout bij ophalen orders");
-    } else {
-      setOrders((data as GasCylinderOrder[]) || []);
     }
+    
     setLoading(false);
   };
 
@@ -574,6 +595,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
                           <SelectValue placeholder="Maand" />
                         </SelectTrigger>
                         <SelectContent className="bg-background border shadow-lg z-50">
+                          <SelectItem value="0">Hele jaar</SelectItem>
                           {monthNames.map((month, idx) => (
                             <SelectItem key={idx + 1} value={(idx + 1).toString()}>{month}</SelectItem>
                           ))}
