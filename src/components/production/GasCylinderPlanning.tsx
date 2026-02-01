@@ -465,6 +465,19 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
   const emmenCount = orders.filter(o => o.location === "sol_emmen").length;
   const tilburgCount = orders.filter(o => o.location === "sol_tilburg").length;
 
+  // Total counts for the selected period (all orders, not filtered by location)
+  const totalOrderCount = orders.length;
+  const totalCylinderCount = orders.reduce((sum, o) => sum + o.cylinder_count, 0);
+  
+  // Filtered counts for current view
+  const filteredOrderCount = filteredOrders.length;
+  const filteredCylinderCount = filteredOrders.reduce((sum, o) => sum + o.cylinder_count, 0);
+
+  // Period label for display
+  const periodLabel = monthFilter === 0 
+    ? `${yearFilter}` 
+    : `${monthNames[monthFilter - 1]} ${yearFilter}`;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -473,9 +486,22 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
             <Cylinder className="h-5 w-5 text-orange-500" />
             Gascilinders Vulling
           </h2>
-          <p className="text-sm text-muted-foreground">
-            Beheer vulorders voor gascilinders
-          </p>
+          <div className="flex flex-wrap items-center gap-3 mt-1">
+            <p className="text-sm text-muted-foreground">
+              {periodLabel}
+            </p>
+            <Badge variant="secondary" className="text-xs">
+              {formatNumber(totalOrderCount)} orders
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              {formatNumber(totalCylinderCount)} cilinders
+            </Badge>
+            {(filteredOrderCount !== totalOrderCount) && (
+              <span className="text-xs text-muted-foreground">
+                (gefilterd: {formatNumber(filteredOrderCount)} orders, {formatNumber(filteredCylinderCount)} cilinders)
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
           {permissions?.canDeleteOrders && (
