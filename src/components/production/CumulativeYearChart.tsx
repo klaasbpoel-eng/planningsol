@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Loader2, Cylinder, Snowflake, LineChart as LineChartIcon, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
@@ -262,14 +263,23 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
                   onClick={() => toggleYear(year)}
                 >
                   {isTopFive && (
-                    <Trophy 
-                      className={`h-3 w-3 ${
-                        topRank === 0 ? "text-yellow-400" : 
-                        topRank === 1 ? "text-gray-300" : 
-                        topRank === 2 ? "text-amber-600" : 
-                        isSelected ? "text-white/70" : "opacity-50"
-                      }`} 
-                    />
+                    <TooltipProvider delayDuration={0}>
+                      <UITooltip>
+                        <TooltipTrigger asChild>
+                          <Trophy 
+                            className={`h-3 w-3 ${
+                              topRank === 0 ? "text-yellow-400" : 
+                              topRank === 1 ? "text-gray-300" : 
+                              topRank === 2 ? "text-amber-600" : 
+                              isSelected ? "text-white/70" : "opacity-50"
+                            }`} 
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          #{topRank + 1} in volume
+                        </TooltipContent>
+                      </UITooltip>
+                    </TooltipProvider>
                   )}
                   {year}
                 </Badge>
