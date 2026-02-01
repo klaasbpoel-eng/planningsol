@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Cylinder, Snowflake, LineChart as LineChartIcon } from "lucide-react";
+import { Loader2, Cylinder, Snowflake, LineChart as LineChartIcon, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
 import {
@@ -168,14 +168,18 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
     setSelectedYears([]);
   };
 
-  const selectTopFive = () => {
-    // Calculate total volume for each year and select top 5
+  // Calculate top 5 years by total volume (memoized for indicator display)
+  const topFiveYears = useMemo(() => {
     const totals = yearlyData.map(yd => ({
       year: yd.year,
       total: yd.months.reduce((sum, val) => sum + val, 0)
     })).sort((a, b) => b.total - a.total);
 
-    setSelectedYears(totals.slice(0, 5).map(t => t.year));
+    return totals.slice(0, 5).map(t => t.year);
+  }, [yearlyData]);
+
+  const selectTopFive = () => {
+    setSelectedYears(topFiveYears);
   };
 
   if (loading) {
@@ -243,11 +247,13 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
           <div className="flex flex-wrap gap-2">
             {availableYears.map(year => {
               const isSelected = selectedYears.includes(year);
+              const isTopFive = topFiveYears.includes(year);
+              const topRank = topFiveYears.indexOf(year);
               return (
                 <Badge
                   key={year}
                   variant={isSelected ? "default" : "outline"}
-                  className="cursor-pointer transition-colors"
+                  className="cursor-pointer transition-colors flex items-center gap-1"
                   style={{
                     backgroundColor: isSelected ? getYearColor(year) : undefined,
                     borderColor: getYearColor(year),
@@ -255,6 +261,16 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
                   }}
                   onClick={() => toggleYear(year)}
                 >
+                  {isTopFive && (
+                    <Trophy 
+                      className={`h-3 w-3 ${
+                        topRank === 0 ? "text-yellow-400" : 
+                        topRank === 1 ? "text-gray-300" : 
+                        topRank === 2 ? "text-amber-600" : 
+                        isSelected ? "text-white/70" : "opacity-50"
+                      }`} 
+                    />
+                  )}
                   {year}
                 </Badge>
               );
