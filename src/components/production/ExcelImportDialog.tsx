@@ -241,32 +241,41 @@ export function ExcelImportDialog({
           
           // Look for header row with "Datum", "Gassoort", etc.
           const rowStr = row.map(cell => String(cell || "").toLowerCase()).join("|");
-          if (rowStr.includes("datum") && rowStr.includes("gassoort")) {
+          if (rowStr.includes("datum") && (rowStr.includes("gassoort") || rowStr.includes("gastype"))) {
             headerRowIndex = i;
             // Map column names to indices
             row.forEach((cell, idx) => {
               const cellStr = String(cell || "").toLowerCase().trim();
               if (cellStr.includes("datum")) columnMap.date = idx;
-              if (cellStr.includes("gassoort")) columnMap.gasType = idx;
-              if (cellStr.includes("type vulling") || cellStr.includes("vulling type")) columnMap.size = idx;
+              if (cellStr.includes("gassoort") || cellStr.includes("gastype")) columnMap.gasType = idx;
+              if (cellStr.includes("type vulling") || cellStr.includes("vulling type") || 
+                  cellStr.includes("cilinderinhoud") || cellStr.includes("cilinder inhoud")) columnMap.size = idx;
               if (cellStr === "aantal") columnMap.count = idx;
               if (cellStr === "m/t") columnMap.grade = idx;
-              if (cellStr.includes("vulling tbv") || cellStr.includes("tbv")) columnMap.customer = idx;
-              if (cellStr.includes("opmerkingen") || cellStr.includes("opmerking")) columnMap.notes = idx;
               // Detect location column
               if (cellStr.includes("locatie") || cellStr.includes("location") || 
                   cellStr.includes("productielocatie") || cellStr.includes("site") || 
                   cellStr.includes("vestiging")) {
                 columnMap.location = idx;
               }
+              // Detect customer column - "klant" or "vulling tbv"
+              if (cellStr.includes("vulling tbv") || cellStr.includes("tbv") || 
+                  cellStr === "klant" || cellStr.includes("customer")) {
+                columnMap.customer = idx;
+              }
+              // Detect notes column - "opmerkingen" or "omschrijving"
+              if (cellStr.includes("opmerkingen") || cellStr.includes("opmerking") ||
+                  cellStr.includes("omschrijving") || cellStr === "notes") {
+                columnMap.notes = idx;
+              }
             });
             break;
           }
         }
         
-        // Fallback to fixed indices if header not found
+        // Fallback to fixed indices if header not found (matching Excel structure: Datum, Gastype, Cilinderinhoud, Aantal, M/T, Locatie, Klant, Omschrijving)
         if (headerRowIndex === -1) {
-          columnMap = { date: 0, gasType: 1, size: 2, count: 3, grade: 4, customer: 5, notes: 6 };
+          columnMap = { date: 0, gasType: 1, size: 2, count: 3, grade: 4, location: 5, customer: 6, notes: 7 };
         }
         
         console.log("Column mapping:", columnMap, "Header row:", headerRowIndex);
