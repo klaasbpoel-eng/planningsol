@@ -207,6 +207,10 @@ export function CumulativeGasTypeChart() {
     });
   }, [allGasTypes, yearData, selectedYear1, selectedYear2]);
 
+  const totalAllGasTypesVolume = useMemo(() => {
+    return allGasTypeVolumes.reduce((sum, gtv) => sum + gtv.total, 0);
+  }, [allGasTypeVolumes]);
+
   const topFiveWithVolume = useMemo(() => {
     return [...allGasTypeVolumes].sort((a, b) => b.total - a.total).slice(0, 5);
   }, [allGasTypeVolumes]);
@@ -215,6 +219,11 @@ export function CumulativeGasTypeChart() {
 
   const getGasTypeVolume = (gasTypeId: string) => {
     return allGasTypeVolumes.find(t => t.id === gasTypeId)?.total || 0;
+  };
+
+  const getGasTypePercentage = (gasTypeId: string) => {
+    if (totalAllGasTypesVolume === 0) return 0;
+    return (getGasTypeVolume(gasTypeId) / totalAllGasTypesVolume) * 100;
   };
 
   const selectTopFive = () => {
@@ -370,6 +379,9 @@ export function CumulativeGasTypeChart() {
                         )}
                         <div className={isTopFive ? "text-muted-foreground" : "font-medium"}>
                           {formatNumber(gasTypeVolume, 0)} cilinders
+                        </div>
+                        <div className="text-muted-foreground text-[10px]">
+                          {getGasTypePercentage(gasType.id).toFixed(1)}% van totaal
                         </div>
                         <div className="text-muted-foreground text-[10px]">
                           ({selectedYear1} + {selectedYear2})
