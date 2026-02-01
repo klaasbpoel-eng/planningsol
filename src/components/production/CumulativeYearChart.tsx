@@ -185,6 +185,10 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
     }));
   }, [yearlyData]);
 
+  const totalAllYearsVolume = useMemo(() => {
+    return allYearVolumes.reduce((sum, yv) => sum + yv.total, 0);
+  }, [allYearVolumes]);
+
   const topFiveWithVolume = useMemo(() => {
     return [...allYearVolumes].sort((a, b) => b.total - a.total).slice(0, 5);
   }, [allYearVolumes]);
@@ -193,6 +197,11 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
 
   const getYearVolume = (year: number) => {
     return allYearVolumes.find(t => t.year === year)?.total || 0;
+  };
+
+  const getYearPercentage = (year: number) => {
+    if (totalAllYearsVolume === 0) return 0;
+    return (getYearVolume(year) / totalAllYearsVolume) * 100;
   };
 
   const selectTopFive = () => {
@@ -312,6 +321,9 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
                         )}
                         <div className={isTopFive ? "text-muted-foreground" : "font-medium"}>
                           {formatNumber(yearVolume, 0)} {type === "dryIce" ? "kg" : "cilinders"}
+                        </div>
+                        <div className="text-muted-foreground text-[10px]">
+                          {getYearPercentage(year).toFixed(1)}% van totaal
                         </div>
                       </div>
                     </TooltipContent>
