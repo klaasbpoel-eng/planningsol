@@ -168,6 +168,16 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
     setSelectedYears([]);
   };
 
+  const selectTopFive = () => {
+    // Calculate total volume for each year and select top 5
+    const totals = yearlyData.map(yd => ({
+      year: yd.year,
+      total: yd.months.reduce((sum, val) => sum + val, 0)
+    })).sort((a, b) => b.total - a.total);
+
+    setSelectedYears(totals.slice(0, 5).map(t => t.year));
+  };
+
   if (loading) {
     return (
       <Card className="glass-card">
@@ -208,6 +218,13 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
           <div className="flex items-center justify-between">
             <Label className="text-sm text-muted-foreground">Selecteer jaren</Label>
             <div className="flex gap-2">
+              <button 
+                onClick={selectTopFive}
+                className="text-xs text-primary hover:underline"
+              >
+                Top 5
+              </button>
+              <span className="text-muted-foreground">|</span>
               <button 
                 onClick={selectAllYears}
                 className="text-xs text-primary hover:underline"
