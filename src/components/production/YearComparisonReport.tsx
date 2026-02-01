@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users, Building2 } from "lucide-react";
@@ -113,6 +113,95 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
 
   const isSignificantGrowth = (percent: number) => percent > 10 || percent < -10;
+
+  // =================== FILTERED DATA CALCULATIONS ===================
+  
+  // Gefilterde gastype vergelijking data
+  const filteredGasTypeData = useMemo(() => {
+    if (selectedGasTypes.length === 0) return gasTypeComparison;
+    return gasTypeComparison.filter(gt => selectedGasTypes.includes(gt.gas_type_id));
+  }, [gasTypeComparison, selectedGasTypes]);
+
+  // Herberekende cylinder totalen op basis van gastype filter
+  const filteredCylinderTotals = useMemo(() => {
+    if (selectedGasTypes.length === 0) return cylinderTotals;
+    if (!cylinderTotals) return null;
+    
+    // Bereken totalen alleen voor geselecteerde gastypes
+    const currentTotal = filteredGasTypeData.reduce((sum, gt) => sum + gt.currentYear, 0);
+    const previousTotal = filteredGasTypeData.reduce((sum, gt) => sum + gt.previousYear, 0);
+    const change = currentTotal - previousTotal;
+    const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
+    return { currentYear: currentTotal, previousYear: previousTotal, change, changePercent };
+  }, [cylinderTotals, filteredGasTypeData, selectedGasTypes]);
+
+  // Gefilterde maandelijkse data voor cilinders per gastype
+  const filteredMonthlyGasTypeData = useMemo(() => {
+    if (selectedGasTypes.length === 0) return monthlyGasTypeData;
+    
+    const filterMonthData = (data: MonthlyGasTypeChartData[]) => {
+      return data.map(month => {
+        const filtered: MonthlyGasTypeChartData = { month: month.month, monthName: month.monthName };
+        selectedGasTypes.forEach(gtId => {
+          if (month[gtId] !== undefined) filtered[gtId] = month[gtId];
+        });
+        return filtered;
+      });
+    };
+    
+    return {
+      current: filterMonthData(monthlyGasTypeData.current),
+      previous: filterMonthData(monthlyGasTypeData.previous)
+    };
+  }, [monthlyGasTypeData, selectedGasTypes]);
+
+  // Herberekende cylinder maanddata op basis van gastype filter
+  const filteredCylinderData = useMemo(() => {
+    if (selectedGasTypes.length === 0) return cylinderData;
+    
+    // Bereken nieuwe maandtotalen uit gefilterde gastype data
+    return cylinderData.map((month, idx) => {
+      const currentMonthData = filteredMonthlyGasTypeData.current[idx];
+      const previousMonthData = filteredMonthlyGasTypeData.previous[idx];
+      
+      const currentTotal = selectedGasTypes.reduce((sum, gtId) => 
+        sum + (Number(currentMonthData?.[gtId]) || 0), 0);
+      const previousTotal = selectedGasTypes.reduce((sum, gtId) => 
+        sum + (Number(previousMonthData?.[gtId]) || 0), 0);
+      
+      const change = currentTotal - previousTotal;
+      const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
+      
+      return {
+        ...month,
+        currentYear: currentTotal,
+        previousYear: previousTotal,
+        change,
+        changePercent
+      };
+    });
+  }, [cylinderData, filteredMonthlyGasTypeData, selectedGasTypes]);
+
+  // Gefilterde klant data
+  const filteredCustomerComparison = useMemo(() => {
+    if (selectedCustomers.length === 0) return customerComparison;
+    return customerComparison.filter(c => {
+      const customerKey = c.customer_id || c.customer_name;
+      return selectedCustomers.includes(customerKey);
+    });
+  }, [customerComparison, selectedCustomers]);
+
+  // Herberekende droogijs totalen op basis van klant filter
+  const filteredDryIceTotals = useMemo(() => {
+    if (selectedCustomers.length === 0) return dryIceTotals;
+    if (!dryIceTotals) return null;
+    
+    const currentTotal = filteredCustomerComparison.reduce((sum, c) => sum + c.currentDryIce, 0);
+    const previousTotal = filteredCustomerComparison.reduce((sum, c) => sum + c.previousDryIce, 0);
+    const change = currentTotal - previousTotal;
+    const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
+    return { currentYear: currentTotal, previousYear: previousTotal, change, changePercent };
+  }, [dryIceTotals, filteredCustomerComparison, selectedCustomers]);
 
   useEffect(() => {
     // Generate years from 2024 to current year + 1
@@ -572,28 +661,33 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
             <CardTitle className="text-lg flex items-center gap-2">
               <Cylinder className="h-5 w-5 text-orange-500" />
               Cilinders Jaartotaal
+              {selectedGasTypes.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {selectedGasTypes.length} gastype(s) gefilterd
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {cylinderTotals && (
+            {filteredCylinderTotals && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">{selectedYear}</p>
-                    <p className="text-2xl font-bold">{formatNumber(cylinderTotals.currentYear, 0)}</p>
+                    <p className="text-2xl font-bold">{formatNumber(filteredCylinderTotals.currentYear, 0)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">{selectedYear - 1}</p>
-                    <p className="text-2xl font-bold text-muted-foreground">{formatNumber(cylinderTotals.previousYear, 0)}</p>
+                    <p className="text-2xl font-bold text-muted-foreground">{formatNumber(filteredCylinderTotals.previousYear, 0)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {getTrendIcon(cylinderTotals.changePercent)}
-                  <span className={`font-medium ${getChangeColor(cylinderTotals.changePercent)}`}>
-                    {cylinderTotals.change >= 0 ? "+" : ""}{formatNumber(cylinderTotals.change, 0)}
+                  {getTrendIcon(filteredCylinderTotals.changePercent)}
+                  <span className={`font-medium ${getChangeColor(filteredCylinderTotals.changePercent)}`}>
+                    {filteredCylinderTotals.change >= 0 ? "+" : ""}{formatNumber(filteredCylinderTotals.change, 0)}
                   </span>
-                  <Badge variant={cylinderTotals.changePercent >= 0 ? "default" : "destructive"}>
-                    {cylinderTotals.changePercent >= 0 ? "+" : ""}{cylinderTotals.changePercent.toFixed(1)}%
+                  <Badge variant={filteredCylinderTotals.changePercent >= 0 ? "default" : "destructive"}>
+                    {filteredCylinderTotals.changePercent >= 0 ? "+" : ""}{filteredCylinderTotals.changePercent.toFixed(1)}%
                   </Badge>
                 </div>
               </div>
@@ -607,28 +701,33 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
             <CardTitle className="text-lg flex items-center gap-2">
               <Snowflake className="h-5 w-5 text-cyan-500" />
               Droogijs Jaartotaal (kg)
+              {selectedCustomers.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {selectedCustomers.length} klant(en) gefilterd
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {dryIceTotals && (
+            {filteredDryIceTotals && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">{selectedYear}</p>
-                    <p className="text-2xl font-bold">{formatNumber(dryIceTotals.currentYear, 0)}</p>
+                    <p className="text-2xl font-bold">{formatNumber(filteredDryIceTotals.currentYear, 0)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">{selectedYear - 1}</p>
-                    <p className="text-2xl font-bold text-muted-foreground">{formatNumber(dryIceTotals.previousYear, 0)}</p>
+                    <p className="text-2xl font-bold text-muted-foreground">{formatNumber(filteredDryIceTotals.previousYear, 0)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {getTrendIcon(dryIceTotals.changePercent)}
-                  <span className={`font-medium ${getChangeColor(dryIceTotals.changePercent)}`}>
-                    {dryIceTotals.change >= 0 ? "+" : ""}{formatNumber(dryIceTotals.change, 0)} kg
+                  {getTrendIcon(filteredDryIceTotals.changePercent)}
+                  <span className={`font-medium ${getChangeColor(filteredDryIceTotals.changePercent)}`}>
+                    {filteredDryIceTotals.change >= 0 ? "+" : ""}{formatNumber(filteredDryIceTotals.change, 0)} kg
                   </span>
-                  <Badge variant={dryIceTotals.changePercent >= 0 ? "default" : "destructive"}>
-                    {dryIceTotals.changePercent >= 0 ? "+" : ""}{dryIceTotals.changePercent.toFixed(1)}%
+                  <Badge variant={filteredDryIceTotals.changePercent >= 0 ? "default" : "destructive"}>
+                    {filteredDryIceTotals.changePercent >= 0 ? "+" : ""}{filteredDryIceTotals.changePercent.toFixed(1)}%
                   </Badge>
                 </div>
               </div>
@@ -652,6 +751,11 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
           <CardTitle className="text-lg flex items-center gap-2">
             <Award className="h-5 w-5 text-yellow-500" />
             Groei Highlights
+            {(selectedGasTypes.length > 0 || selectedCustomers.length > 0) && (
+              <Badge variant="secondary" className="ml-2">
+                Gefilterd
+              </Badge>
+            )}
           </CardTitle>
           <CardDescription>
             Beste en slechtste maanden qua groei t.o.v. {selectedYear - 1}
@@ -664,9 +768,12 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
               <h4 className="font-medium flex items-center gap-2">
                 <Cylinder className="h-4 w-4 text-orange-500" />
                 Cilinders
+                {selectedGasTypes.length > 0 && (
+                  <span className="text-xs text-muted-foreground">({selectedGasTypes.length} gastype(s))</span>
+                )}
               </h4>
               {(() => {
-                const highlights = getGrowthHighlights(cylinderData);
+                const highlights = getGrowthHighlights(filteredCylinderData);
                 return (
                   <div className="grid grid-cols-2 gap-3">
                     {/* Best Month */}
@@ -1133,6 +1240,11 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
             <CardTitle className="text-lg flex items-center gap-2">
               <Cylinder className="h-5 w-5 text-orange-500" />
               Cilinders per maand
+              {selectedGasTypes.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {selectedGasTypes.length} gastype(s) gefilterd
+                </Badge>
+              )}
             </CardTitle>
             <CardDescription>
               Vergelijking {selectedYear} vs {selectedYear - 1}
@@ -1140,7 +1252,7 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={cylinderData}>
+              <BarChart data={filteredCylinderData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="monthName" className="text-xs" />
                 <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
@@ -1208,6 +1320,11 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
           <CardTitle className="text-lg flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
             Groeipercentage per maand
+            {(selectedGasTypes.length > 0 || selectedCustomers.length > 0) && (
+              <Badge variant="secondary" className="ml-2">
+                Gefilterd
+              </Badge>
+            )}
           </CardTitle>
           <CardDescription>
             Procentuele verandering t.o.v. {selectedYear - 1} — boven 0% = groei, onder 0% = daling
@@ -1216,7 +1333,7 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart
-              data={cylinderData.map((c, i) => ({
+              data={filteredCylinderData.map((c, i) => ({
                 monthName: c.monthName,
                 cylinders: parseFloat(c.changePercent.toFixed(1)),
                 dryIce: parseFloat((dryIceData[i]?.changePercent || 0).toFixed(1))
@@ -1283,11 +1400,16 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
             <CardTitle className="text-base flex items-center gap-2">
               <Cylinder className="h-4 w-4 text-orange-500" />
               Cilinders groeitrend
+              {selectedGasTypes.length > 0 && (
+                <Badge variant="secondary" className="text-[10px] px-1.5">
+                  Gefilterd
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={cylinderData}>
+              <LineChart data={filteredCylinderData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="monthName" className="text-xs" tick={{ fontSize: 10 }} />
                 <YAxis className="text-xs" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} />
@@ -1354,7 +1476,14 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <CardTitle className="text-lg">Maandelijks overzicht</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                Maandelijks overzicht
+                {(selectedGasTypes.length > 0 || selectedCustomers.length > 0) && (
+                  <Badge variant="secondary" className="ml-2">
+                    Gefilterd
+                  </Badge>
+                )}
+              </CardTitle>
               <CardDescription>Gedetailleerde vergelijking per maand</CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -1389,7 +1518,7 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
                 </tr>
               </thead>
               <tbody>
-                {cylinderData.map((cylinder, i) => {
+                {filteredCylinderData.map((cylinder, i) => {
                   const dryIce = dryIceData[i];
                   const cylinderSignificant = isSignificantGrowth(cylinder.changePercent);
                   const dryIceSignificant = isSignificantGrowth(dryIce?.changePercent || 0);
@@ -1437,15 +1566,15 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
                 {/* Totals row */}
                 <tr className="bg-muted/30 font-bold">
                   <td className="py-3 px-2">Totaal</td>
-                  <td className="text-right py-3 px-2">{formatNumber(cylinderTotals?.currentYear || 0, 0)}</td>
-                  <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(cylinderTotals?.previousYear || 0, 0)}</td>
-                  <td className={`text-right py-3 px-2 ${getChangeColor(cylinderTotals?.changePercent || 0)}`}>
-                    {(cylinderTotals?.changePercent || 0) >= 0 ? "+" : ""}{(cylinderTotals?.changePercent || 0).toFixed(1)}%
+                  <td className="text-right py-3 px-2">{formatNumber(filteredCylinderTotals?.currentYear || 0, 0)}</td>
+                  <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(filteredCylinderTotals?.previousYear || 0, 0)}</td>
+                  <td className={`text-right py-3 px-2 ${getChangeColor(filteredCylinderTotals?.changePercent || 0)}`}>
+                    {(filteredCylinderTotals?.changePercent || 0) >= 0 ? "+" : ""}{(filteredCylinderTotals?.changePercent || 0).toFixed(1)}%
                   </td>
-                  <td className="text-right py-3 px-2">{formatNumber(dryIceTotals?.currentYear || 0, 0)}</td>
-                  <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(dryIceTotals?.previousYear || 0, 0)}</td>
-                  <td className={`text-right py-3 px-2 ${getChangeColor(dryIceTotals?.changePercent || 0)}`}>
-                    {(dryIceTotals?.changePercent || 0) >= 0 ? "+" : ""}{(dryIceTotals?.changePercent || 0).toFixed(1)}%
+                  <td className="text-right py-3 px-2">{formatNumber(filteredDryIceTotals?.currentYear || 0, 0)}</td>
+                  <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(filteredDryIceTotals?.previousYear || 0, 0)}</td>
+                  <td className={`text-right py-3 px-2 ${getChangeColor(filteredDryIceTotals?.changePercent || 0)}`}>
+                    {(filteredDryIceTotals?.changePercent || 0) >= 0 ? "+" : ""}{(filteredDryIceTotals?.changePercent || 0).toFixed(1)}%
                   </td>
                 </tr>
               </tbody>
