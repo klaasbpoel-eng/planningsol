@@ -83,11 +83,22 @@ interface GasType {
   color: string;
 }
 
+type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
+
 interface GasCylinderPlanningProps {
   onDataChanged?: () => void;
+  location?: ProductionLocation;
 }
 
-export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps) {
+export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCylinderPlanningProps) {
+  // Determine initial tab based on location prop
+  const getInitialTab = (): LocationTab => {
+    if (location === "sol_emmen" || location === "sol_tilburg") {
+      return location;
+    }
+    return "sol_emmen";
+  };
+
   const [orders, setOrders] = useState<GasCylinderOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -108,7 +119,17 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
   const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
   const [monthFilter, setMonthFilter] = useState<number>(new Date().getMonth() + 1);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [locationTab, setLocationTab] = useState<LocationTab>("sol_emmen");
+  const [locationTab, setLocationTab] = useState<LocationTab>(getInitialTab());
+
+  // Update location tab when location prop changes (for non-admin users)
+  useEffect(() => {
+    if (location === "sol_emmen" || location === "sol_tilburg") {
+      setLocationTab(location);
+    }
+  }, [location]);
+
+  // Check if location tabs should be hidden (when user is restricted to a single location)
+  const showLocationTabs = location === "all";
 
   // Dutch month names for dropdown
   const monthNames = [
@@ -455,6 +476,331 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
     ? `${yearFilter}` 
     : `${monthNames[monthFilter - 1]} ${yearFilter}`;
 
+  // Check if any filters are active
+  const hasActiveFilters = pressureFilter !== "all" || 
+    gasTypeFilter.length > 0 || 
+    dateFilter !== undefined || 
+    statusFilter !== "all" || 
+    gradeFilter !== "all" || 
+    customerFilter !== "all" ||
+    yearFilter !== new Date().getFullYear() ||
+    monthFilter !== new Date().getMonth() + 1;
+
+  const clearFilters = () => {
+    setPressureFilter("all");
+    setGasTypeFilter([]);
+    setDateFilter(undefined);
+    setStatusFilter("all");
+    setGradeFilter("all");
+    setCustomerFilter("all");
+    setYearFilter(new Date().getFullYear());
+    setMonthFilter(new Date().getMonth() + 1);
+  };
+
+  // Render the order content (table, filters, stats)
+  const renderOrderContent = () => (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Filling queue */}
+      <div className="lg:col-span-2">
+        <Card className="glass-card">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Vulwachtrij - {locationTab === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg"}
+                </CardTitle>
+                <CardDescription>
+                  Geplande vulorders voor gascilinders
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-[160px] justify-start text-left font-normal bg-background",
+                        !dateFilter && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateFilter ? format(dateFilter, "dd-MM-yyyy") : "Datum"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={dateFilter}
+                      onSelect={setDateFilter}
+                      locale={nl}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Select value={yearFilter.toString()} onValueChange={(v) => setYearFilter(parseInt(v))}>
+                  <SelectTrigger className="w-[100px] bg-background">
+                    <SelectValue placeholder="Jaar" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border shadow-lg z-50">
+                    {availableYears.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={monthFilter.toString()} onValueChange={(v) => setMonthFilter(parseInt(v))}>
+                  <SelectTrigger className="w-[130px] bg-background">
+                    <SelectValue placeholder="Maand" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border shadow-lg z-50">
+                    <SelectItem value="0">Hele jaar</SelectItem>
+                    {monthNames.map((name, i) => (
+                      <SelectItem key={i + 1} value={(i + 1).toString()}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {hasActiveFilters && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9"
+                    onClick={clearFilters}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Wis filters
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Cylinder className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="font-medium">
+                  {hasActiveFilters
+                    ? "Geen vulorders gevonden met de huidige filters"
+                    : "Geen vulorders gepland"}
+                </p>
+                <p className="text-sm">
+                  {hasActiveFilters
+                    ? "Pas de filters aan of voeg een nieuwe order toe"
+                    : "Voeg een nieuwe vulorder toe om te beginnen"}
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>
+                      <div className="space-y-1">
+                        <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("customer_name")}>
+                          Klant<SortIcon column="customer_name" />
+                        </div>
+                        <Select value={customerFilter} onValueChange={(v) => setCustomerFilter(v)}>
+                          <SelectTrigger className="h-7 text-xs bg-background w-full">
+                            <SelectValue placeholder="Alle" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border shadow-lg z-50 max-h-[300px]">
+                            <SelectItem value="all">Alle klanten</SelectItem>
+                            {uniqueCustomers.map((customer) => (
+                              <SelectItem key={customer} value={customer}>{customer}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="space-y-1">
+                        <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("gas_type")}>
+                          Gastype<SortIcon column="gas_type" />
+                        </div>
+                        <GasTypeMultiSelect
+                          gasTypes={gasTypes}
+                          selectedGasTypes={gasTypeFilter}
+                          onSelectionChange={setGasTypeFilter}
+                          className="w-full"
+                        />
+                      </div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("cylinder_count")}>
+                      <div className="flex items-center">Aantal<SortIcon column="cylinder_count" /></div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="space-y-1">
+                        <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("pressure")}>
+                          Druk<SortIcon column="pressure" />
+                        </div>
+                        <Select value={pressureFilter} onValueChange={(v) => setPressureFilter(v as PressureFilter)}>
+                          <SelectTrigger className="h-7 text-xs bg-background w-full">
+                            <SelectValue placeholder="Alle" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border shadow-lg z-50">
+                            <SelectItem value="all">Alle</SelectItem>
+                            <SelectItem value="200">200 bar</SelectItem>
+                            <SelectItem value="300">300 bar</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("scheduled_date")}>
+                      <div className="flex items-center">Datum<SortIcon column="scheduled_date" /></div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="space-y-1">
+                        <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("status")}>
+                          Status<SortIcon column="status" />
+                        </div>
+                        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                          <SelectTrigger className="h-7 text-xs bg-background w-full">
+                            <SelectValue placeholder="Alle" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border shadow-lg z-50">
+                            <SelectItem value="all">Alle</SelectItem>
+                            <SelectItem value="pending">Gepland</SelectItem>
+                            <SelectItem value="in_progress">Bezig</SelectItem>
+                            <SelectItem value="completed">Voltooid</SelectItem>
+                            <SelectItem value="cancelled">Geannuleerd</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-right">Acties</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedOrders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">{order.customer_name}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: getGasTypeColor(order) }}
+                          />
+                          {getGasTypeLabel(order)}
+                        </div>
+                      </TableCell>
+                      <TableCell>{order.cylinder_count}</TableCell>
+                      <TableCell>{order.pressure} bar</TableCell>
+                      <TableCell>{format(new Date(order.scheduled_date), "dd-MM-yyyy")}</TableCell>
+                      <TableCell>
+                        <Select 
+                          value={order.status} 
+                          onValueChange={(v) => handleStatusChange(order.id, v)}
+                        >
+                          <SelectTrigger className="h-8 w-[110px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border shadow-lg z-50">
+                            <SelectItem value="pending">Gepland</SelectItem>
+                            <SelectItem value="in_progress">Bezig</SelectItem>
+                            <SelectItem value="completed">Voltooid</SelectItem>
+                            <SelectItem value="cancelled">Geannuleerd</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          {permissions?.canEditOrders && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => handleEditOrder(order)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {permissions?.canDeleteOrders && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => handleDeleteClick(order)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Stats sidebar */}
+      <div className="space-y-6">
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Gauge className="h-5 w-5" />
+              Dagelijkse Voortgang
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span>Cilinders vandaag</span>
+                <span className="font-medium">{todayCount}</span>
+              </div>
+              <Progress value={Math.min((todayCount / 50) * 100, 100)} className="h-2" />
+            </div>
+            <div className="grid grid-cols-2 gap-4 pt-2">
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <span className="text-muted-foreground text-xs">Orders</span>
+                <p className="font-medium">
+                  {filteredOrders.filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd")).length}
+                </p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <span className="text-muted-foreground text-xs">Voltooid</span>
+                <p className="font-medium">
+                  {filteredOrders.filter(o => 
+                    o.scheduled_date === format(new Date(), "yyyy-MM-dd") && 
+                    o.status === "completed"
+                  ).length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Capaciteit
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Vandaag</span>
+                <span className="font-medium">
+                  {filteredOrders.filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd")).length}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Orders</span>
+                <span className="font-medium">
+                  {filteredOrders.filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd")).length}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -496,427 +842,40 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
         </div>
       </div>
 
-      {/* Location Tabs */}
-      <Tabs value={locationTab} onValueChange={(v) => setLocationTab(v as LocationTab)} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="sol_emmen" className="flex items-center gap-2">
-            <MapPin className="h-4 w-4" />
-            SOL Emmen
-            <Badge variant="secondary" className="ml-1 text-xs">{emmenCount}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="sol_tilburg" className="flex items-center gap-2">
-            <MapPin className="h-4 w-4" />
-            SOL Tilburg
-            <Badge variant="secondary" className="ml-1 text-xs">{tilburgCount}</Badge>
-          </TabsTrigger>
-        </TabsList>
+      {/* Location Tabs - only show when user can view all locations */}
+      {showLocationTabs ? (
+        <Tabs value={locationTab} onValueChange={(v) => setLocationTab(v as LocationTab)} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="sol_emmen" className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              SOL Emmen
+              <Badge variant="secondary" className="ml-1 text-xs">{emmenCount}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="sol_tilburg" className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              SOL Tilburg
+              <Badge variant="secondary" className="ml-1 text-xs">{tilburgCount}</Badge>
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value={locationTab} className="mt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Filling queue */}
-            <div className="lg:col-span-2">
-              <Card className="glass-card">
-                <CardHeader>
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Calendar className="h-5 w-5" />
-                        Vulwachtrij - {locationTab === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg"}
-                      </CardTitle>
-                      <CardDescription>
-                        Geplande vulorders voor gascilinders
-                      </CardDescription>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Filter className="h-4 w-4 text-muted-foreground" />
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-[160px] justify-start text-left font-normal bg-background",
-                              !dateFilter && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {dateFilter ? format(dateFilter, "d MMM yyyy", { locale: nl }) : "Alle datums"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
-                          <CalendarComponent
-                            mode="single"
-                            selected={dateFilter}
-                            onSelect={setDateFilter}
-                            initialFocus
-                            locale={nl}
-                            className={cn("p-3 pointer-events-auto")}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      {dateFilter && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => setDateFilter(undefined)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {(dateFilter || pressureFilter !== "all" || gasTypeFilter.length > 0 || statusFilter !== "all" || gradeFilter !== "all" || customerFilter !== "all" || yearFilter !== new Date().getFullYear() || monthFilter !== new Date().getMonth() + 1) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-9"
-                          onClick={() => {
-                            setDateFilter(undefined);
-                            setPressureFilter("all");
-                            setGasTypeFilter([]);
-                            setStatusFilter("all");
-                            setGradeFilter("all");
-                            setCustomerFilter("all");
-                            setYearFilter(new Date().getFullYear());
-                            setMonthFilter(new Date().getMonth() + 1);
-                          }}
-                        >
-                          <X className="h-4 w-4 mr-1" />
-                          Wis filters
-                        </Button>
-                      )}
-                      <Select value={monthFilter.toString()} onValueChange={(v) => setMonthFilter(parseInt(v))}>
-                        <SelectTrigger className="w-[130px] bg-background">
-                          <SelectValue placeholder="Maand" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-background border shadow-lg z-50">
-                          <SelectItem value="0">Hele jaar</SelectItem>
-                          {monthNames.map((month, idx) => (
-                            <SelectItem key={idx + 1} value={(idx + 1).toString()}>{month}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select value={yearFilter.toString()} onValueChange={(v) => setYearFilter(parseInt(v))}>
-                        <SelectTrigger className="w-[100px] bg-background">
-                          <SelectValue placeholder="Jaar" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-background border shadow-lg z-50">
-                          {availableYears.map((year) => (
-                            <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <GasTypeMultiSelect
-                        gasTypes={gasTypes}
-                        selectedGasTypes={gasTypeFilter}
-                        onSelectionChange={setGasTypeFilter}
-                        placeholder="Alle gastypes"
-                        className="w-[180px]"
-                      />
-                      <Select value={pressureFilter} onValueChange={(v) => setPressureFilter(v as PressureFilter)}>
-                        <SelectTrigger className="w-[140px] bg-background">
-                          <SelectValue placeholder="Druk" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-background border shadow-lg z-50">
-                          <SelectItem value="all">Alle drukken</SelectItem>
-                          <SelectItem value="200">200 bar</SelectItem>
-                          <SelectItem value="300">300 bar</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-                        <SelectTrigger className="w-[140px] bg-background">
-                          <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-background border shadow-lg z-50">
-                          <SelectItem value="all">Alle statussen</SelectItem>
-                          {Object.entries(statusLabels).map(([value, label]) => (
-                            <SelectItem key={value} value={value}>{label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : filteredOrders.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Cylinder className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p className="font-medium">
-                        {dateFilter || pressureFilter !== "all" || gasTypeFilter.length > 0 || statusFilter !== "all"
-                          ? "Geen orders gevonden met de huidige filters" 
-                          : "Geen vulorders gepland"}
-                      </p>
-                      <p className="text-sm">
-                        {dateFilter || pressureFilter !== "all" || gasTypeFilter.length > 0 || statusFilter !== "all"
-                          ? "Pas de filters aan of voeg een nieuwe order toe" 
-                          : "Voeg een nieuwe vulorder toe om te beginnen"}
-                      </p>
-                    </div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>
-                            <div className="space-y-1">
-                              <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("customer_name")}>
-                                Klant<SortIcon column="customer_name" />
-                              </div>
-                              <Select value={customerFilter} onValueChange={(v) => setCustomerFilter(v)}>
-                                <SelectTrigger className="h-7 text-xs bg-background w-full">
-                                  <SelectValue placeholder="Alle" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-background border shadow-lg z-50 max-h-[300px]">
-                                  <SelectItem value="all">Alle klanten</SelectItem>
-                                  {uniqueCustomers.map((customer) => (
-                                    <SelectItem key={customer} value={customer}>{customer}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </TableHead>
-                          <TableHead>
-                            <div className="space-y-1">
-                              <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("gas_type")}>
-                                Gastype<SortIcon column="gas_type" />
-                              </div>
-                              <GasTypeMultiSelect
-                                gasTypes={gasTypes}
-                                selectedGasTypes={gasTypeFilter}
-                                onSelectionChange={setGasTypeFilter}
-                                placeholder="Alle"
-                                className="h-7 text-xs w-full"
-                              />
-                            </div>
-                          </TableHead>
-                          <TableHead>
-                            <div className="space-y-1">
-                              <span className="text-xs text-muted-foreground">M/T</span>
-                              <Select value={gradeFilter} onValueChange={(v) => setGradeFilter(v as GradeFilter)}>
-                                <SelectTrigger className="h-7 text-xs bg-background w-full">
-                                  <SelectValue placeholder="Alle" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-background border shadow-lg z-50">
-                                  <SelectItem value="all">Alle</SelectItem>
-                                  <SelectItem value="medical">M</SelectItem>
-                                  <SelectItem value="technical">T</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </TableHead>
-                          <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("cylinder_count")}>
-                            <div className="flex items-center">Aantal<SortIcon column="cylinder_count" /></div>
-                          </TableHead>
-                          <TableHead>
-                            <div className="space-y-1">
-                              <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("pressure")}>
-                                Druk<SortIcon column="pressure" />
-                              </div>
-                              <Select value={pressureFilter} onValueChange={(v) => setPressureFilter(v as PressureFilter)}>
-                                <SelectTrigger className="h-7 text-xs bg-background w-full">
-                                  <SelectValue placeholder="Alle" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-background border shadow-lg z-50">
-                                  <SelectItem value="all">Alle</SelectItem>
-                                  <SelectItem value="200">200</SelectItem>
-                                  <SelectItem value="300">300</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </TableHead>
-                          <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("scheduled_date")}>
-                            <div className="flex items-center">Datum<SortIcon column="scheduled_date" /></div>
-                          </TableHead>
-                          <TableHead>
-                            <div className="space-y-1">
-                              <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("status")}>
-                                Status<SortIcon column="status" />
-                              </div>
-                              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-                                <SelectTrigger className="h-7 text-xs bg-background w-full">
-                                  <SelectValue placeholder="Alle" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-background border shadow-lg z-50">
-                                  <SelectItem value="all">Alle</SelectItem>
-                                  {Object.entries(statusLabels).map(([value, label]) => (
-                                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </TableHead>
-                          {(permissions?.canEditOrders || permissions?.canDeleteOrders) && <TableHead className="w-[80px]"></TableHead>}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {sortedOrders.map((order) => (
-                          <TableRow key={order.id}>
-                            <TableCell>{order.customer_name}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <div 
-                                  className="w-2 h-2 rounded-full flex-shrink-0" 
-                                  style={{ backgroundColor: getGasTypeColor(order) }} 
-                                />
-                                {getGasTypeLabel(order)}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs">
-                                {order.gas_grade === "medical" ? "M" : "T"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{formatNumber(order.cylinder_count, 0)} st.</TableCell>
-                            <TableCell>{formatNumber(order.pressure, 0)} bar</TableCell>
-                            <TableCell>
-                              {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
-                            </TableCell>
-                            <TableCell>
-                              {permissions?.canEditOrders ? (
-                                <Select 
-                                  value={order.status} 
-                                  onValueChange={(newStatus) => handleStatusChange(order.id, newStatus)}
-                                >
-                                  <SelectTrigger className="h-8 w-[130px] bg-background">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent className="bg-background border shadow-lg z-50">
-                                    {Object.entries(statusLabels).map(([value, label]) => (
-                                      <SelectItem key={value} value={value}>{label}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                getStatusBadge(order.status)
-                              )}
-                            </TableCell>
-                            {(permissions?.canEditOrders || permissions?.canDeleteOrders) && (
-                              <TableCell>
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => handleEditOrder(order)}
-                                  >
-                                    <Edit2 className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-destructive hover:text-destructive"
-                                    onClick={() => handleDeleteClick(order)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            )}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Quick info */}
-            <div className="space-y-4">
-              <Card className="glass-card border-orange-500/20">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Gauge className="h-4 w-4 text-orange-500" />
-                    Gastypes
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {gasTypes.length > 0 ? (
-                    (() => {
-                      // Calculate total cylinders across all orders
-                      const allCylinders = orders.reduce((sum, order) => sum + order.cylinder_count, 0);
-                      
-                      // Calculate cylinder count per gas type and sort
-                      const gasTypeStats = gasTypes.map((type) => {
-                        const typeOrders = orders.filter(order => 
-                          order.gas_type_id === type.id || order.gas_type_ref?.id === type.id
-                        );
-                        const totalCylinders = typeOrders.reduce((sum, order) => sum + order.cylinder_count, 0);
-                        return { ...type, totalCylinders };
-                      })
-                      .sort((a, b) => b.totalCylinders - a.totalCylinders)
-                      .slice(0, 6);
-
-                      return gasTypeStats.map((type) => {
-                        const percentage = allCylinders > 0 
-                          ? Math.round((type.totalCylinders / allCylinders) * 100) 
-                          : 0;
-                        
-                        return (
-                          <div key={type.id} className="space-y-2">
-                            <div className="flex justify-between items-center">
-                              <div className="flex items-center gap-2">
-                                <div 
-                                  className="w-2 h-2 rounded-full flex-shrink-0" 
-                                  style={{ backgroundColor: type.color }} 
-                                />
-                                <span className="text-sm">{type.name}</span>
-                              </div>
-                              <span className="text-xs text-muted-foreground">
-                                {type.totalCylinders} cilinders
-                              </span>
-                            </div>
-                            <Progress value={percentage} className="h-2" />
-                          </div>
-                        );
-                      });
-                    })()
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-2">
-                      Geen gastypes beschikbaar
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="glass-card">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                    Meldingen
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-4 text-muted-foreground">
-                    <p className="text-sm">Geen actieve meldingen</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="glass-card">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Vandaag gepland</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Cilinders te vullen</span>
-                      <span className="font-medium">{todayCount}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Orders</span>
-                      <span className="font-medium">
-                        {filteredOrders.filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd")).length}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+          <TabsContent value={locationTab} className="mt-6">
+            {renderOrderContent()}
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <div className="mt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">
+              {locationTab === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg"}
+            </span>
+            <Badge variant="secondary" className="text-xs">
+              {filteredOrders.length} orders
+            </Badge>
           </div>
-        </TabsContent>
-      </Tabs>
+          {renderOrderContent()}
+        </div>
+      )}
 
       <CreateGasCylinderOrderDialog
         open={dialogOpen}

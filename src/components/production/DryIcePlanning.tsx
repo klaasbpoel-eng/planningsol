@@ -76,11 +76,14 @@ interface DryIceOrder {
   location: "sol_emmen" | "sol_tilburg";
 }
 
+type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
+
 interface DryIcePlanningProps {
   onDataChanged?: () => void;
+  location?: ProductionLocation;
 }
 
-export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
+export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanningProps) {
   const [orders, setOrders] = useState<DryIceOrder[]>([]);
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [packagingOptions, setPackagingOptions] = useState<Packaging[]>([]);
@@ -309,12 +312,13 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
     return "-";
   };
 
-  // Filtering logic
+  // Filtering logic (including location)
   const filteredOrders = orders.filter(o => {
+    const matchesLocation = location === "all" || o.location === location;
     const matchesCustomer = customerFilter === "all" || o.customer_name === customerFilter;
     const matchesProductType = productTypeFilter === "all" || o.product_type_id === productTypeFilter;
     const matchesStatus = statusFilter === "all" || o.status === statusFilter;
-    return matchesCustomer && matchesProductType && matchesStatus;
+    return matchesLocation && matchesCustomer && matchesProductType && matchesStatus;
   });
 
   // Sorting logic

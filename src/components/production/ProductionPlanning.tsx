@@ -352,11 +352,17 @@ export function ProductionPlanning({
         </TabsList>
 
         <TabsContent value="droogijs" className="mt-6">
-          <DryIcePlanning onDataChanged={handleDataChanged} />
+          <DryIcePlanning 
+            onDataChanged={handleDataChanged} 
+            location={selectedLocation}
+          />
         </TabsContent>
 
         <TabsContent value="gascilinders" className="mt-6">
-          <GasCylinderPlanning onDataChanged={handleDataChanged} />
+          <GasCylinderPlanning 
+            onDataChanged={handleDataChanged} 
+            location={selectedLocation}
+          />
         </TabsContent>
 
         <TabsContent value="rapportage" className="mt-6">
