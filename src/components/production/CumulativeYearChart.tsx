@@ -62,6 +62,7 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
   const [yearlyData, setYearlyData] = useState<YearlyMonthlyData[]>([]);
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [animatingTopFive, setAnimatingTopFive] = useState(false);
 
   useEffect(() => {
     fetchAllYearsData();
@@ -187,6 +188,8 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
 
   const selectTopFive = () => {
     setSelectedYears(topFiveYears);
+    setAnimatingTopFive(true);
+    setTimeout(() => setAnimatingTopFive(false), 600);
   };
 
   if (loading) {
@@ -260,7 +263,11 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
                 <Badge
                   key={year}
                   variant={isSelected ? "default" : "outline"}
-                  className="cursor-pointer transition-colors flex items-center gap-1"
+                  className={`cursor-pointer transition-all flex items-center gap-1 ${
+                    animatingTopFive && isTopFive 
+                      ? "animate-[pulse_0.3s_ease-in-out_2] scale-110" 
+                      : ""
+                  }`}
                   style={{
                     backgroundColor: isSelected ? getYearColor(year) : undefined,
                     borderColor: getYearColor(year),
