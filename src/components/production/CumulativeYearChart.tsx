@@ -63,6 +63,8 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [animatingTopFive, setAnimatingTopFive] = useState(false);
+  const [animatingAll, setAnimatingAll] = useState(false);
+  const [animatingClear, setAnimatingClear] = useState(false);
 
   useEffect(() => {
     fetchAllYearsData();
@@ -164,10 +166,14 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
 
   const selectAllYears = () => {
     setSelectedYears(availableYears);
+    setAnimatingAll(true);
+    setTimeout(() => setAnimatingAll(false), 600);
   };
 
   const clearYears = () => {
     setSelectedYears([]);
+    setAnimatingClear(true);
+    setTimeout(() => setAnimatingClear(false), 300);
   };
 
   // Calculate top 5 years by total volume (memoized for indicator display)
@@ -259,12 +265,16 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
               const isSelected = selectedYears.includes(year);
               const isTopFive = topFiveYears.includes(year);
               const topRank = topFiveYears.indexOf(year);
+              const shouldAnimate = 
+                (animatingTopFive && isTopFive) || 
+                animatingAll || 
+                (animatingClear && isSelected);
               return (
                 <Badge
                   key={year}
                   variant={isSelected ? "default" : "outline"}
                   className={`cursor-pointer transition-all flex items-center gap-1 ${
-                    animatingTopFive && isTopFive 
+                    shouldAnimate 
                       ? "animate-[pulse_0.3s_ease-in-out_2] scale-110" 
                       : ""
                   }`}

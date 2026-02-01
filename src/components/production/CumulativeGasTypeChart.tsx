@@ -50,6 +50,8 @@ export function CumulativeGasTypeChart() {
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [allGasTypes, setAllGasTypes] = useState<{ id: string; name: string; color: string }[]>([]);
   const [animatingTopFive, setAnimatingTopFive] = useState(false);
+  const [animatingAll, setAnimatingAll] = useState(false);
+  const [animatingClear, setAnimatingClear] = useState(false);
   
 
   useEffect(() => {
@@ -221,10 +223,14 @@ export function CumulativeGasTypeChart() {
 
   const selectAllGasTypes = () => {
     setSelectedGasTypes(allGasTypes.map(gt => gt.id));
+    setAnimatingAll(true);
+    setTimeout(() => setAnimatingAll(false), 600);
   };
 
   const clearGasTypes = () => {
     setSelectedGasTypes([]);
+    setAnimatingClear(true);
+    setTimeout(() => setAnimatingClear(false), 300);
   };
 
   if (loading) {
@@ -318,12 +324,16 @@ export function CumulativeGasTypeChart() {
               const isSelected = selectedGasTypes.includes(gasType.id);
               const isTopFive = topFiveGasTypes.includes(gasType.id);
               const topRank = topFiveGasTypes.indexOf(gasType.id);
+              const shouldAnimate = 
+                (animatingTopFive && isTopFive) || 
+                animatingAll || 
+                (animatingClear && isSelected);
               return (
                 <Badge
                   key={gasType.id}
                   variant={isSelected ? "default" : "outline"}
                   className={`cursor-pointer transition-all flex items-center gap-1 ${
-                    animatingTopFive && isTopFive 
+                    shouldAnimate 
                       ? "animate-[pulse_0.3s_ease-in-out_2] scale-110" 
                       : ""
                   }`}
