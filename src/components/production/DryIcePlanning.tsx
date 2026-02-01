@@ -73,6 +73,7 @@ interface DryIceOrder {
   created_by: string;
   customer_id: string | null;
   parent_order_id: string | null;
+  location: "sol_emmen" | "sol_tilburg";
 }
 
 interface DryIcePlanningProps {

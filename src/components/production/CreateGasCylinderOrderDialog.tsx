@@ -156,7 +156,12 @@ export function CreateGasCylinderOrderDialog({
     setScheduledDate(new Date());
     setNotes("");
     setIsCompleted(true);
-    setLocation("sol_emmen");
+    // Reset location to user's assigned location or default
+    if (userProductionLocation) {
+      setLocation(userProductionLocation);
+    } else {
+      setLocation("sol_emmen");
+    }
   };
 
   const handleClose = () => {

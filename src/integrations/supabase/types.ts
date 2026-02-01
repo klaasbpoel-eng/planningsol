@@ -170,6 +170,7 @@ export type Database = {
           customer_name: string
           id: string
           is_recurring: boolean | null
+          location: Database["public"]["Enums"]["production_location"]
           notes: string | null
           order_number: string
           packaging_id: string | null
@@ -192,6 +193,7 @@ export type Database = {
           customer_name: string
           id?: string
           is_recurring?: boolean | null
+          location?: Database["public"]["Enums"]["production_location"]
           notes?: string | null
           order_number: string
           packaging_id?: string | null
@@ -214,6 +216,7 @@ export type Database = {
           customer_name?: string
           id?: string
           is_recurring?: boolean | null
+          location?: Database["public"]["Enums"]["production_location"]
           notes?: string | null
           order_number?: string
           packaging_id?: string | null

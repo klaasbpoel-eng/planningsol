@@ -14,6 +14,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays, Snowflake, Plus, Repeat } from "lucide-react";
@@ -50,7 +57,10 @@ export function CreateDryIceOrderDialog({
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>(undefined);
   const [notes, setNotes] = useState("");
   const [alreadyCompleted, setAlreadyCompleted] = useState(true);
+  const [location, setLocation] = useState<"sol_emmen" | "sol_tilburg">("sol_emmen");
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
+  const [userProductionLocation, setUserProductionLocation] = useState<"sol_emmen" | "sol_tilburg" | null>(null);
+  const [canSelectLocation, setCanSelectLocation] = useState(true);
   
   const [productTypes, setProductTypes] = useState<{ id: string; name: string }[]>([]);
   const [packagingOptions, setPackagingOptions] = useState<{ id: string; name: string }[]>([]);
@@ -61,21 +71,45 @@ export function CreateDryIceOrderDialog({
   const isKunststofContainer = selectedPackaging?.name.toLowerCase().includes("kunststof");
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchProfileAndPermissions = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        // Fetch profile with production_location
         const { data: profile } = await supabase
           .from("profiles")
-          .select("id")
+          .select("id, production_location")
           .eq("user_id", user.id)
           .maybeSingle();
         
         if (profile) {
           setCurrentProfileId(profile.id);
+          
+          // Check user role
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          
+          const userRole = roleData?.role || "user";
+          const isAdmin = userRole === "admin";
+          
+          // If user has assigned location and is not admin, restrict to that location
+          if (profile.production_location && !isAdmin) {
+            setUserProductionLocation(profile.production_location);
+            setLocation(profile.production_location);
+            setCanSelectLocation(false);
+          } else if (profile.production_location) {
+            // Admin with location - set as default but allow selection
+            setLocation(profile.production_location);
+            setCanSelectLocation(true);
+          } else {
+            setCanSelectLocation(isAdmin);
+          }
         }
       }
     };
-    fetchProfile();
+    fetchProfileAndPermissions();
     fetchProductTypes();
     fetchPackaging();
   }, []);
@@ -123,6 +157,10 @@ export function CreateDryIceOrderDialog({
     setRecurrenceEndDate(undefined);
     setNotes("");
     setAlreadyCompleted(true);
+    // Reset location to user's assigned location or default
+    if (userProductionLocation) {
+      setLocation(userProductionLocation);
+    }
   };
 
   const handleClose = () => {
@@ -211,6 +249,7 @@ export function CreateDryIceOrderDialog({
           ? format(recurrenceEndDate, "yyyy-MM-dd") 
           : null,
         status: alreadyCompleted ? "completed" as const : "pending" as const,
+        location: location,
       };
 
       // Insert all orders
@@ -365,39 +404,63 @@ export function CreateDryIceOrderDialog({
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label>
-              Geplande datum <span className="text-destructive">*</span>
-            </Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !scheduledDate && "text-muted-foreground"
-                  )}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>
+                Geplande datum <span className="text-destructive">*</span>
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !scheduledDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    {scheduledDate
+                      ? format(scheduledDate, "d MMM yyyy", { locale: nl })
+                      : "Selecteer datum"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-auto p-0 bg-background border shadow-lg z-50"
+                  align="start"
                 >
-                  <CalendarDays className="mr-2 h-4 w-4" />
-                  {scheduledDate
-                    ? format(scheduledDate, "d MMM yyyy", { locale: nl })
-                    : "Selecteer datum"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                className="w-auto p-0 bg-background border shadow-lg z-50"
-                align="start"
+                  <Calendar
+                    mode="single"
+                    selected={scheduledDate}
+                    onSelect={setScheduledDate}
+                    locale={nl}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Productielocatie</Label>
+              <Select 
+                value={location} 
+                onValueChange={(v) => setLocation(v as "sol_emmen" | "sol_tilburg")}
+                disabled={!canSelectLocation}
               >
-                <Calendar
-                  mode="single"
-                  selected={scheduledDate}
-                  onSelect={setScheduledDate}
-                  locale={nl}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
+                <SelectTrigger className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="sol_emmen">SOL Emmen</SelectItem>
+                  <SelectItem value="sol_tilburg">SOL Tilburg</SelectItem>
+                </SelectContent>
+              </Select>
+              {!canSelectLocation && (
+                <p className="text-xs text-muted-foreground">
+                  Gebaseerd op je toegewezen locatie
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Weekly recurrence option */}
