@@ -195,7 +195,7 @@ export function CumulativeGasTypeChart() {
   };
 
   // Calculate top 5 gas types by total volume (memoized for indicator display)
-  const topFiveGasTypes = useMemo(() => {
+  const topFiveWithVolume = useMemo(() => {
     const totals = allGasTypes.map(gt => {
       const y1 = yearData.find(yd => yd.year === selectedYear1)?.gasTypes.find(d => d.id === gt.id);
       const y2 = yearData.find(yd => yd.year === selectedYear2)?.gasTypes.find(d => d.id === gt.id);
@@ -203,8 +203,14 @@ export function CumulativeGasTypeChart() {
       return { id: gt.id, total };
     }).sort((a, b) => b.total - a.total);
 
-    return totals.slice(0, 5).map(t => t.id);
+    return totals.slice(0, 5);
   }, [allGasTypes, yearData, selectedYear1, selectedYear2]);
+
+  const topFiveGasTypes = topFiveWithVolume.map(t => t.id);
+
+  const getGasTypeVolume = (gasTypeId: string) => {
+    return topFiveWithVolume.find(t => t.id === gasTypeId)?.total || 0;
+  };
 
   const selectTopFive = () => {
     setSelectedGasTypes(topFiveGasTypes);
@@ -335,7 +341,10 @@ export function CumulativeGasTypeChart() {
                           />
                         </TooltipTrigger>
                         <TooltipContent side="top" className="text-xs">
-                          #{topRank + 1} in volume
+                          <div className="text-center">
+                            <div className="font-medium">#{topRank + 1} in volume</div>
+                            <div className="text-muted-foreground">{formatNumber(getGasTypeVolume(gasType.id), 0)} cilinders</div>
+                          </div>
                         </TooltipContent>
                       </UITooltip>
                     </TooltipProvider>

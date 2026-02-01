@@ -170,14 +170,20 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
   };
 
   // Calculate top 5 years by total volume (memoized for indicator display)
-  const topFiveYears = useMemo(() => {
+  const topFiveWithVolume = useMemo(() => {
     const totals = yearlyData.map(yd => ({
       year: yd.year,
       total: yd.months.reduce((sum, val) => sum + val, 0)
     })).sort((a, b) => b.total - a.total);
 
-    return totals.slice(0, 5).map(t => t.year);
+    return totals.slice(0, 5);
   }, [yearlyData]);
+
+  const topFiveYears = topFiveWithVolume.map(t => t.year);
+
+  const getYearVolume = (year: number) => {
+    return topFiveWithVolume.find(t => t.year === year)?.total || 0;
+  };
 
   const selectTopFive = () => {
     setSelectedYears(topFiveYears);
@@ -276,7 +282,10 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
                           />
                         </TooltipTrigger>
                         <TooltipContent side="top" className="text-xs">
-                          #{topRank + 1} in volume
+                          <div className="text-center">
+                            <div className="font-medium">#{topRank + 1} in volume</div>
+                            <div className="text-muted-foreground">{formatNumber(getYearVolume(year), 0)} {type === "dryIce" ? "kg" : "cil."}</div>
+                          </div>
                         </TooltipContent>
                       </UITooltip>
                     </TooltipProvider>
