@@ -402,6 +402,119 @@ export type Database = {
           },
         ]
       }
+      gas_cylinder_orders: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by: string
+          customer_id: string | null
+          customer_name: string
+          cylinder_count: number
+          cylinder_size: string
+          gas_grade: Database["public"]["Enums"]["gas_grade"]
+          gas_type: Database["public"]["Enums"]["gas_type"]
+          gas_type_id: string | null
+          id: string
+          location: Database["public"]["Enums"]["production_location"]
+          notes: string | null
+          order_number: string
+          pressure: number
+          scheduled_date: string
+          status: Database["public"]["Enums"]["production_order_status"]
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by: string
+          customer_id?: string | null
+          customer_name: string
+          cylinder_count: number
+          cylinder_size?: string
+          gas_grade?: Database["public"]["Enums"]["gas_grade"]
+          gas_type?: Database["public"]["Enums"]["gas_type"]
+          gas_type_id?: string | null
+          id?: string
+          location?: Database["public"]["Enums"]["production_location"]
+          notes?: string | null
+          order_number: string
+          pressure?: number
+          scheduled_date: string
+          status?: Database["public"]["Enums"]["production_order_status"]
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string
+          customer_id?: string | null
+          customer_name?: string
+          cylinder_count?: number
+          cylinder_size?: string
+          gas_grade?: Database["public"]["Enums"]["gas_grade"]
+          gas_type?: Database["public"]["Enums"]["gas_type"]
+          gas_type_id?: string | null
+          id?: string
+          location?: Database["public"]["Enums"]["production_location"]
+          notes?: string | null
+          order_number?: string
+          pressure?: number
+          scheduled_date?: string
+          status?: Database["public"]["Enums"]["production_order_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gas_cylinder_orders_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gas_cylinder_orders_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles_limited"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gas_cylinder_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gas_cylinder_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_limited"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gas_cylinder_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gas_cylinder_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_limited"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gas_cylinder_orders_gas_type_id_fkey"
+            columns: ["gas_type_id"]
+            isOneToOne: false
+            referencedRelation: "gas_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gas_types: {
         Row: {
           color: string
@@ -1033,6 +1146,7 @@ export type Database = {
         | "oxygen"
         | "helium"
         | "other"
+      production_location: "sol_emmen" | "sol_tilburg"
       production_order_status:
         | "pending"
         | "in_progress"
@@ -1179,6 +1293,7 @@ export const Constants = {
         "helium",
         "other",
       ],
+      production_location: ["sol_emmen", "sol_tilburg"],
       production_order_status: [
         "pending",
         "in_progress",
