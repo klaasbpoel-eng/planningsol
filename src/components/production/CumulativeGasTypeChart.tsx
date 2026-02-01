@@ -197,22 +197,24 @@ export function CumulativeGasTypeChart() {
     });
   };
 
-  // Calculate top 5 gas types by total volume (memoized for indicator display)
-  const topFiveWithVolume = useMemo(() => {
-    const totals = allGasTypes.map(gt => {
+  // Calculate all gas type volumes for tooltips
+  const allGasTypeVolumes = useMemo(() => {
+    return allGasTypes.map(gt => {
       const y1 = yearData.find(yd => yd.year === selectedYear1)?.gasTypes.find(d => d.id === gt.id);
       const y2 = yearData.find(yd => yd.year === selectedYear2)?.gasTypes.find(d => d.id === gt.id);
       const total = (y1?.months.reduce((a, b) => a + b, 0) || 0) + (y2?.months.reduce((a, b) => a + b, 0) || 0);
       return { id: gt.id, total };
-    }).sort((a, b) => b.total - a.total);
-
-    return totals.slice(0, 5);
+    });
   }, [allGasTypes, yearData, selectedYear1, selectedYear2]);
+
+  const topFiveWithVolume = useMemo(() => {
+    return [...allGasTypeVolumes].sort((a, b) => b.total - a.total).slice(0, 5);
+  }, [allGasTypeVolumes]);
 
   const topFiveGasTypes = topFiveWithVolume.map(t => t.id);
 
   const getGasTypeVolume = (gasTypeId: string) => {
-    return topFiveWithVolume.find(t => t.id === gasTypeId)?.total || 0;
+    return allGasTypeVolumes.find(t => t.id === gasTypeId)?.total || 0;
   };
 
   const selectTopFive = () => {
@@ -328,26 +330,27 @@ export function CumulativeGasTypeChart() {
                 (animatingTopFive && isTopFive) || 
                 animatingAll || 
                 (animatingClear && isSelected);
+              const gasTypeVolume = getGasTypeVolume(gasType.id);
+              
               return (
-                <Badge
-                  key={gasType.id}
-                  variant={isSelected ? "default" : "outline"}
-                  className={`cursor-pointer transition-all duration-200 flex items-center gap-1 hover:scale-105 hover:shadow-md active:scale-95 ${
-                    shouldAnimate 
-                      ? "animate-[pulse_0.3s_ease-in-out_2] scale-110" 
-                      : ""
-                  }`}
-                  style={{
-                    backgroundColor: isSelected ? gasType.color : undefined,
-                    borderColor: gasType.color,
-                    color: isSelected ? "white" : gasType.color
-                  }}
-                  onClick={() => toggleGasType(gasType.id)}
-                >
-                  {isTopFive && (
-                    <TooltipProvider delayDuration={0}>
-                      <UITooltip>
-                        <TooltipTrigger asChild>
+                <TooltipProvider key={gasType.id} delayDuration={0}>
+                  <UITooltip>
+                    <TooltipTrigger asChild>
+                      <Badge
+                        variant={isSelected ? "default" : "outline"}
+                        className={`cursor-pointer transition-all duration-200 flex items-center gap-1 hover:scale-105 hover:shadow-md active:scale-95 ${
+                          shouldAnimate 
+                            ? "animate-[pulse_0.3s_ease-in-out_2] scale-110" 
+                            : ""
+                        }`}
+                        style={{
+                          backgroundColor: isSelected ? gasType.color : undefined,
+                          borderColor: gasType.color,
+                          color: isSelected ? "white" : gasType.color
+                        }}
+                        onClick={() => toggleGasType(gasType.id)}
+                      >
+                        {isTopFive && (
                           <Trophy 
                             className={`h-3 w-3 ${
                               topRank === 0 ? "text-yellow-400" : 
@@ -356,18 +359,25 @@ export function CumulativeGasTypeChart() {
                               isSelected ? "text-white/70" : "opacity-50"
                             }`} 
                           />
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="text-xs">
-                          <div className="text-center">
-                            <div className="font-medium">#{topRank + 1} in volume</div>
-                            <div className="text-muted-foreground">{formatNumber(getGasTypeVolume(gasType.id), 0)} cilinders</div>
-                          </div>
-                        </TooltipContent>
-                      </UITooltip>
-                    </TooltipProvider>
-                  )}
-                  {gasType.name}
-                </Badge>
+                        )}
+                        {gasType.name}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      <div className="text-center">
+                        {isTopFive && (
+                          <div className="font-medium text-primary">#{topRank + 1} in volume</div>
+                        )}
+                        <div className={isTopFive ? "text-muted-foreground" : "font-medium"}>
+                          {formatNumber(gasTypeVolume, 0)} cilinders
+                        </div>
+                        <div className="text-muted-foreground text-[10px]">
+                          ({selectedYear1} + {selectedYear2})
+                        </div>
+                      </div>
+                    </TooltipContent>
+                  </UITooltip>
+                </TooltipProvider>
               );
             })}
           </div>
