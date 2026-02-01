@@ -150,11 +150,16 @@ export function ExcelImportDialog({
     const str = locationStr.toLowerCase().trim();
     
     // Match Tilburg variations
-    if (str.includes("tilburg") || str === "sol_tilburg" || str === "tilburg") {
+    if (str.includes("tilburg")) {
       return "sol_tilburg";
     }
     
-    // Default to Emmen
+    // Match Emmen variations (including "depot emmen")
+    if (str.includes("emmen")) {
+      return "sol_emmen";
+    }
+    
+    // Default to Emmen for unknown locations
     return "sol_emmen";
   };
 
