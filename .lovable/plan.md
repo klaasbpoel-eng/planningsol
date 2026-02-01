@@ -1,121 +1,84 @@
 
-# Plan: Fix Supervisor Access to Gas Cylinder Orders
+# Plan: Klantbeheer integreren in Admin Instellingen
 
-## Problem Identified
-When logged in as a supervisor, no orders are visible in the "vulwachrij" (gas cylinder filling queue) for January 2026, even though orders exist in the database.
+## Overzicht
+De klantenbeheer functionaliteit wordt verplaatst naar de Admin Instellingen pagina. Het aparte menu-item "Klanten" en de bijbehorende pagina worden verwijderd, zodat alles gecentraliseerd is op één plek.
 
-### Root Cause Analysis
-The Row-Level Security (RLS) policy on `gas_cylinder_orders` is too restrictive for supervisors:
+## Wijzigingen
 
-**Current RLS Policy:**
-```sql
-Users can view assigned or created gas cylinder orders:
-(created_by = user's profile id) OR (assigned_to = user's profile id)
-```
+### 1. Admin Instellingen uitbreiden
+Een nieuwe sectie "Klantenbeheer" toevoegen aan de AdminSettings component die de bestaande CustomerManagement component hergebruikt.
 
-This means supervisors can ONLY see orders they personally created or are assigned to. Since the January 2026 orders were created by a different user (kbpoel) and have no `assigned_to` value, the supervisor sees nothing.
+**Bestand:** `src/components/admin/AdminSettings.tsx`
+- Import CustomerManagement component toevoegen
+- CustomerManagement component toevoegen aan de sectie-indeling
 
-**Expected Behavior:**
-Supervisors (and operators) should be able to see all orders for their assigned production location, regardless of who created them.
+### 2. Menu-item verwijderen
+Het "Klanten" menu-item uit de navigatie header verwijderen.
 
----
+**Bestand:** `src/components/layout/Header.tsx`
+- De Link naar `/klanten` verwijderen (regels 84-91)
+- De `Building2` icon import kan behouden blijven (wordt mogelijk elders gebruikt)
 
-## Solution
+### 3. Route verwijderen
+De `/klanten` route uit de applicatie verwijderen.
 
-### Database Change: Update RLS Policy for `gas_cylinder_orders`
+**Bestand:** `src/App.tsx`
+- De import van CustomersPage verwijderen
+- De Route voor `/klanten` verwijderen
 
-Add a new RLS policy that allows supervisors and operators to view orders based on their assigned production location:
+### 4. Pagina verwijderen (optioneel)
+Het CustomersPage bestand kan worden verwijderd omdat het niet meer wordt gebruikt.
 
-```sql
--- Allow Supervisors to view all orders at their location
-CREATE POLICY "Supervisors can view orders at their location"
-ON public.gas_cylinder_orders FOR SELECT
-USING (
-  has_role(auth.uid(), 'supervisor'::app_role) 
-  AND (
-    -- If supervisor has a location assigned, show orders for that location
-    (get_user_production_location(auth.uid()) IS NOT NULL 
-     AND location = get_user_production_location(auth.uid()))
-    OR
-    -- If no location assigned, show all orders (fallback)
-    get_user_production_location(auth.uid()) IS NULL
-  )
-);
-
--- Allow Operators to view all orders at their location  
-CREATE POLICY "Operators can view orders at their location"
-ON public.gas_cylinder_orders FOR SELECT
-USING (
-  has_role(auth.uid(), 'operator'::app_role)
-  AND (
-    (get_user_production_location(auth.uid()) IS NOT NULL 
-     AND location = get_user_production_location(auth.uid()))
-    OR
-    get_user_production_location(auth.uid()) IS NULL
-  )
-);
-```
-
-### Apply Same Fix to `dry_ice_orders` Table
-
-The same issue exists for dry ice orders. Add equivalent policies:
-
-```sql
--- Allow Supervisors to view all dry ice orders at their location
-CREATE POLICY "Supervisors can view dry ice orders at their location"
-ON public.dry_ice_orders FOR SELECT
-USING (
-  has_role(auth.uid(), 'supervisor'::app_role)
-  AND (
-    (get_user_production_location(auth.uid()) IS NOT NULL 
-     AND location = get_user_production_location(auth.uid()))
-    OR
-    get_user_production_location(auth.uid()) IS NULL
-  )
-);
-
--- Allow Operators to view all dry ice orders at their location
-CREATE POLICY "Operators can view dry ice orders at their location"  
-ON public.dry_ice_orders FOR SELECT
-USING (
-  has_role(auth.uid(), 'operator'::app_role)
-  AND (
-    (get_user_production_location(auth.uid()) IS NOT NULL 
-     AND location = get_user_production_location(auth.uid()))
-    OR
-    get_user_production_location(auth.uid()) IS NULL
-  )
-);
-```
+**Bestand:** `src/pages/CustomersPage.tsx`
+- Dit bestand kan worden verwijderd
 
 ---
 
-## Technical Details
+## Technische Details
 
-### Why This Works
-1. The `has_role()` function checks if the current user has the supervisor or operator role
-2. The `get_user_production_location()` function retrieves the user's assigned location from their profile
-3. If a location is assigned, they can only see orders for that location
-4. If no location is assigned (NULL), they can see all orders (backward compatibility)
+### AdminSettings.tsx aanpassing
+```text
+Huidige structuur:
+- UserApprovalManagement
+- CategoryManagement
+- LeaveTypeManagement
+- GasCylinderSettings
+- DryIceSettings
+- DefaultCustomerSetting
 
-### Security Considerations
-- Admins retain full access via existing "Admins can view all" policies
-- Supervisors/operators are still restricted to their assigned location
-- Regular users still only see orders they created or are assigned to
-- The policy is additive (multiple SELECT policies work with OR logic in Postgres)
+Nieuwe structuur:
+- UserApprovalManagement
+- CategoryManagement
+- LeaveTypeManagement
+- GasCylinderSettings
+- DryIceSettings
+- DefaultCustomerSetting
+- CustomerManagement (nieuw)
+```
 
-### Impact
-- No code changes required - the fix is entirely at the database level
-- Supervisor "Guido Regtop" (assigned to sol_emmen) will immediately see all sol_emmen orders
-- The fix applies to both gas cylinder and dry ice order tables
+### Header.tsx aanpassing
+De volgende code wordt verwijderd:
+```text
+{role === "admin" && (
+  <Link to="/klanten">
+    <Button variant="ghost" size="sm" ...>
+      <Building2 className="h-4 w-4 mr-2" />
+      <span className="hidden sm:inline">Klanten</span>
+    </Button>
+  </Link>
+)}
+```
+
+### App.tsx aanpassing
+De volgende worden verwijderd:
+- `import CustomersPage from "./pages/CustomersPage";`
+- `<Route path="/klanten" element={<CustomersPage />} />`
 
 ---
 
-## Summary
-
-| Task | Description |
-|------|-------------|
-| 1 | Add RLS policy for supervisors on `gas_cylinder_orders` |
-| 2 | Add RLS policy for operators on `gas_cylinder_orders` |
-| 3 | Add RLS policy for supervisors on `dry_ice_orders` |
-| 4 | Add RLS policy for operators on `dry_ice_orders` |
+## Resultaat
+Na implementatie:
+- Admin gebruikers beheren klanten rechtstreeks vanuit de Admin Instellingen pagina
+- De navigatie is vereenvoudigd met één menu-item minder
+- Alle beheersfuncties zijn gecentraliseerd op één plek
