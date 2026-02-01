@@ -1734,10 +1734,12 @@ export function CalendarOverview() {
 
   return (
     <div className="flex-1 flex flex-col bg-card/90 backdrop-blur-xl overflow-hidden">
-      {/* Decorative gradient bar */}
-      <div className="h-1 w-full gradient-primary flex-shrink-0" />
-      
-      <div className="flex-shrink-0 px-4 py-4 border-b border-border/50">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-card/95 backdrop-blur-xl">
+        {/* Decorative gradient bar */}
+        <div className="h-1 w-full gradient-primary" />
+        
+        <div className="px-4 py-4 border-b border-border/50">
         <div className="flex flex-col gap-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -1862,6 +1864,7 @@ export function CalendarOverview() {
           >
             <ChevronRight className="h-5 w-5" />
           </Button>
+        </div>
         </div>
       </div>
 
