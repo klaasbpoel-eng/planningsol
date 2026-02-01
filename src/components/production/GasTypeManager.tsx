@@ -21,6 +21,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Flame, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -42,6 +49,12 @@ interface GasType {
   color: string;
   is_active: boolean;
   sort_order: number;
+  category_id: string | null;
+}
+
+interface GasTypeCategory {
+  id: string;
+  name: string;
 }
 
 interface GasTypeManagerProps {
@@ -54,6 +67,7 @@ type SortDirection = "asc" | "desc";
 
 export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
+  const [categories, setCategories] = useState<GasTypeCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -75,7 +89,20 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#3b82f6");
   const [isActive, setIsActive] = useState(true);
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const fetchCategories = async () => {
+    const { data, error } = await supabase
+      .from("gas_type_categories")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
+
+    if (!error && data) {
+      setCategories(data);
+    }
+  };
 
   const fetchGasTypes = async () => {
     const { data, error } = await supabase
@@ -113,6 +140,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
     if (open) {
       setCurrentPage(1);
       fetchGasTypes();
+      fetchCategories();
     }
   }, [open, sortColumn, sortDirection]);
 
@@ -128,11 +156,13 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
       setDescription(type.description || "");
       setColor(type.color);
       setIsActive(type.is_active);
+      setCategoryId(type.category_id);
     } else {
       setName("");
       setDescription("");
       setColor("#3b82f6");
       setIsActive(true);
+      setCategoryId(null);
     }
     setEditingType(type);
     setEditDialogOpen(true);
@@ -151,6 +181,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
       color,
       is_active: isActive,
       sort_order: editingType ? editingType.sort_order : gasTypes.length,
+      category_id: categoryId,
     };
 
     try {
@@ -477,6 +508,25 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                   className="flex-1"
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="typeCategory">Categorie</Label>
+              <Select 
+                value={categoryId || "none"} 
+                onValueChange={(v) => setCategoryId(v === "none" ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecteer categorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Geen categorie</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center justify-between rounded-lg border p-3">
               <Label>Actief</Label>

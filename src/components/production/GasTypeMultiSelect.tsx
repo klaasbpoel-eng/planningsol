@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,11 +13,19 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
+import { supabase } from "@/integrations/supabase/client";
 
 interface GasType {
   id: string;
   name: string;
   color: string;
+  category_id?: string | null;
+}
+
+interface GasTypeCategory {
+  id: string;
+  name: string;
+  sort_order: number;
 }
 
 interface GasTypeMultiSelectProps {
@@ -27,14 +36,6 @@ interface GasTypeMultiSelectProps {
   className?: string;
 }
 
-// Define categories with gas type name patterns
-const GAS_TYPE_CATEGORIES = [
-  { name: "Industriële gassen", patterns: ["CO2", "Argon 4.8", "Argon 5.0", "Zuurstof", "Stikstof 4.8", "Stikstof 5.0", "Lucht"] },
-  { name: "Lasgassen (Weldmix)", patterns: ["Weldmix"] },
-  { name: "Medische gassen", patterns: ["Alisol", "Med.Device"] },
-  { name: "Speciale mengsels", patterns: ["Carbogeen", "EnerMix"] },
-];
-
 export function GasTypeMultiSelect({
   gasTypes,
   selectedGasTypes,
@@ -42,11 +43,29 @@ export function GasTypeMultiSelect({
   placeholder = "Alle gastypes",
   className = "",
 }: GasTypeMultiSelectProps) {
-  // Group gas types by category and sort alphabetically
-  const categorizedGasTypes = GAS_TYPE_CATEGORIES.map(category => ({
-    ...category,
+  const [categories, setCategories] = useState<GasTypeCategory[]>([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data, error } = await supabase
+        .from("gas_type_categories")
+        .select("id, name, sort_order")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+
+      if (!error && data) {
+        setCategories(data);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  // Group gas types by category from database
+  const categorizedGasTypes = categories.map(category => ({
+    id: category.id,
+    name: category.name,
     gasTypes: gasTypes
-      .filter(gt => category.patterns.some(pattern => gt.name.includes(pattern)))
+      .filter(gt => gt.category_id === category.id)
       .sort((a, b) => a.name.localeCompare(b.name, 'nl')),
   }));
 
@@ -126,7 +145,7 @@ export function GasTypeMultiSelect({
               </CommandItem>
               <CommandSeparator />
 
-              {/* Categorized gas types */}
+              {/* Categorized gas types from database */}
               {categorizedGasTypes.map((category, idx) => {
                 if (category.gasTypes.length === 0) return null;
                 const categoryIds = category.gasTypes.map(g => g.id);
@@ -135,7 +154,7 @@ export function GasTypeMultiSelect({
                 const selectedInCategory = categoryIds.filter(id => selectedGasTypes.includes(id)).length;
 
                 return (
-                  <div key={category.name}>
+                  <div key={category.id}>
                     {idx > 0 && <CommandSeparator />}
                     <CommandItem
                       onSelect={() => handleCategorySelect(categoryIds)}

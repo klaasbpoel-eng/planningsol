@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Flame, Cylinder, Settings, Trash2, Loader2 } from "lucide-react";
+import { Flame, Cylinder, Settings, Trash2, Loader2, FolderOpen } from "lucide-react";
 import { GasTypeManager } from "@/components/production/GasTypeManager";
+import { GasTypeCategoryManager } from "@/components/production/GasTypeCategoryManager";
 import { CylinderSizeManager } from "@/components/production/CylinderSizeManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -20,6 +21,7 @@ import {
 
 export function GasCylinderSettings() {
   const [gasTypeManagerOpen, setGasTypeManagerOpen] = useState(false);
+  const [gasCategoryManagerOpen, setGasCategoryManagerOpen] = useState(false);
   const [cylinderSizeManagerOpen, setCylinderSizeManagerOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
@@ -70,6 +72,14 @@ export function GasCylinderSettings() {
             >
               <Flame className="h-4 w-4 text-orange-500" />
               Gastypes beheren
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setGasCategoryManagerOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <FolderOpen className="h-4 w-4 text-primary" />
+              Gastype categorieën
             </Button>
             <Button
               variant="outline"
@@ -124,6 +134,10 @@ export function GasCylinderSettings() {
       <GasTypeManager
         open={gasTypeManagerOpen}
         onOpenChange={setGasTypeManagerOpen}
+      />
+      <GasTypeCategoryManager
+        open={gasCategoryManagerOpen}
+        onOpenChange={setGasCategoryManagerOpen}
       />
       <CylinderSizeManager
         open={cylinderSizeManagerOpen}
