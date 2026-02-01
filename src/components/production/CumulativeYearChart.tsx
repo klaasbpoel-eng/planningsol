@@ -273,7 +273,7 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
                 <Badge
                   key={year}
                   variant={isSelected ? "default" : "outline"}
-                  className={`cursor-pointer transition-all flex items-center gap-1 ${
+                  className={`cursor-pointer transition-all duration-200 flex items-center gap-1 hover:scale-105 hover:shadow-md active:scale-95 ${
                     shouldAnimate 
                       ? "animate-[pulse_0.3s_ease-in-out_2] scale-110" 
                       : ""
