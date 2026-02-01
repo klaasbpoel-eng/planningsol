@@ -418,6 +418,7 @@ export type Database = {
           notes: string | null
           order_number: string
           pressure: number
+          production_location: string
           scheduled_date: string
           status: Database["public"]["Enums"]["production_order_status"]
           updated_at: string
@@ -437,6 +438,7 @@ export type Database = {
           notes?: string | null
           order_number: string
           pressure?: number
+          production_location?: string
           scheduled_date: string
           status?: Database["public"]["Enums"]["production_order_status"]
           updated_at?: string
@@ -456,6 +458,7 @@ export type Database = {
           notes?: string | null
           order_number?: string
           pressure?: number
+          production_location?: string
           scheduled_date?: string
           status?: Database["public"]["Enums"]["production_order_status"]
           updated_at?: string

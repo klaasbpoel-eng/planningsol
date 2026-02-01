@@ -17,10 +17,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
+type ProductionLocation = "tilburg" | "emmen";
+
 interface ExcelImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImported: () => void;
+  location: ProductionLocation;
 }
 
 interface ParsedCylinderOrder {
@@ -50,6 +53,7 @@ export function ExcelImportDialog({
   open,
   onOpenChange,
   onImported,
+  location,
 }: ExcelImportDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedCylinderOrder[]>([]);
@@ -336,6 +340,7 @@ export function ExcelImportDialog({
         notes: order.notes || null,
         created_by: currentProfileId,
         status: "completed" as const,
+        production_location: location,
       }));
       
       let insertData = createInsertData();
@@ -373,6 +378,7 @@ export function ExcelImportDialog({
               notes: order.notes || null,
               created_by: currentProfileId,
               status: "completed" as const,
+              production_location: location,
             };
             
             const { error: singleError } = await supabase

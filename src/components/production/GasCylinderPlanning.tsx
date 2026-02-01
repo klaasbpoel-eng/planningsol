@@ -60,6 +60,7 @@ interface GasCylinderOrder {
   notes: string | null;
   created_at: string;
   pressure: number;
+  production_location: string;
   gas_type_ref?: {
     id: string;
     name: string;
@@ -79,11 +80,19 @@ interface GasType {
   color: string;
 }
 
+export type ProductionLocation = "tilburg" | "emmen";
+
 interface GasCylinderPlanningProps {
+  location: ProductionLocation;
   onDataChanged?: () => void;
 }
 
-export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps) {
+const locationLabels: Record<ProductionLocation, { title: string; description: string; color: string }> = {
+  tilburg: { title: "SOL Tilburg", description: "Beheer vulorders voor gascilinders - Tilburg", color: "text-orange-500" },
+  emmen: { title: "SOL Emmen", description: "Beheer vulorders voor gascilinders - Emmen", color: "text-purple-500" },
+};
+
+export function GasCylinderPlanning({ location, onDataChanged }: GasCylinderPlanningProps) {
   const [orders, setOrders] = useState<GasCylinderOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -165,7 +174,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
   useEffect(() => {
     fetchOrders();
     fetchGasTypes();
-  }, [yearFilter]);
+  }, [yearFilter, location]);
 
   const fetchGasTypes = async () => {
     const { data } = await supabase
@@ -190,6 +199,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
         *,
         gas_type_ref:gas_types(id, name, color)
       `)
+      .eq("production_location", location)
       .gte("scheduled_date", startDate)
       .lte("scheduled_date", endDate)
       .order("scheduled_date", { ascending: true });
@@ -241,6 +251,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
     const { count, error } = await supabase
       .from("gas_cylinder_orders")
       .select("*", { count: "exact", head: true })
+      .eq("production_location", location)
       .gte("scheduled_date", startDate)
       .lte("scheduled_date", endDate);
     
@@ -426,11 +437,11 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-xl font-semibold flex items-center gap-2">
-            <Cylinder className="h-5 w-5 text-orange-500" />
-            Gascilinders Vulling
+            <Cylinder className={cn("h-5 w-5", locationLabels[location].color)} />
+            {locationLabels[location].title} - Gascilinders
           </h2>
           <p className="text-sm text-muted-foreground">
-            Beheer vulorders voor gascilinders
+            {locationLabels[location].description}
           </p>
         </div>
         <div className="flex gap-2">
@@ -450,7 +461,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Excel import
               </Button>
-              <Button className="bg-orange-500 hover:bg-orange-600" onClick={() => setDialogOpen(true)}>
+              <Button className={cn(location === "tilburg" ? "bg-orange-500 hover:bg-orange-600" : "bg-purple-500 hover:bg-purple-600")} onClick={() => setDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nieuwe vulorder
               </Button>
@@ -855,6 +866,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onCreated={handleOrderCreated}
+        location={location}
       />
 
       <GasCylinderOrderDialog
@@ -958,6 +970,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
           fetchOrders();
           onDataChanged?.();
         }}
+        location={location}
       />
     </div>
   );
