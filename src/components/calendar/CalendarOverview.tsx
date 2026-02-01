@@ -240,6 +240,7 @@ export function CalendarOverview() {
       const { data: dryIceOrdersData, error: dryIceOrdersError } = await supabase
         .from("dry_ice_orders")
         .select("*")
+        .eq("status", "pending")
         .order("scheduled_date", { ascending: true });
 
       if (dryIceOrdersError) throw dryIceOrdersError;
@@ -264,6 +265,7 @@ export function CalendarOverview() {
       const { data: gasCylinderOrdersData, error: gasCylinderOrdersError } = await supabase
         .from("gas_cylinder_orders")
         .select("*")
+        .eq("status", "pending")
         .order("scheduled_date", { ascending: true });
 
       if (gasCylinderOrdersError) throw gasCylinderOrdersError;
