@@ -1,67 +1,79 @@
 
-# Plan: Locatie-onderscheid toevoegen aan gascilinder import
 
-## Probleem
-Bij het importeren van gascilinder orders via Excel wordt geen onderscheid gemaakt tussen de twee productielocaties (SOL Emmen en SOL Tilburg). Alle orders krijgen automatisch de standaardwaarde `sol_emmen`.
+# Plan: Fix kolom mapping voor Excel import
 
-## Oorzaak
-De Excel import functionaliteit (`ExcelImportDialog.tsx`) detecteert, parst en bewaart de `location` kolom niet uit het Excel bestand.
+## Probleem geïdentificeerd
+De Excel kolomstructuur in `Productie_2026.xlsx` is:
+1. Datum (index 0)
+2. Gastype (index 1)
+3. Cilinderinhoud (index 2)
+4. Aantal (index 3)
+5. M/T (index 4)
+6. **Locatie (index 5)** ← Wordt nu verkeerd gemapped naar `customer`
+7. **Klant (index 6)** ← Wordt nu verkeerd gemapped naar `notes`
+8. Omschrijving (index 7) ← Dit zou `notes` moeten zijn
 
-## Oplossing
-Uitbreiding van de import- en orderbeheer-functionaliteit om de productielocatie correct te verwerken.
+De huidige header detectie zoekt naar "vulling tbv" voor customer, maar het Excel bestand gebruikt "Klant". Hierdoor matcht de header niet en valt de code terug naar verkeerde fallback indices.
 
 ---
 
-## Technisch Plan
+## Oplossing
 
-### Stap 1: ParsedCylinderOrder interface uitbreiden
-Voeg een `location` veld toe aan het interface zodat de locatie kan worden opgeslagen per geparseerde order.
+### Stap 1: Header detectie uitbreiden voor "Klant"
+Voeg "klant" toe aan de zoektermen voor de customer kolom naast de bestaande "vulling tbv" en "tbv".
 
 ```text
-interface ParsedCylinderOrder {
-  date: Date;
-  gasType: string;
-  cylinderSize: string;
-  count: number;
-  grade: "medical" | "technical";
-  customer: string;
-  notes: string;
-  pressure: number;
-  location: "sol_emmen" | "sol_tilburg";  // Nieuw veld
+if (cellStr.includes("vulling tbv") || cellStr.includes("tbv") || 
+    cellStr.includes("klant") || cellStr.includes("customer")) {
+  columnMap.customer = idx;
 }
 ```
 
-### Stap 2: Kolom detectie voor locatie toevoegen
-Uitbreiding van de header mapping om de locatie-kolom te detecteren met flexibele matching:
-- Detectie van kolomnamen zoals "locatie", "location", "productielocatie", "site", "vestiging"
-- Genormaliseerde matching (lowercase, geen accenten, geen extra spaties)
+### Stap 2: Header detectie uitbreiden voor "Omschrijving" als notes
+Voeg "omschrijving" toe aan de zoektermen voor notes:
 
-### Stap 3: Locatie waarde parsen
-Functie toevoegen die Excel waarden vertaalt naar database enum waarden:
-- "emmen", "sol emmen", "sol_emmen" → `sol_emmen`
-- "tilburg", "sol tilburg", "sol_tilburg" → `sol_tilburg`
-- Fallback naar `sol_emmen` als geen match gevonden wordt
+```text
+if (cellStr.includes("opmerkingen") || cellStr.includes("opmerking") ||
+    cellStr.includes("omschrijving") || cellStr.includes("notes")) {
+  columnMap.notes = idx;
+}
+```
 
-### Stap 4: Locatie meenemen bij database insert
-Het `location` veld toevoegen aan de insert data object zodat de juiste locatie wordt opgeslagen.
+### Stap 3: Fallback indices aanpassen
+Update de fallback kolom mapping voor het geval headers niet gevonden worden, zodat deze overeenkomt met de huidige Excel structuur:
 
-### Stap 5: Locatie tonen in preview tabel
-De locatie-kolom toevoegen aan de preview tabel zodat gebruikers kunnen controleren of de locaties correct zijn gedetecteerd.
-
-### Stap 6 (Optioneel): Fallback locatiekeuze toevoegen
-Als er geen locatie-kolom in het Excel bestand staat, een dropdown tonen waar de gebruiker een standaard locatie kan kiezen voor alle orders in de import.
+```text
+columnMap = { 
+  date: 0, 
+  gasType: 1, 
+  size: 2, 
+  count: 3, 
+  grade: 4, 
+  location: 5,  // Nieuw
+  customer: 6,  // Was 5, nu 6
+  notes: 7      // Was 6, nu 7
+};
+```
 
 ---
 
-## Betrokken bestanden
+## Technische wijzigingen
 
-| Bestand | Wijziging |
-|---------|-----------|
-| `src/components/production/ExcelImportDialog.tsx` | Interface uitbreiden, locatie-kolom detectie, parsing, insert data, preview tabel |
-| `src/components/production/CreateGasCylinderOrderDialog.tsx` | Locatie-selectie dropdown toevoegen |
-| `src/components/production/GasCylinderPlanning.tsx` | (Optioneel) Locatie-filter en kolom in tabel |
+| Regel | Wijziging |
+|-------|-----------|
+| 244 | Header detectie: "datum" en "gassoort" → verbreden naar "gastype" |
+| 251 | Cilinderinhoud toevoegen aan size detectie |
+| 254 | "klant" en "customer" toevoegen aan customer detectie |
+| 255 | "omschrijving" toevoegen aan notes detectie |
+| 269 | Fallback indices aanpassen naar juiste volgorde |
 
 ---
 
 ## Verwacht resultaat
-Na implementatie kunnen gascilinder orders worden geïmporteerd met de juiste productielocatie (SOL Emmen of SOL Tilburg) en blijft het onderscheid behouden in de database en rapportages.
+Na deze wijziging worden de Excel kolommen correct gemapped:
+- Kolom "Locatie" (index 5) → `location` veld
+- Kolom "Klant" (index 6) → `customer` veld  
+- Kolom "Omschrijving" (index 7) → `notes` veld
+
+Dit zorgt ervoor dat klantnamen correct worden geïmporteerd in het `customer_name` veld en locaties in het `location` veld.
+
