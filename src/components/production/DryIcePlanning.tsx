@@ -103,7 +103,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
   const [productTypeFilter, setProductTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortColumn, setSortColumn] = useState<SortColumn>("scheduled_date");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   
   const { permissions, isAdmin } = useUserPermissions(userId);
 
