@@ -1096,6 +1096,15 @@ export type Database = {
         Args: { p_order_type: string; p_year: number }
         Returns: number
       }
+      get_monthly_cylinder_totals_by_customer: {
+        Args: { p_location?: string; p_year: number }
+        Returns: {
+          customer_id: string
+          customer_name: string
+          month: number
+          total_cylinders: number
+        }[]
+      }
       get_monthly_cylinder_totals_by_gas_type: {
         Args: { p_location?: string; p_year: number }
         Returns: {
