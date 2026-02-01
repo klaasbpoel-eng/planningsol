@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown, Minus, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
 import {
@@ -193,7 +193,8 @@ export function CumulativeGasTypeChart() {
     });
   };
 
-  const selectTopFive = () => {
+  // Calculate top 5 gas types by total volume (memoized for indicator display)
+  const topFiveGasTypes = useMemo(() => {
     const totals = allGasTypes.map(gt => {
       const y1 = yearData.find(yd => yd.year === selectedYear1)?.gasTypes.find(d => d.id === gt.id);
       const y2 = yearData.find(yd => yd.year === selectedYear2)?.gasTypes.find(d => d.id === gt.id);
@@ -201,7 +202,11 @@ export function CumulativeGasTypeChart() {
       return { id: gt.id, total };
     }).sort((a, b) => b.total - a.total);
 
-    setSelectedGasTypes(totals.slice(0, 5).map(t => t.id));
+    return totals.slice(0, 5).map(t => t.id);
+  }, [allGasTypes, yearData, selectedYear1, selectedYear2]);
+
+  const selectTopFive = () => {
+    setSelectedGasTypes(topFiveGasTypes);
   };
 
   const selectAllGasTypes = () => {
@@ -301,11 +306,13 @@ export function CumulativeGasTypeChart() {
           <div className="flex flex-wrap gap-2">
             {allGasTypes.map(gasType => {
               const isSelected = selectedGasTypes.includes(gasType.id);
+              const isTopFive = topFiveGasTypes.includes(gasType.id);
+              const topRank = topFiveGasTypes.indexOf(gasType.id);
               return (
                 <Badge
                   key={gasType.id}
                   variant={isSelected ? "default" : "outline"}
-                  className="cursor-pointer transition-colors"
+                  className="cursor-pointer transition-colors flex items-center gap-1"
                   style={{
                     backgroundColor: isSelected ? gasType.color : undefined,
                     borderColor: gasType.color,
@@ -313,6 +320,16 @@ export function CumulativeGasTypeChart() {
                   }}
                   onClick={() => toggleGasType(gasType.id)}
                 >
+                  {isTopFive && (
+                    <Trophy 
+                      className={`h-3 w-3 ${
+                        topRank === 0 ? "text-yellow-400" : 
+                        topRank === 1 ? "text-gray-300" : 
+                        topRank === 2 ? "text-amber-600" : 
+                        isSelected ? "text-white/70" : "opacity-50"
+                      }`} 
+                    />
+                  )}
                   {gasType.name}
                 </Badge>
               );
