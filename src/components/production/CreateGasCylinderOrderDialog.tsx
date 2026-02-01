@@ -51,6 +51,7 @@ export function CreateGasCylinderOrderDialog({
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [notes, setNotes] = useState("");
   const [isCompleted, setIsCompleted] = useState(true);
+  const [location, setLocation] = useState<"sol_emmen" | "sol_tilburg">("sol_emmen");
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   const [gasTypes, setGasTypes] = useState<Array<{
     id: string;
@@ -129,6 +130,7 @@ export function CreateGasCylinderOrderDialog({
     setScheduledDate(new Date());
     setNotes("");
     setIsCompleted(true);
+    setLocation("sol_emmen");
   };
 
   const handleClose = () => {
@@ -201,6 +203,7 @@ export function CreateGasCylinderOrderDialog({
         notes: notes.trim() || null,
         created_by: currentProfileId,
         status: isCompleted ? "completed" as const : "pending" as const,
+        location: location,
       };
       
       const { error } = await supabase.from("gas_cylinder_orders").insert(insertData);
@@ -333,6 +336,19 @@ export function CreateGasCylinderOrderDialog({
                 <SelectContent className="bg-background border shadow-lg z-50">
                   <SelectItem value="200">200 bar</SelectItem>
                   <SelectItem value="300">300 bar</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Productielocatie</Label>
+              <Select value={location} onValueChange={(v) => setLocation(v as "sol_emmen" | "sol_tilburg")}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="sol_emmen">SOL Emmen</SelectItem>
+                  <SelectItem value="sol_tilburg">SOL Tilburg</SelectItem>
                 </SelectContent>
               </Select>
             </div>

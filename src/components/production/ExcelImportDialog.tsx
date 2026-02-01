@@ -32,6 +32,7 @@ interface ParsedCylinderOrder {
   customer: string;
   notes: string;
   pressure: number;
+  location: "sol_emmen" | "sol_tilburg";
 }
 
 interface ImportStats {
@@ -142,6 +143,21 @@ export function ExcelImportDialog({
     return { size: "50L", pressure };
   };
 
+  // Parse location from Excel format
+  const parseLocation = (locationStr: string | undefined): "sol_emmen" | "sol_tilburg" => {
+    if (!locationStr) return "sol_emmen";
+    
+    const str = locationStr.toLowerCase().trim();
+    
+    // Match Tilburg variations
+    if (str.includes("tilburg") || str === "sol_tilburg" || str === "tilburg") {
+      return "sol_tilburg";
+    }
+    
+    // Default to Emmen
+    return "sol_emmen";
+  };
+
   // Parse Excel date
   const parseExcelDate = (value: unknown): Date | null => {
     if (!value) return null;
@@ -232,6 +248,12 @@ export function ExcelImportDialog({
               if (cellStr === "m/t") columnMap.grade = idx;
               if (cellStr.includes("vulling tbv") || cellStr.includes("tbv")) columnMap.customer = idx;
               if (cellStr.includes("opmerkingen") || cellStr.includes("opmerking")) columnMap.notes = idx;
+              // Detect location column
+              if (cellStr.includes("locatie") || cellStr.includes("location") || 
+                  cellStr.includes("productielocatie") || cellStr.includes("site") || 
+                  cellStr.includes("vestiging")) {
+                columnMap.location = idx;
+              }
             });
             break;
           }
@@ -262,10 +284,14 @@ export function ExcelImportDialog({
           const gradeCode = String(row[columnMap.grade ?? 4] || "T").toUpperCase();
           const customer = String(row[columnMap.customer ?? 5] || "").trim();
           const notes = String(row[columnMap.notes ?? 6] || "").trim();
+          const locationStr = columnMap.location !== undefined 
+            ? String(row[columnMap.location] || "").trim() 
+            : undefined;
           
           if (!gasType || count <= 0) continue;
           
           const { size, pressure } = parseCylinderSize(sizeStr);
+          const location = parseLocation(locationStr);
           
           orders.push({
             date: dateValue,
@@ -276,6 +302,7 @@ export function ExcelImportDialog({
             customer: customer || "Onbekend",
             notes,
             pressure,
+            location,
           });
         }
         
@@ -336,6 +363,7 @@ export function ExcelImportDialog({
         notes: order.notes || null,
         created_by: currentProfileId,
         status: "completed" as const,
+        location: order.location,
       }));
       
       let insertData = createInsertData();
@@ -373,6 +401,7 @@ export function ExcelImportDialog({
               notes: order.notes || null,
               created_by: currentProfileId,
               status: "completed" as const,
+              location: order.location,
             };
             
             const { error: singleError } = await supabase
@@ -485,6 +514,7 @@ export function ExcelImportDialog({
                         <th className="text-left py-2">Grootte</th>
                         <th className="text-right py-2">Aantal</th>
                         <th className="text-left py-2">Klant</th>
+                        <th className="text-left py-2">Locatie</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -495,6 +525,11 @@ export function ExcelImportDialog({
                           <td className="py-1.5">{order.cylinderSize}</td>
                           <td className="py-1.5 text-right">{order.count}</td>
                           <td className="py-1.5">{order.customer}</td>
+                          <td className="py-1.5">
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${order.location === "sol_tilburg" ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" : "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300"}`}>
+                              {order.location === "sol_tilburg" ? "Tilburg" : "Emmen"}
+                            </span>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
