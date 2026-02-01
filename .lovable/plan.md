@@ -1,95 +1,104 @@
 
 
-# Plan: Add Pressure Column Mapping to Excel Import
+# Plan: Fix Gascilinder Overzicht Limiet (1000 orders)
 
-## Current Situation
+## Probleem Geanalyseerd
 
-The uploaded Excel file `Productie_2026-2.xlsx` has an updated structure with a dedicated Pressure column:
+De database query bevestigt het probleem:
+- **Januari 2026**: 1445 orders in database, maar slechts 1000 getoond
+- **Oorzaak**: Supabase standaardlimiet is 1000 rijen per query
+- **Andere jaren**: 20.000-24.000 orders per jaar - dit wordt nog problematischer
 
-| Index | Column Name | Example Value |
-|-------|-------------|---------------|
-| 0 | Datum | 2026-01-31 |
-| 1 | Gastype | Formeer 5 |
-| 2 | Cilinderinhoud | 10 |
-| 3 | Aantal | 16 |
-| 4 | M/T | (empty) |
-| 5 | Location | SOL Nederland-Tilburg |
-| 6 | Customer_Name | Gasco Nederland NV |
-| 7 | Omschrijving | 10 liter cilinder |
-| 8 | **Pressure** | 200, 300, or 4 |
+| Jaar | Orders in DB | Getoond |
+|------|-------------|---------|
+| 2020 | 23.441 | 1.000 |
+| 2021 | 24.313 | 1.000 |
+| 2022 | 22.894 | 1.000 |
+| 2023 | 21.740 | 1.000 |
+| 2024 | 20.691 | 1.000 |
+| 2025 | 19.398 | 1.000 |
+| 2026 | 1.445 | 1.000 |
 
-Currently, pressure is extracted from the description text in `parseCylinderSize()`, but now it should be read directly from the Pressure column.
+## Oplossing: Maandelijkse Paginering
 
----
+Omdat er 20.000+ orders per jaar zijn, is het niet praktisch om alles tegelijk te laden. De beste oplossing is **maandelijkse filtering** in plaats van jaarvolgorde:
 
-## Solution
-
-### Step 1: Add Pressure to Column Detection
-Add header detection for the "Pressure" column:
-
+### Stap 1: Voeg maandfilter toe naast jaarfilter
 ```typescript
-if (cellStr.includes("pressure") || cellStr.includes("druk") || 
-    cellStr.includes("bar")) {
-  columnMap.pressure = idx;
-}
+const [monthFilter, setMonthFilter] = useState<number>(new Date().getMonth() + 1);
 ```
 
-### Step 2: Update Fallback Indices
-Add pressure to the fallback column mapping:
-
+### Stap 2: Pas query aan voor maand-specifieke data
 ```typescript
-columnMap = { 
-  date: 0, gasType: 1, size: 2, count: 3, grade: 4, 
-  location: 5, customer: 6, notes: 7, pressure: 8 
+const fetchOrders = async () => {
+  const startDate = `${yearFilter}-${String(monthFilter).padStart(2, '0')}-01`;
+  // Calculate last day of month
+  const lastDay = new Date(yearFilter, monthFilter, 0).getDate();
+  const endDate = `${yearFilter}-${String(monthFilter).padStart(2, '0')}-${lastDay}`;
+  
+  const { data } = await supabase
+    .from("gas_cylinder_orders")
+    .select(`*, gas_type_ref:gas_types(id, name, color)`)
+    .gte("scheduled_date", startDate)
+    .lte("scheduled_date", endDate)
+    .order("scheduled_date", { ascending: true })
+    .limit(5000); // Veilige limiet voor 1 maand
 };
 ```
 
-### Step 3: Parse Pressure from Excel Column
-Read pressure directly from the column when available:
+### Stap 3: UI maandkiezer toevoegen
+Voeg een dropdown toe naast de jaarkiezer:
 
 ```typescript
-// Get pressure value from dedicated column
-let pressure = 200; // default
-if (columnMap.pressure !== undefined) {
-  const pressureVal = parseInt(String(row[columnMap.pressure] || "200"));
-  if (!isNaN(pressureVal) && pressureVal > 0) {
-    pressure = pressureVal;
-  }
-} else {
-  // Fallback: extract from description
-  const { pressure: descPressure } = parseCylinderSize(sizeStr);
-  pressure = descPressure;
+<Select 
+  value={String(monthFilter)} 
+  onValueChange={(v) => setMonthFilter(parseInt(v))}
+>
+  <SelectTrigger className="w-[140px]">
+    <SelectValue />
+  </SelectTrigger>
+  <SelectContent>
+    {months.map((month, idx) => (
+      <SelectItem key={idx + 1} value={String(idx + 1)}>
+        {month}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+```
+
+### Stap 4: Voeg "Hele jaar" optie toe
+Voor gebruikers die toch alle data willen zien, voeg een optie toe die per maand itereert en combineert:
+
+```typescript
+// Optioneel: Laad alle maanden parallel voor volledig jaaroverzicht
+if (monthFilter === 0) { // 0 = hele jaar
+  const allMonthPromises = Array.from({ length: 12 }, (_, i) => 
+    fetchMonthData(yearFilter, i + 1)
+  );
+  const allMonthData = await Promise.all(allMonthPromises);
+  setOrders(allMonthData.flat());
 }
 ```
 
-### Step 4: Add Pressure Column to Preview Table
-Display pressure in the import preview:
+---
 
-```tsx
-<th className="text-right py-2">Bar</th>
-...
-<td className="py-1.5 text-right">{order.pressure}</td>
-```
+## Verwacht Resultaat
+
+Na deze wijziging:
+- Standaard wordt de **huidige maand** getoond (max ~2.500 orders)
+- Gebruikers kunnen schakelen tussen maanden
+- Geen data meer gemist door de 1000-rij limiet
+- Performance verbetert significant door kleinere datasets
 
 ---
 
-## Technical Changes Summary
+## Technische Wijzigingen
 
-| Line Range | Change |
-|------------|--------|
-| 256-270 | Add pressure header detection (`pressure`, `druk`, `bar`) |
-| 278 | Add `pressure: 8` to fallback column map |
-| 295-320 | Read pressure from column, fallback to description parsing |
-| 526-531 | Add "Bar" column header to preview table |
-| 537-546 | Add pressure cell to preview table rows |
-
----
-
-## Expected Result
-
-After these changes:
-- The import will detect and use the dedicated "Pressure" column from Excel
-- Values like 200, 300, and 4 (bar) will be correctly imported
-- The preview table will show the pressure for each order
-- Fallback to description-based parsing remains for older Excel formats
+| Bestand | Wijziging |
+|---------|-----------|
+| `GasCylinderPlanning.tsx` | Voeg `monthFilter` state toe |
+| `GasCylinderPlanning.tsx` | Update `fetchOrders` met maandgrenzen |
+| `GasCylinderPlanning.tsx` | Voeg maand-dropdown UI toe |
+| `GasCylinderPlanning.tsx` | Update useEffect dependencies |
 
