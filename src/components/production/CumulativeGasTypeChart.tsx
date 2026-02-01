@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -48,7 +48,7 @@ export function CumulativeGasTypeChart() {
   const [selectedYear2, setSelectedYear2] = useState<number>(new Date().getFullYear() - 1);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [allGasTypes, setAllGasTypes] = useState<{ id: string; name: string; color: string }[]>([]);
-  const initialSelectionDone = useRef(false);
+  
 
   useEffect(() => {
     const currentYear = new Date().getFullYear();
@@ -112,18 +112,7 @@ export function CumulativeGasTypeChart() {
       { year: selectedYear2, gasTypes: year2Data }
     ]);
 
-    // Default: select top 5 gas types by total volume (only on first load)
-    if (!initialSelectionDone.current && allTypes.length > 0) {
-      const totals = allTypes.map(gt => {
-        const y1 = year1Data.find(d => d.id === gt.id);
-        const y2 = year2Data.find(d => d.id === gt.id);
-        const total = (y1?.months.reduce((a, b) => a + b, 0) || 0) + (y2?.months.reduce((a, b) => a + b, 0) || 0);
-        return { id: gt.id, total };
-      }).sort((a, b) => b.total - a.total);
-
-      setSelectedGasTypes(totals.slice(0, 5).map(t => t.id));
-      initialSelectionDone.current = true;
-    }
+    // No default selection - start with empty selection
 
     setLoading(false);
   };
