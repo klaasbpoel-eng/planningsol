@@ -1,139 +1,62 @@
 
-# Plan: Snellere Bulk Delete via Server-Side RPC
+# Plan: Droogijs productie rapportage herstellen
 
-## Huidige Situatie
+## Probleem Analyse
 
-De applicatie verwijdert orders in batches van 50 records per API call via de Supabase client. Met 127.817+ records betekent dit:
-- ~2.556 individuele API calls
-- Elke call heeft netwerk latency + authenticatie overhead
-- Geschatte tijd: 20-30 minuten
+De rapportage toont geen droogijs (en cilinder) data omdat de database functies niet correct werken. De oorzaak is **function overloading ambiguïteit**:
+
+Er bestaan twee versies van dezelfde functies:
+- `get_monthly_order_totals(p_year, p_order_type)` - oude versie met 2 parameters
+- `get_monthly_order_totals(p_year, p_order_type, p_location)` - nieuwe versie met 3 parameters
+
+Wanneer de frontend deze functies aanroept met alleen 2 parameters, kan PostgreSQL/PostgREST niet bepalen welke versie moet worden gebruikt. Dit resulteert in HTTP 300 errors en lege data.
+
+Hetzelfde probleem geldt voor:
+- `get_monthly_cylinder_totals_by_gas_type`
+- `get_yearly_totals_by_customer`
+
+---
 
 ## Oplossing
 
-Maak een **server-side PostgreSQL functie** die alle orders in één database-operatie verwijdert. Dit is vele malen sneller omdat:
-1. Geen netwerk overhead per record
-2. Geen client-side loops
-3. De database kan dit in één transactie afhandelen
+De oude 2-parameter versies van de functies moeten worden verwijderd, zodat alleen de nieuwere 3-parameter versies (met optionele `p_location DEFAULT NULL`) overblijven.
 
-## Technische Wijzigingen
+---
 
-### 1. Database: Nieuwe RPC functie aanmaken
+## Stappen
+
+### 1. Database Migratie
+Verwijder de oude overloaded functie versies:
 
 ```sql
-CREATE OR REPLACE FUNCTION public.bulk_delete_orders_by_year(
-  p_year integer,
-  p_order_type text
-)
-RETURNS integer
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-DECLARE
-  deleted_count integer;
-BEGIN
-  -- Controleer of gebruiker admin is
-  IF NOT is_admin() THEN
-    RAISE EXCEPTION 'Alleen admins kunnen bulk operaties uitvoeren';
-  END IF;
-
-  IF p_order_type = 'cylinder' THEN
-    DELETE FROM gas_cylinder_orders 
-    WHERE scheduled_date >= make_date(p_year, 1, 1)
-      AND scheduled_date <= make_date(p_year, 12, 31);
-    GET DIAGNOSTICS deleted_count = ROW_COUNT;
-  ELSIF p_order_type = 'dry_ice' THEN
-    DELETE FROM dry_ice_orders 
-    WHERE scheduled_date >= make_date(p_year, 1, 1)
-      AND scheduled_date <= make_date(p_year, 12, 31);
-    GET DIAGNOSTICS deleted_count = ROW_COUNT;
-  ELSE
-    RAISE EXCEPTION 'Ongeldig order type: %', p_order_type;
-  END IF;
-
-  RETURN deleted_count;
-END;
-$$;
+DROP FUNCTION IF EXISTS public.get_monthly_order_totals(integer, text);
+DROP FUNCTION IF EXISTS public.get_monthly_cylinder_totals_by_gas_type(integer);
+DROP FUNCTION IF EXISTS public.get_yearly_totals_by_customer(integer);
 ```
 
-### 2. Frontend: GasCylinderPlanning.tsx aanpassen
+Dit laat de nieuwere versies met optionele locatie parameter intact. De `DEFAULT NULL` parameter zorgt ervoor dat de functies nog steeds correct werken wanneer geen locatie wordt meegegeven.
 
-Vervang de huidige `handleConfirmDeleteAll` functie:
+### 2. Verificatie
+Na de migratie wordt gecontroleerd of:
+- De `CumulativeYearChart` component droogijs data correct toont
+- De `YearComparisonReport` zowel cilinder als droogijs data weergeeft
+- De locatiefilter correct werkt voor beide typen
 
-```typescript
-const handleConfirmDeleteAll = async () => {
-  setDeletingAll(true);
-  
-  try {
-    // Roep server-side RPC functie aan voor snelle bulk delete
-    const { data, error } = await supabase
-      .rpc('bulk_delete_orders_by_year', {
-        p_year: deleteYear,
-        p_order_type: 'cylinder'
-      });
-    
-    if (error) throw error;
-    
-    toast.success(`Alle ${data} vulorders van ${deleteYear} zijn verwijderd`);
-    fetchOrders();
-    onDataChanged?.();
-  } catch (err) {
-    toast.error("Fout bij verwijderen van orders");
-    console.error("Error:", err);
-  } finally {
-    setDeletingAll(false);
-    setDeleteAllDialogOpen(false);
-  }
-};
-```
+---
 
-### 3. Frontend: DryIcePlanning.tsx aanpassen
+## Technische Details
 
-Zelfde aanpassing maar met `p_order_type: 'dry_ice'`:
+| Onderdeel | Actie |
+|-----------|-------|
+| Database functies | Verwijder 3 oude overloaded functies |
+| Frontend code | Geen wijzigingen nodig |
+| Risico | Laag - de nieuwe functies zijn al aanwezig en functioneel |
 
-```typescript
-const handleConfirmDeleteAll = async () => {
-  setDeletingAll(true);
-  
-  try {
-    const { data, error } = await supabase
-      .rpc('bulk_delete_orders_by_year', {
-        p_year: deleteYear,
-        p_order_type: 'dry_ice'
-      });
-    
-    if (error) throw error;
-    
-    toast.success(`Alle ${data} droogijs orders van ${deleteYear} zijn verwijderd`);
-    fetchOrders();
-    onDataChanged?.();
-  } catch (err) {
-    toast.error("Fout bij verwijderen van orders");
-    console.error("Error:", err);
-  } finally {
-    setDeletingAll(false);
-    setDeleteAllDialogOpen(false);
-  }
-};
-```
+---
 
-## Prestatieverbetering
+## Verwacht Resultaat
 
-| Methode | API Calls | Geschatte Tijd |
-|---------|-----------|----------------|
-| Huidige (batch 50) | ~2.556 | 20-30 minuten |
-| Nieuwe (RPC) | 1 | 2-5 seconden |
-
-## Samenvatting Wijzigingen
-
-| Onderdeel | Wijziging |
-|-----------|-----------|
-| Database | Nieuwe `bulk_delete_orders_by_year` RPC functie |
-| `GasCylinderPlanning.tsx` | Vervang batch-loop door RPC call |
-| `DryIcePlanning.tsx` | Vervang batch-loop door RPC call |
-
-## Beveiliging
-
-- De RPC functie controleert of de gebruiker admin is via `is_admin()`
-- `SECURITY DEFINER` zorgt ervoor dat de functie met de juiste rechten draait
-- `search_path` is expliciet gezet om SQL injection te voorkomen
+Na deze wijziging:
+- Droogijs productie voor 2025 (123.373 kg over 320 orders) wordt correct weergegeven in alle rapportages
+- Cilinder data wordt ook correct getoond
+- De jaarvergelijking en cumulatieve grafieken werken weer
