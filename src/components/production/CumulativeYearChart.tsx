@@ -240,21 +240,21 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
             <div className="flex gap-2">
               <button 
                 onClick={selectTopFive}
-                className="text-xs text-primary hover:underline"
+                className="text-xs text-primary font-medium px-2 py-1 rounded-md transition-all duration-200 hover:bg-primary/10 hover:scale-105 active:scale-95"
               >
                 Top 5
               </button>
               <span className="text-muted-foreground">|</span>
               <button 
                 onClick={selectAllYears}
-                className="text-xs text-primary hover:underline"
+                className="text-xs text-primary font-medium px-2 py-1 rounded-md transition-all duration-200 hover:bg-primary/10 hover:scale-105 active:scale-95"
               >
                 Alles
               </button>
               <span className="text-muted-foreground">|</span>
               <button 
                 onClick={clearYears}
-                className="text-xs text-primary hover:underline"
+                className="text-xs text-primary font-medium px-2 py-1 rounded-md transition-all duration-200 hover:bg-primary/10 hover:scale-105 active:scale-95"
               >
                 Wissen
               </button>
