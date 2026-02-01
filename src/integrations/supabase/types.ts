@@ -518,8 +518,39 @@ export type Database = {
           },
         ]
       }
+      gas_type_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       gas_types: {
         Row: {
+          category_id: string | null
           color: string
           created_at: string
           description: string | null
@@ -530,6 +561,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category_id?: string | null
           color?: string
           created_at?: string
           description?: string | null
@@ -540,6 +572,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category_id?: string | null
           color?: string
           created_at?: string
           description?: string | null
@@ -549,7 +582,15 @@ export type Database = {
           sort_order?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "gas_types_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "gas_type_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
