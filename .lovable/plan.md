@@ -1,95 +1,59 @@
 
 
-# Plan: Fix Gascilinder Overzicht Limiet (1000 orders)
+# Plan: Fix Gascilinder Overzicht Data Limiet
 
-## Probleem Geanalyseerd
+## Probleemanalyse
 
-De database query bevestigt het probleem:
-- **Januari 2026**: 1445 orders in database, maar slechts 1000 getoond
-- **Oorzaak**: Supabase standaardlimiet is 1000 rijen per query
-- **Andere jaren**: 20.000-24.000 orders per jaar - dit wordt nog problematischer
+Na onderzoek van de database en code:
 
-| Jaar | Orders in DB | Getoond |
-|------|-------------|---------|
-| 2020 | 23.441 | 1.000 |
-| 2021 | 24.313 | 1.000 |
-| 2022 | 22.894 | 1.000 |
-| 2023 | 21.740 | 1.000 |
-| 2024 | 20.691 | 1.000 |
-| 2025 | 19.398 | 1.000 |
-| 2026 | 1.445 | 1.000 |
+- **Database**: Januari 2026 bevat **1445 orders** met **25.914 cilinders**
+- **Weergave**: Slechts 1000 orders worden getoond
+- **Oorzaak**: De oude code zonder maandfilter raakte de Supabase 1000-rij limiet
 
-## Oplossing: Maandelijkse Paginering
+De recente wijziging met maandfiltering en `limit(5000)` zou dit probleem moeten oplossen, maar er zijn nog twee aandachtspunten:
 
-Omdat er 20.000+ orders per jaar zijn, is het niet praktisch om alles tegelijk te laden. De beste oplossing is **maandelijkse filtering** in plaats van jaarvolgorde:
+## Huidige Status
 
-### Stap 1: Voeg maandfilter toe naast jaarfilter
+| Component | Limiet | Status |
+|-----------|--------|--------|
+| GasCylinderPlanning.tsx | `limit(5000)` | Correct |
+| ProductionReports.tsx | `range(0, 9999)` | Kan verbeterd |
+
+## Oplossing
+
+### Stap 1: Verifieer dat de nieuwe code actief is
+De gebruiker moet de pagina vernieuwen (Ctrl+F5) om de nieuwe code met maandfiltering te laden.
+
+### Stap 2: Pas ProductionReports.tsx aan voor consistentie
+Wijzig de query methode van `.range(0, 9999)` naar hetzelfde patroon als GasCylinderPlanning:
+- Gebruik maandelijkse filtering of een hogere limiet
+- Voor periodes langer dan een maand: laad data per maand parallel
+
+### Stap 3: Implementeer maandelijkse parallelle loading in rapportages
+
 ```typescript
-const [monthFilter, setMonthFilter] = useState<number>(new Date().getMonth() + 1);
-```
-
-### Stap 2: Pas query aan voor maand-specifieke data
-```typescript
-const fetchOrders = async () => {
-  const startDate = `${yearFilter}-${String(monthFilter).padStart(2, '0')}-01`;
-  // Calculate last day of month
-  const lastDay = new Date(yearFilter, monthFilter, 0).getDate();
-  const endDate = `${yearFilter}-${String(monthFilter).padStart(2, '0')}-${lastDay}`;
+const fetchMonthData = async (year: number, month: number) => {
+  const monthStr = String(month).padStart(2, '0');
+  const startDate = `${year}-${monthStr}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const endDate = `${year}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
   
-  const { data } = await supabase
+  return supabase
     .from("gas_cylinder_orders")
     .select(`*, gas_type_ref:gas_types(id, name, color)`)
     .gte("scheduled_date", startDate)
     .lte("scheduled_date", endDate)
-    .order("scheduled_date", { ascending: true })
-    .limit(5000); // Veilige limiet voor 1 maand
+    .limit(5000);
+};
+
+// Voor periodes die meerdere maanden omvatten:
+const fetchDataForRange = async (from: Date, to: Date) => {
+  const months = getMonthsInRange(from, to);
+  const promises = months.map(({ year, month }) => fetchMonthData(year, month));
+  const results = await Promise.all(promises);
+  return results.flatMap(r => r.data || []);
 };
 ```
-
-### Stap 3: UI maandkiezer toevoegen
-Voeg een dropdown toe naast de jaarkiezer:
-
-```typescript
-<Select 
-  value={String(monthFilter)} 
-  onValueChange={(v) => setMonthFilter(parseInt(v))}
->
-  <SelectTrigger className="w-[140px]">
-    <SelectValue />
-  </SelectTrigger>
-  <SelectContent>
-    {months.map((month, idx) => (
-      <SelectItem key={idx + 1} value={String(idx + 1)}>
-        {month}
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
-```
-
-### Stap 4: Voeg "Hele jaar" optie toe
-Voor gebruikers die toch alle data willen zien, voeg een optie toe die per maand itereert en combineert:
-
-```typescript
-// Optioneel: Laad alle maanden parallel voor volledig jaaroverzicht
-if (monthFilter === 0) { // 0 = hele jaar
-  const allMonthPromises = Array.from({ length: 12 }, (_, i) => 
-    fetchMonthData(yearFilter, i + 1)
-  );
-  const allMonthData = await Promise.all(allMonthPromises);
-  setOrders(allMonthData.flat());
-}
-```
-
----
-
-## Verwacht Resultaat
-
-Na deze wijziging:
-- Standaard wordt de **huidige maand** getoond (max ~2.500 orders)
-- Gebruikers kunnen schakelen tussen maanden
-- Geen data meer gemist door de 1000-rij limiet
-- Performance verbetert significant door kleinere datasets
 
 ---
 
@@ -97,8 +61,15 @@ Na deze wijziging:
 
 | Bestand | Wijziging |
 |---------|-----------|
-| `GasCylinderPlanning.tsx` | Voeg `monthFilter` state toe |
-| `GasCylinderPlanning.tsx` | Update `fetchOrders` met maandgrenzen |
-| `GasCylinderPlanning.tsx` | Voeg maand-dropdown UI toe |
-| `GasCylinderPlanning.tsx` | Update useEffect dependencies |
+| `ProductionReports.tsx` | Implementeer maandelijkse data loading met `Promise.all` |
+| `ProductionReports.tsx` | Verwijder `.range(0, 9999)` en vervang door `limit(5000)` per maand |
+
+---
+
+## Verwacht Resultaat
+
+Na implementatie:
+- Alle 1445 orders van januari 2026 worden correct getoond
+- Rapportages kunnen periodes van meerdere maanden aan zonder datalimiet
+- Consistente aanpak over alle componenten
 
