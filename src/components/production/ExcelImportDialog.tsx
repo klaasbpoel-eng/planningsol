@@ -268,6 +268,11 @@ export function ExcelImportDialog({
                   cellStr.includes("omschrijving") || cellStr === "notes") {
                 columnMap.notes = idx;
               }
+              // Detect pressure column
+              if (cellStr.includes("pressure") || cellStr.includes("druk") || 
+                  cellStr === "bar") {
+                columnMap.pressure = idx;
+              }
             });
             break;
           }
@@ -275,7 +280,7 @@ export function ExcelImportDialog({
         
         // Fallback to fixed indices if header not found (matching Excel structure: Datum, Gastype, Cilinderinhoud, Aantal, M/T, Locatie, Klant, Omschrijving)
         if (headerRowIndex === -1) {
-          columnMap = { date: 0, gasType: 1, size: 2, count: 3, grade: 4, location: 5, customer: 6, notes: 7 };
+          columnMap = { date: 0, gasType: 1, size: 2, count: 3, grade: 4, location: 5, customer: 6, notes: 7, pressure: 8 };
         }
         
         console.log("Column mapping:", columnMap, "Header row:", headerRowIndex);
@@ -304,7 +309,19 @@ export function ExcelImportDialog({
           
           if (!gasType || count <= 0) continue;
           
-          const { size, pressure } = parseCylinderSize(sizeStr);
+          // Parse pressure from dedicated column, fallback to description parsing
+          let pressure = 200;
+          if (columnMap.pressure !== undefined) {
+            const pressureVal = parseInt(String(row[columnMap.pressure] || "200"));
+            if (!isNaN(pressureVal) && pressureVal > 0) {
+              pressure = pressureVal;
+            }
+          } else {
+            const { pressure: descPressure } = parseCylinderSize(sizeStr);
+            pressure = descPressure;
+          }
+          
+          const { size } = parseCylinderSize(sizeStr);
           const location = parseLocation(locationStr);
           
           orders.push({
@@ -527,6 +544,7 @@ export function ExcelImportDialog({
                         <th className="text-left py-2">Gastype</th>
                         <th className="text-left py-2">Grootte</th>
                         <th className="text-right py-2">Aantal</th>
+                        <th className="text-right py-2">Bar</th>
                         <th className="text-left py-2">Klant</th>
                         <th className="text-left py-2">Locatie</th>
                       </tr>
@@ -538,6 +556,7 @@ export function ExcelImportDialog({
                           <td className="py-1.5">{order.gasType}</td>
                           <td className="py-1.5">{order.cylinderSize}</td>
                           <td className="py-1.5 text-right">{order.count}</td>
+                          <td className="py-1.5 text-right">{order.pressure}</td>
                           <td className="py-1.5">{order.customer}</td>
                           <td className="py-1.5">
                             <span className={`text-xs px-1.5 py-0.5 rounded ${order.location === "sol_tilburg" ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" : "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300"}`}>
