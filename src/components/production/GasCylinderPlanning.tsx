@@ -118,7 +118,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
   
   // Unique customers from orders for filtering
   const uniqueCustomers = [...new Set(orders.map(o => o.customer_name))].sort();
-  const { permissions } = useUserPermissions(userId);
+  const { permissions, isAdmin } = useUserPermissions(userId);
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -481,17 +481,17 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
           </div>
         </div>
         <div className="flex gap-2">
+          {isAdmin && (
+            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Excel import
+            </Button>
+          )}
           {permissions?.canCreateOrders && (
-            <>
-              <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Excel import
-              </Button>
-              <Button className="bg-orange-500 hover:bg-orange-600" onClick={() => setDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Nieuwe vulorder
-              </Button>
-            </>
+            <Button className="bg-orange-500 hover:bg-orange-600" onClick={() => setDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nieuwe vulorder
+            </Button>
           )}
         </div>
       </div>

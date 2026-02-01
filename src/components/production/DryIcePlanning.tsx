@@ -102,7 +102,7 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
   const [sortColumn, setSortColumn] = useState<SortColumn>("scheduled_date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   
-  const { permissions } = useUserPermissions(userId);
+  const { permissions, isAdmin } = useUserPermissions(userId);
 
   // Unique customers from orders for filtering
   const uniqueCustomers = [...new Set(orders.map(o => o.customer_name))].sort();
@@ -363,17 +363,17 @@ export function DryIcePlanning({ onDataChanged }: DryIcePlanningProps) {
           </p>
         </div>
         <div className="flex gap-2">
+          {isAdmin && (
+            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Excel import
+            </Button>
+          )}
           {permissions?.canCreateOrders && (
-            <>
-              <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Excel import
-              </Button>
-              <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={() => setDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Nieuwe productieorder
-              </Button>
-            </>
+            <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={() => setDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nieuwe productieorder
+            </Button>
           )}
         </div>
       </div>
