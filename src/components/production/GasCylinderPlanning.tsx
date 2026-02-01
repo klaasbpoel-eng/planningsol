@@ -191,12 +191,8 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
     }
   };
 
-  const fetchMonthData = async (year: number, month: number) => {
-    const monthStr = String(month).padStart(2, '0');
-    const startDate = `${year}-${monthStr}-01`;
-    const lastDay = new Date(year, month, 0).getDate();
-    const endDate = `${year}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
-    
+  // Fetch data for a single week (to bypass Supabase 1000-row default limit)
+  const fetchWeekData = async (startDate: string, endDate: string) => {
     const { data, error } = await supabase
       .from("gas_cylinder_orders")
       .select(`
@@ -209,10 +205,46 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
       .limit(5000);
     
     if (error) {
-      console.error(`Error fetching orders for month ${month}:`, error);
+      console.error(`Error fetching orders for ${startDate} - ${endDate}:`, error);
       return [];
     }
     return (data as GasCylinderOrder[]) || [];
+  };
+
+  // Get all weeks for a given month
+  const getWeeksInMonth = (year: number, month: number) => {
+    const weeks: { startDate: string; endDate: string }[] = [];
+    const monthStr = String(month).padStart(2, '0');
+    const lastDay = new Date(year, month, 0).getDate();
+    
+    let currentDay = 1;
+    while (currentDay <= lastDay) {
+      const endDay = Math.min(currentDay + 6, lastDay);
+      weeks.push({
+        startDate: `${year}-${monthStr}-${String(currentDay).padStart(2, '0')}`,
+        endDate: `${year}-${monthStr}-${String(endDay).padStart(2, '0')}`
+      });
+      currentDay = endDay + 1;
+    }
+    return weeks;
+  };
+
+  const fetchMonthData = async (year: number, month: number) => {
+    // Split month into weeks to bypass 1000-row limit
+    const weeks = getWeeksInMonth(year, month);
+    const weekPromises = weeks.map(({ startDate, endDate }) => 
+      fetchWeekData(startDate, endDate)
+    );
+    const weekResults = await Promise.all(weekPromises);
+    
+    // Combine and deduplicate (in case of edge cases)
+    const allOrders = weekResults.flat();
+    const uniqueOrders = Array.from(
+      new Map(allOrders.map(o => [o.id, o])).values()
+    );
+    return uniqueOrders.sort((a, b) => 
+      a.scheduled_date.localeCompare(b.scheduled_date)
+    );
   };
 
   const fetchOrders = async () => {
@@ -226,9 +258,13 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
         );
         const allMonthData = await Promise.all(monthPromises);
         const combinedOrders = allMonthData.flat().sort((a, b) => 
-          new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime()
+          a.scheduled_date.localeCompare(b.scheduled_date)
         );
-        setOrders(combinedOrders);
+        // Deduplicate across months (shouldn't happen but safety first)
+        const uniqueOrders = Array.from(
+          new Map(combinedOrders.map(o => [o.id, o])).values()
+        );
+        setOrders(uniqueOrders);
       } else {
         // Specifieke maand
         const data = await fetchMonthData(yearFilter, monthFilter);
