@@ -1,62 +1,67 @@
 
-# Plan: Droogijs productie rapportage herstellen
+# Plan: Locatie-onderscheid toevoegen aan gascilinder import
 
-## Probleem Analyse
+## Probleem
+Bij het importeren van gascilinder orders via Excel wordt geen onderscheid gemaakt tussen de twee productielocaties (SOL Emmen en SOL Tilburg). Alle orders krijgen automatisch de standaardwaarde `sol_emmen`.
 
-De rapportage toont geen droogijs (en cilinder) data omdat de database functies niet correct werken. De oorzaak is **function overloading ambiguïteit**:
-
-Er bestaan twee versies van dezelfde functies:
-- `get_monthly_order_totals(p_year, p_order_type)` - oude versie met 2 parameters
-- `get_monthly_order_totals(p_year, p_order_type, p_location)` - nieuwe versie met 3 parameters
-
-Wanneer de frontend deze functies aanroept met alleen 2 parameters, kan PostgreSQL/PostgREST niet bepalen welke versie moet worden gebruikt. Dit resulteert in HTTP 300 errors en lege data.
-
-Hetzelfde probleem geldt voor:
-- `get_monthly_cylinder_totals_by_gas_type`
-- `get_yearly_totals_by_customer`
-
----
+## Oorzaak
+De Excel import functionaliteit (`ExcelImportDialog.tsx`) detecteert, parst en bewaart de `location` kolom niet uit het Excel bestand.
 
 ## Oplossing
-
-De oude 2-parameter versies van de functies moeten worden verwijderd, zodat alleen de nieuwere 3-parameter versies (met optionele `p_location DEFAULT NULL`) overblijven.
+Uitbreiding van de import- en orderbeheer-functionaliteit om de productielocatie correct te verwerken.
 
 ---
 
-## Stappen
+## Technisch Plan
 
-### 1. Database Migratie
-Verwijder de oude overloaded functie versies:
+### Stap 1: ParsedCylinderOrder interface uitbreiden
+Voeg een `location` veld toe aan het interface zodat de locatie kan worden opgeslagen per geparseerde order.
 
-```sql
-DROP FUNCTION IF EXISTS public.get_monthly_order_totals(integer, text);
-DROP FUNCTION IF EXISTS public.get_monthly_cylinder_totals_by_gas_type(integer);
-DROP FUNCTION IF EXISTS public.get_yearly_totals_by_customer(integer);
+```text
+interface ParsedCylinderOrder {
+  date: Date;
+  gasType: string;
+  cylinderSize: string;
+  count: number;
+  grade: "medical" | "technical";
+  customer: string;
+  notes: string;
+  pressure: number;
+  location: "sol_emmen" | "sol_tilburg";  // Nieuw veld
+}
 ```
 
-Dit laat de nieuwere versies met optionele locatie parameter intact. De `DEFAULT NULL` parameter zorgt ervoor dat de functies nog steeds correct werken wanneer geen locatie wordt meegegeven.
+### Stap 2: Kolom detectie voor locatie toevoegen
+Uitbreiding van de header mapping om de locatie-kolom te detecteren met flexibele matching:
+- Detectie van kolomnamen zoals "locatie", "location", "productielocatie", "site", "vestiging"
+- Genormaliseerde matching (lowercase, geen accenten, geen extra spaties)
 
-### 2. Verificatie
-Na de migratie wordt gecontroleerd of:
-- De `CumulativeYearChart` component droogijs data correct toont
-- De `YearComparisonReport` zowel cilinder als droogijs data weergeeft
-- De locatiefilter correct werkt voor beide typen
+### Stap 3: Locatie waarde parsen
+Functie toevoegen die Excel waarden vertaalt naar database enum waarden:
+- "emmen", "sol emmen", "sol_emmen" → `sol_emmen`
+- "tilburg", "sol tilburg", "sol_tilburg" → `sol_tilburg`
+- Fallback naar `sol_emmen` als geen match gevonden wordt
+
+### Stap 4: Locatie meenemen bij database insert
+Het `location` veld toevoegen aan de insert data object zodat de juiste locatie wordt opgeslagen.
+
+### Stap 5: Locatie tonen in preview tabel
+De locatie-kolom toevoegen aan de preview tabel zodat gebruikers kunnen controleren of de locaties correct zijn gedetecteerd.
+
+### Stap 6 (Optioneel): Fallback locatiekeuze toevoegen
+Als er geen locatie-kolom in het Excel bestand staat, een dropdown tonen waar de gebruiker een standaard locatie kan kiezen voor alle orders in de import.
 
 ---
 
-## Technische Details
+## Betrokken bestanden
 
-| Onderdeel | Actie |
-|-----------|-------|
-| Database functies | Verwijder 3 oude overloaded functies |
-| Frontend code | Geen wijzigingen nodig |
-| Risico | Laag - de nieuwe functies zijn al aanwezig en functioneel |
+| Bestand | Wijziging |
+|---------|-----------|
+| `src/components/production/ExcelImportDialog.tsx` | Interface uitbreiden, locatie-kolom detectie, parsing, insert data, preview tabel |
+| `src/components/production/CreateGasCylinderOrderDialog.tsx` | Locatie-selectie dropdown toevoegen |
+| `src/components/production/GasCylinderPlanning.tsx` | (Optioneel) Locatie-filter en kolom in tabel |
 
 ---
 
-## Verwacht Resultaat
-
-Na deze wijziging:
-- Droogijs productie voor 2025 (123.373 kg over 320 orders) wordt correct weergegeven in alle rapportages
-- Cilinder data wordt ook correct getoond
-- De jaarvergelijking en cumulatieve grafieken werken weer
+## Verwacht resultaat
+Na implementatie kunnen gascilinder orders worden geïmporteerd met de juiste productielocatie (SOL Emmen of SOL Tilburg) en blijft het onderscheid behouden in de database en rapportages.
