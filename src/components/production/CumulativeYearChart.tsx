@@ -177,19 +177,22 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
   };
 
   // Calculate top 5 years by total volume (memoized for indicator display)
-  const topFiveWithVolume = useMemo(() => {
-    const totals = yearlyData.map(yd => ({
+  // Calculate all year volumes for tooltips
+  const allYearVolumes = useMemo(() => {
+    return yearlyData.map(yd => ({
       year: yd.year,
       total: yd.months.reduce((sum, val) => sum + val, 0)
-    })).sort((a, b) => b.total - a.total);
-
-    return totals.slice(0, 5);
+    }));
   }, [yearlyData]);
+
+  const topFiveWithVolume = useMemo(() => {
+    return [...allYearVolumes].sort((a, b) => b.total - a.total).slice(0, 5);
+  }, [allYearVolumes]);
 
   const topFiveYears = topFiveWithVolume.map(t => t.year);
 
   const getYearVolume = (year: number) => {
-    return topFiveWithVolume.find(t => t.year === year)?.total || 0;
+    return allYearVolumes.find(t => t.year === year)?.total || 0;
   };
 
   const selectTopFive = () => {
@@ -269,26 +272,27 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
                 (animatingTopFive && isTopFive) || 
                 animatingAll || 
                 (animatingClear && isSelected);
+              const yearVolume = getYearVolume(year);
+              
               return (
-                <Badge
-                  key={year}
-                  variant={isSelected ? "default" : "outline"}
-                  className={`cursor-pointer transition-all duration-200 flex items-center gap-1 hover:scale-105 hover:shadow-md active:scale-95 ${
-                    shouldAnimate 
-                      ? "animate-[pulse_0.3s_ease-in-out_2] scale-110" 
-                      : ""
-                  }`}
-                  style={{
-                    backgroundColor: isSelected ? getYearColor(year) : undefined,
-                    borderColor: getYearColor(year),
-                    color: isSelected ? "white" : getYearColor(year)
-                  }}
-                  onClick={() => toggleYear(year)}
-                >
-                  {isTopFive && (
-                    <TooltipProvider delayDuration={0}>
-                      <UITooltip>
-                        <TooltipTrigger asChild>
+                <TooltipProvider key={year} delayDuration={0}>
+                  <UITooltip>
+                    <TooltipTrigger asChild>
+                      <Badge
+                        variant={isSelected ? "default" : "outline"}
+                        className={`cursor-pointer transition-all duration-200 flex items-center gap-1 hover:scale-105 hover:shadow-md active:scale-95 ${
+                          shouldAnimate 
+                            ? "animate-[pulse_0.3s_ease-in-out_2] scale-110" 
+                            : ""
+                        }`}
+                        style={{
+                          backgroundColor: isSelected ? getYearColor(year) : undefined,
+                          borderColor: getYearColor(year),
+                          color: isSelected ? "white" : getYearColor(year)
+                        }}
+                        onClick={() => toggleYear(year)}
+                      >
+                        {isTopFive && (
                           <Trophy 
                             className={`h-3 w-3 ${
                               topRank === 0 ? "text-yellow-400" : 
@@ -297,18 +301,22 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
                               isSelected ? "text-white/70" : "opacity-50"
                             }`} 
                           />
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="text-xs">
-                          <div className="text-center">
-                            <div className="font-medium">#{topRank + 1} in volume</div>
-                            <div className="text-muted-foreground">{formatNumber(getYearVolume(year), 0)} {type === "dryIce" ? "kg" : "cil."}</div>
-                          </div>
-                        </TooltipContent>
-                      </UITooltip>
-                    </TooltipProvider>
-                  )}
-                  {year}
-                </Badge>
+                        )}
+                        {year}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      <div className="text-center">
+                        {isTopFive && (
+                          <div className="font-medium text-primary">#{topRank + 1} in volume</div>
+                        )}
+                        <div className={isTopFive ? "text-muted-foreground" : "font-medium"}>
+                          {formatNumber(yearVolume, 0)} {type === "dryIce" ? "kg" : "cilinders"}
+                        </div>
+                      </div>
+                    </TooltipContent>
+                  </UITooltip>
+                </TooltipProvider>
               );
             })}
           </div>
