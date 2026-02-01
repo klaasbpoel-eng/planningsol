@@ -111,8 +111,15 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
   const [sortColumn, setSortColumn] = useState<SortColumn>("scheduled_date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
+  const [monthFilter, setMonthFilter] = useState<number>(new Date().getMonth() + 1);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [locationTab, setLocationTab] = useState<LocationTab>("sol_emmen");
+
+  // Dutch month names for dropdown
+  const monthNames = [
+    "Januari", "Februari", "Maart", "April", "Mei", "Juni",
+    "Juli", "Augustus", "September", "Oktober", "November", "December"
+  ];
   
   // Unique customers from orders for filtering
   const uniqueCustomers = [...new Set(orders.map(o => o.customer_name))].sort();
@@ -170,7 +177,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
   useEffect(() => {
     fetchOrders();
     fetchGasTypes();
-  }, [yearFilter]);
+  }, [yearFilter, monthFilter]);
 
   const fetchGasTypes = async () => {
     const { data } = await supabase
@@ -186,8 +193,13 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
 
   const fetchOrders = async () => {
     setLoading(true);
-    const startDate = `${yearFilter}-01-01`;
-    const endDate = `${yearFilter}-12-31`;
+    
+    // Calculate date range based on month filter
+    const monthStr = String(monthFilter).padStart(2, '0');
+    const startDate = `${yearFilter}-${monthStr}-01`;
+    // Get last day of the month
+    const lastDay = new Date(yearFilter, monthFilter, 0).getDate();
+    const endDate = `${yearFilter}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
     
     const { data, error } = await supabase
       .from("gas_cylinder_orders")
@@ -197,7 +209,8 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
       `)
       .gte("scheduled_date", startDate)
       .lte("scheduled_date", endDate)
-      .order("scheduled_date", { ascending: true });
+      .order("scheduled_date", { ascending: true })
+      .limit(5000); // Verhoogd van standaard 1000 naar 5000 voor maandelijkse data
 
     if (error) {
       console.error("Error fetching orders:", error);
@@ -536,7 +549,7 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
                           <X className="h-4 w-4" />
                         </Button>
                       )}
-                      {(dateFilter || pressureFilter !== "all" || gasTypeFilter.length > 0 || statusFilter !== "all" || gradeFilter !== "all" || customerFilter !== "all" || yearFilter !== new Date().getFullYear()) && (
+                      {(dateFilter || pressureFilter !== "all" || gasTypeFilter.length > 0 || statusFilter !== "all" || gradeFilter !== "all" || customerFilter !== "all" || yearFilter !== new Date().getFullYear() || monthFilter !== new Date().getMonth() + 1) && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -549,12 +562,23 @@ export function GasCylinderPlanning({ onDataChanged }: GasCylinderPlanningProps)
                             setGradeFilter("all");
                             setCustomerFilter("all");
                             setYearFilter(new Date().getFullYear());
+                            setMonthFilter(new Date().getMonth() + 1);
                           }}
                         >
                           <X className="h-4 w-4 mr-1" />
                           Wis filters
                         </Button>
                       )}
+                      <Select value={monthFilter.toString()} onValueChange={(v) => setMonthFilter(parseInt(v))}>
+                        <SelectTrigger className="w-[130px] bg-background">
+                          <SelectValue placeholder="Maand" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-background border shadow-lg z-50">
+                          {monthNames.map((month, idx) => (
+                            <SelectItem key={idx + 1} value={(idx + 1).toString()}>{month}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Select value={yearFilter.toString()} onValueChange={(v) => setYearFilter(parseInt(v))}>
                         <SelectTrigger className="w-[100px] bg-background">
                           <SelectValue placeholder="Jaar" />
