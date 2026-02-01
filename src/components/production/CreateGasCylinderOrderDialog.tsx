@@ -53,6 +53,8 @@ export function CreateGasCylinderOrderDialog({
   const [isCompleted, setIsCompleted] = useState(true);
   const [location, setLocation] = useState<"sol_emmen" | "sol_tilburg">("sol_emmen");
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
+  const [userProductionLocation, setUserProductionLocation] = useState<"sol_emmen" | "sol_tilburg" | null>(null);
+  const [canSelectLocation, setCanSelectLocation] = useState(true);
   const [gasTypes, setGasTypes] = useState<Array<{
     id: string;
     name: string;
@@ -65,21 +67,45 @@ export function CreateGasCylinderOrderDialog({
   }>>([]);
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchProfileAndPermissions = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        // Fetch profile with production_location
         const { data: profile } = await supabase
           .from("profiles")
-          .select("id")
+          .select("id, production_location")
           .eq("user_id", user.id)
           .single();
         
         if (profile) {
           setCurrentProfileId(profile.id);
+          
+          // Check user role
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          
+          const userRole = roleData?.role || "user";
+          const isAdmin = userRole === "admin";
+          
+          // If user has assigned location and is not admin, restrict to that location
+          if (profile.production_location && !isAdmin) {
+            setUserProductionLocation(profile.production_location);
+            setLocation(profile.production_location);
+            setCanSelectLocation(false);
+          } else if (profile.production_location) {
+            // Admin with location - set as default but allow selection
+            setLocation(profile.production_location);
+            setCanSelectLocation(true);
+          } else {
+            setCanSelectLocation(isAdmin);
+          }
         }
       }
     };
-    fetchProfile();
+    fetchProfileAndPermissions();
   }, []);
 
   useEffect(() => {
@@ -342,7 +368,11 @@ export function CreateGasCylinderOrderDialog({
 
             <div className="space-y-2">
               <Label>Productielocatie</Label>
-              <Select value={location} onValueChange={(v) => setLocation(v as "sol_emmen" | "sol_tilburg")}>
+              <Select 
+                value={location} 
+                onValueChange={(v) => setLocation(v as "sol_emmen" | "sol_tilburg")}
+                disabled={!canSelectLocation}
+              >
                 <SelectTrigger className="bg-background">
                   <SelectValue />
                 </SelectTrigger>
@@ -351,6 +381,11 @@ export function CreateGasCylinderOrderDialog({
                   <SelectItem value="sol_tilburg">SOL Tilburg</SelectItem>
                 </SelectContent>
               </Select>
+              {!canSelectLocation && (
+                <p className="text-xs text-muted-foreground">
+                  Locatie is gebaseerd op je toegewezen productielocatie
+                </p>
+              )}
             </div>
           </div>
 
