@@ -47,7 +47,11 @@ interface Customer {
   created_at: string;
 }
 
-export function CustomerManagement() {
+interface CustomerManagementProps {
+  isAdmin?: boolean;
+}
+
+export function CustomerManagement({ isAdmin = false }: CustomerManagementProps) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -136,12 +140,13 @@ export function CustomerManagement() {
             Beheer uw klantenbestand
           </p>
         </div>
-        <Button onClick={() => { setEditingCustomer(null); setDialogOpen(true); }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nieuwe klant
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => { setEditingCustomer(null); setDialogOpen(true); }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nieuwe klant
+          </Button>
+        )}
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -206,7 +211,7 @@ export function CustomerManagement() {
                   <TableHead>Contactpersoon</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Acties</TableHead>
+                  {isAdmin && <TableHead className="text-right">Acties</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -261,27 +266,29 @@ export function CustomerManagement() {
                         {customer.is_active ? "Actief" : "Inactief"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(customer)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setCustomerToDelete(customer);
-                            setDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    {isAdmin && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(customer)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setCustomerToDelete(customer);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
