@@ -4,12 +4,14 @@ import { Header } from "@/components/layout/Header";
 import { ProductionPlanning } from "@/components/production/ProductionPlanning";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import type { User } from "@supabase/supabase-js";
 
 const ProductionPlanningPage = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { role, permissions, loading: permissionsLoading, productionLocation, canViewAllLocations } = useUserPermissions(user?.id);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -33,7 +35,7 @@ const ProductionPlanningPage = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  if (loading) {
+  if (loading || permissionsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -47,7 +49,7 @@ const ProductionPlanningPage = () => {
 
   return (
     <div className="min-h-screen gradient-mesh">
-      <Header userEmail={user.email} />
+      <Header userEmail={user.email} role={role} />
       
       <main className="px-4 py-8 w-full">
         <div className="mb-8">
@@ -57,7 +59,11 @@ const ProductionPlanningPage = () => {
           </p>
         </div>
 
-        <ProductionPlanning />
+        <ProductionPlanning 
+          userProductionLocation={productionLocation}
+          canViewAllLocations={canViewAllLocations}
+          permissions={permissions}
+        />
       </main>
     </div>
   );

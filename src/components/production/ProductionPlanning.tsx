@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import { Snowflake, Cylinder, Package, TrendingUp, BarChart3, MapPin } from "lucide-react";
+import { Snowflake, Cylinder, Package, TrendingUp, BarChart3, MapPin, Lock } from "lucide-react";
 import { DryIcePlanning } from "./DryIcePlanning";
 import { GasCylinderPlanning } from "./GasCylinderPlanning";
 import { ProductionReports } from "./ProductionReports";
@@ -10,18 +10,49 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { Database } from "@/integrations/supabase/types";
+import type { RolePermissions } from "@/hooks/useUserPermissions";
 
 type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
+type UserProductionLocation = Database["public"]["Enums"]["production_location"] | null;
 
-export function ProductionPlanning() {
+interface ProductionPlanningProps {
+  userProductionLocation?: UserProductionLocation;
+  canViewAllLocations?: boolean;
+  permissions?: RolePermissions;
+}
+
+export function ProductionPlanning({ 
+  userProductionLocation, 
+  canViewAllLocations = true,
+  permissions 
+}: ProductionPlanningProps) {
   const [activeTab, setActiveTab] = useState("droogijs");
   const [dryIceToday, setDryIceToday] = useState(0);
   const [cylindersToday, setCylindersToday] = useState(0);
   const [weekOrders, setWeekOrders] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState<ProductionLocation>("all");
+  
+  // Determine initial and allowed location based on user's assigned location
+  const getInitialLocation = (): ProductionLocation => {
+    if (canViewAllLocations) return "all";
+    if (userProductionLocation) return userProductionLocation;
+    return "all";
+  };
+  
+  const [selectedLocation, setSelectedLocation] = useState<ProductionLocation>(getInitialLocation());
 
+  // Update selected location when user's production location changes
+  // Update selected location when user's production location changes
+  useEffect(() => {
+    if (!canViewAllLocations && userProductionLocation) {
+      setSelectedLocation(userProductionLocation);
+    }
+  }, [canViewAllLocations, userProductionLocation]);
+
+  // Fetch stats when location or refreshKey changes
   useEffect(() => {
     fetchStats();
   }, [refreshKey, selectedLocation]);
@@ -109,39 +140,105 @@ export function ProductionPlanning() {
       <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 border border-border/50">
         <MapPin className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm text-muted-foreground mr-2">Locatie:</span>
-        <div className="flex gap-1">
-          <Badge 
-            variant={selectedLocation === "all" ? "default" : "outline"}
-            className="cursor-pointer hover:bg-primary/80"
-            onClick={() => setSelectedLocation("all")}
-          >
-            Alle locaties
-          </Badge>
-          <Badge 
-            variant={selectedLocation === "sol_emmen" ? "default" : "outline"}
-            className={cn(
-              "cursor-pointer",
-              selectedLocation === "sol_emmen" 
-                ? "bg-orange-500 hover:bg-orange-600 text-white" 
-                : "hover:bg-orange-100 dark:hover:bg-orange-900/30"
+        <TooltipProvider>
+          <div className="flex gap-1">
+            {/* "Alle locaties" - only clickable for admins */}
+            {canViewAllLocations ? (
+              <Badge 
+                variant={selectedLocation === "all" ? "default" : "outline"}
+                className="cursor-pointer hover:bg-primary/80"
+                onClick={() => setSelectedLocation("all")}
+              >
+                Alle locaties
+              </Badge>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge 
+                    variant="outline"
+                    className="cursor-not-allowed opacity-50 flex items-center gap-1"
+                  >
+                    <Lock className="h-3 w-3" />
+                    Alle locaties
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Je hebt alleen toegang tot je toegewezen locatie</p>
+                </TooltipContent>
+              </Tooltip>
             )}
-            onClick={() => setSelectedLocation("sol_emmen")}
-          >
-            SOL Emmen
-          </Badge>
-          <Badge 
-            variant={selectedLocation === "sol_tilburg" ? "default" : "outline"}
-            className={cn(
-              "cursor-pointer",
-              selectedLocation === "sol_tilburg" 
-                ? "bg-blue-500 hover:bg-blue-600 text-white" 
-                : "hover:bg-blue-100 dark:hover:bg-blue-900/30"
+            
+            {/* SOL Emmen */}
+            {canViewAllLocations || userProductionLocation === "sol_emmen" ? (
+              <Badge 
+                variant={selectedLocation === "sol_emmen" ? "default" : "outline"}
+                className={cn(
+                  "cursor-pointer",
+                  selectedLocation === "sol_emmen" 
+                    ? "bg-orange-500 hover:bg-orange-600 text-white" 
+                    : "hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                )}
+                onClick={() => setSelectedLocation("sol_emmen")}
+              >
+                SOL Emmen
+              </Badge>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge 
+                    variant="outline"
+                    className="cursor-not-allowed opacity-50 flex items-center gap-1"
+                  >
+                    <Lock className="h-3 w-3" />
+                    SOL Emmen
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Je hebt geen toegang tot deze locatie</p>
+                </TooltipContent>
+              </Tooltip>
             )}
-            onClick={() => setSelectedLocation("sol_tilburg")}
-          >
-            SOL Tilburg
-          </Badge>
-        </div>
+            
+            {/* SOL Tilburg */}
+            {canViewAllLocations || userProductionLocation === "sol_tilburg" ? (
+              <Badge 
+                variant={selectedLocation === "sol_tilburg" ? "default" : "outline"}
+                className={cn(
+                  "cursor-pointer",
+                  selectedLocation === "sol_tilburg" 
+                    ? "bg-blue-500 hover:bg-blue-600 text-white" 
+                    : "hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                )}
+                onClick={() => setSelectedLocation("sol_tilburg")}
+              >
+                SOL Tilburg
+              </Badge>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge 
+                    variant="outline"
+                    className="cursor-not-allowed opacity-50 flex items-center gap-1"
+                  >
+                    <Lock className="h-3 w-3" />
+                    SOL Tilburg
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Je hebt geen toegang tot deze locatie</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        </TooltipProvider>
+        
+        {/* Show user's assigned location info if restricted */}
+        {!canViewAllLocations && userProductionLocation && (
+          <span className="text-xs text-muted-foreground ml-2 flex items-center gap-1">
+            <Lock className="h-3 w-3" />
+            Beperkt tot jouw locatie
+          </span>
+        )}
       </div>
 
       {/* Quick stats */}

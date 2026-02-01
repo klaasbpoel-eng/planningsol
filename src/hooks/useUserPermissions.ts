@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
 export type AppRole = "admin" | "supervisor" | "operator" | "user";
+export type ProductionLocation = Database["public"]["Enums"]["production_location"] | null;
 
 export interface RolePermissions {
   // User management
@@ -108,6 +110,7 @@ const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
 export function useUserPermissions(userId: string | undefined) {
   const [role, setRole] = useState<AppRole>("user");
   const [permissions, setPermissions] = useState<RolePermissions>(ROLE_PERMISSIONS.user);
+  const [productionLocation, setProductionLocation] = useState<ProductionLocation>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -116,32 +119,59 @@ export function useUserPermissions(userId: string | undefined) {
       return;
     }
 
-    const fetchRole = async () => {
+    const fetchRoleAndLocation = async () => {
       try {
-        const { data, error } = await supabase
+        // Fetch role
+        const { data: roleData, error: roleError } = await supabase
           .from("user_roles")
           .select("role")
           .eq("user_id", userId)
           .maybeSingle();
 
-        if (error) throw error;
+        if (roleError) throw roleError;
         
-        const userRole = (data?.role as AppRole) || "user";
+        const userRole = (roleData?.role as AppRole) || "user";
         setRole(userRole);
         setPermissions(ROLE_PERMISSIONS[userRole]);
+
+        // Fetch production location from profile
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("production_location")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+        
+        // Admins always have access to all locations (null means all)
+        // Operators and supervisors are restricted to their assigned location
+        if (userRole === "admin") {
+          setProductionLocation(null); // null = all locations
+        } else {
+          setProductionLocation(profileData?.production_location || null);
+        }
       } catch (error) {
-        console.error("Error fetching role:", error);
+        console.error("Error fetching role/location:", error);
         setRole("user");
         setPermissions(ROLE_PERMISSIONS.user);
+        setProductionLocation(null);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchRole();
+    fetchRoleAndLocation();
   }, [userId]);
 
-  return { role, permissions, loading, isAdmin: role === "admin" };
+  return { 
+    role, 
+    permissions, 
+    loading, 
+    isAdmin: role === "admin",
+    productionLocation,
+    // Helper to check if user can view all locations
+    canViewAllLocations: role === "admin" || productionLocation === null,
+  };
 }
 
 export function getPermissionsForRole(role: AppRole): RolePermissions {

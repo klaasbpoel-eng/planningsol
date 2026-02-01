@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Loader2, User, Briefcase, Phone, MapPin, Heart, UserPlus } from "lucide-react";
+import { CalendarIcon, Loader2, User, Briefcase, Phone, MapPin, Heart, UserPlus, Factory } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +26,7 @@ type Profile = Database["public"]["Tables"]["profiles"]["Row"] & {
   address?: string | null;
   emergency_contact_name?: string | null;
   emergency_contact_phone?: string | null;
+  production_location?: Database["public"]["Enums"]["production_location"] | null;
 };
 
 interface EmployeeDetailDialogProps {
@@ -51,6 +52,7 @@ const initialFormData = {
   address: "",
   emergency_contact_name: "",
   emergency_contact_phone: "",
+  production_location: "" as string,
 };
 
 export function EmployeeDetailDialog({ 
@@ -85,6 +87,7 @@ export function EmployeeDetailDialog({
           address: employee.address || "",
           emergency_contact_name: employee.emergency_contact_name || "",
           emergency_contact_phone: employee.emergency_contact_phone || "",
+          production_location: employee.production_location || "",
         });
       }
     }
@@ -120,6 +123,7 @@ export function EmployeeDetailDialog({
         }
 
         // Create new profile - user_id is null for admin-created profiles until user signs up
+        const productionLoc = formData.production_location as "sol_emmen" | "sol_tilburg" | null;
         const { error } = await supabase
           .from("profiles")
           .insert({
@@ -136,6 +140,7 @@ export function EmployeeDetailDialog({
             address: formData.address || null,
             emergency_contact_name: formData.emergency_contact_name || null,
             emergency_contact_phone: formData.emergency_contact_phone || null,
+            production_location: productionLoc || null,
           });
 
         if (error) throw error;
@@ -144,6 +149,7 @@ export function EmployeeDetailDialog({
       } else {
         if (!employee) return;
         
+        const updateProductionLoc = formData.production_location as "sol_emmen" | "sol_tilburg" | null;
         const { error } = await supabase
           .from("profiles")
           .update({
@@ -159,6 +165,7 @@ export function EmployeeDetailDialog({
             address: formData.address || null,
             emergency_contact_name: formData.emergency_contact_name || null,
             emergency_contact_phone: formData.emergency_contact_phone || null,
+            production_location: updateProductionLoc || null,
           })
           .eq("id", employee.id);
 
@@ -358,6 +365,29 @@ export function EmployeeDetailDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Factory className="h-4 w-4" />
+                Productielocatie (voor operators/supervisors)
+              </Label>
+              <Select
+                value={formData.production_location}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, production_location: value === "none" ? "" : value }))}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Geen (alle locaties)" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover z-50">
+                  <SelectItem value="none">Geen (alle locaties)</SelectItem>
+                  <SelectItem value="sol_emmen">SOL Emmen</SelectItem>
+                  <SelectItem value="sol_tilburg">SOL Tilburg</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Operators en supervisors zien alleen orders van hun toegewezen locatie. Laat leeg voor toegang tot alle locaties.
+              </p>
             </div>
           </TabsContent>
 

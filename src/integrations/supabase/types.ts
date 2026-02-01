@@ -754,6 +754,9 @@ export type Database = {
           location: string | null
           manager_id: string | null
           phone: string | null
+          production_location:
+            | Database["public"]["Enums"]["production_location"]
+            | null
           updated_at: string
           user_id: string | null
         }
@@ -777,6 +780,9 @@ export type Database = {
           location?: string | null
           manager_id?: string | null
           phone?: string | null
+          production_location?:
+            | Database["public"]["Enums"]["production_location"]
+            | null
           updated_at?: string
           user_id?: string | null
         }
@@ -800,6 +806,9 @@ export type Database = {
           location?: string | null
           manager_id?: string | null
           phone?: string | null
+          production_location?:
+            | Database["public"]["Enums"]["production_location"]
+            | null
           updated_at?: string
           user_id?: string | null
         }
@@ -1121,6 +1130,10 @@ export type Database = {
           month: number
           total_value: number
         }[]
+      }
+      get_user_production_location: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["production_location"]
       }
       get_user_role: { Args: { _user_id: string }; Returns: string }
       get_yearly_totals_by_customer: {
