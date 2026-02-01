@@ -1,78 +1,139 @@
 
+# Plan: Snellere Bulk Delete via Server-Side RPC
 
-# Plan: Productielocatie Splitsing voor Gascilinders
+## Huidige Situatie
 
-## Overzicht
-Dit plan implementeert twee aparte tabbladen voor de gascilinder productielocaties **SOL Tilburg** en **SOL Emmen**. De database is al voorbereid met een `production_location` kolom.
+De applicatie verwijdert orders in batches van 50 records per API call via de Supabase client. Met 127.817+ records betekent dit:
+- ~2.556 individuele API calls
+- Elke call heeft netwerk latency + authenticatie overhead
+- Geschatte tijd: 20-30 minuten
 
-## Wat wordt er gewijzigd?
+## Oplossing
 
-### 1. Hoofdtabbladen Structuur (ProductionPlanning.tsx)
-De huidige structuur met 3 tabbladen wordt uitgebreid naar 4 tabbladen:
-- **Droogijs** - blijft ongewijzigd
-- **Tilburg** (nieuw) - gascilinder orders voor SOL Tilburg
-- **Emmen** (nieuw) - gascilinder orders voor SOL Emmen
-- **Rapportage** - blijft ongewijzigd
+Maak een **server-side PostgreSQL functie** die alle orders in één database-operatie verwijdert. Dit is vele malen sneller omdat:
+1. Geen netwerk overhead per record
+2. Geen client-side loops
+3. De database kan dit in één transactie afhandelen
 
-De statistiekkaart "Gascilinders vandaag" wordt gesplitst in twee aparte kaarten per locatie.
+## Technische Wijzigingen
 
-### 2. GasCylinderPlanning Component Aanpassen
-Het GasCylinderPlanning component krijgt een nieuwe `location` prop:
-- Filtert orders automatisch op de geselecteerde locatie
-- Toont alleen orders voor die specifieke locatie
-- Bulk verwijderen werkt per locatie
+### 1. Database: Nieuwe RPC functie aanmaken
 
-### 3. Order Aanmaken met Locatie
-Bij het aanmaken van een nieuwe order (CreateGasCylinderOrderDialog):
-- De locatie wordt automatisch ingesteld op basis van het actieve tabblad
-- De locatie prop wordt doorgegeven vanuit het parent component
+```sql
+CREATE OR REPLACE FUNCTION public.bulk_delete_orders_by_year(
+  p_year integer,
+  p_order_type text
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  deleted_count integer;
+BEGIN
+  -- Controleer of gebruiker admin is
+  IF NOT is_admin() THEN
+    RAISE EXCEPTION 'Alleen admins kunnen bulk operaties uitvoeren';
+  END IF;
 
-### 4. Order Bewerken met Locatie
-Bij het bewerken van een order (GasCylinderOrderDialog):
-- Locatie kan niet worden gewijzigd (order blijft bij originele vestiging)
-- De locatie wordt wel getoond in de detailweergave
+  IF p_order_type = 'cylinder' THEN
+    DELETE FROM gas_cylinder_orders 
+    WHERE scheduled_date >= make_date(p_year, 1, 1)
+      AND scheduled_date <= make_date(p_year, 12, 31);
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  ELSIF p_order_type = 'dry_ice' THEN
+    DELETE FROM dry_ice_orders 
+    WHERE scheduled_date >= make_date(p_year, 1, 1)
+      AND scheduled_date <= make_date(p_year, 12, 31);
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  ELSE
+    RAISE EXCEPTION 'Ongeldig order type: %', p_order_type;
+  END IF;
 
----
-
-## Technische Details
-
-### Nieuwe Props
-```text
-GasCylinderPlanning:
-  + location: "tilburg" | "emmen" (verplicht)
-
-CreateGasCylinderOrderDialog:
-  + location: "tilburg" | "emmen" (verplicht, wordt opgeslagen bij aanmaken)
+  RETURN deleted_count;
+END;
+$$;
 ```
 
-### Database Query Aanpassingen
-Alle queries in GasCylinderPlanning worden uitgebreid met:
-```text
-.eq("production_location", location)
+### 2. Frontend: GasCylinderPlanning.tsx aanpassen
+
+Vervang de huidige `handleConfirmDeleteAll` functie:
+
+```typescript
+const handleConfirmDeleteAll = async () => {
+  setDeletingAll(true);
+  
+  try {
+    // Roep server-side RPC functie aan voor snelle bulk delete
+    const { data, error } = await supabase
+      .rpc('bulk_delete_orders_by_year', {
+        p_year: deleteYear,
+        p_order_type: 'cylinder'
+      });
+    
+    if (error) throw error;
+    
+    toast.success(`Alle ${data} vulorders van ${deleteYear} zijn verwijderd`);
+    fetchOrders();
+    onDataChanged?.();
+  } catch (err) {
+    toast.error("Fout bij verwijderen van orders");
+    console.error("Error:", err);
+  } finally {
+    setDeletingAll(false);
+    setDeleteAllDialogOpen(false);
+  }
+};
 ```
 
-### Bestanden die worden aangepast
-1. `src/components/production/ProductionPlanning.tsx`
-   - Nieuwe tabbladen toevoegen (Tilburg, Emmen in plaats van Gascilinders)
-   - Statistieken splitsen per locatie
-   
-2. `src/components/production/GasCylinderPlanning.tsx`
-   - Nieuwe `location` prop toevoegen
-   - Filter queries op locatie
-   - Titel en beschrijving aanpassen per locatie
-   
-3. `src/components/production/CreateGasCylinderOrderDialog.tsx`
-   - Nieuwe `location` prop toevoegen
-   - Locatie opslaan bij aanmaken order
+### 3. Frontend: DryIcePlanning.tsx aanpassen
 
-4. `src/components/production/GasCylinderOrderDialog.tsx`
-   - Locatie tonen in detailweergave (read-only)
+Zelfde aanpassing maar met `p_order_type: 'dry_ice'`:
 
-5. `src/components/production/ExcelImportDialog.tsx`
-   - Locatie meegeven bij bulk import
+```typescript
+const handleConfirmDeleteAll = async () => {
+  setDeletingAll(true);
+  
+  try {
+    const { data, error } = await supabase
+      .rpc('bulk_delete_orders_by_year', {
+        p_year: deleteYear,
+        p_order_type: 'dry_ice'
+      });
+    
+    if (error) throw error;
+    
+    toast.success(`Alle ${data} droogijs orders van ${deleteYear} zijn verwijderd`);
+    fetchOrders();
+    onDataChanged?.();
+  } catch (err) {
+    toast.error("Fout bij verwijderen van orders");
+    console.error("Error:", err);
+  } finally {
+    setDeletingAll(false);
+    setDeleteAllDialogOpen(false);
+  }
+};
+```
 
-### UI/UX
-- Tilburg tabblad krijgt dezelfde oranje kleur als het huidige gascilinders tabblad
-- Emmen tabblad krijgt een paarse kleur voor visueel onderscheid
-- Beide tabbladen tonen het Cylinder icoon
+## Prestatieverbetering
 
+| Methode | API Calls | Geschatte Tijd |
+|---------|-----------|----------------|
+| Huidige (batch 50) | ~2.556 | 20-30 minuten |
+| Nieuwe (RPC) | 1 | 2-5 seconden |
+
+## Samenvatting Wijzigingen
+
+| Onderdeel | Wijziging |
+|-----------|-----------|
+| Database | Nieuwe `bulk_delete_orders_by_year` RPC functie |
+| `GasCylinderPlanning.tsx` | Vervang batch-loop door RPC call |
+| `DryIcePlanning.tsx` | Vervang batch-loop door RPC call |
+
+## Beveiliging
+
+- De RPC functie controleert of de gebruiker admin is via `is_admin()`
+- `SECURITY DEFINER` zorgt ervoor dat de functie met de juiste rechten draait
+- `search_path` is expliciet gezet om SQL injection te voorkomen

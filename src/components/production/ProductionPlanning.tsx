@@ -13,8 +13,7 @@ import { cn } from "@/lib/utils";
 export function ProductionPlanning() {
   const [activeTab, setActiveTab] = useState("droogijs");
   const [dryIceToday, setDryIceToday] = useState(0);
-  const [cylindersTilburgToday, setCylindersTilburgToday] = useState(0);
-  const [cylindersEmmenToday, setCylindersEmmenToday] = useState(0);
+  const [cylindersToday, setCylindersToday] = useState(0);
   const [weekOrders, setWeekOrders] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -51,28 +50,15 @@ export function ProductionPlanning() {
       setDryIceToday(dryIceData.reduce((sum, o) => sum + Number(o.quantity_kg), 0));
     }
 
-    // Fetch cylinder orders for today - Tilburg
-    const { data: cylinderTilburgData } = await supabase
+    // Fetch cylinder orders for today
+    const { data: cylinderData } = await supabase
       .from("gas_cylinder_orders")
       .select("cylinder_count")
       .eq("scheduled_date", today)
-      .eq("production_location", "tilburg")
       .neq("status", "cancelled");
     
-    if (cylinderTilburgData) {
-      setCylindersTilburgToday(cylinderTilburgData.reduce((sum, o) => sum + o.cylinder_count, 0));
-    }
-
-    // Fetch cylinder orders for today - Emmen
-    const { data: cylinderEmmenData } = await supabase
-      .from("gas_cylinder_orders")
-      .select("cylinder_count")
-      .eq("scheduled_date", today)
-      .eq("production_location", "emmen")
-      .neq("status", "cancelled");
-    
-    if (cylinderEmmenData) {
-      setCylindersEmmenToday(cylinderEmmenData.reduce((sum, o) => sum + o.cylinder_count, 0));
+    if (cylinderData) {
+      setCylindersToday(cylinderData.reduce((sum, o) => sum + o.cylinder_count, 0));
     }
 
     // Fetch week orders count
@@ -99,7 +85,7 @@ export function ProductionPlanning() {
   return (
     <div className="space-y-6">
       {/* Quick stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className={cn(
           "glass-card transition-all duration-300",
           isRefreshing && "animate-pulse ring-2 ring-primary/30"
@@ -123,28 +109,12 @@ export function ProductionPlanning() {
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <Cylinder className="h-4 w-4 text-orange-500" />
-              Tilburg vandaag
+              Gascilinders vandaag
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{cylindersTilburgToday}</div>
-            <p className="text-xs text-muted-foreground">Cilinders voor vulling</p>
-          </CardContent>
-        </Card>
-
-        <Card className={cn(
-          "glass-card transition-all duration-300",
-          isRefreshing && "animate-pulse ring-2 ring-primary/30"
-        )}>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Cylinder className="h-4 w-4 text-purple-500" />
-              Emmen vandaag
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{cylindersEmmenToday}</div>
-            <p className="text-xs text-muted-foreground">Cilinders voor vulling</p>
+            <div className="text-2xl font-bold">{cylindersToday}</div>
+            <p className="text-xs text-muted-foreground">Gepland voor vulling</p>
           </CardContent>
         </Card>
         
@@ -186,7 +156,7 @@ export function ProductionPlanning() {
 
       {/* Main content tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-4 bg-muted/50 backdrop-blur-sm">
+        <TabsList className="grid w-full max-w-lg grid-cols-3 bg-muted/50 backdrop-blur-sm">
           <TabsTrigger 
             value="droogijs" 
             className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white flex items-center gap-2"
@@ -195,18 +165,11 @@ export function ProductionPlanning() {
             Droogijs
           </TabsTrigger>
           <TabsTrigger 
-            value="tilburg"
+            value="gascilinders"
             className="data-[state=active]:bg-orange-500 data-[state=active]:text-white flex items-center gap-2"
           >
             <Cylinder className="h-4 w-4" />
-            Tilburg
-          </TabsTrigger>
-          <TabsTrigger 
-            value="emmen"
-            className="data-[state=active]:bg-purple-500 data-[state=active]:text-white flex items-center gap-2"
-          >
-            <Cylinder className="h-4 w-4" />
-            Emmen
+            Gascilinders
           </TabsTrigger>
           <TabsTrigger 
             value="rapportage"
@@ -221,12 +184,8 @@ export function ProductionPlanning() {
           <DryIcePlanning onDataChanged={handleDataChanged} />
         </TabsContent>
 
-        <TabsContent value="tilburg" className="mt-6">
-          <GasCylinderPlanning location="tilburg" onDataChanged={handleDataChanged} />
-        </TabsContent>
-
-        <TabsContent value="emmen" className="mt-6">
-          <GasCylinderPlanning location="emmen" onDataChanged={handleDataChanged} />
+        <TabsContent value="gascilinders" className="mt-6">
+          <GasCylinderPlanning onDataChanged={handleDataChanged} />
         </TabsContent>
 
         <TabsContent value="rapportage" className="mt-6">
