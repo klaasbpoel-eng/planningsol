@@ -138,40 +138,104 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
     }
   };
 
-  const fetchReportData = async () => {
-    setLoading(true);
-    const fromDate = format(dateRange.from, "yyyy-MM-dd");
-    const toDate = format(dateRange.to, "yyyy-MM-dd");
+  // Helper function to get all months in a date range
+  const getMonthsInRange = (from: Date, to: Date) => {
+    const months: { year: number; month: number }[] = [];
+    const current = new Date(from.getFullYear(), from.getMonth(), 1);
+    const end = new Date(to.getFullYear(), to.getMonth(), 1);
+    
+    while (current <= end) {
+      months.push({ year: current.getFullYear(), month: current.getMonth() + 1 });
+      current.setMonth(current.getMonth() + 1);
+    }
+    return months;
+  };
 
-    // Build cylinder query with optional location filter
-    let cylinderQuery = supabase
+  // Fetch cylinder orders for a single month
+  const fetchCylinderMonthData = async (year: number, month: number, fromDate: string, toDate: string) => {
+    const monthStr = String(month).padStart(2, '0');
+    const monthStartDate = `${year}-${monthStr}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const monthEndDate = `${year}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
+    
+    // Clamp to the actual date range
+    const effectiveStart = monthStartDate < fromDate ? fromDate : monthStartDate;
+    const effectiveEnd = monthEndDate > toDate ? toDate : monthEndDate;
+    
+    let query = supabase
       .from("gas_cylinder_orders")
       .select(`
         *,
         gas_type_ref:gas_types(id, name, color)
       `)
-      .gte("scheduled_date", fromDate)
-      .lte("scheduled_date", toDate)
+      .gte("scheduled_date", effectiveStart)
+      .lte("scheduled_date", effectiveEnd)
       .order("scheduled_date", { ascending: true })
-      .range(0, 9999);
+      .limit(5000);
     
     if (location !== "all") {
-      cylinderQuery = cylinderQuery.eq("location", location);
+      query = query.eq("location", location);
     }
+    
+    return query;
+  };
 
-    const [cylinderRes, dryIceRes] = await Promise.all([
-      cylinderQuery,
-      supabase
-        .from("dry_ice_orders")
-        .select("*")
-        .gte("scheduled_date", fromDate)
-        .lte("scheduled_date", toDate)
-        .order("scheduled_date", { ascending: true })
-        .range(0, 9999)
+  // Fetch dry ice orders for a single month
+  const fetchDryIceMonthData = async (year: number, month: number, fromDate: string, toDate: string) => {
+    const monthStr = String(month).padStart(2, '0');
+    const monthStartDate = `${year}-${monthStr}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const monthEndDate = `${year}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
+    
+    // Clamp to the actual date range
+    const effectiveStart = monthStartDate < fromDate ? fromDate : monthStartDate;
+    const effectiveEnd = monthEndDate > toDate ? toDate : monthEndDate;
+    
+    return supabase
+      .from("dry_ice_orders")
+      .select("*")
+      .gte("scheduled_date", effectiveStart)
+      .lte("scheduled_date", effectiveEnd)
+      .order("scheduled_date", { ascending: true })
+      .limit(5000);
+  };
+
+  const fetchReportData = async () => {
+    setLoading(true);
+    const fromDate = format(dateRange.from, "yyyy-MM-dd");
+    const toDate = format(dateRange.to, "yyyy-MM-dd");
+
+    // Get all months in the range
+    const months = getMonthsInRange(dateRange.from, dateRange.to);
+    
+    // Fetch data for each month in parallel
+    const cylinderPromises = months.map(({ year, month }) => 
+      fetchCylinderMonthData(year, month, fromDate, toDate)
+    );
+    const dryIcePromises = months.map(({ year, month }) => 
+      fetchDryIceMonthData(year, month, fromDate, toDate)
+    );
+
+    const [cylinderResults, dryIceResults] = await Promise.all([
+      Promise.all(cylinderPromises),
+      Promise.all(dryIcePromises)
     ]);
 
-    if (cylinderRes.data) setCylinderOrders(cylinderRes.data);
-    if (dryIceRes.data) setDryIceOrders(dryIceRes.data);
+    // Combine results from all months
+    const allCylinderOrders = cylinderResults.flatMap(res => res.data || []);
+    const allDryIceOrders = dryIceResults.flatMap(res => res.data || []);
+
+    // Remove duplicates (in case of overlapping date boundaries)
+    const uniqueCylinderOrders = Array.from(
+      new Map(allCylinderOrders.map(o => [o.id, o])).values()
+    ).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
+    
+    const uniqueDryIceOrders = Array.from(
+      new Map(allDryIceOrders.map(o => [o.id, o])).values()
+    ).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
+
+    setCylinderOrders(uniqueCylinderOrders);
+    setDryIceOrders(uniqueDryIceOrders);
     setLoading(false);
   };
 
