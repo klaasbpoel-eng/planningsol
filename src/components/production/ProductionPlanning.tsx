@@ -263,7 +263,7 @@ export function ProductionPlanning() {
         </TabsContent>
 
         <TabsContent value="rapportage" className="mt-6">
-          <ProductionReports refreshKey={refreshKey} onDataChanged={handleDataChanged} />
+          <ProductionReports refreshKey={refreshKey} onDataChanged={handleDataChanged} location={selectedLocation} />
         </TabsContent>
       </Tabs>
     </div>

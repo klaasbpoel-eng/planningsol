@@ -88,7 +88,13 @@ const MONTH_NAMES = [
   "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"
 ];
 
-export function YearComparisonReport() {
+type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
+
+interface YearComparisonReportProps {
+  location?: ProductionLocation;
+}
+
+export function YearComparisonReport({ location = "all" }: YearComparisonReportProps) {
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [cylinderData, setCylinderData] = useState<MonthlyData[]>([]);
@@ -137,13 +143,14 @@ export function YearComparisonReport() {
     if (selectedYear) {
       fetchYearComparisonData();
     }
-  }, [selectedYear]);
+  }, [selectedYear, location]);
 
   const fetchYearComparisonData = async () => {
     setLoading(true);
     
     const currentYear = selectedYear;
     const previousYear = selectedYear - 1;
+    const locationFilter = location === "all" ? null : location;
 
     // Use database function to get aggregated monthly totals - bypasses the 1000 row limit
     const [
@@ -156,14 +163,14 @@ export function YearComparisonReport() {
       currentCustomerRes,
       previousCustomerRes
     ] = await Promise.all([
-      supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "cylinder" }),
-      supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "cylinder" }),
+      supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "cylinder", p_location: locationFilter }),
+      supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "cylinder", p_location: locationFilter }),
       supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "dry_ice" }),
       supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "dry_ice" }),
-      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: currentYear }),
-      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: previousYear }),
-      supabase.rpc("get_yearly_totals_by_customer", { p_year: currentYear }),
-      supabase.rpc("get_yearly_totals_by_customer", { p_year: previousYear })
+      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: currentYear, p_location: locationFilter }),
+      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: previousYear, p_location: locationFilter }),
+      supabase.rpc("get_yearly_totals_by_customer", { p_year: currentYear, p_location: locationFilter }),
+      supabase.rpc("get_yearly_totals_by_customer", { p_year: previousYear, p_location: locationFilter })
     ]);
 
     // Process cylinder data from aggregated results

@@ -90,12 +90,15 @@ interface DryIceOrder {
 
 const COLORS = ['#06b6d4', '#f97316', '#22c55e', '#ef4444', '#8b5cf6', '#eab308'];
 
+type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
+
 interface ProductionReportsProps {
   refreshKey?: number;
   onDataChanged?: () => void;
+  location?: ProductionLocation;
 }
 
-export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionReportsProps) {
+export function ProductionReports({ refreshKey = 0, onDataChanged, location = "all" }: ProductionReportsProps) {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>({
     from: startOfMonth(new Date()),
@@ -113,7 +116,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
 
   useEffect(() => {
     fetchReportData();
-  }, [dateRange, refreshKey]);
+  }, [dateRange, refreshKey, location]);
 
   useEffect(() => {
     fetchGasTypes();
@@ -121,7 +124,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
 
   useEffect(() => {
     fetchReportData();
-  }, [dateRange]);
+  }, [dateRange, location]);
 
   const fetchGasTypes = async () => {
     const { data } = await supabase
@@ -140,17 +143,24 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
     const fromDate = format(dateRange.from, "yyyy-MM-dd");
     const toDate = format(dateRange.to, "yyyy-MM-dd");
 
+    // Build cylinder query with optional location filter
+    let cylinderQuery = supabase
+      .from("gas_cylinder_orders")
+      .select(`
+        *,
+        gas_type_ref:gas_types(id, name, color)
+      `)
+      .gte("scheduled_date", fromDate)
+      .lte("scheduled_date", toDate)
+      .order("scheduled_date", { ascending: true })
+      .range(0, 9999);
+    
+    if (location !== "all") {
+      cylinderQuery = cylinderQuery.eq("location", location);
+    }
+
     const [cylinderRes, dryIceRes] = await Promise.all([
-      supabase
-        .from("gas_cylinder_orders")
-        .select(`
-          *,
-          gas_type_ref:gas_types(id, name, color)
-        `)
-        .gte("scheduled_date", fromDate)
-        .lte("scheduled_date", toDate)
-        .order("scheduled_date", { ascending: true })
-        .range(0, 9999),
+      cylinderQuery,
       supabase
         .from("dry_ice_orders")
         .select("*")
@@ -805,7 +815,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged }: ProductionR
         </TabsContent>
 
         <TabsContent value="comparison" className="mt-6">
-          <YearComparisonReport />
+          <YearComparisonReport location={location} />
         </TabsContent>
       </Tabs>
     </div>
