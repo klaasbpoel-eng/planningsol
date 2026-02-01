@@ -1,92 +1,164 @@
 
-# Plan: Fix Jaarvergelijking Filters
+
+# Plan: Fix Cilinder Orders Count en Klant Filter
 
 ## Probleemanalyse
 
-Na onderzoek van de code is het probleem duidelijk: de filters voor gastype en klant **werken niet** omdat:
+Er zijn twee problemen geïdentificeerd:
 
-1. **De data wordt client-side niet gefilterd**: De totalen (`cylinderTotals`, `dryIceTotals`) en maandelijkse overzichten worden berekend op basis van alle data, ongeacht de geselecteerde filters.
+### Probleem 1: 1000 vs 1445 cilinder orders
+De "Cilinder orders" statistiek in het Rapportage overzicht toont 1000 in plaats van 1445. Dit komt doordat:
+- `ProductionReports.tsx` haalt data per maand op met `fetchCylinderMonthData`
+- Supabase heeft een default limiet van 1000 rijen
+- Januari 2026 bevat 1445 orders, wat de limiet overschrijdt
+- De `.limit(5000)` wordt overschreven door de Supabase server-side limiet
 
-2. **Alleen specifieke secties filteren**: 
-   - Gastype filter: Alleen toegepast op "Cilinders per gastype" charts
-   - Klant filter: Alleen toegepast op "Vergelijking per klant" sectie
+### Probleem 2: Klant filter niet toegepast op cilinder data
+Het klant filter in de Jaarvergelijking wordt alleen toegepast op:
+- Droogijs totalen
+- De "Vergelijking per klant" sectie
 
-3. **Niet-gefilterde secties**:
-   - Cilinders Jaartotaal card
-   - Droogijs Jaartotaal card
-   - Groei Highlights
-   - Cilinders per maand chart
-   - Droogijs per maand chart
-   - Groeipercentage per maand chart
-   - Maandelijkse overzichtstabel
+Het filter wordt **niet** toegepast op:
+- Cilinders per maand chart
+- Maandelijkse breakdown per gastype
+- Groeitrend charts voor cilinders
 
-## Oplossing
-
-Implementeer reactieve filtering met `useMemo` zodat alle overzichten dynamisch updaten wanneer filters wijzigen.
+Dit komt doordat er geen maandelijkse cilinder data per klant beschikbaar is vanuit de database.
 
 ---
 
-## Technische Wijzigingen
+## Oplossing
 
-### Stap 1: Voeg gefilterde data berekeningen toe
+### Stap 1: Weekly Chunking voor ProductionReports
 
-Voeg `useMemo` hooks toe die de data herberekenen op basis van:
-- `selectedGasTypes` (voor gastype-gerelateerde overzichten)
-- `selectedCustomers` (voor klant-gerelateerde overzichten)
+Implementeer hetzelfde weekly chunking patroon als in `GasCylinderPlanning.tsx`:
 
 ```text
-// Nieuwe useMemo hooks toevoegen na de bestaande state declaraties:
-
-// Gefilterde gastype vergelijking data
-const filteredGasTypeData = useMemo(() => {
-  if (selectedGasTypes.length === 0) return gasTypeComparison;
-  return gasTypeComparison.filter(gt => selectedGasTypes.includes(gt.gas_type_id));
-}, [gasTypeComparison, selectedGasTypes]);
-
-// Herberekende cylinder totalen op basis van gastype filter
-const filteredCylinderTotals = useMemo(() => {
-  if (selectedGasTypes.length === 0) return cylinderTotals;
-  // Bereken totalen alleen voor geselecteerde gastypes
-  const currentTotal = filteredGasTypeData.reduce((sum, gt) => sum + gt.currentYear, 0);
-  const previousTotal = filteredGasTypeData.reduce((sum, gt) => sum + gt.previousYear, 0);
-  const change = currentTotal - previousTotal;
-  const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
-  return { currentYear: currentTotal, previousYear: previousTotal, change, changePercent };
-}, [cylinderTotals, filteredGasTypeData, selectedGasTypes]);
-
-// Gefilterde maandelijkse data voor cilinders
-const filteredMonthlyGasTypeData = useMemo(() => {
-  if (selectedGasTypes.length === 0) return monthlyGasTypeData;
+// Nieuwe helper functie
+const getWeeksInMonth = (year: number, month: number) => {
+  const weeks: { startDate: string; endDate: string }[] = [];
+  const monthStr = String(month).padStart(2, '0');
+  const lastDay = new Date(year, month, 0).getDate();
+  let currentDay = 1;
   
-  const filterMonthData = (data: MonthlyGasTypeChartData[]) => {
-    return data.map(month => {
-      const filtered: MonthlyGasTypeChartData = { month: month.month, monthName: month.monthName };
-      selectedGasTypes.forEach(gtId => {
-        if (month[gtId] !== undefined) filtered[gtId] = month[gtId];
-      });
-      return filtered;
+  while (currentDay <= lastDay) {
+    const endDay = Math.min(currentDay + 6, lastDay);
+    weeks.push({
+      startDate: `${year}-${monthStr}-${String(currentDay).padStart(2, '0')}`,
+      endDate: `${year}-${monthStr}-${String(endDay).padStart(2, '0')}`
     });
-  };
-  
-  return {
-    current: filterMonthData(monthlyGasTypeData.current),
-    previous: filterMonthData(monthlyGasTypeData.previous)
-  };
-}, [monthlyGasTypeData, selectedGasTypes]);
+    currentDay = endDay + 1;
+  }
+  return weeks;
+};
 
-// Herberekende cylinder maanddata op basis van gastype filter
-const filteredCylinderData = useMemo(() => {
-  if (selectedGasTypes.length === 0) return cylinderData;
+// Nieuwe functie voor wekelijkse data ophalen
+const fetchCylinderWeekData = async (startDate: string, endDate: string) => {
+  let query = supabase
+    .from("gas_cylinder_orders")
+    .select(`*, gas_type_ref:gas_types(id, name, color)`)
+    .gte("scheduled_date", startDate)
+    .lte("scheduled_date", endDate)
+    .order("scheduled_date", { ascending: true });
   
-  // Bereken nieuwe maandtotalen uit gefilterde gastype data
+  if (location !== "all") {
+    query = query.eq("location", location);
+  }
+  
+  return query;
+};
+
+// Update fetchCylinderMonthData om weeks te gebruiken
+const fetchCylinderMonthData = async (year: number, month: number, fromDate: string, toDate: string) => {
+  const weeks = getWeeksInMonth(year, month);
+  
+  // Clamp weeks to actual date range
+  const relevantWeeks = weeks.filter(week => 
+    week.endDate >= fromDate && week.startDate <= toDate
+  ).map(week => ({
+    startDate: week.startDate < fromDate ? fromDate : week.startDate,
+    endDate: week.endDate > toDate ? toDate : week.endDate
+  }));
+  
+  const weekPromises = relevantWeeks.map(week => 
+    fetchCylinderWeekData(week.startDate, week.endDate)
+  );
+  
+  const results = await Promise.all(weekPromises);
+  const allOrders = results.flatMap(res => res.data || []);
+  
+  // Deduplicate by ID
+  return Array.from(new Map(allOrders.map(o => [o.id, o])).values());
+};
+```
+
+### Stap 2: Database Functie voor Maandelijkse Klant Data
+
+Maak een nieuwe database functie die maandelijkse cilinder totalen per klant ophaalt:
+
+```sql
+CREATE OR REPLACE FUNCTION get_monthly_cylinder_totals_by_customer(
+  p_year integer,
+  p_location text DEFAULT NULL
+)
+RETURNS TABLE(
+  month integer,
+  customer_id uuid,
+  customer_name text,
+  total_cylinders bigint
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    EXTRACT(MONTH FROM gco.scheduled_date)::integer as month,
+    gco.customer_id,
+    gco.customer_name,
+    SUM(gco.cylinder_count)::bigint as total_cylinders
+  FROM gas_cylinder_orders gco
+  WHERE gco.scheduled_date >= make_date(p_year, 1, 1)
+    AND gco.scheduled_date <= make_date(p_year, 12, 31)
+    AND (p_location IS NULL OR gco.location::text = p_location)
+  GROUP BY month, gco.customer_id, gco.customer_name
+  ORDER BY month, total_cylinders DESC;
+END;
+$$;
+```
+
+### Stap 3: Update YearComparisonReport voor Klant Filtering
+
+Pas de component aan om de nieuwe database functie te gebruiken en cilinder data te filteren op klant:
+
+1. **Nieuwe state voor maandelijkse klant data**:
+```text
+const [monthlyCustomerCylinderData, setMonthlyCustomerCylinderData] = useState<...>({});
+```
+
+2. **Fetch nieuwe data in fetchYearComparisonData**:
+```text
+// Voeg toe aan Promise.all:
+supabase.rpc("get_monthly_cylinder_totals_by_customer", { p_year: currentYear, p_location: locationFilter }),
+supabase.rpc("get_monthly_cylinder_totals_by_customer", { p_year: previousYear, p_location: locationFilter })
+```
+
+3. **Nieuwe useMemo voor gefilterde cylinder maanddata op basis van klant**:
+```text
+const filteredCylinderDataByCustomer = useMemo(() => {
+  if (selectedCustomers.length === 0) return filteredCylinderData;
+  
+  // Herbereken maandtotalen uit klant-specifieke data
   return cylinderData.map((month, idx) => {
-    const currentMonthData = filteredMonthlyGasTypeData.current[idx];
-    const previousMonthData = filteredMonthlyGasTypeData.previous[idx];
+    const currentMonthCustomerData = monthlyCustomerCylinderData.current[month.month] || [];
+    const previousMonthCustomerData = monthlyCustomerCylinderData.previous[month.month] || [];
     
-    const currentTotal = selectedGasTypes.reduce((sum, gtId) => 
-      sum + (Number(currentMonthData?.[gtId]) || 0), 0);
-    const previousTotal = selectedGasTypes.reduce((sum, gtId) => 
-      sum + (Number(previousMonthData?.[gtId]) || 0), 0);
+    const currentTotal = currentMonthCustomerData
+      .filter(c => selectedCustomers.includes(c.customer_id || c.customer_name))
+      .reduce((sum, c) => sum + c.total_cylinders, 0);
+    
+    const previousTotal = previousMonthCustomerData
+      .filter(c => selectedCustomers.includes(c.customer_id || c.customer_name))
+      .reduce((sum, c) => sum + c.total_cylinders, 0);
     
     const change = currentTotal - previousTotal;
     const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
@@ -99,37 +171,12 @@ const filteredCylinderData = useMemo(() => {
       changePercent
     };
   });
-}, [cylinderData, filteredMonthlyGasTypeData, selectedGasTypes]);
+}, [filteredCylinderData, monthlyCustomerCylinderData, selectedCustomers, cylinderData]);
 ```
 
-### Stap 2: Update de UI componenten
-
-Vervang hardcoded data referenties met gefilterde versies:
-
-| Origineel | Vervang door | Sectie |
-|-----------|--------------|--------|
-| `cylinderTotals` | `filteredCylinderTotals` | Cilinders Jaartotaal card |
-| `cylinderData` | `filteredCylinderData` | Cilinders per maand chart |
-| `cylinderData` | `filteredCylinderData` | Groei Highlights |
-| `cylinderData` | `filteredCylinderData` | Groeipercentage chart |
-| `cylinderData` | `filteredCylinderData` | Maandelijkse overzichtstabel |
-| `gasTypeComparison` | `filteredGasTypeData` | Gastype charts (al deels gedaan) |
-
-### Stap 3: Voeg filter indicator toe aan totalen
-
-Toon een badge wanneer filters actief zijn zodat gebruikers weten dat de weergegeven data gefilterd is:
-
-```text
-<CardTitle className="text-lg flex items-center gap-2">
-  <Cylinder className="h-5 w-5 text-orange-500" />
-  Cilinders Jaartotaal
-  {selectedGasTypes.length > 0 && (
-    <Badge variant="secondary" className="ml-2">
-      {selectedGasTypes.length} gastype(s) gefilterd
-    </Badge>
-  )}
-</CardTitle>
-```
+4. **Update UI componenten om gefilterde data te gebruiken**:
+   - Vervang `filteredCylinderData` met `filteredCylinderDataByCustomer` in relevante charts
+   - Voeg klant filter badge toe aan cilinder charts
 
 ---
 
@@ -137,16 +184,17 @@ Toon een badge wanneer filters actief zijn zodat gebruikers weten dat de weergeg
 
 | Bestand | Type Wijziging |
 |---------|----------------|
-| `YearComparisonReport.tsx` | Toevoegen van gefilterde data berekeningen via `useMemo` |
-| `YearComparisonReport.tsx` | Update alle relevante charts en tabellen om gefilterde data te gebruiken |
-| `YearComparisonReport.tsx` | Toevoegen van filter-actief indicatoren |
+| `ProductionReports.tsx` | Weekly chunking implementeren om 1000-row limiet te omzeilen |
+| Database | Nieuwe `get_monthly_cylinder_totals_by_customer` functie |
+| `YearComparisonReport.tsx` | Klant filter toepassen op cilinder maanddata |
 
 ---
 
 ## Verwacht Resultaat
 
 Na implementatie:
-- Alle grafieken en totalen updaten dynamisch wanneer gastype of klant filters worden geselecteerd
-- Gebruikers zien een duidelijke indicatie wanneer data gefilterd wordt
-- Performance blijft optimaal door gebruik van `useMemo` voor herberekeningen
-- Consistente gebruikerservaring: filteren werkt overal in de jaarvergelijking
+- "Cilinder orders" toont correct **1.445** in plaats van 1.000
+- Klant filter in Jaarvergelijking werkt voor zowel cilinders als droogijs
+- Alle charts en grafieken updaten dynamisch wanneer klanten worden geselecteerd
+- Consistente filtering over het gehele dashboard
+
