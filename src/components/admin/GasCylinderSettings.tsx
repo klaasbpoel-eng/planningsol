@@ -1,13 +1,53 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Flame, Cylinder, Settings } from "lucide-react";
+import { Flame, Cylinder, Settings, Trash2, Loader2 } from "lucide-react";
 import { GasTypeManager } from "@/components/production/GasTypeManager";
 import { CylinderSizeManager } from "@/components/production/CylinderSizeManager";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export function GasCylinderSettings() {
   const [gasTypeManagerOpen, setGasTypeManagerOpen] = useState(false);
   const [cylinderSizeManagerOpen, setCylinderSizeManagerOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleResetTable = async () => {
+    setIsResetting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("reset-gas-cylinder-orders");
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      toast.success("Tabel succesvol gereset", {
+        description: "De gas_cylinder_orders tabel is verwijderd en opnieuw aangemaakt.",
+      });
+    } catch (error: any) {
+      console.error("Error resetting table:", error);
+      toast.error("Fout bij resetten van tabel", {
+        description: error.message || "Er is een onbekende fout opgetreden.",
+      });
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   return (
     <>
@@ -21,7 +61,7 @@ export function GasCylinderSettings() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-3">
             <Button
               variant="outline"
@@ -39,6 +79,44 @@ export function GasCylinderSettings() {
               <Cylinder className="h-4 w-4 text-blue-500" />
               Cilinderinhouden beheren
             </Button>
+          </div>
+
+          <div className="border-t pt-4">
+            <h4 className="text-sm font-medium text-muted-foreground mb-2">Gevaarlijke acties</h4>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  className="flex items-center gap-2"
+                  disabled={isResetting}
+                >
+                  {isResetting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Gascilinder orders tabel resetten
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Deze actie verwijdert <strong>alle gascilinder orders</strong> permanent en
+                    maakt de tabel opnieuw aan. Dit kan niet ongedaan worden gemaakt.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleResetTable}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Ja, reset de tabel
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </CardContent>
       </Card>
