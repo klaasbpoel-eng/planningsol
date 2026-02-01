@@ -94,6 +94,13 @@ interface YearComparisonReportProps {
   location?: ProductionLocation;
 }
 
+interface MonthlyCustomerCylinderData {
+  month: number;
+  customer_id: string | null;
+  customer_name: string;
+  total_cylinders: number;
+}
+
 export function YearComparisonReport({ location = "all" }: YearComparisonReportProps) {
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -111,6 +118,10 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
   const [customerComparison, setCustomerComparison] = useState<CustomerComparison[]>([]);
   const [customerSortBy, setCustomerSortBy] = useState<"cylinders" | "dryIce" | "total">("total");
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
+  const [monthlyCustomerCylinderData, setMonthlyCustomerCylinderData] = useState<{
+    current: Map<number, MonthlyCustomerCylinderData[]>;
+    previous: Map<number, MonthlyCustomerCylinderData[]>;
+  }>({ current: new Map(), previous: new Map() });
 
   const isSignificantGrowth = (percent: number) => percent > 10 || percent < -10;
 
@@ -203,6 +214,51 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
     return { currentYear: currentTotal, previousYear: previousTotal, change, changePercent };
   }, [dryIceTotals, filteredCustomerComparison, selectedCustomers]);
 
+  // Herberekende cilinder maanddata op basis van klant filter
+  const filteredCylinderDataByCustomer = useMemo(() => {
+    // Geen klantfilter actief = gebruik de gastype gefilterde data
+    if (selectedCustomers.length === 0) return filteredCylinderData;
+    
+    // Herbereken maandtotalen uit klant-specifieke data
+    return cylinderData.map((month) => {
+      const currentMonthCustomerData = monthlyCustomerCylinderData.current.get(month.month) || [];
+      const previousMonthCustomerData = monthlyCustomerCylinderData.previous.get(month.month) || [];
+      
+      const currentTotal = currentMonthCustomerData
+        .filter(c => selectedCustomers.includes(c.customer_id || c.customer_name))
+        .reduce((sum, c) => sum + Number(c.total_cylinders), 0);
+      
+      const previousTotal = previousMonthCustomerData
+        .filter(c => selectedCustomers.includes(c.customer_id || c.customer_name))
+        .reduce((sum, c) => sum + Number(c.total_cylinders), 0);
+      
+      const change = currentTotal - previousTotal;
+      const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
+      
+      return {
+        ...month,
+        currentYear: currentTotal,
+        previousYear: previousTotal,
+        change,
+        changePercent
+      };
+    });
+  }, [filteredCylinderData, monthlyCustomerCylinderData, selectedCustomers, cylinderData]);
+
+  // Herberekende cilinder totalen op basis van klant filter
+  const filteredCylinderTotalsByCustomer = useMemo(() => {
+    // Geen klantfilter = gebruik de gastype gefilterde totalen
+    if (selectedCustomers.length === 0) return filteredCylinderTotals;
+    if (!cylinderTotals) return null;
+    
+    // Bereken totalen alleen voor geselecteerde klanten
+    const currentTotal = filteredCustomerComparison.reduce((sum, c) => sum + c.currentCylinders, 0);
+    const previousTotal = filteredCustomerComparison.reduce((sum, c) => sum + c.previousCylinders, 0);
+    const change = currentTotal - previousTotal;
+    const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
+    return { currentYear: currentTotal, previousYear: previousTotal, change, changePercent };
+  }, [filteredCylinderTotals, filteredCustomerComparison, selectedCustomers, cylinderTotals]);
+
   useEffect(() => {
     // Generate years from 2024 to current year + 1
     const currentYear = new Date().getFullYear();
@@ -250,7 +306,9 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
       currentGasTypeRes,
       previousGasTypeRes,
       currentCustomerRes,
-      previousCustomerRes
+      previousCustomerRes,
+      currentMonthlyCustCylRes,
+      previousMonthlyCustCylRes
     ] = await Promise.all([
       supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "cylinder", p_location: locationFilter }),
       supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "cylinder", p_location: locationFilter }),
@@ -259,7 +317,9 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
       supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: currentYear, p_location: locationFilter }),
       supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: previousYear, p_location: locationFilter }),
       supabase.rpc("get_yearly_totals_by_customer", { p_year: currentYear, p_location: locationFilter }),
-      supabase.rpc("get_yearly_totals_by_customer", { p_year: previousYear, p_location: locationFilter })
+      supabase.rpc("get_yearly_totals_by_customer", { p_year: previousYear, p_location: locationFilter }),
+      supabase.rpc("get_monthly_cylinder_totals_by_customer", { p_year: currentYear, p_location: locationFilter }),
+      supabase.rpc("get_monthly_cylinder_totals_by_customer", { p_year: previousYear, p_location: locationFilter })
     ]);
 
     // Process cylinder data from aggregated results
@@ -293,6 +353,27 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
       previousCustomerRes.data || []
     );
     setCustomerComparison(customerData);
+
+    // Process monthly customer cylinder data
+    const currentMonthlyCustMap = new Map<number, MonthlyCustomerCylinderData[]>();
+    const previousMonthlyCustMap = new Map<number, MonthlyCustomerCylinderData[]>();
+    
+    (currentMonthlyCustCylRes.data || []).forEach((item: MonthlyCustomerCylinderData) => {
+      const existing = currentMonthlyCustMap.get(item.month) || [];
+      existing.push(item);
+      currentMonthlyCustMap.set(item.month, existing);
+    });
+    
+    (previousMonthlyCustCylRes.data || []).forEach((item: MonthlyCustomerCylinderData) => {
+      const existing = previousMonthlyCustMap.get(item.month) || [];
+      existing.push(item);
+      previousMonthlyCustMap.set(item.month, existing);
+    });
+    
+    setMonthlyCustomerCylinderData({
+      current: currentMonthlyCustMap,
+      previous: previousMonthlyCustMap
+    });
 
     setLoading(false);
   };
@@ -666,28 +747,33 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
                   {selectedGasTypes.length} gastype(s) gefilterd
                 </Badge>
               )}
+              {selectedCustomers.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {selectedCustomers.length} klant(en) gefilterd
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {filteredCylinderTotals && (
+            {filteredCylinderTotalsByCustomer && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">{selectedYear}</p>
-                    <p className="text-2xl font-bold">{formatNumber(filteredCylinderTotals.currentYear, 0)}</p>
+                    <p className="text-2xl font-bold">{formatNumber(filteredCylinderTotalsByCustomer.currentYear, 0)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">{selectedYear - 1}</p>
-                    <p className="text-2xl font-bold text-muted-foreground">{formatNumber(filteredCylinderTotals.previousYear, 0)}</p>
+                    <p className="text-2xl font-bold text-muted-foreground">{formatNumber(filteredCylinderTotalsByCustomer.previousYear, 0)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {getTrendIcon(filteredCylinderTotals.changePercent)}
-                  <span className={`font-medium ${getChangeColor(filteredCylinderTotals.changePercent)}`}>
-                    {filteredCylinderTotals.change >= 0 ? "+" : ""}{formatNumber(filteredCylinderTotals.change, 0)}
+                  {getTrendIcon(filteredCylinderTotalsByCustomer.changePercent)}
+                  <span className={`font-medium ${getChangeColor(filteredCylinderTotalsByCustomer.changePercent)}`}>
+                    {filteredCylinderTotalsByCustomer.change >= 0 ? "+" : ""}{formatNumber(filteredCylinderTotalsByCustomer.change, 0)}
                   </span>
-                  <Badge variant={filteredCylinderTotals.changePercent >= 0 ? "default" : "destructive"}>
-                    {filteredCylinderTotals.changePercent >= 0 ? "+" : ""}{filteredCylinderTotals.changePercent.toFixed(1)}%
+                  <Badge variant={filteredCylinderTotalsByCustomer.changePercent >= 0 ? "default" : "destructive"}>
+                    {filteredCylinderTotalsByCustomer.changePercent >= 0 ? "+" : ""}{filteredCylinderTotalsByCustomer.changePercent.toFixed(1)}%
                   </Badge>
                 </div>
               </div>
@@ -771,9 +857,12 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
                 {selectedGasTypes.length > 0 && (
                   <span className="text-xs text-muted-foreground">({selectedGasTypes.length} gastype(s))</span>
                 )}
+                {selectedCustomers.length > 0 && (
+                  <span className="text-xs text-muted-foreground">({selectedCustomers.length} klant(en))</span>
+                )}
               </h4>
               {(() => {
-                const highlights = getGrowthHighlights(filteredCylinderData);
+                const highlights = getGrowthHighlights(filteredCylinderDataByCustomer);
                 return (
                   <div className="grid grid-cols-2 gap-3">
                     {/* Best Month */}
@@ -1252,7 +1341,7 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={filteredCylinderData}>
+              <BarChart data={filteredCylinderDataByCustomer}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="monthName" className="text-xs" />
                 <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
@@ -1333,7 +1422,7 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart
-              data={filteredCylinderData.map((c, i) => ({
+              data={filteredCylinderDataByCustomer.map((c, i) => ({
                 monthName: c.monthName,
                 cylinders: parseFloat(c.changePercent.toFixed(1)),
                 dryIce: parseFloat((dryIceData[i]?.changePercent || 0).toFixed(1))
@@ -1409,7 +1498,7 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={filteredCylinderData}>
+              <LineChart data={filteredCylinderDataByCustomer}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="monthName" className="text-xs" tick={{ fontSize: 10 }} />
                 <YAxis className="text-xs" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} />
@@ -1518,7 +1607,7 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
                 </tr>
               </thead>
               <tbody>
-                {filteredCylinderData.map((cylinder, i) => {
+                {filteredCylinderDataByCustomer.map((cylinder, i) => {
                   const dryIce = dryIceData[i];
                   const cylinderSignificant = isSignificantGrowth(cylinder.changePercent);
                   const dryIceSignificant = isSignificantGrowth(dryIce?.changePercent || 0);
@@ -1566,10 +1655,10 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
                 {/* Totals row */}
                 <tr className="bg-muted/30 font-bold">
                   <td className="py-3 px-2">Totaal</td>
-                  <td className="text-right py-3 px-2">{formatNumber(filteredCylinderTotals?.currentYear || 0, 0)}</td>
-                  <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(filteredCylinderTotals?.previousYear || 0, 0)}</td>
-                  <td className={`text-right py-3 px-2 ${getChangeColor(filteredCylinderTotals?.changePercent || 0)}`}>
-                    {(filteredCylinderTotals?.changePercent || 0) >= 0 ? "+" : ""}{(filteredCylinderTotals?.changePercent || 0).toFixed(1)}%
+                  <td className="text-right py-3 px-2">{formatNumber(filteredCylinderTotalsByCustomer?.currentYear || 0, 0)}</td>
+                  <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(filteredCylinderTotalsByCustomer?.previousYear || 0, 0)}</td>
+                  <td className={`text-right py-3 px-2 ${getChangeColor(filteredCylinderTotalsByCustomer?.changePercent || 0)}`}>
+                    {(filteredCylinderTotalsByCustomer?.changePercent || 0) >= 0 ? "+" : ""}{(filteredCylinderTotalsByCustomer?.changePercent || 0).toFixed(1)}%
                   </td>
                   <td className="text-right py-3 px-2">{formatNumber(filteredDryIceTotals?.currentYear || 0, 0)}</td>
                   <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(filteredDryIceTotals?.previousYear || 0, 0)}</td>
