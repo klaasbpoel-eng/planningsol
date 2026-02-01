@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import { Snowflake, Cylinder, Package, TrendingUp, BarChart3 } from "lucide-react";
+import { Snowflake, Cylinder, Package, TrendingUp, BarChart3, MapPin } from "lucide-react";
 import { DryIcePlanning } from "./DryIcePlanning";
 import { GasCylinderPlanning } from "./GasCylinderPlanning";
 import { ProductionReports } from "./ProductionReports";
@@ -9,6 +9,9 @@ import { TopCustomersWidget } from "./TopCustomersWidget";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+
+type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 
 export function ProductionPlanning() {
   const [activeTab, setActiveTab] = useState("droogijs");
@@ -17,10 +20,11 @@ export function ProductionPlanning() {
   const [weekOrders, setWeekOrders] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<ProductionLocation>("all");
 
   useEffect(() => {
     fetchStats();
-  }, [refreshKey]);
+  }, [refreshKey, selectedLocation]);
 
   // Trigger refresh animation when refreshKey changes (but not on initial load)
   useEffect(() => {
@@ -39,23 +43,33 @@ export function ProductionPlanning() {
   const fetchStats = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
     
-    // Fetch dry ice orders for today
-    const { data: dryIceData } = await supabase
+    // Fetch dry ice orders for today (filtered by location if not "all")
+    let dryIceQuery = supabase
       .from("dry_ice_orders")
       .select("quantity_kg")
       .eq("scheduled_date", today)
       .neq("status", "cancelled");
     
+    // Note: dry_ice_orders doesn't have a location column, so we don't filter it by location
+    
+    const { data: dryIceData } = await dryIceQuery;
+    
     if (dryIceData) {
       setDryIceToday(dryIceData.reduce((sum, o) => sum + Number(o.quantity_kg), 0));
     }
 
-    // Fetch cylinder orders for today
-    const { data: cylinderData } = await supabase
+    // Fetch cylinder orders for today (filtered by location)
+    let cylinderQuery = supabase
       .from("gas_cylinder_orders")
       .select("cylinder_count")
       .eq("scheduled_date", today)
       .neq("status", "cancelled");
+    
+    if (selectedLocation !== "all") {
+      cylinderQuery = cylinderQuery.eq("location", selectedLocation);
+    }
+    
+    const { data: cylinderData } = await cylinderQuery;
     
     if (cylinderData) {
       setCylindersToday(cylinderData.reduce((sum, o) => sum + o.cylinder_count, 0));
@@ -73,17 +87,63 @@ export function ProductionPlanning() {
       .gte("scheduled_date", format(weekStart, "yyyy-MM-dd"))
       .lte("scheduled_date", format(weekEnd, "yyyy-MM-dd"));
 
-    const { count: cylinderCount } = await supabase
+    // Week cylinder count with location filter
+    let weekCylinderQuery = supabase
       .from("gas_cylinder_orders")
       .select("*", { count: "exact", head: true })
       .gte("scheduled_date", format(weekStart, "yyyy-MM-dd"))
       .lte("scheduled_date", format(weekEnd, "yyyy-MM-dd"));
+    
+    if (selectedLocation !== "all") {
+      weekCylinderQuery = weekCylinderQuery.eq("location", selectedLocation);
+    }
+    
+    const { count: cylinderCount } = await weekCylinderQuery;
 
     setWeekOrders((dryIceCount || 0) + (cylinderCount || 0));
   };
 
   return (
     <div className="space-y-6">
+      {/* Location Filter */}
+      <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 border border-border/50">
+        <MapPin className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground mr-2">Locatie:</span>
+        <div className="flex gap-1">
+          <Badge 
+            variant={selectedLocation === "all" ? "default" : "outline"}
+            className="cursor-pointer hover:bg-primary/80"
+            onClick={() => setSelectedLocation("all")}
+          >
+            Alle locaties
+          </Badge>
+          <Badge 
+            variant={selectedLocation === "sol_emmen" ? "default" : "outline"}
+            className={cn(
+              "cursor-pointer",
+              selectedLocation === "sol_emmen" 
+                ? "bg-orange-500 hover:bg-orange-600 text-white" 
+                : "hover:bg-orange-100 dark:hover:bg-orange-900/30"
+            )}
+            onClick={() => setSelectedLocation("sol_emmen")}
+          >
+            SOL Emmen
+          </Badge>
+          <Badge 
+            variant={selectedLocation === "sol_tilburg" ? "default" : "outline"}
+            className={cn(
+              "cursor-pointer",
+              selectedLocation === "sol_tilburg" 
+                ? "bg-blue-500 hover:bg-blue-600 text-white" 
+                : "hover:bg-blue-100 dark:hover:bg-blue-900/30"
+            )}
+            onClick={() => setSelectedLocation("sol_tilburg")}
+          >
+            SOL Tilburg
+          </Badge>
+        </div>
+      </div>
+
       {/* Quick stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className={cn(
@@ -110,6 +170,11 @@ export function ProductionPlanning() {
             <CardDescription className="flex items-center gap-2">
               <Cylinder className="h-4 w-4 text-orange-500" />
               Gascilinders vandaag
+              {selectedLocation !== "all" && (
+                <Badge variant="outline" className="ml-1 text-[10px] py-0">
+                  {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
+                </Badge>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -126,6 +191,11 @@ export function ProductionPlanning() {
             <CardDescription className="flex items-center gap-2">
               <Package className="h-4 w-4 text-green-500" />
               Orders deze week
+              {selectedLocation !== "all" && (
+                <Badge variant="outline" className="ml-1 text-[10px] py-0">
+                  {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
+                </Badge>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -151,7 +221,11 @@ export function ProductionPlanning() {
         </Card>
 
         {/* Top 5 Customers Widget */}
-        <TopCustomersWidget refreshKey={refreshKey} isRefreshing={isRefreshing} />
+        <TopCustomersWidget 
+          refreshKey={refreshKey} 
+          isRefreshing={isRefreshing} 
+          location={selectedLocation}
+        />
       </div>
 
       {/* Main content tabs */}

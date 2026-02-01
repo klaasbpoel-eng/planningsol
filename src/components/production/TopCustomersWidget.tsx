@@ -17,27 +17,39 @@ interface CustomerData {
   changePercent: number;
 }
 
+type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
+
 interface TopCustomersWidgetProps {
   refreshKey?: number;
   isRefreshing?: boolean;
+  location?: ProductionLocation;
 }
 
-export function TopCustomersWidget({ refreshKey = 0, isRefreshing = false }: TopCustomersWidgetProps) {
+export function TopCustomersWidget({ refreshKey = 0, isRefreshing = false, location = "all" }: TopCustomersWidgetProps) {
   const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchTopCustomers();
-  }, [refreshKey]);
+  }, [refreshKey, location]);
 
   const fetchTopCustomers = async () => {
     try {
       const currentYear = new Date().getFullYear();
       const previousYear = currentYear - 1;
 
+      // Pass location filter to the RPC function (null for "all")
+      const locationFilter = location === "all" ? null : location;
+
       const [currentRes, previousRes] = await Promise.all([
-        supabase.rpc("get_yearly_totals_by_customer", { p_year: currentYear }),
-        supabase.rpc("get_yearly_totals_by_customer", { p_year: previousYear })
+        supabase.rpc("get_yearly_totals_by_customer", { 
+          p_year: currentYear,
+          p_location: locationFilter
+        }),
+        supabase.rpc("get_yearly_totals_by_customer", { 
+          p_year: previousYear,
+          p_location: locationFilter
+        })
       ]);
 
       if (currentRes.error) throw currentRes.error;
@@ -123,9 +135,14 @@ export function TopCustomersWidget({ refreshKey = 0, isRefreshing = false }: Top
       isRefreshing && "animate-pulse ring-2 ring-primary/30"
     )}>
       <CardHeader className="pb-2">
-        <CardDescription className="flex items-center gap-2">
+        <CardDescription className="flex items-center gap-2 flex-wrap">
           <Trophy className="h-4 w-4 text-yellow-500" />
-          Top 5 Klanten {new Date().getFullYear()}
+          <span>Top 5 Klanten {new Date().getFullYear()}</span>
+          {location !== "all" && (
+            <Badge variant="outline" className="text-[10px] py-0">
+              {location === "sol_emmen" ? "Emmen" : "Tilburg"}
+            </Badge>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
