@@ -1,84 +1,115 @@
 
-# Plan: Klantbeheer integreren in Admin Instellingen
+# Plan: Modernize Admin Filters UI
 
-## Overzicht
-De klantenbeheer functionaliteit wordt verplaatst naar de Admin Instellingen pagina. Het aparte menu-item "Klanten" en de bijbehorende pagina worden verwijderd, zodat alles gecentraliseerd is op één plek.
+## Overview
+Transform the current AdminFilters component into a more user-friendly, modern interface that aligns with the application's glassmorphism aesthetic and provides a better user experience with visual feedback, animations, and improved interactions.
 
-## Wijzigingen
+## Current State Analysis
+The existing filter component uses:
+- Basic Card layout with static grid
+- Simple dropdowns without search functionality
+- Plain date pickers
+- Basic badge for active filter count
+- No visual feedback for selected filters
 
-### 1. Admin Instellingen uitbreiden
-Een nieuwe sectie "Klantenbeheer" toevoegen aan de AdminSettings component die de bestaande CustomerManagement component hergebruikt.
+## Proposed Improvements
 
-**Bestand:** `src/components/admin/AdminSettings.tsx`
-- Import CustomerManagement component toevoegen
-- CustomerManagement component toevoegen aan de sectie-indeling
+### 1. Visual Design Enhancements
+- Apply glassmorphism styling (`glass-card` utility) for a modern frosted glass effect
+- Add subtle gradient background decoration
+- Use `hover-lift` effects for interactive elements
+- Add smooth animations using Framer Motion for filter state changes
 
-### 2. Menu-item verwijderen
-Het "Klanten" menu-item uit de navigatie header verwijderen.
+### 2. Collapsible Filter Panel
+- Make the filter section collapsible to save screen space when not in use
+- Show active filter pills in the collapsed header for quick visibility
+- Animate expand/collapse transitions smoothly
 
-**Bestand:** `src/components/layout/Header.tsx`
-- De Link naar `/klanten` verwijderen (regels 84-91)
-- De `Building2` icon import kan behouden blijven (wordt mogelijk elders gebruikt)
+### 3. Active Filter Pills/Chips
+- Display selected filters as removable chips/pills below the filter bar
+- Allow one-click removal of individual filters
+- Provide visual indication of which filters are active at a glance
 
-### 3. Route verwijderen
-De `/klanten` route uit de applicatie verwijderen.
+### 4. Enhanced Filter Controls
+- Add icons to filter labels for better visual recognition
+- Use color-coded status indicators that match the application's color scheme
+- Improve employee dropdown with avatars/initials
+- Add quick filter presets (e.g., "This week", "This month" for dates)
 
-**Bestand:** `src/App.tsx`
-- De import van CustomersPage verwijderen
-- De Route voor `/klanten` verwijderen
+### 5. Date Range Improvements
+- Add preset date range buttons (Today, This Week, This Month)
+- Show selected date range more prominently
+- Add clear button for individual date filters
 
-### 4. Pagina verwijderen (optioneel)
-Het CustomersPage bestand kan worden verwijderd omdat het niet meer wordt gebruikt.
+### 6. Responsive Design
+- Better mobile layout with stacked filters
+- Touch-friendly controls on smaller screens
 
-**Bestand:** `src/pages/CustomersPage.tsx`
-- Dit bestand kan worden verwijderd
+## Technical Implementation
 
----
+### File Changes
 
-## Technische Details
+**File:** `src/components/admin/AdminFilters.tsx`
 
-### AdminSettings.tsx aanpassing
+Key changes:
+- Import Framer Motion for animations
+- Import Collapsible from Radix UI
+- Add new icons (User, CheckCircle, Clock, XCircle, ChevronDown)
+- Wrap in `AnimatePresence` for smooth transitions
+- Add filter chip components for active filters
+- Add date preset buttons
+- Apply glass-card styling
+
+### Component Structure
 ```text
-Huidige structuur:
-- UserApprovalManagement
-- CategoryManagement
-- LeaveTypeManagement
-- GasCylinderSettings
-- DryIceSettings
-- DefaultCustomerSetting
-
-Nieuwe structuur:
-- UserApprovalManagement
-- CategoryManagement
-- LeaveTypeManagement
-- GasCylinderSettings
-- DryIceSettings
-- DefaultCustomerSetting
-- CustomerManagement (nieuw)
+AdminFilters
+├── Header (always visible)
+│   ├── Filter icon + title
+│   ├── Active filter count badge
+│   ├── Active filter chips (when collapsed)
+│   └── Expand/Collapse toggle
+├── Collapsible Content
+│   ├── Date Presets Row
+│   │   └── Quick buttons: Vandaag, Deze week, Deze maand
+│   └── Filter Grid
+│       ├── Employee Select (with search & avatars)
+│       ├── Status Select (with color indicators)
+│       ├── Start Date Picker
+│       └── End Date Picker
+└── Active Filters Bar (when filters selected)
+    └── Removable filter chips
 ```
 
-### Header.tsx aanpassing
-De volgende code wordt verwijderd:
+### New Styling
+- Use `glass-card` class for main container
+- Add gradient accent bar at top (matching calendar design)
+- Animated filter chip entrance/exit
+- Hover states with subtle shadows
+- Focus rings for accessibility
+
+### Date Presets Logic
 ```text
-{role === "admin" && (
-  <Link to="/klanten">
-    <Button variant="ghost" size="sm" ...>
-      <Building2 className="h-4 w-4 mr-2" />
-      <span className="hidden sm:inline">Klanten</span>
-    </Button>
-  </Link>
-)}
+- Vandaag: startDate = today, endDate = today
+- Deze week: startDate = Monday of current week, endDate = Sunday
+- Deze maand: startDate = 1st of month, endDate = last of month
 ```
 
-### App.tsx aanpassing
-De volgende worden verwijderd:
-- `import CustomersPage from "./pages/CustomersPage";`
-- `<Route path="/klanten" element={<CustomersPage />} />`
+### Filter Chip Display
+Show chips for:
+- Selected employee name
+- Selected status with color dot
+- Date range in readable format
 
----
+Each chip has:
+- Label text
+- X button to remove
+- Smooth fade-out animation on removal
 
-## Resultaat
-Na implementatie:
-- Admin gebruikers beheren klanten rechtstreeks vanuit de Admin Instellingen pagina
-- De navigatie is vereenvoudigd met één menu-item minder
-- Alle beheersfuncties zijn gecentraliseerd op één plek
+## Expected Result
+After implementation:
+- More visually appealing filter interface matching the modern app aesthetic
+- Faster interaction with quick date presets
+- Better overview of active filters with removable chips
+- Collapsible panel to save screen space
+- Improved accessibility with better focus states
+- Consistent styling with the rest of the application
