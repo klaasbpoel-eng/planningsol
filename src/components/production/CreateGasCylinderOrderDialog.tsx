@@ -29,16 +29,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CustomerSelect } from "./CustomerSelect";
 
+type ProductionLocation = "tilburg" | "emmen";
+
 interface CreateGasCylinderOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
+  location: ProductionLocation;
 }
 
 export function CreateGasCylinderOrderDialog({
   open,
   onOpenChange,
   onCreated,
+  location,
 }: CreateGasCylinderOrderDialogProps) {
   const [saving, setSaving] = useState(false);
   const [customerId, setCustomerId] = useState("");
@@ -201,6 +205,7 @@ export function CreateGasCylinderOrderDialog({
         notes: notes.trim() || null,
         created_by: currentProfileId,
         status: isCompleted ? "completed" as const : "pending" as const,
+        production_location: location,
       };
       
       const { error } = await supabase.from("gas_cylinder_orders").insert(insertData);

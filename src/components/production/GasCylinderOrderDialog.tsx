@@ -32,7 +32,8 @@ import {
   Building2,
   FileText,
   Gauge,
-  Hash
+  Hash,
+  MapPin
 } from "lucide-react";
 import {
   AlertDialog,
@@ -63,12 +64,18 @@ interface GasCylinderOrder {
   status: string;
   notes: string | null;
   pressure: number;
+  production_location?: string;
   gas_type_ref?: {
     id: string;
     name: string;
     color: string;
   } | null;
 }
+
+const locationLabels: Record<string, string> = {
+  tilburg: "SOL Tilburg",
+  emmen: "SOL Emmen",
+};
 
 interface GasType {
   id: string;
@@ -561,6 +568,16 @@ export function GasCylinderOrderDialog({
                       </div>
                     </div>
                   </div>
+
+                  {order.production_location && (
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                      <MapPin className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Productielocatie</p>
+                        <p className="font-medium">{locationLabels[order.production_location] || order.production_location}</p>
+                      </div>
+                    </div>
+                  )}
 
                   {order.notes && (
                     <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
