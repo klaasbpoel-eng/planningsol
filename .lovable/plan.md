@@ -1,79 +1,95 @@
 
 
-# Plan: Fix kolom mapping voor Excel import
+# Plan: Add Pressure Column Mapping to Excel Import
 
-## Probleem geïdentificeerd
-De Excel kolomstructuur in `Productie_2026.xlsx` is:
-1. Datum (index 0)
-2. Gastype (index 1)
-3. Cilinderinhoud (index 2)
-4. Aantal (index 3)
-5. M/T (index 4)
-6. **Locatie (index 5)** ← Wordt nu verkeerd gemapped naar `customer`
-7. **Klant (index 6)** ← Wordt nu verkeerd gemapped naar `notes`
-8. Omschrijving (index 7) ← Dit zou `notes` moeten zijn
+## Current Situation
 
-De huidige header detectie zoekt naar "vulling tbv" voor customer, maar het Excel bestand gebruikt "Klant". Hierdoor matcht de header niet en valt de code terug naar verkeerde fallback indices.
+The uploaded Excel file `Productie_2026-2.xlsx` has an updated structure with a dedicated Pressure column:
+
+| Index | Column Name | Example Value |
+|-------|-------------|---------------|
+| 0 | Datum | 2026-01-31 |
+| 1 | Gastype | Formeer 5 |
+| 2 | Cilinderinhoud | 10 |
+| 3 | Aantal | 16 |
+| 4 | M/T | (empty) |
+| 5 | Location | SOL Nederland-Tilburg |
+| 6 | Customer_Name | Gasco Nederland NV |
+| 7 | Omschrijving | 10 liter cilinder |
+| 8 | **Pressure** | 200, 300, or 4 |
+
+Currently, pressure is extracted from the description text in `parseCylinderSize()`, but now it should be read directly from the Pressure column.
 
 ---
 
-## Oplossing
+## Solution
 
-### Stap 1: Header detectie uitbreiden voor "Klant"
-Voeg "klant" toe aan de zoektermen voor de customer kolom naast de bestaande "vulling tbv" en "tbv".
+### Step 1: Add Pressure to Column Detection
+Add header detection for the "Pressure" column:
 
-```text
-if (cellStr.includes("vulling tbv") || cellStr.includes("tbv") || 
-    cellStr.includes("klant") || cellStr.includes("customer")) {
-  columnMap.customer = idx;
+```typescript
+if (cellStr.includes("pressure") || cellStr.includes("druk") || 
+    cellStr.includes("bar")) {
+  columnMap.pressure = idx;
 }
 ```
 
-### Stap 2: Header detectie uitbreiden voor "Omschrijving" als notes
-Voeg "omschrijving" toe aan de zoektermen voor notes:
+### Step 2: Update Fallback Indices
+Add pressure to the fallback column mapping:
 
-```text
-if (cellStr.includes("opmerkingen") || cellStr.includes("opmerking") ||
-    cellStr.includes("omschrijving") || cellStr.includes("notes")) {
-  columnMap.notes = idx;
-}
-```
-
-### Stap 3: Fallback indices aanpassen
-Update de fallback kolom mapping voor het geval headers niet gevonden worden, zodat deze overeenkomt met de huidige Excel structuur:
-
-```text
+```typescript
 columnMap = { 
-  date: 0, 
-  gasType: 1, 
-  size: 2, 
-  count: 3, 
-  grade: 4, 
-  location: 5,  // Nieuw
-  customer: 6,  // Was 5, nu 6
-  notes: 7      // Was 6, nu 7
+  date: 0, gasType: 1, size: 2, count: 3, grade: 4, 
+  location: 5, customer: 6, notes: 7, pressure: 8 
 };
 ```
 
+### Step 3: Parse Pressure from Excel Column
+Read pressure directly from the column when available:
+
+```typescript
+// Get pressure value from dedicated column
+let pressure = 200; // default
+if (columnMap.pressure !== undefined) {
+  const pressureVal = parseInt(String(row[columnMap.pressure] || "200"));
+  if (!isNaN(pressureVal) && pressureVal > 0) {
+    pressure = pressureVal;
+  }
+} else {
+  // Fallback: extract from description
+  const { pressure: descPressure } = parseCylinderSize(sizeStr);
+  pressure = descPressure;
+}
+```
+
+### Step 4: Add Pressure Column to Preview Table
+Display pressure in the import preview:
+
+```tsx
+<th className="text-right py-2">Bar</th>
+...
+<td className="py-1.5 text-right">{order.pressure}</td>
+```
+
 ---
 
-## Technische wijzigingen
+## Technical Changes Summary
 
-| Regel | Wijziging |
-|-------|-----------|
-| 244 | Header detectie: "datum" en "gassoort" → verbreden naar "gastype" |
-| 251 | Cilinderinhoud toevoegen aan size detectie |
-| 254 | "klant" en "customer" toevoegen aan customer detectie |
-| 255 | "omschrijving" toevoegen aan notes detectie |
-| 269 | Fallback indices aanpassen naar juiste volgorde |
+| Line Range | Change |
+|------------|--------|
+| 256-270 | Add pressure header detection (`pressure`, `druk`, `bar`) |
+| 278 | Add `pressure: 8` to fallback column map |
+| 295-320 | Read pressure from column, fallback to description parsing |
+| 526-531 | Add "Bar" column header to preview table |
+| 537-546 | Add pressure cell to preview table rows |
 
 ---
 
-## Verwacht resultaat
-Na deze wijziging worden de Excel kolommen correct gemapped:
-- Kolom "Locatie" (index 5) → `location` veld
-- Kolom "Klant" (index 6) → `customer` veld  
-- Kolom "Omschrijving" (index 7) → `notes` veld
+## Expected Result
 
-Dit zorgt ervoor dat klantnamen correct worden geïmporteerd in het `customer_name` veld en locaties in het `location` veld.
+After these changes:
+- The import will detect and use the dedicated "Pressure" column from Excel
+- Values like 200, 300, and 4 (bar) will be correctly imported
+- The preview table will show the pressure for each order
+- Fallback to description-based parsing remains for older Excel formats
 
