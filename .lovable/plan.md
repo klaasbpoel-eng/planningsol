@@ -1,75 +1,152 @@
 
-
-# Plan: Fix Gascilinder Overzicht Data Limiet
+# Plan: Fix Jaarvergelijking Filters
 
 ## Probleemanalyse
 
-Na onderzoek van de database en code:
+Na onderzoek van de code is het probleem duidelijk: de filters voor gastype en klant **werken niet** omdat:
 
-- **Database**: Januari 2026 bevat **1445 orders** met **25.914 cilinders**
-- **Weergave**: Slechts 1000 orders worden getoond
-- **Oorzaak**: De oude code zonder maandfilter raakte de Supabase 1000-rij limiet
+1. **De data wordt client-side niet gefilterd**: De totalen (`cylinderTotals`, `dryIceTotals`) en maandelijkse overzichten worden berekend op basis van alle data, ongeacht de geselecteerde filters.
 
-De recente wijziging met maandfiltering en `limit(5000)` zou dit probleem moeten oplossen, maar er zijn nog twee aandachtspunten:
+2. **Alleen specifieke secties filteren**: 
+   - Gastype filter: Alleen toegepast op "Cilinders per gastype" charts
+   - Klant filter: Alleen toegepast op "Vergelijking per klant" sectie
 
-## Huidige Status
-
-| Component | Limiet | Status |
-|-----------|--------|--------|
-| GasCylinderPlanning.tsx | `limit(5000)` | Correct |
-| ProductionReports.tsx | `range(0, 9999)` | Kan verbeterd |
+3. **Niet-gefilterde secties**:
+   - Cilinders Jaartotaal card
+   - Droogijs Jaartotaal card
+   - Groei Highlights
+   - Cilinders per maand chart
+   - Droogijs per maand chart
+   - Groeipercentage per maand chart
+   - Maandelijkse overzichtstabel
 
 ## Oplossing
 
-### Stap 1: Verifieer dat de nieuwe code actief is
-De gebruiker moet de pagina vernieuwen (Ctrl+F5) om de nieuwe code met maandfiltering te laden.
-
-### Stap 2: Pas ProductionReports.tsx aan voor consistentie
-Wijzig de query methode van `.range(0, 9999)` naar hetzelfde patroon als GasCylinderPlanning:
-- Gebruik maandelijkse filtering of een hogere limiet
-- Voor periodes langer dan een maand: laad data per maand parallel
-
-### Stap 3: Implementeer maandelijkse parallelle loading in rapportages
-
-```typescript
-const fetchMonthData = async (year: number, month: number) => {
-  const monthStr = String(month).padStart(2, '0');
-  const startDate = `${year}-${monthStr}-01`;
-  const lastDay = new Date(year, month, 0).getDate();
-  const endDate = `${year}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
-  
-  return supabase
-    .from("gas_cylinder_orders")
-    .select(`*, gas_type_ref:gas_types(id, name, color)`)
-    .gte("scheduled_date", startDate)
-    .lte("scheduled_date", endDate)
-    .limit(5000);
-};
-
-// Voor periodes die meerdere maanden omvatten:
-const fetchDataForRange = async (from: Date, to: Date) => {
-  const months = getMonthsInRange(from, to);
-  const promises = months.map(({ year, month }) => fetchMonthData(year, month));
-  const results = await Promise.all(promises);
-  return results.flatMap(r => r.data || []);
-};
-```
+Implementeer reactieve filtering met `useMemo` zodat alle overzichten dynamisch updaten wanneer filters wijzigen.
 
 ---
 
 ## Technische Wijzigingen
 
-| Bestand | Wijziging |
-|---------|-----------|
-| `ProductionReports.tsx` | Implementeer maandelijkse data loading met `Promise.all` |
-| `ProductionReports.tsx` | Verwijder `.range(0, 9999)` en vervang door `limit(5000)` per maand |
+### Stap 1: Voeg gefilterde data berekeningen toe
+
+Voeg `useMemo` hooks toe die de data herberekenen op basis van:
+- `selectedGasTypes` (voor gastype-gerelateerde overzichten)
+- `selectedCustomers` (voor klant-gerelateerde overzichten)
+
+```text
+// Nieuwe useMemo hooks toevoegen na de bestaande state declaraties:
+
+// Gefilterde gastype vergelijking data
+const filteredGasTypeData = useMemo(() => {
+  if (selectedGasTypes.length === 0) return gasTypeComparison;
+  return gasTypeComparison.filter(gt => selectedGasTypes.includes(gt.gas_type_id));
+}, [gasTypeComparison, selectedGasTypes]);
+
+// Herberekende cylinder totalen op basis van gastype filter
+const filteredCylinderTotals = useMemo(() => {
+  if (selectedGasTypes.length === 0) return cylinderTotals;
+  // Bereken totalen alleen voor geselecteerde gastypes
+  const currentTotal = filteredGasTypeData.reduce((sum, gt) => sum + gt.currentYear, 0);
+  const previousTotal = filteredGasTypeData.reduce((sum, gt) => sum + gt.previousYear, 0);
+  const change = currentTotal - previousTotal;
+  const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
+  return { currentYear: currentTotal, previousYear: previousTotal, change, changePercent };
+}, [cylinderTotals, filteredGasTypeData, selectedGasTypes]);
+
+// Gefilterde maandelijkse data voor cilinders
+const filteredMonthlyGasTypeData = useMemo(() => {
+  if (selectedGasTypes.length === 0) return monthlyGasTypeData;
+  
+  const filterMonthData = (data: MonthlyGasTypeChartData[]) => {
+    return data.map(month => {
+      const filtered: MonthlyGasTypeChartData = { month: month.month, monthName: month.monthName };
+      selectedGasTypes.forEach(gtId => {
+        if (month[gtId] !== undefined) filtered[gtId] = month[gtId];
+      });
+      return filtered;
+    });
+  };
+  
+  return {
+    current: filterMonthData(monthlyGasTypeData.current),
+    previous: filterMonthData(monthlyGasTypeData.previous)
+  };
+}, [monthlyGasTypeData, selectedGasTypes]);
+
+// Herberekende cylinder maanddata op basis van gastype filter
+const filteredCylinderData = useMemo(() => {
+  if (selectedGasTypes.length === 0) return cylinderData;
+  
+  // Bereken nieuwe maandtotalen uit gefilterde gastype data
+  return cylinderData.map((month, idx) => {
+    const currentMonthData = filteredMonthlyGasTypeData.current[idx];
+    const previousMonthData = filteredMonthlyGasTypeData.previous[idx];
+    
+    const currentTotal = selectedGasTypes.reduce((sum, gtId) => 
+      sum + (Number(currentMonthData?.[gtId]) || 0), 0);
+    const previousTotal = selectedGasTypes.reduce((sum, gtId) => 
+      sum + (Number(previousMonthData?.[gtId]) || 0), 0);
+    
+    const change = currentTotal - previousTotal;
+    const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
+    
+    return {
+      ...month,
+      currentYear: currentTotal,
+      previousYear: previousTotal,
+      change,
+      changePercent
+    };
+  });
+}, [cylinderData, filteredMonthlyGasTypeData, selectedGasTypes]);
+```
+
+### Stap 2: Update de UI componenten
+
+Vervang hardcoded data referenties met gefilterde versies:
+
+| Origineel | Vervang door | Sectie |
+|-----------|--------------|--------|
+| `cylinderTotals` | `filteredCylinderTotals` | Cilinders Jaartotaal card |
+| `cylinderData` | `filteredCylinderData` | Cilinders per maand chart |
+| `cylinderData` | `filteredCylinderData` | Groei Highlights |
+| `cylinderData` | `filteredCylinderData` | Groeipercentage chart |
+| `cylinderData` | `filteredCylinderData` | Maandelijkse overzichtstabel |
+| `gasTypeComparison` | `filteredGasTypeData` | Gastype charts (al deels gedaan) |
+
+### Stap 3: Voeg filter indicator toe aan totalen
+
+Toon een badge wanneer filters actief zijn zodat gebruikers weten dat de weergegeven data gefilterd is:
+
+```text
+<CardTitle className="text-lg flex items-center gap-2">
+  <Cylinder className="h-5 w-5 text-orange-500" />
+  Cilinders Jaartotaal
+  {selectedGasTypes.length > 0 && (
+    <Badge variant="secondary" className="ml-2">
+      {selectedGasTypes.length} gastype(s) gefilterd
+    </Badge>
+  )}
+</CardTitle>
+```
+
+---
+
+## Wijzigingen Overzicht
+
+| Bestand | Type Wijziging |
+|---------|----------------|
+| `YearComparisonReport.tsx` | Toevoegen van gefilterde data berekeningen via `useMemo` |
+| `YearComparisonReport.tsx` | Update alle relevante charts en tabellen om gefilterde data te gebruiken |
+| `YearComparisonReport.tsx` | Toevoegen van filter-actief indicatoren |
 
 ---
 
 ## Verwacht Resultaat
 
 Na implementatie:
-- Alle 1445 orders van januari 2026 worden correct getoond
-- Rapportages kunnen periodes van meerdere maanden aan zonder datalimiet
-- Consistente aanpak over alle componenten
-
+- Alle grafieken en totalen updaten dynamisch wanneer gastype of klant filters worden geselecteerd
+- Gebruikers zien een duidelijke indicatie wanneer data gefilterd wordt
+- Performance blijft optimaal door gebruik van `useMemo` voor herberekeningen
+- Consistente gebruikerservaring: filteren werkt overal in de jaarvergelijking
