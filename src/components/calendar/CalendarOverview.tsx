@@ -1288,8 +1288,8 @@ export function CalendarOverview() {
     const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
     return (
-      <div className="space-y-3 animate-fade-in">
-        <div className="grid grid-cols-7 gap-2">
+      <div className="flex-1 flex flex-col gap-2 animate-fade-in">
+        <div className="grid grid-cols-7 gap-2 flex-shrink-0">
           {weekDays.map((day, index) => {
             const isWeekendDay = index >= 5;
             return (
@@ -1307,7 +1307,7 @@ export function CalendarOverview() {
             );
           })}
         </div>
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7 gap-2 flex-1">
           {days.map((day, index) => {
             const dayRequests = getRequestsForDay(day);
             const dayTasks = getTasksForDay(day);
@@ -1328,7 +1328,7 @@ export function CalendarOverview() {
                 key={day.toISOString()}
                 onClick={(e) => handleDayClick(day, e)}
                 className={cn(
-                  "min-h-[140px] p-3 rounded-xl border transition-all duration-300 hover:shadow-md",
+                  "p-3 rounded-xl border transition-all duration-300 hover:shadow-md flex flex-col",
                   isWeekendDay
                     ? "bg-primary/5 backdrop-blur-sm border-primary/20 hover:bg-primary/10"
                     : "bg-card/80 backdrop-blur-sm border-border/50",
@@ -1868,9 +1868,9 @@ export function CalendarOverview() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-4 pb-4">
+      <div className="flex-1 flex flex-col overflow-auto px-4 pb-4">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-16">
+          <div className="flex flex-col items-center justify-center py-16 flex-1">
             <div className="relative">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
             </div>
@@ -1887,6 +1887,7 @@ export function CalendarOverview() {
                 duration: 0.3, 
                 ease: [0.4, 0, 0.2, 1]
               }}
+              className="flex-1 flex flex-col"
             >
               {viewType === "list" && renderListView()}
               {viewType === "day" && renderDayView()}
@@ -1895,77 +1896,6 @@ export function CalendarOverview() {
               {viewType === "year" && renderYearView()}
             </motion.div>
           </AnimatePresence>
-        )}
-
-        {/* Type Legend */}
-        <div className="mt-8 pt-6 border-t border-border/50">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Leave Types Legend */}
-            {showTimeOff && (
-              <div>
-                <div className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                  <Palmtree className="h-4 w-4 text-primary" />
-                  Verlof types
-                </div>
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex items-center gap-2.5 text-sm">
-                    <div className="w-3 h-3 rounded-md bg-primary shadow-sm" />
-                    <span className="text-muted-foreground font-medium">Vakantie</span>
-                  </div>
-                  <div className="flex items-center gap-2.5 text-sm">
-                    <div className="w-3 h-3 rounded-md bg-destructive shadow-sm" />
-                    <span className="text-muted-foreground font-medium">Ziekteverlof</span>
-                  </div>
-                  <div className="flex items-center gap-2.5 text-sm">
-                    <div className="w-3 h-3 rounded-md bg-warning/80 shadow-sm" />
-                    <span className="text-muted-foreground font-medium">In behandeling</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Task Status Legend */}
-            {showTasks && (
-              <div>
-                <div className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                  <ClipboardList className="h-4 w-4 text-blue-500" />
-                  Taak status
-                </div>
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex items-center gap-2.5 text-sm">
-                    <div className="w-3 h-3 rounded-md bg-warning/80 shadow-sm" />
-                    <span className="text-muted-foreground font-medium">Te doen</span>
-                  </div>
-                  <div className="flex items-center gap-2.5 text-sm">
-                    <div className="w-3 h-3 rounded-md bg-blue-500/80 shadow-sm" />
-                    <span className="text-muted-foreground font-medium">Bezig</span>
-                  </div>
-                  <div className="flex items-center gap-2.5 text-sm">
-                    <div className="w-3 h-3 rounded-md bg-success/80 shadow-sm" />
-                    <span className="text-muted-foreground font-medium">Voltooid</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Employee Legend */}
-        {uniqueEmployees.length > 0 && (
-          <div className="mt-6 pt-6 border-t border-border/50">
-            <div className="text-sm font-semibold text-foreground mb-3">Medewerkers</div>
-            <div className="flex flex-wrap gap-4">
-              {uniqueEmployees.map((employee) => (
-                <div 
-                  key={employee.userId} 
-                  className="flex items-center gap-2.5 text-sm px-3 py-1.5 rounded-full bg-muted/50 border border-border/50"
-                >
-                  <div className={cn("w-2.5 h-2.5 rounded-full ring-2 ring-white/50", employee.color)} />
-                  <span className="text-muted-foreground font-medium">{employee.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
         )}
       </div>
       
