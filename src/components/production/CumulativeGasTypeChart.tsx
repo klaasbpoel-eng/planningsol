@@ -49,6 +49,7 @@ export function CumulativeGasTypeChart() {
   const [selectedYear2, setSelectedYear2] = useState<number>(new Date().getFullYear() - 1);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [allGasTypes, setAllGasTypes] = useState<{ id: string; name: string; color: string }[]>([]);
+  const [animatingTopFive, setAnimatingTopFive] = useState(false);
   
 
   useEffect(() => {
@@ -214,6 +215,8 @@ export function CumulativeGasTypeChart() {
 
   const selectTopFive = () => {
     setSelectedGasTypes(topFiveGasTypes);
+    setAnimatingTopFive(true);
+    setTimeout(() => setAnimatingTopFive(false), 600);
   };
 
   const selectAllGasTypes = () => {
@@ -319,7 +322,11 @@ export function CumulativeGasTypeChart() {
                 <Badge
                   key={gasType.id}
                   variant={isSelected ? "default" : "outline"}
-                  className="cursor-pointer transition-colors flex items-center gap-1"
+                  className={`cursor-pointer transition-all flex items-center gap-1 ${
+                    animatingTopFive && isTopFive 
+                      ? "animate-[pulse_0.3s_ease-in-out_2] scale-110" 
+                      : ""
+                  }`}
                   style={{
                     backgroundColor: isSelected ? gasType.color : undefined,
                     borderColor: gasType.color,
