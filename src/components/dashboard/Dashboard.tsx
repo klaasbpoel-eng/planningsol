@@ -98,7 +98,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
             </Button>
           )}
           
-          {permissions?.canViewCustomers && (
+          {role === "admin" && (
             <Button
               onClick={() => navigate("/klanten")}
               variant="outline"
