@@ -1096,62 +1096,33 @@ export type Database = {
         Args: { p_order_type: string; p_year: number }
         Returns: number
       }
-      get_monthly_cylinder_totals_by_gas_type:
-        | {
-            Args: { p_year: number }
-            Returns: {
-              gas_type_color: string
-              gas_type_id: string
-              gas_type_name: string
-              month: number
-              total_cylinders: number
-            }[]
-          }
-        | {
-            Args: { p_location?: string; p_year: number }
-            Returns: {
-              gas_type_color: string
-              gas_type_id: string
-              gas_type_name: string
-              month: number
-              total_cylinders: number
-            }[]
-          }
-      get_monthly_order_totals:
-        | {
-            Args: { p_order_type: string; p_year: number }
-            Returns: {
-              month: number
-              total_value: number
-            }[]
-          }
-        | {
-            Args: { p_location?: string; p_order_type: string; p_year: number }
-            Returns: {
-              month: number
-              total_value: number
-            }[]
-          }
+      get_monthly_cylinder_totals_by_gas_type: {
+        Args: { p_location?: string; p_year: number }
+        Returns: {
+          gas_type_color: string
+          gas_type_id: string
+          gas_type_name: string
+          month: number
+          total_cylinders: number
+        }[]
+      }
+      get_monthly_order_totals: {
+        Args: { p_location?: string; p_order_type: string; p_year: number }
+        Returns: {
+          month: number
+          total_value: number
+        }[]
+      }
       get_user_role: { Args: { _user_id: string }; Returns: string }
-      get_yearly_totals_by_customer:
-        | {
-            Args: { p_year: number }
-            Returns: {
-              customer_id: string
-              customer_name: string
-              total_cylinders: number
-              total_dry_ice_kg: number
-            }[]
-          }
-        | {
-            Args: { p_location?: string; p_year: number }
-            Returns: {
-              customer_id: string
-              customer_name: string
-              total_cylinders: number
-              total_dry_ice_kg: number
-            }[]
-          }
+      get_yearly_totals_by_customer: {
+        Args: { p_location?: string; p_year: number }
+        Returns: {
+          customer_id: string
+          customer_name: string
+          total_cylinders: number
+          total_dry_ice_kg: number
+        }[]
+      }
       has_elevated_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
