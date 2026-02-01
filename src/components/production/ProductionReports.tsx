@@ -151,33 +151,65 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
     return months;
   };
 
-  // Fetch cylinder orders for a single month
-  const fetchCylinderMonthData = async (year: number, month: number, fromDate: string, toDate: string) => {
+  // Helper function to get weeks in a month for chunking
+  const getWeeksInMonth = (year: number, month: number) => {
+    const weeks: { startDate: string; endDate: string }[] = [];
     const monthStr = String(month).padStart(2, '0');
-    const monthStartDate = `${year}-${monthStr}-01`;
     const lastDay = new Date(year, month, 0).getDate();
-    const monthEndDate = `${year}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
+    let currentDay = 1;
     
-    // Clamp to the actual date range
-    const effectiveStart = monthStartDate < fromDate ? fromDate : monthStartDate;
-    const effectiveEnd = monthEndDate > toDate ? toDate : monthEndDate;
-    
+    while (currentDay <= lastDay) {
+      const endDay = Math.min(currentDay + 6, lastDay);
+      weeks.push({
+        startDate: `${year}-${monthStr}-${String(currentDay).padStart(2, '0')}`,
+        endDate: `${year}-${monthStr}-${String(endDay).padStart(2, '0')}`
+      });
+      currentDay = endDay + 1;
+    }
+    return weeks;
+  };
+
+  // Fetch cylinder orders for a single week
+  const fetchCylinderWeekData = async (startDate: string, endDate: string) => {
     let query = supabase
       .from("gas_cylinder_orders")
       .select(`
         *,
         gas_type_ref:gas_types(id, name, color)
       `)
-      .gte("scheduled_date", effectiveStart)
-      .lte("scheduled_date", effectiveEnd)
-      .order("scheduled_date", { ascending: true })
-      .limit(5000);
+      .gte("scheduled_date", startDate)
+      .lte("scheduled_date", endDate)
+      .order("scheduled_date", { ascending: true });
     
     if (location !== "all") {
       query = query.eq("location", location);
     }
     
     return query;
+  };
+
+  // Fetch cylinder orders for a single month using weekly chunking to bypass 1000-row limit
+  const fetchCylinderMonthData = async (year: number, month: number, fromDate: string, toDate: string) => {
+    const weeks = getWeeksInMonth(year, month);
+    
+    // Clamp weeks to actual date range
+    const relevantWeeks = weeks.filter(week => 
+      week.endDate >= fromDate && week.startDate <= toDate
+    ).map(week => ({
+      startDate: week.startDate < fromDate ? fromDate : week.startDate,
+      endDate: week.endDate > toDate ? toDate : week.endDate
+    }));
+    
+    const weekPromises = relevantWeeks.map(week => 
+      fetchCylinderWeekData(week.startDate, week.endDate)
+    );
+    
+    const results = await Promise.all(weekPromises);
+    const allOrders = results.flatMap(res => res.data || []);
+    
+    // Deduplicate by ID and return as array
+    const uniqueOrders = Array.from(new Map(allOrders.map(o => [o.id, o])).values());
+    return { data: uniqueOrders, error: null };
   };
 
   // Fetch dry ice orders for a single month
