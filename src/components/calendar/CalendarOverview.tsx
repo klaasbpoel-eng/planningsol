@@ -39,7 +39,8 @@ import {
   GripVertical,
   Plus,
   Undo2,
-  Snowflake
+  Snowflake,
+  Cylinder
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -96,6 +97,8 @@ type TaskType = Database["public"]["Tables"]["task_types"]["Row"];
 type DryIceOrder = Database["public"]["Tables"]["dry_ice_orders"]["Row"];
 type DryIceProductType = Database["public"]["Tables"]["dry_ice_product_types"]["Row"];
 type DryIcePackaging = Database["public"]["Tables"]["dry_ice_packaging"]["Row"];
+type GasCylinderOrder = Database["public"]["Tables"]["gas_cylinder_orders"]["Row"];
+type GasType = Database["public"]["Tables"]["gas_types"]["Row"];
 
 type RequestWithProfile = TimeOffRequest & {
   profile?: Profile | null;
@@ -111,11 +114,16 @@ type DryIceOrderWithDetails = DryIceOrder & {
   packaging_info?: DryIcePackaging | null;
 };
 
+type GasCylinderOrderWithDetails = GasCylinderOrder & {
+  gas_type_info?: GasType | null;
+};
+
 type ViewType = "list" | "day" | "week" | "month" | "year";
 type CalendarItem = 
   | { type: "timeoff"; data: RequestWithProfile }
   | { type: "task"; data: TaskWithProfile }
-  | { type: "dryice"; data: DryIceOrderWithDetails };
+  | { type: "dryice"; data: DryIceOrderWithDetails }
+  | { type: "gascylinder"; data: GasCylinderOrderWithDetails };
 
 export function CalendarOverview() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -123,6 +131,7 @@ export function CalendarOverview() {
   const [requests, setRequests] = useState<RequestWithProfile[]>([]);
   const [tasks, setTasks] = useState<TaskWithProfile[]>([]);
   const [dryIceOrders, setDryIceOrders] = useState<DryIceOrderWithDetails[]>([]);
+  const [gasCylinderOrders, setGasCylinderOrders] = useState<GasCylinderOrderWithDetails[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
@@ -132,12 +141,15 @@ export function CalendarOverview() {
   const [showTimeOff, setShowTimeOff] = useState(true);
   const [showTasks, setShowTasks] = useState(true);
   const [showDryIce, setShowDryIce] = useState(true);
+  const [showGasCylinders, setShowGasCylinders] = useState(true);
   const [draggedTask, setDraggedTask] = useState<TaskWithProfile | null>(null);
   const [dragOverDate, setDragOverDate] = useState<Date | null>(null);
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
   const [selectedDryIceOrder, setSelectedDryIceOrder] = useState<DryIceOrderWithDetails | null>(null);
+  const [selectedGasCylinderOrder, setSelectedGasCylinderOrder] = useState<GasCylinderOrderWithDetails | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dryIceDialogOpen, setDryIceDialogOpen] = useState(false);
+  const [gasCylinderDialogOpen, setGasCylinderDialogOpen] = useState(false);
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
   const [createLeaveDialogOpen, setCreateLeaveDialogOpen] = useState(false);
   const [createDryIceDialogOpen, setCreateDryIceDialogOpen] = useState(false);
@@ -148,6 +160,7 @@ export function CalendarOverview() {
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
   const [dryIceProductTypes, setDryIceProductTypes] = useState<DryIceProductType[]>([]);
   const [dryIcePackaging, setDryIcePackaging] = useState<DryIcePackaging[]>([]);
+  const [gasTypes, setGasTypes] = useState<GasType[]>([]);
   const [lastAction, setLastAction] = useState<{
     type: "task_move";
     taskId: string;
@@ -247,6 +260,22 @@ export function CalendarOverview() {
 
       if (dryIcePackagingError) throw dryIcePackagingError;
 
+      // Fetch gas cylinder orders
+      const { data: gasCylinderOrdersData, error: gasCylinderOrdersError } = await supabase
+        .from("gas_cylinder_orders")
+        .select("*")
+        .order("scheduled_date", { ascending: true });
+
+      if (gasCylinderOrdersError) throw gasCylinderOrdersError;
+
+      // Fetch gas types
+      const { data: gasTypesData, error: gasTypesError } = await supabase
+        .from("gas_types")
+        .select("*")
+        .eq("is_active", true);
+
+      if (gasTypesError) throw gasTypesError;
+
       // Map profiles to requests using profile_id (new) or user_id (legacy)
       const requestsWithProfiles: RequestWithProfile[] = (requestsData || []).map((request) => {
         // Use profile_id if available, otherwise fall back to user_id
@@ -277,13 +306,21 @@ export function CalendarOverview() {
         return { ...order, product_type_info, packaging_info };
       });
 
+      // Map gas types to gas cylinder orders
+      const gasCylinderOrdersWithDetails: GasCylinderOrderWithDetails[] = (gasCylinderOrdersData || []).map((order) => {
+        const gas_type_info = gasTypesData?.find((t) => t.id === order.gas_type_id) || null;
+        return { ...order, gas_type_info };
+      });
+
       setRequests(requestsWithProfiles);
       setTasks(tasksWithProfiles);
       setDryIceOrders(dryIceOrdersWithDetails);
+      setGasCylinderOrders(gasCylinderOrdersWithDetails);
       setProfiles(profilesData || []);
       setTaskTypes(taskTypesData || []);
       setDryIceProductTypes(dryIceProductTypesData || []);
       setDryIcePackaging(dryIcePackagingData || []);
+      setGasTypes(gasTypesData || []);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -296,6 +333,9 @@ export function CalendarOverview() {
     if (item.type === "dryice") {
       setSelectedDryIceOrder(item.data);
       setDryIceDialogOpen(true);
+    } else if (item.type === "gascylinder") {
+      setSelectedGasCylinderOrder(item.data);
+      setGasCylinderDialogOpen(true);
     } else {
       setSelectedItem(item);
       setDialogOpen(true);
@@ -306,6 +346,12 @@ export function CalendarOverview() {
     e.stopPropagation();
     setSelectedDryIceOrder(order);
     setDryIceDialogOpen(true);
+  };
+
+  const handleGasCylinderOrderClick = (order: GasCylinderOrderWithDetails, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedGasCylinderOrder(order);
+    setGasCylinderDialogOpen(true);
   };
 
   const handleDialogUpdate = () => {
@@ -515,6 +561,11 @@ export function CalendarOverview() {
     return dryIceOrders;
   }, [dryIceOrders]);
 
+  // Filter gas cylinder orders
+  const filteredGasCylinderOrders = useMemo(() => {
+    return gasCylinderOrders;
+  }, [gasCylinderOrders]);
+
   const getItemsForDay = (day: Date): CalendarItem[] => {
     const items: CalendarItem[] = [];
     
@@ -544,6 +595,14 @@ export function CalendarOverview() {
         }
       });
     }
+
+    if (showGasCylinders) {
+      filteredGasCylinderOrders.forEach((order) => {
+        if (isSameDay(parseISO(order.scheduled_date), day)) {
+          items.push({ type: "gascylinder", data: order });
+        }
+      });
+    }
     
     return items;
   };
@@ -568,6 +627,11 @@ export function CalendarOverview() {
     return filteredDryIceOrders.filter((order) => isSameDay(parseISO(order.scheduled_date), day));
   };
 
+  const getGasCylinderOrdersForDay = (day: Date): GasCylinderOrderWithDetails[] => {
+    if (!showGasCylinders) return [];
+    return filteredGasCylinderOrders.filter((order) => isSameDay(parseISO(order.scheduled_date), day));
+  };
+
   const getDryIceStatusColor = (status: string) => {
     switch (status) {
       case "completed": return "bg-success/80 text-success-foreground";
@@ -575,6 +639,26 @@ export function CalendarOverview() {
       case "pending": return "bg-cyan-500/80 text-white";
       case "cancelled": return "bg-muted text-muted-foreground";
       default: return "bg-cyan-500/80 text-white";
+    }
+  };
+
+  const getGasCylinderStatusColor = (status: string) => {
+    switch (status) {
+      case "completed": return "bg-success/80 text-success-foreground";
+      case "in_progress": return "bg-blue-500/80 text-white";
+      case "pending": return "bg-orange-500/80 text-white";
+      case "cancelled": return "bg-muted text-muted-foreground";
+      default: return "bg-orange-500/80 text-white";
+    }
+  };
+
+  const getGasCylinderStatusLabel = (status: string) => {
+    switch (status) {
+      case "completed": return "Voltooid";
+      case "in_progress": return "Bezig";
+      case "pending": return "Gepland";
+      case "cancelled": return "Geannuleerd";
+      default: return "Gepland";
     }
   };
 
@@ -745,6 +829,15 @@ export function CalendarOverview() {
         allItems.push({
           date: parseISO(order.scheduled_date),
           item: { type: "dryice", data: order }
+        });
+      });
+    }
+
+    if (showGasCylinders) {
+      filteredGasCylinderOrders.forEach((order) => {
+        allItems.push({
+          date: parseISO(order.scheduled_date),
+          item: { type: "gascylinder", data: order }
         });
       });
     }
@@ -925,6 +1018,37 @@ export function CalendarOverview() {
                         </motion.div>
                       </DryIceOrderPreview>
                     );
+                } else if (calendarItem.type === "gascylinder") {
+                  const order = calendarItem.data;
+                    return (
+                      <motion.div
+                        key={`gascylinder-${order.id}`}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }}
+                        onClick={(e) => handleGasCylinderOrderClick(order, e)}
+                        className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4"
+                      >
+                        <div className="w-1 h-12 rounded-full bg-orange-500" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Cylinder className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                            <span className="font-medium truncate">{order.customer_name}</span>
+                            <Badge variant="outline" className={cn("text-xs flex-shrink-0", getGasCylinderStatusColor(order.status))}>
+                              {getGasCylinderStatusLabel(order.status)}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+                            <span>{order.cylinder_count}x {order.gas_type_info?.name || order.gas_type}</span>
+                            <span className="text-xs">• {order.pressure} bar</span>
+                          </div>
+                          {order.notes && (
+                            <div className="text-xs text-muted-foreground/70 mt-1 truncate italic">{order.notes}</div>
+                          )}
+                        </div>
+                        <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-500" />
+                      </motion.div>
+                    );
                 }
                 return null;
               })}
@@ -940,7 +1064,8 @@ export function CalendarOverview() {
     const dayRequests = getRequestsForDay(currentDate);
     const dayTasks = getTasksForDay(currentDate);
     const dayDryIceOrders = getDryIceOrdersForDay(currentDate);
-    const hasItems = dayRequests.length > 0 || dayTasks.length > 0 || dayDryIceOrders.length > 0;
+    const dayGasCylinderOrders = getGasCylinderOrdersForDay(currentDate);
+    const hasItems = dayRequests.length > 0 || dayTasks.length > 0 || dayDryIceOrders.length > 0 || dayGasCylinderOrders.length > 0;
     
     return (
       <div className="space-y-4 animate-fade-in">
@@ -1105,6 +1230,48 @@ export function CalendarOverview() {
                   ))}
                 </div>
               )}
+
+              {/* Gas Cylinder Orders */}
+              {dayGasCylinderOrders.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                    <Cylinder className="h-4 w-4 text-orange-500" />
+                    <span>Gascilinders</span>
+                  </div>
+                  {dayGasCylinderOrders.map((order, index) => (
+                    <motion.div
+                      key={order.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25, delay: (dayRequests.length + dayTasks.length + dayDryIceOrders.length + index) * 0.05 }}
+                      onClick={(e) => handleGasCylinderOrderClick(order, e)}
+                      className={cn(
+                        "p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md cursor-pointer",
+                        getGasCylinderStatusColor(order.status)
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <Cylinder className="w-4 h-4" />
+                          <span className="font-semibold">{order.customer_name}</span>
+                        </div>
+                        <Badge variant="outline" className="text-xs bg-white/20">
+                          {order.order_number}
+                        </Badge>
+                      </div>
+                      <div className="font-medium mt-2">
+                        {order.cylinder_count}x {order.gas_type_info?.name || order.gas_type}
+                      </div>
+                      <div className="text-xs opacity-75 mt-1">
+                        {order.pressure} bar • {order.cylinder_size}
+                      </div>
+                      {order.notes && (
+                        <div className="text-xs opacity-60 mt-2 italic">{order.notes}</div>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1143,10 +1310,12 @@ export function CalendarOverview() {
             const dayRequests = getRequestsForDay(day);
             const dayTasks = getTasksForDay(day);
             const dayDryIceOrders = getDryIceOrdersForDay(day);
+            const dayGasCylinderOrders = getGasCylinderOrdersForDay(day);
             const allItems = [
               ...dayRequests.map(r => ({ type: 'timeoff' as const, item: r })), 
               ...dayTasks.map(t => ({ type: 'task' as const, item: t })),
-              ...dayDryIceOrders.map(o => ({ type: 'dryice' as const, item: o }))
+              ...dayDryIceOrders.map(o => ({ type: 'dryice' as const, item: o })),
+              ...dayGasCylinderOrders.map(o => ({ type: 'gascylinder' as const, item: o }))
             ];
             const isCurrentDay = isToday(day);
             const isDragOver = dragOverDate && isSameDay(dragOverDate, day);
@@ -1248,6 +1417,20 @@ export function CalendarOverview() {
                             <span className="truncate font-medium">{order.customer_name} • {order.quantity_kg}kg</span>
                           </div>
                         </DryIceOrderPreview>
+                      );
+                    } else if (entry.type === 'gascylinder') {
+                      const order = entry.item as GasCylinderOrderWithDetails;
+                      return (
+                        <div
+                          key={order.id}
+                          onClick={(e) => handleGasCylinderOrderClick(order, e)}
+                          className={cn(
+                            "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-orange-500/20 text-orange-700 dark:text-orange-300 border border-orange-500/30"
+                          )}
+                        >
+                          <Cylinder className="w-3 h-3 shrink-0" />
+                          <span className="truncate font-medium">{order.customer_name} • {order.cylinder_count}x</span>
+                        </div>
                       );
                     }
                     return null;
@@ -1600,6 +1783,17 @@ export function CalendarOverview() {
                 <label htmlFor="showDryIce" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
                   <Snowflake className="h-3.5 w-3.5 text-cyan-500" />
                   Droogijs
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="showGasCylinders" 
+                  checked={showGasCylinders} 
+                  onCheckedChange={(checked) => setShowGasCylinders(checked as boolean)}
+                />
+                <label htmlFor="showGasCylinders" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                  <Cylinder className="h-3.5 w-3.5 text-orange-500" />
+                  Gascilinders
                 </label>
               </div>
             </div>
