@@ -4,6 +4,7 @@ import { GasCylinderSettings } from "./GasCylinderSettings";
 import { DryIceSettings } from "./DryIceSettings";
 import { DefaultCustomerSetting } from "./DefaultCustomerSetting";
 import { UserApprovalManagement } from "./UserApprovalManagement";
+import { CustomerManagement } from "../customers/CustomerManagement";
 
 export function AdminSettings() {
   return (
@@ -14,6 +15,7 @@ export function AdminSettings() {
       <GasCylinderSettings />
       <DryIceSettings />
       <DefaultCustomerSetting />
+      <CustomerManagement isAdmin />
     </div>
   );
 }
