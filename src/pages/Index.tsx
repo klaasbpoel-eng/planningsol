@@ -6,6 +6,7 @@ import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { PendingApproval } from "@/components/auth/PendingApproval";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
+import { PageTransition } from "@/components/ui/page-transition";
 import { Loader2 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
@@ -41,34 +42,46 @@ const Index = () => {
   }
 
   if (!user) {
-    return <AuthForm />;
+    return (
+      <PageTransition>
+        <AuthForm />
+      </PageTransition>
+    );
   }
 
   // Check approval status - admins bypass this check
   if (!isApproved && !isAdmin) {
-    return <PendingApproval />;
+    return (
+      <PageTransition>
+        <PendingApproval />
+      </PageTransition>
+    );
   }
 
   // Show admin dashboard for admins who want to see it
   if (isAdmin && showAdminView) {
     return (
-      <AdminDashboard 
-        userEmail={user.email} 
-        onSwitchView={() => setShowAdminView(false)} 
-        permissions={permissions}
-        role={role}
-      />
+      <PageTransition>
+        <AdminDashboard 
+          userEmail={user.email} 
+          onSwitchView={() => setShowAdminView(false)} 
+          permissions={permissions}
+          role={role}
+        />
+      </PageTransition>
     );
   }
 
   return (
-    <Dashboard 
-      userEmail={user.email} 
-      isAdmin={isAdmin}
-      onSwitchToAdmin={() => setShowAdminView(true)}
-      permissions={permissions}
-      role={role}
-    />
+    <PageTransition>
+      <Dashboard 
+        userEmail={user.email} 
+        isAdmin={isAdmin}
+        onSwitchToAdmin={() => setShowAdminView(true)}
+        permissions={permissions}
+        role={role}
+      />
+    </PageTransition>
   );
 };
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/layout/Header";
 import { ProductionPlanning } from "@/components/production/ProductionPlanning";
+import { PageTransition } from "@/components/ui/page-transition";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
@@ -48,24 +49,26 @@ const ProductionPlanningPage = () => {
   }
 
   return (
-    <div className="min-h-screen gradient-mesh">
-      <Header userEmail={user.email} role={role} />
-      
-      <main className="px-4 py-8 w-full">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gradient">Productieplanning</h1>
-          <p className="text-muted-foreground mt-1">
-            Plan en beheer de productie van droogijs en gascilinders
-          </p>
-        </div>
+    <PageTransition>
+      <div className="min-h-screen gradient-mesh">
+        <Header userEmail={user.email} role={role} />
+        
+        <main className="px-4 py-8 w-full">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gradient">Productieplanning</h1>
+            <p className="text-muted-foreground mt-1">
+              Plan en beheer de productie van droogijs en gascilinders
+            </p>
+          </div>
 
-        <ProductionPlanning 
-          userProductionLocation={productionLocation}
-          canViewAllLocations={canViewAllLocations}
-          permissions={permissions}
-        />
-      </main>
-    </div>
+          <ProductionPlanning 
+            userProductionLocation={productionLocation}
+            canViewAllLocations={canViewAllLocations}
+            permissions={permissions}
+          />
+        </main>
+      </div>
+    </PageTransition>
   );
 };
 
