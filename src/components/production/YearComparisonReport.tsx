@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users, Building2 } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users, Building2, Ruler } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GasTypeMultiSelect } from "./GasTypeMultiSelect";
 import { CustomerMultiSelect } from "./CustomerMultiSelect";
+import { CylinderSizeMultiSelect } from "./CylinderSizeMultiSelect";
 import { CumulativeYearChart } from "./CumulativeYearChart";
 import { CumulativeGasTypeChart } from "./CumulativeGasTypeChart";
 import {
@@ -83,6 +84,14 @@ interface CustomerComparison {
   dryIceChangePercent: number;
 }
 
+interface CylinderSizeComparison {
+  cylinder_size: string;
+  currentYear: number;
+  previousYear: number;
+  change: number;
+  changePercent: number;
+}
+
 const MONTH_NAMES = [
   "Jan", "Feb", "Mrt", "Apr", "Mei", "Jun",
   "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"
@@ -122,6 +131,11 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
     current: Map<number, MonthlyCustomerCylinderData[]>;
     previous: Map<number, MonthlyCustomerCylinderData[]>;
   }>({ current: new Map(), previous: new Map() });
+  
+  // Cylinder size state
+  const [cylinderSizes, setCylinderSizes] = useState<{ id: string; name: string; capacity_liters: number | null }[]>([]);
+  const [selectedCylinderSizes, setSelectedCylinderSizes] = useState<string[]>([]);
+  const [cylinderSizeComparison, setCylinderSizeComparison] = useState<CylinderSizeComparison[]>([]);
 
   const isSignificantGrowth = (percent: number) => percent > 10 || percent < -10;
 
@@ -259,6 +273,12 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
     return { currentYear: currentTotal, previousYear: previousTotal, change, changePercent };
   }, [filteredCylinderTotals, filteredCustomerComparison, selectedCustomers, cylinderTotals]);
 
+  // Gefilterde cilindergrootte vergelijking data
+  const filteredCylinderSizeComparison = useMemo(() => {
+    if (selectedCylinderSizes.length === 0) return cylinderSizeComparison;
+    return cylinderSizeComparison.filter(cs => selectedCylinderSizes.includes(cs.cylinder_size));
+  }, [cylinderSizeComparison, selectedCylinderSizes]);
+
   useEffect(() => {
     // Generate years from 2024 to current year + 1
     const currentYear = new Date().getFullYear();
@@ -268,8 +288,9 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
     }
     setAvailableYears(years);
     
-    // Fetch gas types for filter
+    // Fetch gas types and cylinder sizes for filters
     fetchGasTypes();
+    fetchCylinderSizes();
   }, []);
 
   const fetchGasTypes = async () => {
@@ -281,6 +302,18 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
     
     if (data) {
       setGasTypes(data);
+    }
+  };
+
+  const fetchCylinderSizes = async () => {
+    const { data } = await supabase
+      .from("cylinder_sizes")
+      .select("id, name, capacity_liters")
+      .eq("is_active", true)
+      .order("sort_order");
+    
+    if (data) {
+      setCylinderSizes(data);
     }
   };
 
@@ -308,7 +341,9 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
       currentCustomerRes,
       previousCustomerRes,
       currentMonthlyCustCylRes,
-      previousMonthlyCustCylRes
+      previousMonthlyCustCylRes,
+      currentCylinderSizeRes,
+      previousCylinderSizeRes
     ] = await Promise.all([
       supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "cylinder", p_location: locationFilter }),
       supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "cylinder", p_location: locationFilter }),
@@ -319,7 +354,9 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
       supabase.rpc("get_yearly_totals_by_customer", { p_year: currentYear, p_location: locationFilter }),
       supabase.rpc("get_yearly_totals_by_customer", { p_year: previousYear, p_location: locationFilter }),
       supabase.rpc("get_monthly_cylinder_totals_by_customer", { p_year: currentYear, p_location: locationFilter }),
-      supabase.rpc("get_monthly_cylinder_totals_by_customer", { p_year: previousYear, p_location: locationFilter })
+      supabase.rpc("get_monthly_cylinder_totals_by_customer", { p_year: previousYear, p_location: locationFilter }),
+      supabase.rpc("get_monthly_cylinder_totals_by_size", { p_year: currentYear, p_location: locationFilter }),
+      supabase.rpc("get_monthly_cylinder_totals_by_size", { p_year: previousYear, p_location: locationFilter })
     ]);
 
     // Process cylinder data from aggregated results
@@ -374,6 +411,13 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
       current: currentMonthlyCustMap,
       previous: previousMonthlyCustMap
     });
+
+    // Process cylinder size comparison data
+    const cylinderSizeData = processCylinderSizeComparison(
+      currentCylinderSizeRes.data || [],
+      previousCylinderSizeRes.data || []
+    );
+    setCylinderSizeComparison(cylinderSizeData);
 
     setLoading(false);
   };
@@ -444,6 +488,51 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
         dryIceChangePercent
       });
     });
+
+    return result;
+  };
+
+  const processCylinderSizeComparison = (
+    currentData: { month: number; cylinder_size: string; total_cylinders: number }[],
+    previousData: { month: number; cylinder_size: string; total_cylinders: number }[]
+  ): CylinderSizeComparison[] => {
+    // Create maps for yearly totals
+    const currentYearMap = new Map<string, number>();
+    const previousYearMap = new Map<string, number>();
+
+    currentData.forEach(item => {
+      if (!item.cylinder_size) return;
+      const existing = currentYearMap.get(item.cylinder_size) || 0;
+      currentYearMap.set(item.cylinder_size, existing + (Number(item.total_cylinders) || 0));
+    });
+
+    previousData.forEach(item => {
+      if (!item.cylinder_size) return;
+      const existing = previousYearMap.get(item.cylinder_size) || 0;
+      previousYearMap.set(item.cylinder_size, existing + (Number(item.total_cylinders) || 0));
+    });
+
+    // Get all unique cylinder sizes
+    const allSizes = new Set([...currentYearMap.keys(), ...previousYearMap.keys()]);
+    const result: CylinderSizeComparison[] = [];
+
+    allSizes.forEach(size => {
+      const currentTotal = currentYearMap.get(size) || 0;
+      const previousTotal = previousYearMap.get(size) || 0;
+      const change = currentTotal - previousTotal;
+      const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
+
+      result.push({
+        cylinder_size: size,
+        currentYear: currentTotal,
+        previousYear: previousTotal,
+        change,
+        changePercent
+      });
+    });
+
+    // Sort by current year total descending
+    result.sort((a, b) => b.currentYear - a.currentYear);
 
     return result;
   };
@@ -693,19 +782,36 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
           </div>
 
           {/* Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Gas Type Filter */}
             {gasTypes.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground flex items-center gap-2">
                   <Filter className="h-4 w-4" />
-                  Filter op gastype (cilinders)
+                  Filter op gastype
                 </Label>
                 <GasTypeMultiSelect
                   gasTypes={gasTypes}
                   selectedGasTypes={selectedGasTypes}
                   onSelectionChange={setSelectedGasTypes}
                   placeholder="Alle gastypes"
+                  className="w-full"
+                />
+              </div>
+            )}
+
+            {/* Cylinder Size Filter */}
+            {cylinderSizes.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Ruler className="h-4 w-4" />
+                  Filter op cilindergrootte
+                </Label>
+                <CylinderSizeMultiSelect
+                  cylinderSizes={cylinderSizes}
+                  selectedCylinderSizes={selectedCylinderSizes}
+                  onSelectionChange={setSelectedCylinderSizes}
+                  placeholder="Alle cilindergroottes"
                   className="w-full"
                 />
               </div>
@@ -1081,6 +1187,113 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
                 </div>
               </div>
             </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Cylinder Size Year Comparison */}
+      {cylinderSizeComparison.length > 0 && (
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Ruler className="h-5 w-5 text-blue-500" />
+              Cilinders per cilindergrootte
+              {selectedCylinderSizes.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {selectedCylinderSizes.length} gefilterd
+                </Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Jaarvergelijking {selectedYear} vs {selectedYear - 1} per cilindergrootte
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              if (filteredCylinderSizeComparison.length === 0) {
+                return (
+                  <div className="flex items-center justify-center py-8 text-muted-foreground">
+                    Geen data voor geselecteerde cilindergroottes
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Bar Chart */}
+                  <div>
+                    <ResponsiveContainer width="100%" height={Math.max(300, filteredCylinderSizeComparison.length * 40)}>
+                      <BarChart
+                        data={filteredCylinderSizeComparison}
+                        layout="vertical"
+                        margin={{ left: 80 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis type="number" className="text-xs" />
+                        <YAxis 
+                          type="category" 
+                          dataKey="cylinder_size" 
+                          className="text-xs"
+                          width={75}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--background))',
+                            border: '1px solid hsl(var(--border))'
+                          }}
+                          formatter={(value: number, name: string) => [
+                            formatNumber(value, 0),
+                            name === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()
+                          ]}
+                        />
+                        <Legend
+                          formatter={(value) => value === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()}
+                        />
+                        <Bar dataKey="previousYear" name="previousYear" fill="#94a3b8" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="currentYear" name="currentYear" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Details Table */}
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-muted-foreground mb-3">
+                      Overzicht per cilindergrootte
+                    </div>
+                    <div className="space-y-2 max-h-[380px] overflow-y-auto">
+                      {filteredCylinderSizeComparison.map((size) => (
+                        <div 
+                          key={size.cylinder_size}
+                          className="flex items-center justify-between p-3 rounded-lg border bg-card/50"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Ruler className="h-4 w-4 text-blue-500" />
+                            <span className="font-medium">{size.cylinder_size}</span>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <div className="text-right">
+                              <div className="font-medium">{formatNumber(size.currentYear, 0)}</div>
+                              <div className="text-xs text-muted-foreground">
+                                vs {formatNumber(size.previousYear, 0)}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 min-w-[80px] justify-end">
+                              {getTrendIcon(size.changePercent)}
+                              <Badge 
+                                variant={size.changePercent >= 0 ? "default" : "destructive"}
+                                className="text-xs"
+                              >
+                                {size.changePercent >= 0 ? "+" : ""}{size.changePercent.toFixed(1)}%
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               );
             })()}
           </CardContent>
