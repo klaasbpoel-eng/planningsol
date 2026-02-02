@@ -21,6 +21,7 @@ import {
 import { GlowLineChart } from "@/components/ui/glow-line-chart";
 import { FadeIn } from "@/components/ui/fade-in";
 import { ChartSkeleton, StatCardSkeleton } from "@/components/ui/skeletons";
+import { StatCard } from "@/components/ui/stat-card";
 
 // Lazy load heavy chart components
 const YearComparisonReport = lazy(() => import("./YearComparisonReport").then(m => ({ default: m.YearComparisonReport })));
@@ -33,7 +34,7 @@ const CustomerSegmentation = lazy(() => import("./CustomerSegmentation").then(m 
 const ChartLoadingFallback = () => (
   <ChartSkeleton height={300} showLegend={false} />
 );
-import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, differenceInDays, subDays } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn, formatNumber } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -118,6 +119,16 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
   const [activeTab, setActiveTab] = useState("overview");
   const [productionChartView, setProductionChartView] = useState<"both" | "cylinders" | "dryIce">("both");
   const [chartStyle, setChartStyle] = useState<"area" | "glow">("area");
+  
+  // Previous period stats for trend calculations
+  const [previousPeriodStats, setPreviousPeriodStats] = useState({
+    cylinderOrders: 0,
+    totalCylinders: 0,
+    dryIceOrders: 0,
+    totalDryIce: 0,
+    completed: 0,
+    pending: 0
+  });
 
   useEffect(() => {
     fetchGasTypes();
@@ -246,8 +257,16 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
     const fromDate = format(dateRange.from, "yyyy-MM-dd");
     const toDate = format(dateRange.to, "yyyy-MM-dd");
 
+    // Calculate previous period (same length, immediately before)
+    const periodLength = differenceInDays(dateRange.to, dateRange.from);
+    const prevTo = subDays(dateRange.from, 1);
+    const prevFrom = subDays(prevTo, periodLength);
+    const prevFromDate = format(prevFrom, "yyyy-MM-dd");
+    const prevToDate = format(prevTo, "yyyy-MM-dd");
+
     // Get all months in the range
     const months = getMonthsInRange(dateRange.from, dateRange.to);
+    const prevMonths = getMonthsInRange(prevFrom, prevTo);
     
     // Fetch data for each month in parallel
     const cylinderPromises = months.map(({ year, month }) => 
@@ -257,14 +276,26 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
       fetchDryIceMonthData(year, month, fromDate, toDate)
     );
 
-    const [cylinderResults, dryIceResults] = await Promise.all([
+    // Fetch previous period data
+    const prevCylinderPromises = prevMonths.map(({ year, month }) => 
+      fetchCylinderMonthData(year, month, prevFromDate, prevToDate)
+    );
+    const prevDryIcePromises = prevMonths.map(({ year, month }) => 
+      fetchDryIceMonthData(year, month, prevFromDate, prevToDate)
+    );
+
+    const [cylinderResults, dryIceResults, prevCylinderResults, prevDryIceResults] = await Promise.all([
       Promise.all(cylinderPromises),
-      Promise.all(dryIcePromises)
+      Promise.all(dryIcePromises),
+      Promise.all(prevCylinderPromises),
+      Promise.all(prevDryIcePromises)
     ]);
 
     // Combine results from all months
     const allCylinderOrders = cylinderResults.flatMap(res => res.data || []);
     const allDryIceOrders = dryIceResults.flatMap(res => res.data || []);
+    const allPrevCylinderOrders = prevCylinderResults.flatMap(res => res.data || []);
+    const allPrevDryIceOrders = prevDryIceResults.flatMap(res => res.data || []);
 
     // Remove duplicates (in case of overlapping date boundaries)
     const uniqueCylinderOrders = Array.from(
@@ -275,9 +306,32 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
       new Map(allDryIceOrders.map(o => [o.id, o])).values()
     ).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
 
+    const uniquePrevCylinderOrders = Array.from(
+      new Map(allPrevCylinderOrders.map(o => [o.id, o])).values()
+    );
+    const uniquePrevDryIceOrders = Array.from(
+      new Map(allPrevDryIceOrders.map(o => [o.id, o])).values()
+    );
+
+    // Calculate previous period stats
+    setPreviousPeriodStats({
+      cylinderOrders: uniquePrevCylinderOrders.length,
+      totalCylinders: uniquePrevCylinderOrders.filter(o => o.status !== "cancelled").reduce((sum, o) => sum + o.cylinder_count, 0),
+      dryIceOrders: uniquePrevDryIceOrders.length,
+      totalDryIce: uniquePrevDryIceOrders.filter(o => o.status !== "cancelled").reduce((sum, o) => sum + Number(o.quantity_kg), 0),
+      completed: uniquePrevCylinderOrders.filter(o => o.status === "completed").length + uniquePrevDryIceOrders.filter(o => o.status === "completed").length,
+      pending: uniquePrevCylinderOrders.filter(o => o.status === "pending").length + uniquePrevDryIceOrders.filter(o => o.status === "pending").length
+    });
+
     setCylinderOrders(uniqueCylinderOrders);
     setDryIceOrders(uniqueDryIceOrders);
     setLoading(false);
+  };
+
+  // Helper function to calculate trend percentage
+  const calculateTrend = (current: number, previous: number): number => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return Math.round(((current - previous) / previous) * 100);
   };
 
   const setPresetRange = (preset: string) => {
@@ -541,81 +595,77 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <Card className="glass-card border-orange-500/20">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Cylinder className="h-4 w-4 text-orange-500" />
-              Cilinder orders
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{cylinderStats.total}</div>
-          </CardContent>
-        </Card>
+        <StatCard
+          value={cylinderStats.total}
+          label="Cilinder orders"
+          icon={<Cylinder className="h-5 w-5 text-orange-500" />}
+          iconBgColor="bg-orange-500/10"
+          trend={{
+            value: calculateTrend(cylinderStats.total, previousPeriodStats.cylinderOrders),
+            label: "vs. vorige periode"
+          }}
+          className="glass-card border-orange-500/20"
+        />
 
-        <Card className="glass-card border-orange-500/20">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-orange-500" />
-              Totaal cilinders
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(cylinderStats.totalCylinders, 0)}</div>
-          </CardContent>
-        </Card>
+        <StatCard
+          value={formatNumber(cylinderStats.totalCylinders, 0)}
+          label="Totaal cilinders"
+          icon={<Package className="h-5 w-5 text-orange-500" />}
+          iconBgColor="bg-orange-500/10"
+          trend={{
+            value: calculateTrend(cylinderStats.totalCylinders, previousPeriodStats.totalCylinders),
+            label: "vs. vorige periode"
+          }}
+          className="glass-card border-orange-500/20"
+        />
 
-        <Card className="glass-card border-cyan-500/20">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Snowflake className="h-4 w-4 text-cyan-500" />
-              Droogijs orders
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dryIceStats.total}</div>
-          </CardContent>
-        </Card>
+        <StatCard
+          value={dryIceStats.total}
+          label="Droogijs orders"
+          icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
+          iconBgColor="bg-cyan-500/10"
+          trend={{
+            value: calculateTrend(dryIceStats.total, previousPeriodStats.dryIceOrders),
+            label: "vs. vorige periode"
+          }}
+          className="glass-card border-cyan-500/20"
+        />
 
-        <Card className="glass-card border-cyan-500/20">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-cyan-500" />
-              Totaal droogijs
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(dryIceStats.totalKg, 0)} kg</div>
-          </CardContent>
-        </Card>
+        <StatCard
+          value={`${formatNumber(dryIceStats.totalKg, 0)} kg`}
+          label="Totaal droogijs"
+          icon={<TrendingUp className="h-5 w-5 text-cyan-500" />}
+          iconBgColor="bg-cyan-500/10"
+          trend={{
+            value: calculateTrend(dryIceStats.totalKg, previousPeriodStats.totalDryIce),
+            label: "vs. vorige periode"
+          }}
+          className="glass-card border-cyan-500/20"
+        />
 
-        <Card className="glass-card border-green-500/20">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-              Voltooid
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-500">
-              {cylinderStats.completed + dryIceStats.completed}
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard
+          value={cylinderStats.completed + dryIceStats.completed}
+          label="Voltooid"
+          icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
+          iconBgColor="bg-green-500/10"
+          trend={{
+            value: calculateTrend(cylinderStats.completed + dryIceStats.completed, previousPeriodStats.completed),
+            label: "vs. vorige periode"
+          }}
+          className="glass-card border-green-500/20"
+        />
 
-        <Card className="glass-card border-yellow-500/20">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-yellow-500" />
-              Gepland
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-500">
-              {cylinderStats.pending + dryIceStats.pending}
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard
+          value={cylinderStats.pending + dryIceStats.pending}
+          label="Gepland"
+          icon={<Clock className="h-5 w-5 text-yellow-500" />}
+          iconBgColor="bg-yellow-500/10"
+          trend={{
+            value: calculateTrend(cylinderStats.pending + dryIceStats.pending, previousPeriodStats.pending),
+            label: "vs. vorige periode"
+          }}
+          className="glass-card border-yellow-500/20"
+        />
       </div>
 
       {/* Detailed Tabs */}

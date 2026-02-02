@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Snowflake, Cylinder, Package, TrendingUp, BarChart3, MapPin, Lock } from "lucide-react";
+import { StatCard } from "@/components/ui/stat-card";
 import { TopCustomersWidget } from "./TopCustomersWidget";
 import { KPIDashboard } from "./KPIDashboard";
 import { FadeIn } from "@/components/ui/fade-in";
@@ -21,10 +21,11 @@ const ReportLoadingFallback = () => (
   <ChartSkeleton height={350} />
 );
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, subWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import type { Database } from "@/integrations/supabase/types";
 import type { RolePermissions } from "@/hooks/useUserPermissions";
 
@@ -46,6 +47,9 @@ export function ProductionPlanning({
   const [dryIceToday, setDryIceToday] = useState(0);
   const [cylindersToday, setCylindersToday] = useState(0);
   const [weekOrders, setWeekOrders] = useState(0);
+  const [previousDryIceToday, setPreviousDryIceToday] = useState(0);
+  const [previousCylindersToday, setPreviousCylindersToday] = useState(0);
+  const [previousWeekOrders, setPreviousWeekOrders] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
@@ -85,22 +89,37 @@ export function ProductionPlanning({
     setRefreshKey(prev => prev + 1);
   }, []);
 
+  const calculateTrend = (current: number, previous: number): number => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return Math.round(((current - previous) / previous) * 100);
+  };
+
   const fetchStats = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
+    const lastWeekSameDay = format(subWeeks(new Date(), 1), "yyyy-MM-dd");
     
-    // Fetch dry ice orders for today (filtered by location if not "all")
+    // Fetch dry ice orders for today
     let dryIceQuery = supabase
       .from("dry_ice_orders")
       .select("quantity_kg")
       .eq("scheduled_date", today)
       .neq("status", "cancelled");
     
-    // Note: dry_ice_orders doesn't have a location column, so we don't filter it by location
-    
     const { data: dryIceData } = await dryIceQuery;
     
     if (dryIceData) {
       setDryIceToday(dryIceData.reduce((sum, o) => sum + Number(o.quantity_kg), 0));
+    }
+
+    // Fetch dry ice orders for last week same day (for trend)
+    const { data: prevDryIceData } = await supabase
+      .from("dry_ice_orders")
+      .select("quantity_kg")
+      .eq("scheduled_date", lastWeekSameDay)
+      .neq("status", "cancelled");
+    
+    if (prevDryIceData) {
+      setPreviousDryIceToday(prevDryIceData.reduce((sum, o) => sum + Number(o.quantity_kg), 0));
     }
 
     // Fetch cylinder orders for today (filtered by location)
@@ -120,11 +139,32 @@ export function ProductionPlanning({
       setCylindersToday(cylinderData.reduce((sum, o) => sum + o.cylinder_count, 0));
     }
 
+    // Fetch cylinder orders for last week same day (for trend)
+    let prevCylinderQuery = supabase
+      .from("gas_cylinder_orders")
+      .select("cylinder_count")
+      .eq("scheduled_date", lastWeekSameDay)
+      .neq("status", "cancelled");
+    
+    if (selectedLocation !== "all") {
+      prevCylinderQuery = prevCylinderQuery.eq("location", selectedLocation);
+    }
+    
+    const { data: prevCylinderData } = await prevCylinderQuery;
+    
+    if (prevCylinderData) {
+      setPreviousCylindersToday(prevCylinderData.reduce((sum, o) => sum + o.cylinder_count, 0));
+    }
+
     // Fetch week orders count
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
+
+    // Previous week dates
+    const prevWeekStart = subWeeks(weekStart, 1);
+    const prevWeekEnd = subWeeks(weekEnd, 1);
 
     const { count: dryIceCount } = await supabase
       .from("dry_ice_orders")
@@ -146,6 +186,27 @@ export function ProductionPlanning({
     const { count: cylinderCount } = await weekCylinderQuery;
 
     setWeekOrders((dryIceCount || 0) + (cylinderCount || 0));
+
+    // Fetch previous week orders count (for trend)
+    const { count: prevDryIceCount } = await supabase
+      .from("dry_ice_orders")
+      .select("*", { count: "exact", head: true })
+      .gte("scheduled_date", format(prevWeekStart, "yyyy-MM-dd"))
+      .lte("scheduled_date", format(prevWeekEnd, "yyyy-MM-dd"));
+
+    let prevWeekCylinderQuery = supabase
+      .from("gas_cylinder_orders")
+      .select("*", { count: "exact", head: true })
+      .gte("scheduled_date", format(prevWeekStart, "yyyy-MM-dd"))
+      .lte("scheduled_date", format(prevWeekEnd, "yyyy-MM-dd"));
+    
+    if (selectedLocation !== "all") {
+      prevWeekCylinderQuery = prevWeekCylinderQuery.eq("location", selectedLocation);
+    }
+    
+    const { count: prevCylinderCount } = await prevWeekCylinderQuery;
+
+    setPreviousWeekOrders((prevDryIceCount || 0) + (prevCylinderCount || 0));
   };
 
   return (
@@ -260,63 +321,64 @@ export function ProductionPlanning({
 
       {/* Quick stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className={cn(
-          "glass-card transition-all duration-300",
-          isRefreshing && "animate-pulse ring-2 ring-primary/30"
-        )}>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Snowflake className="h-4 w-4 text-cyan-500" />
-              Droogijs vandaag
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dryIceToday} kg</div>
-            <p className="text-xs text-muted-foreground">Gepland voor productie</p>
-          </CardContent>
-        </Card>
+        <StatCard
+          value={`${dryIceToday} kg`}
+          label="Gepland voor productie"
+          icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
+          iconBgColor="bg-cyan-500/10"
+          trend={{
+            value: calculateTrend(dryIceToday, previousDryIceToday),
+            label: "vs. vorige week"
+          }}
+          className={cn(
+            "glass-card transition-all duration-300",
+            isRefreshing && "animate-pulse ring-2 ring-primary/30"
+          )}
+        />
         
-        <Card className={cn(
-          "glass-card transition-all duration-300",
-          isRefreshing && "animate-pulse ring-2 ring-primary/30"
-        )}>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Cylinder className="h-4 w-4 text-orange-500" />
-              Gascilinders vandaag
-              {selectedLocation !== "all" && (
-                <Badge variant="outline" className="ml-1 text-[10px] py-0">
-                  {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
-                </Badge>
-              )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{cylindersToday}</div>
-            <p className="text-xs text-muted-foreground">Gepland voor vulling</p>
-          </CardContent>
-        </Card>
+        <div className="relative">
+          <StatCard
+            value={cylindersToday}
+            label="Gepland voor vulling"
+            icon={<Cylinder className="h-5 w-5 text-orange-500" />}
+            iconBgColor="bg-orange-500/10"
+            trend={{
+              value: calculateTrend(cylindersToday, previousCylindersToday),
+              label: "vs. vorige week"
+            }}
+            className={cn(
+              "glass-card transition-all duration-300",
+              isRefreshing && "animate-pulse ring-2 ring-primary/30"
+            )}
+          />
+          {selectedLocation !== "all" && (
+            <Badge variant="outline" className="absolute top-2 right-2 text-[10px] py-0">
+              {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
+            </Badge>
+          )}
+        </div>
         
-        <Card className={cn(
-          "glass-card transition-all duration-300",
-          isRefreshing && "animate-pulse ring-2 ring-primary/30"
-        )}>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-green-500" />
-              Orders deze week
-              {selectedLocation !== "all" && (
-                <Badge variant="outline" className="ml-1 text-[10px] py-0">
-                  {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
-                </Badge>
-              )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{weekOrders}</div>
-            <p className="text-xs text-muted-foreground">Totaal te verwerken</p>
-          </CardContent>
-        </Card>
+        <div className="relative">
+          <StatCard
+            value={weekOrders}
+            label="Totaal te verwerken"
+            icon={<Package className="h-5 w-5 text-green-500" />}
+            iconBgColor="bg-green-500/10"
+            trend={{
+              value: calculateTrend(weekOrders, previousWeekOrders),
+              label: "vs. vorige week"
+            }}
+            className={cn(
+              "glass-card transition-all duration-300",
+              isRefreshing && "animate-pulse ring-2 ring-primary/30"
+            )}
+          />
+          {selectedLocation !== "all" && (
+            <Badge variant="outline" className="absolute top-2 right-2 text-[10px] py-0">
+              {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
+            </Badge>
+          )}
+        </div>
         
         <Card className={cn(
           "glass-card transition-all duration-300",
