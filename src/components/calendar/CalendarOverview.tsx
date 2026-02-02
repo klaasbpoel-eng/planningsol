@@ -1325,7 +1325,7 @@ export function CalendarOverview() {
                       type: "timeoff",
                       data: request
                     }, e)} className={cn("text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer", getTypeColor(request.type, request.status))} title={`${getEmployeeName(request)} - ${getLeaveTypeLabel(request)}${request.day_part && request.day_part !== "full_day" ? ` (${getDayPartLabel(request.day_part)})` : ""}`}>
-                            {request.day_part === "morning" ? <Sun className="w-3 h-3 shrink-0" /> : request.day_part === "afternoon" ? <Sunset className="w-3 h-3 shrink-0" /> : <Palmtree className="w-3 h-3 shrink-0" />}
+                            {request.day_part === "morning" ? <Sun className="w-3 h-3 shrink-0 text-amber-300" /> : request.day_part === "afternoon" ? <Sunset className="w-3 h-3 shrink-0" /> : <Palmtree className="w-3 h-3 shrink-0" />}
                             <span className="truncate font-medium">{getEmployeeName(request)} • {getLeaveTypeLabel(request)}</span>
                           </div>
                         </CalendarItemPreview>;
