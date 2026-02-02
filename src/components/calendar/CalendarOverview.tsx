@@ -1565,7 +1565,7 @@ export function CalendarOverview() {
               <div className="flex items-center gap-2">
                 <Checkbox id="showTimeOff" checked={showTimeOff} onCheckedChange={checked => setShowTimeOff(checked as boolean)} />
                 <label htmlFor="showTimeOff" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
-                  <Palmtree className="h-3.5 w-3.5 text-primary" />
+                  <Palmtree className="h-3.5 w-3.5 text-lime-800" />
                   Verlof
                 </label>
               </div>
