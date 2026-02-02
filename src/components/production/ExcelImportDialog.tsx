@@ -47,12 +47,6 @@ interface GasType {
   name: string;
 }
 
-interface CylinderSize {
-  id: string;
-  name: string;
-  capacity_liters: number | null;
-}
-
 export function ExcelImportDialog({
   open,
   onOpenChange,
@@ -66,7 +60,6 @@ export function ExcelImportDialog({
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   const [step, setStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
-  const [cylinderSizes, setCylinderSizes] = useState<CylinderSize[]>([]);
 
   // Fetch gas types when dialog opens
   const fetchGasTypes = async () => {
@@ -75,16 +68,6 @@ export function ExcelImportDialog({
       .select("id, name")
       .eq("is_active", true);
     if (data) setGasTypes(data);
-  };
-
-  // Fetch cylinder sizes from database
-  const fetchCylinderSizes = async () => {
-    const { data } = await supabase
-      .from("cylinder_sizes")
-      .select("id, name, capacity_liters")
-      .eq("is_active", true)
-      .order("capacity_liters", { ascending: true, nullsFirst: false });
-    if (data) setCylinderSizes(data);
   };
 
   // Match gas type name to ID from the gas_types table using priority-based matching
@@ -128,100 +111,36 @@ export function ExcelImportDialog({
     return "other";
   };
 
-  // Match cylinder size from Excel input to database values
-  const matchCylinderSize = (sizeStr: string): string => {
-    const str = sizeStr.toLowerCase().trim();
-    
-    // Special cases: PP bundels en Dewars - exacte match op naam
-    // PP bundel formaten (bijv. "PP 16x50", "PP 12x40")
-    const ppMatch = str.match(/pp\s*(\d+)\s*[xX×]\s*(\d+)/i);
-    if (ppMatch) {
-      const count = parseInt(ppMatch[1]);
-      const size = parseInt(ppMatch[2]);
-      // Zoek exacte PP match in database
-      const ppName = `PP ${count} X ${size}L`;
-      const exactPP = cylinderSizes.find(cs => 
-        cs.name.toUpperCase().replace(/\s+/g, ' ') === ppName.toUpperCase()
-      );
-      if (exactPP) return exactPP.name;
-      // Fallback: zoek op capacity (count * size)
-      const totalCapacity = count * size;
-      const closestPP = cylinderSizes.find(cs => cs.capacity_liters === totalCapacity && cs.name.toLowerCase().includes('pp'));
-      if (closestPP) return closestPP.name;
-    }
-    
-    // Dewar formaten
-    if (str.includes("dewar")) {
-      const dewarMatch = str.match(/(\d+)\s*l?/i);
-      if (dewarMatch) {
-        const liters = parseInt(dewarMatch[1]);
-        // Zoek exacte Dewar match
-        const exactDewar = cylinderSizes.find(cs => 
-          cs.name.toLowerCase().includes('dewar') && cs.capacity_liters === liters
-        );
-        if (exactDewar) return exactDewar.name;
-      }
-      // Fallback naar Dewar 240L (meest voorkomend)
-      const defaultDewar = cylinderSizes.find(cs => cs.name === "Dewar 240L");
-      if (defaultDewar) return defaultDewar.name;
-    }
-    
-    // Standaard cilinder maten - parse liter waarde
-    const sizeMatch = str.match(/(\d+(?:[.,]\d+)?)\s*l/i);
-    if (sizeMatch) {
-      const liters = parseFloat(sizeMatch[1].replace(',', '.'));
-      
-      // Zoek exacte match op capacity_liters
-      const exactMatch = cylinderSizes.find(cs => cs.capacity_liters === liters);
-      if (exactMatch) return exactMatch.name;
-      
-      // Zoek dichtstbijzijnde match (alleen reguliere cilinders, geen PP/Dewar)
-      const regularCylinders = cylinderSizes.filter(cs => 
-        !cs.name.toLowerCase().includes('dewar') && 
-        !cs.name.toLowerCase().includes('pp') &&
-        cs.capacity_liters !== null
-      );
-      
-      if (regularCylinders.length > 0) {
-        const closest = regularCylinders.reduce((prev, curr) => {
-          const prevDiff = Math.abs((prev.capacity_liters || 0) - liters);
-          const currDiff = Math.abs((curr.capacity_liters || 0) - liters);
-          return currDiff < prevDiff ? curr : prev;
-        });
-        return closest.name;
-      }
-    }
-    
-    // Fallback: probeer alleen getal te vinden
-    const numberMatch = str.match(/(\d+)/);
-    if (numberMatch) {
-      const liters = parseInt(numberMatch[1]);
-      const regularCylinders = cylinderSizes.filter(cs => 
-        !cs.name.toLowerCase().includes('dewar') && 
-        !cs.name.toLowerCase().includes('pp') &&
-        cs.capacity_liters !== null
-      );
-      if (regularCylinders.length > 0) {
-        const closest = regularCylinders.reduce((prev, curr) => {
-          const prevDiff = Math.abs((prev.capacity_liters || 0) - liters);
-          const currDiff = Math.abs((curr.capacity_liters || 0) - liters);
-          return currDiff < prevDiff ? curr : prev;
-        });
-        return closest.name;
-      }
-    }
-    
-    // Laatste fallback: 50 liter cilinder
-    const fallback = cylinderSizes.find(cs => cs.capacity_liters === 50);
-    return fallback?.name || "50 liter cilinder";
-  };
-
-  // Parse pressure from Excel format
-  const parsePressure = (sizeStr: string): number => {
+  // Parse cylinder size from Excel format
+  const parseCylinderSize = (sizeStr: string): { size: string; pressure: number } => {
     const str = sizeStr.toLowerCase();
-    if (str.includes("300 bar") || str.includes("300bar")) return 300;
-    if (str.includes("4 bar") || str.includes("4bar")) return 4; // Dewars
-    return 200; // Default
+    let pressure = 200;
+    
+    if (str.includes("300 bar")) pressure = 300;
+    
+    // Extract size patterns
+    if (str.includes("dewar")) return { size: "Dewar 240L", pressure };
+    if (str.includes("pp 16x50")) return { size: "PP 16 X 50L", pressure };
+    if (str.includes("pp 16x40")) return { size: "PP 16 X 40L", pressure };
+    if (str.includes("pp 12x50")) return { size: "PP 12 X 50L", pressure };
+    if (str.includes("pp 12x40")) return { size: "PP 12 X 40L", pressure };
+    
+    // Single cylinder sizes
+    const sizeMatch = str.match(/(\d+)\s*l/i);
+    if (sizeMatch) {
+      const liters = parseInt(sizeMatch[1]);
+      if (liters <= 2) return { size: "2L", pressure };
+      if (liters <= 4) return { size: "4L", pressure };
+      if (liters <= 5) return { size: "5L", pressure };
+      if (liters <= 10) return { size: "10L", pressure };
+      if (liters <= 13) return { size: "10L", pressure }; // 13L maps to 10L
+      if (liters <= 20) return { size: "20L", pressure };
+      if (liters <= 30) return { size: "30L", pressure };
+      if (liters <= 40) return { size: "40L", pressure };
+      return { size: "50L", pressure };
+    }
+    
+    return { size: "50L", pressure };
   };
 
   // Parse location from Excel format
@@ -281,8 +200,8 @@ export function ExcelImportDialog({
     
     setFile(selectedFile);
     
-    // Fetch gas types and cylinder sizes for matching
-    await Promise.all([fetchGasTypes(), fetchCylinderSizes()]);
+    // Fetch gas types for matching
+    await fetchGasTypes();
     
     // Get current user profile
     const { data: { user } } = await supabase.auth.getUser();
@@ -398,10 +317,11 @@ export function ExcelImportDialog({
               pressure = pressureVal;
             }
           } else {
-            pressure = parsePressure(sizeStr);
+            const { pressure: descPressure } = parseCylinderSize(sizeStr);
+            pressure = descPressure;
           }
           
-          const size = matchCylinderSize(sizeStr);
+          const { size } = parseCylinderSize(sizeStr);
           const location = parseLocation(locationStr);
           
           orders.push({
