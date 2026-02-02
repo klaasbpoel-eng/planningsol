@@ -2,17 +2,12 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getStockStatus, type StockStatus } from "./StockStatusBadge";
-
-interface StockItem {
-  subCode: string;
-  description: string;
-  averageConsumption: number;
-  numberOnStock: number;
-  difference: number;
-}
+import { StockExcelImportDialog, type StockItem } from "./StockExcelImportDialog";
+// StockItem is imported from StockExcelImportDialog
 
 interface StockSummaryWidgetProps {
   refreshKey?: number;
@@ -51,7 +46,12 @@ interface StatusConfig {
 }
 
 export function StockSummaryWidget({ refreshKey, isRefreshing, className }: StockSummaryWidgetProps) {
-  const [stockData] = useState<StockItem[]>(mockStockData);
+  const [stockData, setStockData] = useState<StockItem[]>(mockStockData);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+
+  const handleImported = (data: StockItem[]) => {
+    setStockData(data);
+  };
 
   // Group items by status
   const statusConfigs = useMemo(() => {
@@ -141,11 +141,28 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
       )}
     >
       <CardHeader className="pb-2">
-        <CardDescription className="flex items-center gap-2">
-          <Package className="h-4 w-4 text-blue-500" />
-          Voorraadstatus
+        <CardDescription className="flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <Package className="h-4 w-4 text-blue-500" />
+            Voorraadstatus
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => setImportDialogOpen(true)}
+            title="Excel importeren"
+          >
+            <Upload className="h-3.5 w-3.5" />
+          </Button>
         </CardDescription>
       </CardHeader>
+      
+      <StockExcelImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImported={handleImported}
+      />
       <CardContent>
         <div className={cn("text-2xl font-bold mb-2", overallColor)}>{overallLabel}</div>
         <div className="grid grid-cols-4 gap-1">
