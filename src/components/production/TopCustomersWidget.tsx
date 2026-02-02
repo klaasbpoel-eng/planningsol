@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,7 @@ interface TopCustomersWidgetProps {
   location?: ProductionLocation;
 }
 
-export function TopCustomersWidget({ refreshKey = 0, isRefreshing = false, location = "all" }: TopCustomersWidgetProps) {
+export const TopCustomersWidget = React.memo(function TopCustomersWidget({ refreshKey = 0, isRefreshing = false, location = "all" }: TopCustomersWidgetProps) {
   const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -96,20 +96,20 @@ export function TopCustomersWidget({ refreshKey = 0, isRefreshing = false, locat
     }
   };
 
-  const getTrendIcon = (change: number) => {
+  const getTrendIcon = useCallback((change: number) => {
     if (change > 5) return <TrendingUp className="h-3 w-3 text-green-500" />;
     if (change < -5) return <TrendingDown className="h-3 w-3 text-red-500" />;
     return <Minus className="h-3 w-3 text-muted-foreground" />;
-  };
+  }, []);
 
-  const getMedalColor = (index: number) => {
+  const getMedalColor = useCallback((index: number) => {
     switch (index) {
       case 0: return "text-yellow-500";
       case 1: return "text-gray-400";
       case 2: return "text-amber-600";
       default: return "text-muted-foreground";
     }
-  };
+  }, []);
 
   if (loading) {
     return (
@@ -184,4 +184,6 @@ export function TopCustomersWidget({ refreshKey = 0, isRefreshing = false, locat
       </CardContent>
     </Card>
   );
-}
+});
+
+TopCustomersWidget.displayName = "TopCustomersWidget";

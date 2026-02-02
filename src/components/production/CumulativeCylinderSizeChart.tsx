@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -69,7 +69,7 @@ interface CumulativeCylinderSizeChartProps {
   location?: ProductionLocation;
 }
 
-export function CumulativeCylinderSizeChart({ location = "all" }: CumulativeCylinderSizeChartProps) {
+export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinderSizeChart({ location = "all" }: CumulativeCylinderSizeChartProps) {
   const [loading, setLoading] = useState(true);
   const [yearData, setYearData] = useState<YearData[]>([]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
@@ -236,7 +236,7 @@ export function CumulativeCylinderSizeChart({ location = "all" }: CumulativeCyli
     return chartData;
   }, [yearData, selectedSizes]);
 
-  const toggleSize = (sizeName: string) => {
+  const toggleSize = useCallback((sizeName: string) => {
     setSelectedSizes(prev => {
       if (prev.includes(sizeName)) {
         return prev.filter(name => name !== sizeName);
@@ -244,7 +244,7 @@ export function CumulativeCylinderSizeChart({ location = "all" }: CumulativeCyli
         return [...prev, sizeName];
       }
     });
-  };
+  }, []);
 
   // Calculate all cylinder size volumes for tooltips
   const allSizeVolumes = useMemo(() => {
@@ -275,23 +275,23 @@ export function CumulativeCylinderSizeChart({ location = "all" }: CumulativeCyli
     return (getSizeVolume(sizeName) / totalAllSizesVolume) * 100;
   };
 
-  const selectTopFive = () => {
+  const selectTopFive = useCallback(() => {
     setSelectedSizes(topFiveSizes);
     setAnimatingTopFive(true);
     setTimeout(() => setAnimatingTopFive(false), 600);
-  };
+  }, [topFiveSizes]);
 
-  const selectAllSizes = () => {
+  const selectAllSizes = useCallback(() => {
     setSelectedSizes(allCylinderSizes.map(cs => cs.name));
     setAnimatingAll(true);
     setTimeout(() => setAnimatingAll(false), 600);
-  };
+  }, [allCylinderSizes]);
 
-  const clearSizes = () => {
+  const clearSizes = useCallback(() => {
     setSelectedSizes([]);
     setAnimatingClear(true);
     setTimeout(() => setAnimatingClear(false), 300);
-  };
+  }, []);
 
   if (loading) {
     return (
@@ -572,4 +572,6 @@ export function CumulativeCylinderSizeChart({ location = "all" }: CumulativeCyli
       </CardContent>
     </Card>
   );
-}
+});
+
+CumulativeCylinderSizeChart.displayName = "CumulativeCylinderSizeChart";

@@ -1,11 +1,20 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import { Snowflake, Cylinder, Package, TrendingUp, BarChart3, MapPin, Lock } from "lucide-react";
-import { DryIcePlanning } from "./DryIcePlanning";
-import { GasCylinderPlanning } from "./GasCylinderPlanning";
-import { ProductionReports } from "./ProductionReports";
+import { Snowflake, Cylinder, Package, TrendingUp, BarChart3, MapPin, Lock, Loader2 } from "lucide-react";
 import { TopCustomersWidget } from "./TopCustomersWidget";
+
+// Lazy load heavy tab components
+const DryIcePlanning = lazy(() => import("./DryIcePlanning").then(m => ({ default: m.DryIcePlanning })));
+const GasCylinderPlanning = lazy(() => import("./GasCylinderPlanning").then(m => ({ default: m.GasCylinderPlanning })));
+const ProductionReports = lazy(() => import("./ProductionReports").then(m => ({ default: m.ProductionReports })));
+
+// Loading fallback component
+const TabLoadingFallback = () => (
+  <div className="flex items-center justify-center py-12">
+    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+  </div>
+);
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -352,21 +361,27 @@ export function ProductionPlanning({
         </TabsList>
 
         <TabsContent value="droogijs" className="mt-6">
-          <DryIcePlanning 
-            onDataChanged={handleDataChanged} 
-            location={selectedLocation}
-          />
+          <Suspense fallback={<TabLoadingFallback />}>
+            <DryIcePlanning 
+              onDataChanged={handleDataChanged} 
+              location={selectedLocation}
+            />
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="gascilinders" className="mt-6">
-          <GasCylinderPlanning 
-            onDataChanged={handleDataChanged} 
-            location={selectedLocation}
-          />
+          <Suspense fallback={<TabLoadingFallback />}>
+            <GasCylinderPlanning 
+              onDataChanged={handleDataChanged} 
+              location={selectedLocation}
+            />
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="rapportage" className="mt-6">
-          <ProductionReports refreshKey={refreshKey} onDataChanged={handleDataChanged} location={selectedLocation} />
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ProductionReports refreshKey={refreshKey} onDataChanged={handleDataChanged} location={selectedLocation} />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>
