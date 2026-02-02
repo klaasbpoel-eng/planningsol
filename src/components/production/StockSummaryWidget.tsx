@@ -178,7 +178,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
                     </div>
                   </div>
                   {config.items.length > 0 ? (
-                    <ScrollArea className="max-h-48">
+                    <ScrollArea className="max-h-72">
                       <div className="p-2 space-y-1">
                         {config.items.map((item) => (
                           <div
