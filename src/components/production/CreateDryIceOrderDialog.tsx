@@ -121,11 +121,23 @@ export function CreateDryIceOrderDialog({
       .select("id, name")
       .eq("is_active", true)
       .order("sort_order");
+    
+    // Fetch default product type setting
+    const { data: defaultSetting } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "dry_ice_default_product_type_id")
+      .maybeSingle();
+    
     if (data && data.length > 0) {
       setProductTypes(data);
-      // Default to "9mm" if available, otherwise first item
-      const defaultType = data.find(pt => pt.name.toLowerCase().includes("9mm"));
-      setProductTypeId(defaultType?.id || data[0].id);
+      // Use configured default, or fallback to "9mm", or first item
+      if (defaultSetting?.value && data.find(pt => pt.id === defaultSetting.value)) {
+        setProductTypeId(defaultSetting.value);
+      } else {
+        const defaultType = data.find(pt => pt.name.toLowerCase().includes("9mm"));
+        setProductTypeId(defaultType?.id || data[0].id);
+      }
     }
   };
 
@@ -140,14 +152,25 @@ export function CreateDryIceOrderDialog({
     }
   };
 
-  const resetForm = () => {
+  const resetForm = async () => {
     setCustomerId("");
     setCustomerName("");
     setQuantityKg("");
+    
+    // Fetch default product type setting for reset
+    const { data: defaultSetting } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "dry_ice_default_product_type_id")
+      .maybeSingle();
+    
     if (productTypes.length > 0) {
-      // Default to "9mm" if available, otherwise first item
-      const defaultType = productTypes.find(pt => pt.name.toLowerCase().includes("9mm"));
-      setProductTypeId(defaultType?.id || productTypes[0].id);
+      if (defaultSetting?.value && productTypes.find(pt => pt.id === defaultSetting.value)) {
+        setProductTypeId(defaultSetting.value);
+      } else {
+        const defaultType = productTypes.find(pt => pt.name.toLowerCase().includes("9mm"));
+        setProductTypeId(defaultType?.id || productTypes[0].id);
+      }
     }
     setPackagingId("");
     setBoxCount("");
