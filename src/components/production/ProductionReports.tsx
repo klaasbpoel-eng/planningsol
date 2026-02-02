@@ -18,6 +18,8 @@ import {
   GitCompare
 } from "lucide-react";
 import { YearComparisonReport } from "./YearComparisonReport";
+import { CumulativeGasTypeChart } from "./CumulativeGasTypeChart";
+import { CumulativeCylinderSizeChart } from "./CumulativeCylinderSizeChart";
 import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn, formatNumber } from "@/lib/utils";
@@ -910,8 +912,10 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
           </Card>
         </TabsContent>
 
-        <TabsContent value="comparison" className="mt-6">
+        <TabsContent value="comparison" className="mt-6 space-y-6">
           <YearComparisonReport location={location} />
+          <CumulativeGasTypeChart />
+          <CumulativeCylinderSizeChart />
         </TabsContent>
       </Tabs>
     </div>
