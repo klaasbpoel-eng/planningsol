@@ -94,6 +94,7 @@ type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Task = Database["public"]["Tables"]["tasks"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type TaskType = Database["public"]["Tables"]["task_types"]["Row"];
+type TimeOffType = Database["public"]["Tables"]["time_off_types"]["Row"];
 type DryIceOrder = Database["public"]["Tables"]["dry_ice_orders"]["Row"];
 type DryIceProductType = Database["public"]["Tables"]["dry_ice_product_types"]["Row"];
 type DryIcePackaging = Database["public"]["Tables"]["dry_ice_packaging"]["Row"];
@@ -102,6 +103,7 @@ type GasType = Database["public"]["Tables"]["gas_types"]["Row"];
 
 type RequestWithProfile = TimeOffRequest & {
   profile?: Profile | null;
+  leave_type?: TimeOffType | null;
 };
 
 type TaskWithProfile = Task & {
@@ -158,6 +160,7 @@ export function CalendarOverview() {
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
   const [currentProfileId, setCurrentProfileId] = useState<string | undefined>();
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
+  const [timeOffTypes, setTimeOffTypes] = useState<TimeOffType[]>([]);
   const [dryIceProductTypes, setDryIceProductTypes] = useState<DryIceProductType[]>([]);
   const [dryIcePackaging, setDryIcePackaging] = useState<DryIcePackaging[]>([]);
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
@@ -278,14 +281,25 @@ export function CalendarOverview() {
 
       if (gasTypesError) throw gasTypesError;
 
-      // Map profiles to requests using profile_id (new) or user_id (legacy)
+      // Fetch time off types
+      const { data: timeOffTypesData, error: timeOffTypesError } = await supabase
+        .from("time_off_types")
+        .select("*")
+        .eq("is_active", true);
+
+      if (timeOffTypesError) throw timeOffTypesError;
+
+      // Map profiles and leave types to requests using profile_id (new) or user_id (legacy)
       const requestsWithProfiles: RequestWithProfile[] = (requestsData || []).map((request) => {
         // Use profile_id if available, otherwise fall back to user_id
         const requestAny = request as any;
         const profile = requestAny.profile_id 
           ? profilesData?.find((p) => p.id === requestAny.profile_id) 
           : profilesData?.find((p) => p.user_id === request.user_id) || null;
-        return { ...request, profile };
+        const leave_type = request.type_id 
+          ? timeOffTypesData?.find((t) => t.id === request.type_id) || null 
+          : null;
+        return { ...request, profile, leave_type };
       });
 
       // Find current user's profile
@@ -320,6 +334,7 @@ export function CalendarOverview() {
       setGasCylinderOrders(gasCylinderOrdersWithDetails);
       setProfiles(profilesData || []);
       setTaskTypes(taskTypesData || []);
+      setTimeOffTypes(timeOffTypesData || []);
       setDryIceProductTypes(dryIceProductTypesData || []);
       setDryIcePackaging(dryIcePackagingData || []);
       setGasTypes(gasTypesData || []);
@@ -767,6 +782,14 @@ export function CalendarOverview() {
     }
   };
 
+  // Get leave type label from custom type or fall back to enum type
+  const getLeaveTypeLabel = (request: RequestWithProfile) => {
+    if (request.leave_type?.name) {
+      return request.leave_type.name;
+    }
+    return getTypeLabel(request.type);
+  };
+
   const navigate = (direction: "prev" | "next") => {
     const modifier = direction === "prev" ? -1 : 1;
     switch (viewType) {
@@ -923,7 +946,7 @@ export function CalendarOverview() {
                             <Palmtree className="h-4 w-4 text-primary flex-shrink-0" />
                             <span className="font-medium truncate">{getEmployeeName(request)}</span>
                             <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTypeColor(request.type, request.status))}>
-                              {getTypeLabel(request.type)}
+                              {getLeaveTypeLabel(request)}
                             </Badge>
                           </div>
                           <div className="text-sm text-muted-foreground flex items-center gap-2">
@@ -1129,7 +1152,7 @@ export function CalendarOverview() {
                             </div>
                           )}
                         </div>
-                        <div className="font-medium mt-2 opacity-90">{getTypeLabel(request.type)}</div>
+                        <div className="font-medium mt-2 opacity-90">{getLeaveTypeLabel(request)}</div>
                         <div className="text-xs opacity-75 mt-1">
                           {format(parseISO(request.start_date), "d MMM", { locale: nl })} — {format(parseISO(request.end_date), "d MMM", { locale: nl })}
                         </div>
@@ -1361,7 +1384,7 @@ export function CalendarOverview() {
                               "text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer",
                               getTypeColor(request.type, request.status)
                             )}
-                            title={`${getEmployeeName(request)} - ${getTypeLabel(request.type)}${request.day_part && request.day_part !== "full_day" ? ` (${getDayPartLabel(request.day_part)})` : ""}`}
+                            title={`${getEmployeeName(request)} - ${getLeaveTypeLabel(request)}${request.day_part && request.day_part !== "full_day" ? ` (${getDayPartLabel(request.day_part)})` : ""}`}
                           >
                             {request.day_part === "morning" ? (
                               <Sun className="w-3 h-3 shrink-0" />
@@ -1370,7 +1393,7 @@ export function CalendarOverview() {
                             ) : (
                               <Palmtree className="w-3 h-3 shrink-0" />
                             )}
-                            <span className="truncate font-medium">{getEmployeeName(request)}</span>
+                            <span className="truncate font-medium">{getEmployeeName(request)} • {getLeaveTypeLabel(request)}</span>
                           </div>
                         </CalendarItemPreview>
                       );
@@ -1551,7 +1574,7 @@ export function CalendarOverview() {
                             ) : (
                               <Palmtree className="w-2.5 h-2.5 shrink-0" />
                             )}
-                            <span className="truncate font-medium">{getEmployeeName(request)}</span>
+                            <span className="truncate font-medium">{getEmployeeName(request)} • {getLeaveTypeLabel(request)}</span>
                           </div>
                         </CalendarItemPreview>
                       );
@@ -1691,7 +1714,7 @@ export function CalendarOverview() {
                         )}
                       >
                         <Palmtree className="w-2.5 h-2.5" />
-                        {getTypeLabel(request.type)}
+                        {getLeaveTypeLabel(request)}
                       </Badge>
                     ))}
                     {monthTasks.slice(0, 1).map((task) => (
