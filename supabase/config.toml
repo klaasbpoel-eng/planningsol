@@ -1,1 +1,4 @@
 project_id = "lrgjeqsvgsxarneegzmd"
+
+[functions.complete-past-dry-ice-orders]
+verify_jwt = false
