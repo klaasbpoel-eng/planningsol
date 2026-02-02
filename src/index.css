@@ -145,12 +145,36 @@ All colors MUST be HSL.
     @apply bg-white/10 border-white/20 shadow-lg;
   }
   
+  /* Hover animations for interactive elements */
   .hover-lift {
-    @apply transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-lg;
+    @apply transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg;
+  }
+  
+  .hover-scale {
+    @apply transition-transform duration-150 ease-out hover:scale-[1.02] active:scale-[0.98];
   }
   
   .hover-glow {
     @apply transition-all duration-300 ease-out hover:shadow-[0_0_30px_-5px_hsl(var(--primary)/0.3)];
+  }
+  
+  .hover-border {
+    @apply transition-colors duration-200 hover:border-primary/50;
+  }
+  
+  /* Table row hover */
+  .table-row-hover {
+    @apply transition-colors duration-150 hover:bg-muted/50;
+  }
+  
+  /* Badge/chip hover */
+  .badge-hover {
+    @apply transition-all duration-150 hover:scale-105 hover:shadow-sm cursor-pointer;
+  }
+  
+  /* Icon button hover */
+  .icon-hover {
+    @apply transition-all duration-150 hover:scale-110 hover:text-primary;
   }
   
   .calendar-item-modern {
