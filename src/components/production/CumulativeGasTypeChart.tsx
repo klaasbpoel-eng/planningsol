@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -47,7 +47,7 @@ interface CumulativeGasTypeChartProps {
   location?: ProductionLocation;
 }
 
-export function CumulativeGasTypeChart({ location = "all" }: CumulativeGasTypeChartProps) {
+export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart({ location = "all" }: CumulativeGasTypeChartProps) {
   const [loading, setLoading] = useState(true);
   const [yearData, setYearData] = useState<YearData[]>([]);
   const [selectedGasTypes, setSelectedGasTypes] = useState<string[]>([]);
@@ -195,7 +195,7 @@ export function CumulativeGasTypeChart({ location = "all" }: CumulativeGasTypeCh
     return chartData;
   }, [yearData, selectedGasTypes]);
 
-  const toggleGasType = (gasTypeId: string) => {
+  const toggleGasType = useCallback((gasTypeId: string) => {
     setSelectedGasTypes(prev => {
       if (prev.includes(gasTypeId)) {
         return prev.filter(id => id !== gasTypeId);
@@ -203,7 +203,7 @@ export function CumulativeGasTypeChart({ location = "all" }: CumulativeGasTypeCh
         return [...prev, gasTypeId];
       }
     });
-  };
+  }, []);
 
   // Calculate all gas type volumes for tooltips
   const allGasTypeVolumes = useMemo(() => {
@@ -234,23 +234,23 @@ export function CumulativeGasTypeChart({ location = "all" }: CumulativeGasTypeCh
     return (getGasTypeVolume(gasTypeId) / totalAllGasTypesVolume) * 100;
   };
 
-  const selectTopFive = () => {
+  const selectTopFive = useCallback(() => {
     setSelectedGasTypes(topFiveGasTypes);
     setAnimatingTopFive(true);
     setTimeout(() => setAnimatingTopFive(false), 600);
-  };
+  }, [topFiveGasTypes]);
 
-  const selectAllGasTypes = () => {
+  const selectAllGasTypes = useCallback(() => {
     setSelectedGasTypes(allGasTypes.map(gt => gt.id));
     setAnimatingAll(true);
     setTimeout(() => setAnimatingAll(false), 600);
-  };
+  }, [allGasTypes]);
 
-  const clearGasTypes = () => {
+  const clearGasTypes = useCallback(() => {
     setSelectedGasTypes([]);
     setAnimatingClear(true);
     setTimeout(() => setAnimatingClear(false), 300);
-  };
+  }, []);
 
   if (loading) {
     return (
@@ -584,4 +584,6 @@ export function CumulativeGasTypeChart({ location = "all" }: CumulativeGasTypeCh
       </CardContent>
     </Card>
   );
-}
+});
+
+CumulativeGasTypeChart.displayName = "CumulativeGasTypeChart";

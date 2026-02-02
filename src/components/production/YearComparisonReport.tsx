@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users, Building2, Ruler } from "lucide-react";
@@ -110,7 +110,7 @@ interface MonthlyCustomerCylinderData {
   total_cylinders: number;
 }
 
-export function YearComparisonReport({ location = "all" }: YearComparisonReportProps) {
+export const YearComparisonReport = React.memo(function YearComparisonReport({ location = "all" }: YearComparisonReportProps) {
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [cylinderData, setCylinderData] = useState<MonthlyData[]>([]);
@@ -2075,4 +2075,6 @@ export function YearComparisonReport({ location = "all" }: YearComparisonReportP
       )}
     </div>
   );
-}
+});
+
+YearComparisonReport.displayName = "YearComparisonReport";

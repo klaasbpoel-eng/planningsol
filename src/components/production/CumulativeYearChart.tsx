@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -57,7 +57,7 @@ interface CumulativeYearChartProps {
   type: "cylinders" | "dryIce";
 }
 
-export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
+export const CumulativeYearChart = React.memo(function CumulativeYearChart({ type }: CumulativeYearChartProps) {
   const [loading, setLoading] = useState(true);
   const [yearlyData, setYearlyData] = useState<YearlyMonthlyData[]>([]);
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
@@ -154,7 +154,7 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
     return chartData;
   }, [yearlyData, selectedYears]);
 
-  const toggleYear = (year: number) => {
+  const toggleYear = useCallback((year: number) => {
     setSelectedYears(prev => {
       if (prev.includes(year)) {
         return prev.filter(y => y !== year);
@@ -162,19 +162,19 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
         return [...prev, year].sort((a, b) => b - a);
       }
     });
-  };
+  }, []);
 
-  const selectAllYears = () => {
+  const selectAllYears = useCallback(() => {
     setSelectedYears(availableYears);
     setAnimatingAll(true);
     setTimeout(() => setAnimatingAll(false), 600);
-  };
+  }, [availableYears]);
 
-  const clearYears = () => {
+  const clearYears = useCallback(() => {
     setSelectedYears([]);
     setAnimatingClear(true);
     setTimeout(() => setAnimatingClear(false), 300);
-  };
+  }, []);
 
   // Calculate top 5 years by total volume (memoized for indicator display)
   // Calculate all year volumes for tooltips
@@ -204,11 +204,11 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
     return (getYearVolume(year) / totalAllYearsVolume) * 100;
   };
 
-  const selectTopFive = () => {
+  const selectTopFive = useCallback(() => {
     setSelectedYears(topFiveYears);
     setAnimatingTopFive(true);
     setTimeout(() => setAnimatingTopFive(false), 600);
-  };
+  }, [topFiveYears]);
 
   if (loading) {
     return (
@@ -428,4 +428,6 @@ export function CumulativeYearChart({ type }: CumulativeYearChartProps) {
       </CardContent>
     </Card>
   );
-}
+});
+
+CumulativeYearChart.displayName = "CumulativeYearChart";

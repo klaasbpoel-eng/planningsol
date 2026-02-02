@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -17,9 +17,18 @@ import {
   Loader2,
   GitCompare
 } from "lucide-react";
-import { YearComparisonReport } from "./YearComparisonReport";
-import { CumulativeGasTypeChart } from "./CumulativeGasTypeChart";
-import { CumulativeCylinderSizeChart } from "./CumulativeCylinderSizeChart";
+
+// Lazy load heavy chart components
+const YearComparisonReport = lazy(() => import("./YearComparisonReport").then(m => ({ default: m.YearComparisonReport })));
+const CumulativeGasTypeChart = lazy(() => import("./CumulativeGasTypeChart").then(m => ({ default: m.CumulativeGasTypeChart })));
+const CumulativeCylinderSizeChart = lazy(() => import("./CumulativeCylinderSizeChart").then(m => ({ default: m.CumulativeCylinderSizeChart })));
+
+// Loading fallback component
+const ChartLoadingFallback = () => (
+  <div className="flex items-center justify-center py-12">
+    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+  </div>
+);
 import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn, formatNumber } from "@/lib/utils";
@@ -913,9 +922,15 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
         </TabsContent>
 
         <TabsContent value="comparison" className="mt-6 space-y-6">
-          <YearComparisonReport location={location} />
-          <CumulativeGasTypeChart location={location} />
-          <CumulativeCylinderSizeChart location={location} />
+          <Suspense fallback={<ChartLoadingFallback />}>
+            <YearComparisonReport location={location} />
+          </Suspense>
+          <Suspense fallback={<ChartLoadingFallback />}>
+            <CumulativeGasTypeChart location={location} />
+          </Suspense>
+          <Suspense fallback={<ChartLoadingFallback />}>
+            <CumulativeCylinderSizeChart location={location} />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>
