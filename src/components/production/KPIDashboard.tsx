@@ -14,7 +14,8 @@ import {
   ChevronUp,
   Zap,
   BarChart3,
-  Minus
+  Minus,
+  AlertTriangle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn, formatNumber } from "@/lib/utils";
@@ -25,6 +26,8 @@ import {
   ResponsiveContainer,
   Tooltip
 } from "recharts";
+import { analyzeAnomalies, type AnomalyResult } from "@/hooks/useAnomalyDetection";
+import { AnomalyAlertBadge, AnomalyAlertsPanel } from "./AnomalyAlertBadge";
 
 type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 
@@ -53,6 +56,7 @@ export function KPIDashboard({ location, refreshKey = 0 }: KPIDashboardProps) {
   const [currentYearData, setCurrentYearData] = useState<EfficiencyData | null>(null);
   const [previousYearData, setPreviousYearData] = useState<EfficiencyData | null>(null);
   const [weeklyData, setWeeklyData] = useState<SparklineData[]>([]);
+  const [historicalWeeklyData, setHistoricalWeeklyData] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
 
   const currentYear = new Date().getFullYear();
@@ -89,6 +93,10 @@ export function KPIDashboard({ location, refreshKey = 0 }: KPIDashboardProps) {
     // Fetch weekly sparkline data (last 8 weeks)
     const weeklySparkline = await fetchWeeklySparkline(locationParam);
     setWeeklyData(weeklySparkline);
+    
+    // Store historical values for anomaly detection (exclude current week)
+    const historicalValues = weeklySparkline.slice(0, -1).map(w => w.value);
+    setHistoricalWeeklyData(historicalValues);
     
     setLoading(false);
   };
@@ -169,6 +177,27 @@ export function KPIDashboard({ location, refreshKey = 0 }: KPIDashboardProps) {
     return "text-destructive";
   };
 
+  // Anomaly detection for current week volume
+  const anomalies = useMemo(() => {
+    const currentWeekValue = weeklyData.length > 0 ? weeklyData[weeklyData.length - 1]?.value || 0 : 0;
+    
+    return analyzeAnomalies([
+      {
+        label: "Cilinders deze week",
+        current: currentWeekValue,
+        historical: historicalWeeklyData,
+      },
+      {
+        label: "Efficiëntie",
+        current: currentYearData?.efficiency_rate || 0,
+        historical: previousYearData ? [previousYearData.efficiency_rate] : [],
+      },
+    ], { sensitivityThreshold: 1.8, minDataPoints: 3 });
+  }, [weeklyData, historicalWeeklyData, currentYearData, previousYearData]);
+
+  const activeAnomalies = anomalies.filter(a => a.result.isAnomaly);
+  const volumeAnomaly = anomalies.find(a => a.label === "Cilinders deze week")?.result;
+
   if (loading) {
     return (
       <Card className="glass-card animate-pulse">
@@ -198,6 +227,15 @@ export function KPIDashboard({ location, refreshKey = 0 }: KPIDashboardProps) {
                 <Badge variant="outline" className="ml-2 text-xs">
                   {currentYear}
                 </Badge>
+                {activeAnomalies.length > 0 && (
+                  <Badge 
+                    variant="outline" 
+                    className="ml-1 gap-1 bg-warning/10 text-warning border-warning/30 text-xs animate-pulse"
+                  >
+                    <AlertTriangle className="h-3 w-3" />
+                    {activeAnomalies.length} {activeAnomalies.length === 1 ? "alert" : "alerts"}
+                  </Badge>
+                )}
               </CardTitle>
               <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                 {isOpen ? (
@@ -277,7 +315,19 @@ export function KPIDashboard({ location, refreshKey = 0 }: KPIDashboardProps) {
                 </div>
 
                 {/* Weekly Trend Sparkline */}
-                <div className="p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20">
+                <div className={cn(
+                  "p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border relative",
+                  volumeAnomaly?.isAnomaly 
+                    ? volumeAnomaly.severity === "high" 
+                      ? "border-destructive/40 ring-1 ring-destructive/20" 
+                      : "border-warning/40 ring-1 ring-warning/20"
+                    : "border-blue-500/20"
+                )}>
+                  {volumeAnomaly?.isAnomaly && (
+                    <div className="absolute top-2 right-2">
+                      <AnomalyAlertBadge anomaly={volumeAnomaly} compact />
+                    </div>
+                  )}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <TrendingUp className="h-4 w-4 text-blue-500" />
@@ -347,6 +397,11 @@ export function KPIDashboard({ location, refreshKey = 0 }: KPIDashboardProps) {
                   </div>
                 </div>
               </div>
+
+              {/* Anomaly Alerts Panel */}
+              {activeAnomalies.length > 0 && (
+                <AnomalyAlertsPanel anomalies={anomalies} className="mt-4" />
+              )}
             </FadeIn>
           </CardContent>
         </CollapsibleContent>
