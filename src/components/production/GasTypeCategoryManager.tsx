@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FolderOpen, Plus, Pencil, Trash2, Save, GripVertical } from "lucide-react";
+import { FolderOpen, Plus, Pencil, Trash2, Save, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -56,6 +56,10 @@ export function GasTypeCategoryManager({ open, onOpenChange }: GasTypeCategoryMa
   const [editingCategory, setEditingCategory] = useState<GasTypeCategory | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<GasTypeCategory | null>(null);
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -78,9 +82,16 @@ export function GasTypeCategoryManager({ open, onOpenChange }: GasTypeCategoryMa
 
   useEffect(() => {
     if (open) {
+      setCurrentPage(1);
       fetchCategories();
     }
   }, [open]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(categories.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedCategories = categories.slice(startIndex, endIndex);
 
   const openEditDialog = (category: GasTypeCategory | null) => {
     if (category) {
@@ -264,59 +275,94 @@ export function GasTypeCategoryManager({ open, onOpenChange }: GasTypeCategoryMa
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {categories.map((category, index) => (
-                    <TableRow key={category.id}>
-                      <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-5 w-5"
-                            onClick={() => handleMoveUp(index)}
-                            disabled={index === 0}
+                  {paginatedCategories.map((category, index) => {
+                    const actualIndex = startIndex + index;
+                    return (
+                      <TableRow key={category.id}>
+                        <TableCell>
+                          <div className="flex flex-col gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              onClick={() => handleMoveUp(actualIndex)}
+                              disabled={actualIndex === 0}
+                            >
+                              <GripVertical className="h-3 w-3 rotate-90" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">{category.name}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {category.description || "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={category.is_active ? "default" : "secondary"}
+                            className="cursor-pointer"
+                            onClick={() => handleToggleActive(category)}
                           >
-                            <GripVertical className="h-3 w-3 rotate-90" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">{category.name}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {category.description || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={category.is_active ? "default" : "secondary"}
-                          className="cursor-pointer"
-                          onClick={() => handleToggleActive(category)}
-                        >
-                          {category.is_active ? "Actief" : "Inactief"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditDialog(category)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setCategoryToDelete(category);
-                              setDeleteDialogOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                            {category.is_active ? "Actief" : "Inactief"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditDialog(category)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setCategoryToDelete(category);
+                                setDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
+            )}
+
+            {/* Pagination */}
+            {!loading && categories.length > itemsPerPage && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <span className="text-sm text-muted-foreground">
+                  {startIndex + 1}-{Math.min(endIndex, categories.length)} van {categories.length} items
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Vorige
+                  </Button>
+                  <span className="text-sm text-muted-foreground px-2">
+                    Pagina {currentPage} van {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Volgende
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
 
