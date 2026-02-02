@@ -47,6 +47,7 @@ export function CreateDryIceOrderCalendarDialog({
   const [containerHasWheels, setContainerHasWheels] = useState<boolean | null>(null);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(initialDate || new Date());
   const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceInterval, setRecurrenceInterval] = useState<1 | 2>(1);
   const [isInfiniteRecurrence, setIsInfiniteRecurrence] = useState(false);
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>(undefined);
   const [notes, setNotes] = useState("");
@@ -127,6 +128,7 @@ export function CreateDryIceOrderCalendarDialog({
     setContainerHasWheels(null);
     setScheduledDate(initialDate || new Date());
     setIsRecurring(false);
+    setRecurrenceInterval(1);
     setIsInfiniteRecurrence(false);
     setRecurrenceEndDate(undefined);
     setNotes("");
@@ -193,10 +195,10 @@ export function CreateDryIceOrderCalendarDialog({
           : recurrenceEndDate;
         
         if (endDate) {
-          let nextDate = addWeeks(scheduledDate, 1);
+          let nextDate = addWeeks(scheduledDate, recurrenceInterval);
           while (nextDate <= endDate) {
             orderDates.push(nextDate);
-            nextDate = addWeeks(nextDate, 1);
+            nextDate = addWeeks(nextDate, recurrenceInterval);
           }
         }
       }
@@ -406,7 +408,7 @@ export function CreateDryIceOrderCalendarDialog({
             </Popover>
           </div>
 
-          {/* Weekly recurrence option */}
+          {/* Recurrence option */}
           <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
             <div className="flex items-center space-x-2">
               <Checkbox 
@@ -416,17 +418,35 @@ export function CreateDryIceOrderCalendarDialog({
                   setIsRecurring(checked === true);
                   if (!checked) {
                     setRecurrenceEndDate(undefined);
+                    setRecurrenceInterval(1);
                   }
                 }}
               />
               <Label htmlFor="isRecurringCal" className="flex items-center gap-2 cursor-pointer font-normal">
                 <Repeat className="h-4 w-4" />
-                Wekelijks herhalen op dezelfde dag
+                Herhalen op dezelfde dag
               </Label>
             </div>
             
             {isRecurring && (
               <div className="space-y-3 pl-6">
+                <div className="space-y-2">
+                  <Label className="text-sm">Herhalingsinterval</Label>
+                  <RadioGroup
+                    value={recurrenceInterval.toString()}
+                    onValueChange={(v) => setRecurrenceInterval(parseInt(v) as 1 | 2)}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="1" id="interval-weekly-cal" />
+                      <Label htmlFor="interval-weekly-cal" className="font-normal cursor-pointer text-sm">Wekelijks</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="2" id="interval-biweekly-cal" />
+                      <Label htmlFor="interval-biweekly-cal" className="font-normal cursor-pointer text-sm">2-wekelijks</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
                 <div className="flex items-center space-x-2">
                   <Checkbox 
                     id="isInfiniteCal" 
