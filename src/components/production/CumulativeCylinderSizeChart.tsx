@@ -63,7 +63,13 @@ const getCapacityGroup = (capacity: number | null): string => {
   return "Bundels (>100L)";
 };
 
-export function CumulativeCylinderSizeChart() {
+type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
+
+interface CumulativeCylinderSizeChartProps {
+  location?: ProductionLocation;
+}
+
+export function CumulativeCylinderSizeChart({ location = "all" }: CumulativeCylinderSizeChartProps) {
   const [loading, setLoading] = useState(true);
   const [yearData, setYearData] = useState<YearData[]>([]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
@@ -87,7 +93,7 @@ export function CumulativeCylinderSizeChart() {
 
   useEffect(() => {
     fetchBothYearsData();
-  }, [selectedYear1, selectedYear2]);
+  }, [selectedYear1, selectedYear2, location]);
 
   const fetchBothYearsData = async () => {
     setLoading(true);
@@ -104,9 +110,11 @@ export function CumulativeCylinderSizeChart() {
       cylinderSizeCapacities.set(cs.name, cs.capacity_liters);
     });
 
+    const locationParam = location !== "all" ? location : null;
+
     const [result1, result2] = await Promise.all([
-      supabase.rpc("get_monthly_cylinder_totals_by_size", { p_year: selectedYear1 }),
-      supabase.rpc("get_monthly_cylinder_totals_by_size", { p_year: selectedYear2 })
+      supabase.rpc("get_monthly_cylinder_totals_by_size", { p_year: selectedYear1, p_location: locationParam }),
+      supabase.rpc("get_monthly_cylinder_totals_by_size", { p_year: selectedYear2, p_location: locationParam })
     ]);
 
     const processData = (data: any[]): CylinderSizeData[] => {

@@ -41,7 +41,13 @@ const MONTH_NAMES = [
   "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"
 ];
 
-export function CumulativeGasTypeChart() {
+type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
+
+interface CumulativeGasTypeChartProps {
+  location?: ProductionLocation;
+}
+
+export function CumulativeGasTypeChart({ location = "all" }: CumulativeGasTypeChartProps) {
   const [loading, setLoading] = useState(true);
   const [yearData, setYearData] = useState<YearData[]>([]);
   const [selectedGasTypes, setSelectedGasTypes] = useState<string[]>([]);
@@ -65,14 +71,16 @@ export function CumulativeGasTypeChart() {
 
   useEffect(() => {
     fetchBothYearsData();
-  }, [selectedYear1, selectedYear2]);
+  }, [selectedYear1, selectedYear2, location]);
 
   const fetchBothYearsData = async () => {
     setLoading(true);
 
+    const locationParam = location !== "all" ? location : null;
+
     const [result1, result2] = await Promise.all([
-      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: selectedYear1 }),
-      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: selectedYear2 })
+      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: selectedYear1, p_location: locationParam }),
+      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: selectedYear2, p_location: locationParam })
     ]);
 
     const processData = (data: any[]): GasTypeData[] => {

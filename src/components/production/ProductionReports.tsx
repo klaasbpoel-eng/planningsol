@@ -914,8 +914,8 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
 
         <TabsContent value="comparison" className="mt-6 space-y-6">
           <YearComparisonReport location={location} />
-          <CumulativeGasTypeChart />
-          <CumulativeCylinderSizeChart />
+          <CumulativeGasTypeChart location={location} />
+          <CumulativeCylinderSizeChart location={location} />
         </TabsContent>
       </Tabs>
     </div>
