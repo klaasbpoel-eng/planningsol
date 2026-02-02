@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -7,6 +7,8 @@ import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Upload } 
 import { cn } from "@/lib/utils";
 import { getStockStatus, type StockStatus } from "./StockStatusBadge";
 import { StockExcelImportDialog, type StockItem } from "./StockExcelImportDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { useUserRole } from "@/hooks/useUserRole";
 // StockItem is imported from StockExcelImportDialog
 
 interface StockSummaryWidgetProps {
@@ -48,6 +50,16 @@ interface StatusConfig {
 export function StockSummaryWidget({ refreshKey, isRefreshing, className }: StockSummaryWidgetProps) {
   const [stockData, setStockData] = useState<StockItem[]>(mockStockData);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [userId, setUserId] = useState<string | undefined>();
+  const { isAdmin } = useUserRole(userId);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id);
+    };
+    getUser();
+  }, []);
 
   const handleImported = (data: StockItem[]) => {
     setStockData(data);
@@ -146,15 +158,17 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
             <Package className="h-4 w-4 text-blue-500" />
             Voorraadstatus
           </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={() => setImportDialogOpen(true)}
-            title="Excel importeren"
-          >
-            <Upload className="h-3.5 w-3.5" />
-          </Button>
+          {isAdmin && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => setImportDialogOpen(true)}
+              title="Excel importeren"
+            >
+              <Upload className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </CardDescription>
       </CardHeader>
       
