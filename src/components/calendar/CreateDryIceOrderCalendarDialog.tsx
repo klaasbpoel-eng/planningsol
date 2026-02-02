@@ -100,7 +100,9 @@ export function CreateDryIceOrderCalendarDialog({
     if (data && data.length > 0) {
       setProductTypes(data);
       if (!productTypeId) {
-        setProductTypeId(data[0].id);
+        // Default to "9mm" if available, otherwise first item
+        const defaultType = data.find(pt => pt.name.toLowerCase().includes("9mm"));
+        setProductTypeId(defaultType?.id || data[0].id);
       }
     }
   };
@@ -121,7 +123,9 @@ export function CreateDryIceOrderCalendarDialog({
     setCustomerName("");
     setQuantityKg("");
     if (productTypes.length > 0) {
-      setProductTypeId(productTypes[0].id);
+      // Default to "9mm" if available, otherwise first item
+      const defaultType = productTypes.find(pt => pt.name.toLowerCase().includes("9mm"));
+      setProductTypeId(defaultType?.id || productTypes[0].id);
     }
     setPackagingId("");
     setBoxCount("");
