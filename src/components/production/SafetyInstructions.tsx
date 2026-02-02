@@ -427,7 +427,41 @@ export function SafetyInstructions() {
                   <span>Persoonlijke Beschermingsmiddelen</span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="space-y-3 text-sm">
+              <AccordionContent className="space-y-4 text-sm">
+                {/* PPE Images Grid */}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-full aspect-square rounded-lg overflow-hidden border border-border/50 bg-white">
+                      <img 
+                        src={cryogenicGloves} 
+                        alt="Werkhandschoenen" 
+                        className="w-full h-full object-contain p-2"
+                      />
+                    </div>
+                    <span className="text-xs text-center text-muted-foreground">Werkhandschoenen</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-full aspect-square rounded-lg overflow-hidden border border-border/50 bg-white">
+                      <img 
+                        src={protectiveClothing} 
+                        alt="Beschermende kleding" 
+                        className="w-full h-full object-contain p-2"
+                      />
+                    </div>
+                    <span className="text-xs text-center text-muted-foreground">Beschermende kleding</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-full aspect-square rounded-lg overflow-hidden border border-border/50 bg-white">
+                      <img 
+                        src={safetyShoes} 
+                        alt="Veiligheidsschoenen S3" 
+                        className="w-full h-full object-contain p-2"
+                      />
+                    </div>
+                    <span className="text-xs text-center text-muted-foreground">Veiligheidsschoenen S3</span>
+                  </div>
+                </div>
+
                 <div className="grid gap-3">
                   <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
                     <div className="flex items-center gap-2 mb-1">
@@ -451,7 +485,7 @@ export function SafetyInstructions() {
                   </div>
                   <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
                     <div className="flex items-center gap-2 mb-1">
-                      <Droplets className="h-4 w-4 text-cyan-500" />
+                      <Footprints className="h-4 w-4 text-amber-600" />
                       <span className="font-medium">Veiligheidsschoenen</span>
                     </div>
                     <p className="text-muted-foreground">
