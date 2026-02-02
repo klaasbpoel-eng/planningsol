@@ -1,146 +1,59 @@
 
-# Plan: Stock Management Badge System
+# Plan: Fix Stock Data Values
 
-## Objective
-Create a dynamic stock management badge system based on the uploaded Excel file structure (Voorraadbeheer.xlsx), replacing the current hardcoded "Voorraadstatus" card with real inventory health indicators.
+## Problem Identified
 
----
+The mock data in `StockSummaryWidget.tsx` has incorrect values for "Lucht Inhalatie (tech) (50L)":
 
-## Excel Data Analysis
+| Field | Current (Wrong) | Excel (Correct) |
+|-------|-----------------|-----------------|
+| averageConsumption | 8 | 11 |
+| numberOnStock | 4 | 3 |
+| difference | -4 | -8 |
 
-The uploaded file contains:
-| Column | Description | Example Values |
-|--------|-------------|----------------|
-| SubCode | Product code | 250049, 201112 |
-| SubCodeDescription | Gas cylinder type | "Lucht Inhalatie (tech) (50L)" |
-| Average_Consumption | Weekly/monthly usage | 1-17 |
-| Number_On_Stock | Current inventory | 1-46 |
-| Difference | Stock minus consumption | -8 to +35 |
-
-**Stock Health Logic (based on Difference column):**
-- **Critical** (Difference ≤ -3): Severe shortage, needs immediate action
-- **Low** (Difference -2 to 0): At risk, reorder soon  
-- **OK** (Difference 1 to 5): Healthy buffer
-- **Surplus** (Difference > 5): Overstock, consider reducing orders
+Additionally, the other mock items in the list are fictional and should be replaced with actual data from the Excel file.
 
 ---
 
-## Proposed Solution
+## Solution
 
-### 1. Add New Badge Variants
+Update the `mockStockData` array in `src/components/production/StockSummaryWidget.tsx` to use the actual values from the Voorraadbeheer.xlsx file.
 
-Extend `src/components/ui/badge.tsx` to include semantic variants matching the button component:
-
-```text
-┌─────────────────────────────────────────────────────┐
-│  Badge Variants (new)                               │
-├─────────────────────────────────────────────────────┤
-│  success   → Green  → "Op voorraad" / "Voldoende"  │
-│  warning   → Orange → "Lage voorraad"               │
-│  critical  → Red    → "Kritiek"                     │
-│  info      → Cyan   → "Overschot"                   │
-└─────────────────────────────────────────────────────┘
-```
-
-### 2. Create StockStatusBadge Component
-
-New component at `src/components/production/StockStatusBadge.tsx`:
+### Updated Mock Data (first 15 items from Excel)
 
 ```typescript
-// Determines stock health based on difference value
-type StockStatus = "critical" | "low" | "ok" | "surplus";
-
-interface StockStatusBadgeProps {
-  difference: number;          // From Excel: Stock - Consumption
-  showCount?: boolean;         // Show number of affected items
-  compact?: boolean;           // Smaller version for tables
-}
-```
-
-**Visual Examples:**
-```text
-┌──────────────────────────────────────────────────────────┐
-│ 🔴 Kritiek (5)       → Red badge with count             │
-│ 🟠 Lage voorraad (3) → Orange/warning badge             │
-│ 🟢 Op voorraad       → Green/success badge              │
-│ 🔵 Overschot (12)    → Cyan/info badge (optional)       │
-└──────────────────────────────────────────────────────────┘
-```
-
-### 3. Create Stock Summary Widget
-
-Replace the hardcoded "Voorraadstatus" card with a dynamic `StockSummaryWidget`:
-
-```text
-┌─────────────────────────────────────┐
-│  📊 Voorraadstatus                  │
-├─────────────────────────────────────┤
-│                                     │
-│  🔴 5 Kritiek                       │
-│  🟠 8 Lage voorraad                 │
-│  🟢 42 Op voorraad                  │
-│                                     │
-│  ──────────────────────────         │
-│  Laatste update: vandaag 14:30      │
-└─────────────────────────────────────┘
-```
-
-### 4. Database Table for Stock Data (Optional)
-
-Create a `stock_levels` table to persist the Excel data:
-
-```sql
-CREATE TABLE stock_levels (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sub_code TEXT NOT NULL UNIQUE,
-  description TEXT NOT NULL,
-  average_consumption INTEGER DEFAULT 0,
-  number_on_stock INTEGER DEFAULT 0,
-  difference INTEGER GENERATED ALWAYS AS (number_on_stock - average_consumption) STORED,
-  location production_location,
-  updated_at TIMESTAMPTZ DEFAULT now(),
-  updated_by UUID REFERENCES auth.users(id)
-);
+const mockStockData: StockItem[] = [
+  { subCode: "250049", description: "Lucht Inhalatie (tech) (50L)", averageConsumption: 11, numberOnStock: 3, difference: -8 },
+  { subCode: "201112", description: "Zuurstof Medicinaal Gasv. SOL act. geint. 300bar (1L)", averageConsumption: 5, numberOnStock: 1, difference: -4 },
+  { subCode: "201107", description: "Zuurstof Medicinaal Gasv. SOL P.I. (1L)", averageConsumption: 5, numberOnStock: 3, difference: -2 },
+  { subCode: "205408", description: "Kooldioxide E.P. Alu P.I. (5L)", averageConsumption: 2, numberOnStock: 1, difference: -1 },
+  { subCode: "210050", description: "Lucht (10L)", averageConsumption: 2, numberOnStock: 1, difference: -1 },
+  { subCode: "250045", description: "Lucht Synth. Medicinaal Gasv. SOL (50L)", averageConsumption: 3, numberOnStock: 2, difference: -1 },
+  { subCode: "202507", description: "Distikstofoxide Medicinaal SOL P.I. (2L)", averageConsumption: 2, numberOnStock: 2, difference: 0 },
+  { subCode: "205407", description: "Kooldioxide E.P. P.I. (5L)", averageConsumption: 3, numberOnStock: 3, difference: 0 },
+  { subCode: "270382", description: "Pakket AliSOL Stikstof (16x50L)", averageConsumption: 1, numberOnStock: 1, difference: 0 },
+  { subCode: "270840", description: "Pakket Helium 5.0 (16x50L)", averageConsumption: 1, numberOnStock: 1, difference: 0 },
+  { subCode: "250700", description: "Acetyleen (50L)", averageConsumption: 2, numberOnStock: 3, difference: 1 },
+  { subCode: "250288", description: "12% O2 in N2 (50L)", averageConsumption: 3, numberOnStock: 5, difference: 2 },
+  { subCode: "250370", description: "Argon 5.0 300bar (50L)", averageConsumption: 7, numberOnStock: 10, difference: 3 },
+  { subCode: "250383", description: "AliSOL 028 (50L)", averageConsumption: 8, numberOnStock: 13, difference: 5 },
+  { subCode: "250350", description: "Argon 5.0 (50L)", averageConsumption: 1, numberOnStock: 17, difference: 16 },
+];
 ```
 
 ---
 
-## Files to Create/Modify
+## File to Modify
 
-| File | Action | Description |
-|------|--------|-------------|
-| `src/components/ui/badge.tsx` | Modify | Add `success`, `warning`, `info` variants |
-| `src/components/production/StockStatusBadge.tsx` | Create | Reusable badge with status logic |
-| `src/components/production/StockSummaryWidget.tsx` | Create | Dashboard widget with stock overview |
-| `src/components/production/ProductionPlanning.tsx` | Modify | Replace hardcoded card with widget |
-| `supabase/migrations/...` | Create | (Optional) stock_levels table |
+| File | Change |
+|------|--------|
+| `src/components/production/StockSummaryWidget.tsx` | Replace mock data with actual Excel values |
 
 ---
 
-## Implementation Steps
+## Result
 
-1. **Add badge variants** matching the button design system (`success`, `warning`, `info`)
-
-2. **Create StockStatusBadge** component with:
-   - Status calculation logic from difference value
-   - Icon support (CheckCircle, AlertTriangle, ShieldAlert)
-   - Compact mode for table rows
-
-3. **Create StockSummaryWidget** that:
-   - Aggregates stock data into status counts
-   - Displays in the same card style as other stat cards
-   - Shows breakdown by status category
-
-4. **Update ProductionPlanning** to use the new widget
-
-5. **(Optional)** Create database table and Excel import for persistent stock data
-
----
-
-## Summary
-
-This plan creates a complete stock management badge system that:
-- Uses the existing design system colors (success, warning, destructive)
-- Follows the Excel file's data structure (SubCode, Difference for status)
-- Replaces the hardcoded "Goed" status with real-time inventory health
-- Can be extended to show detailed item lists in a hover card or dialog
+After this fix:
+- "Lucht Inhalatie (tech) (50L)" will correctly show **-8** difference
+- The hover card will display accurate stock levels from the Excel
+- Status categories will reflect real inventory health
