@@ -1,115 +1,120 @@
 
-# Plan: Modernize Admin Filters UI
+# Plan: Cilindergrootte toevoegen aan Rapportages
 
-## Overview
-Transform the current AdminFilters component into a more user-friendly, modern interface that aligns with the application's glassmorphism aesthetic and provides a better user experience with visual feedback, animations, and improved interactions.
+## Overzicht
+Het doel is om cilindergrootte (cylinder_size) als extra dimensie toe te voegen aan de productie-rapportages, zodat je kunt zien hoeveel cilinders er per grootte worden gevuld.
 
-## Current State Analysis
-The existing filter component uses:
-- Basic Card layout with static grid
-- Simple dropdowns without search functionality
-- Plain date pickers
-- Basic badge for active filter count
-- No visual feedback for selected filters
+---
 
-## Proposed Improvements
+## Aanpak: Stapsgewijze Implementatie
 
-### 1. Visual Design Enhancements
-- Apply glassmorphism styling (`glass-card` utility) for a modern frosted glass effect
-- Add subtle gradient background decoration
-- Use `hover-lift` effects for interactive elements
-- Add smooth animations using Framer Motion for filter state changes
+### Stap 1: Database Functie Aanmaken
+Een nieuwe database functie `get_monthly_cylinder_totals_by_size` die maandelijkse totalen per cilindergrootte teruggeeft:
 
-### 2. Collapsible Filter Panel
-- Make the filter section collapsible to save screen space when not in use
-- Show active filter pills in the collapsed header for quick visibility
-- Animate expand/collapse transitions smoothly
-
-### 3. Active Filter Pills/Chips
-- Display selected filters as removable chips/pills below the filter bar
-- Allow one-click removal of individual filters
-- Provide visual indication of which filters are active at a glance
-
-### 4. Enhanced Filter Controls
-- Add icons to filter labels for better visual recognition
-- Use color-coded status indicators that match the application's color scheme
-- Improve employee dropdown with avatars/initials
-- Add quick filter presets (e.g., "This week", "This month" for dates)
-
-### 5. Date Range Improvements
-- Add preset date range buttons (Today, This Week, This Month)
-- Show selected date range more prominently
-- Add clear button for individual date filters
-
-### 6. Responsive Design
-- Better mobile layout with stacked filters
-- Touch-friendly controls on smaller screens
-
-## Technical Implementation
-
-### File Changes
-
-**File:** `src/components/admin/AdminFilters.tsx`
-
-Key changes:
-- Import Framer Motion for animations
-- Import Collapsible from Radix UI
-- Add new icons (User, CheckCircle, Clock, XCircle, ChevronDown)
-- Wrap in `AnimatePresence` for smooth transitions
-- Add filter chip components for active filters
-- Add date preset buttons
-- Apply glass-card styling
-
-### Component Structure
-```text
-AdminFilters
-├── Header (always visible)
-│   ├── Filter icon + title
-│   ├── Active filter count badge
-│   ├── Active filter chips (when collapsed)
-│   └── Expand/Collapse toggle
-├── Collapsible Content
-│   ├── Date Presets Row
-│   │   └── Quick buttons: Vandaag, Deze week, Deze maand
-│   └── Filter Grid
-│       ├── Employee Select (with search & avatars)
-│       ├── Status Select (with color indicators)
-│       ├── Start Date Picker
-│       └── End Date Picker
-└── Active Filters Bar (when filters selected)
-    └── Removable filter chips
+```sql
+CREATE OR REPLACE FUNCTION get_monthly_cylinder_totals_by_size(
+  p_year integer,
+  p_location text DEFAULT NULL
+)
+RETURNS TABLE(
+  month integer,
+  cylinder_size text,
+  total_cylinders bigint
+)
 ```
 
-### New Styling
-- Use `glass-card` class for main container
-- Add gradient accent bar at top (matching calendar design)
-- Animated filter chip entrance/exit
-- Hover states with subtle shadows
-- Focus rings for accessibility
+Dit volgt hetzelfde patroon als de bestaande `get_monthly_cylinder_totals_by_gas_type` functie.
 
-### Date Presets Logic
-```text
-- Vandaag: startDate = today, endDate = today
-- Deze week: startDate = Monday of current week, endDate = Sunday
-- Deze maand: startDate = 1st of month, endDate = last of month
+### Stap 2: Rapportage Component Uitbreiden
+Nieuwe sectie toevoegen aan `YearComparisonReport.tsx`:
+- **Cilindergrootte vergelijking kaart**: Tabel met alle cilindergroottes en hun huidige vs vorig jaar volume
+- **Filter mogelijkheid**: Multi-select voor cilindergroottes (vergelijkbaar met gastype filter)
+- **Grafiek**: Optionele bar chart of lijn grafiek per cilindergrootte
+
+### Stap 3: Cumulatief Overzicht per Cilindergrootte (Optioneel)
+Nieuwe component `CumulativeCylinderSizeChart.tsx`:
+- Vergelijkbaar met `CumulativeGasTypeChart.tsx`
+- Toont cumulatieve vullingen per cilindergrootte over meerdere jaren
+
+---
+
+## Technische Details
+
+### Database Migratie
+```sql
+-- Nieuwe functie voor maandelijkse totalen per cilindergrootte
+CREATE OR REPLACE FUNCTION public.get_monthly_cylinder_totals_by_size(
+  p_year integer, 
+  p_location text DEFAULT NULL
+)
+RETURNS TABLE(
+  month integer, 
+  cylinder_size text, 
+  total_cylinders bigint
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    EXTRACT(MONTH FROM gco.scheduled_date)::integer as month,
+    gco.cylinder_size,
+    COALESCE(SUM(gco.cylinder_count), 0)::bigint as total_cylinders
+  FROM gas_cylinder_orders gco
+  WHERE gco.scheduled_date >= make_date(p_year, 1, 1)
+    AND gco.scheduled_date <= make_date(p_year, 12, 31)
+    AND (p_location IS NULL OR gco.location::text = p_location)
+  GROUP BY EXTRACT(MONTH FROM gco.scheduled_date), gco.cylinder_size
+  ORDER BY month, cylinder_size;
+END;
+$function$
 ```
 
-### Filter Chip Display
-Show chips for:
-- Selected employee name
-- Selected status with color dot
-- Date range in readable format
+### Frontend Wijzigingen
 
-Each chip has:
-- Label text
-- X button to remove
-- Smooth fade-out animation on removal
+**YearComparisonReport.tsx:**
+1. Nieuwe state variabelen:
+   - `cylinderSizeComparison` - vergelijkingsdata per cilindergrootte
+   - `selectedCylinderSizes` - filter voor geselecteerde groottes
+   - `monthlyCylinderSizeData` - maandelijkse data voor grafieken
 
-## Expected Result
-After implementation:
-- More visually appealing filter interface matching the modern app aesthetic
-- Faster interaction with quick date presets
-- Better overview of active filters with removable chips
-- Collapsible panel to save screen space
-- Improved accessibility with better focus states
-- Consistent styling with the rest of the application
+2. Nieuwe fetch calls in `fetchYearComparisonData`:
+   - Aanroep naar `get_monthly_cylinder_totals_by_size` voor huidig en vorig jaar
+
+3. Nieuwe UI sectie:
+   - Kaart met cilindergrootte vergelijkingstabel
+   - Multi-select filter component (`CylinderSizeMultiSelect`)
+   - Optionele grafiek visualisatie
+
+### Nieuwe Component (optioneel)
+**CylinderSizeMultiSelect.tsx:**
+- Vergelijkbaar met `GasTypeMultiSelect.tsx`
+- Haalt cilindergroottes op uit `cylinder_sizes` tabel
+- Groepeert op capaciteit (klein/medium/groot/bundels)
+
+---
+
+## UI Design
+De cilindergrootte sectie wordt toegevoegd als een nieuwe tab of collapsible sectie binnen de jaarvergelijking:
+
+1. **Tabel weergave**: Per cilindergrootte met kolommen:
+   - Cilindergrootte naam
+   - Huidig jaar aantal
+   - Vorig jaar aantal
+   - Verschil (absoluut + percentage)
+   - Trend indicator
+
+2. **Filter**: Checkbox of multi-select om specifieke groottes te selecteren
+
+3. **Grafiek** (optioneel): Staafdiagram met top 10 cilindergroottes
+
+---
+
+## Aanbevolen Volgorde
+1. Database functie aanmaken (migratie)
+2. YearComparisonReport.tsx uitbreiden met basis tabel
+3. CylinderSizeMultiSelect component maken
+4. Filtering implementeren
+5. Optioneel: Grafiek visualisatie toevoegen
