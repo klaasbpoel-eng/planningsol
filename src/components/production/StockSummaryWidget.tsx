@@ -165,7 +165,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
                     <span className="text-[9px] text-muted-foreground">{config.label}</span>
                   </div>
                 </HoverCardTrigger>
-                <HoverCardContent className="w-72 p-0" side="top" align="center">
+                <HoverCardContent className="w-96 p-0" side="top" align="center">
                   <div className={cn("px-3 py-2 border-b", config.bgColor)}>
                     <div className="flex items-center gap-2">
                       <Icon className={cn("h-4 w-4", config.color)} />
