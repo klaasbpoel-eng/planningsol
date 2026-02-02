@@ -440,11 +440,13 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
       gasMap.set(gasTypeName, current);
     });
 
-    return Array.from(gasMap.entries()).map(([name, data]) => ({
-      name,
-      value: data.count,
-      color: data.color
-    }));
+    return Array.from(gasMap.entries())
+      .map(([name, data]) => ({
+        name,
+        value: data.count,
+        color: data.color
+      }))
+      .sort((a, b) => b.value - a.value); // Sort descending by value
   };
 
   // Customer ranking
@@ -853,24 +855,48 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
               </CardHeader>
               <CardContent>
                 {gasTypeDistribution.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={gasTypeDistribution}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
+                  <ResponsiveContainer width="100%" height={Math.max(250, gasTypeDistribution.length * 40)}>
+                    <BarChart 
+                      data={gasTypeDistribution} 
+                      layout="vertical"
+                      margin={{ left: 10, right: 60 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
+                      <XAxis 
+                        type="number" 
+                        className="text-xs" 
+                        tickFormatter={(value) => formatNumber(value, 0)} 
+                      />
+                      <YAxis 
+                        dataKey="name" 
+                        type="category" 
+                        width={140} 
+                        className="text-xs"
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--background))', 
+                          border: '1px solid hsl(var(--border))' 
+                        }}
+                        formatter={(value: number) => [formatNumber(value, 0), "Cilinders"]}
+                      />
+                      <Bar 
+                        dataKey="value" 
+                        name="Cilinders" 
+                        radius={[0, 4, 4, 0]}
+                        label={{ 
+                          position: 'right', 
+                          formatter: (value: number) => formatNumber(value, 0),
+                          fontSize: 11,
+                          fill: 'hsl(var(--foreground))'
+                        }}
                       >
                         {gasTypeDistribution.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
+                          <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
+                      </Bar>
+                    </BarChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="text-center py-12 text-muted-foreground">
