@@ -89,6 +89,8 @@ import {
   hasTimeInfo 
 } from "@/lib/calendar-utils";
 import { Clock, Sun, Sunset } from "lucide-react";
+import { CalendarSkeleton } from "@/components/ui/skeletons";
+import { FadeIn } from "@/components/ui/fade-in";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Task = Database["public"]["Tables"]["tasks"]["Row"];
@@ -1893,32 +1895,31 @@ export function CalendarOverview() {
 
       <div className="flex-1 flex flex-col overflow-auto px-4 pb-4">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-16 flex-1">
-            <div className="relative">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
-            </div>
-            <p className="text-sm text-muted-foreground mt-4">Laden...</p>
+          <div className="flex-1 py-4">
+            <CalendarSkeleton className="h-full" />
           </div>
         ) : (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={viewType}
-              initial={{ opacity: 0, y: 20, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.98 }}
-              transition={{ 
-                duration: 0.3, 
-                ease: [0.4, 0, 0.2, 1]
-              }}
-              className="flex-1 flex flex-col"
-            >
-              {viewType === "list" && renderListView()}
-              {viewType === "day" && renderDayView()}
-              {viewType === "week" && renderWeekView()}
-              {viewType === "month" && renderMonthView()}
-              {viewType === "year" && renderYearView()}
-            </motion.div>
-          </AnimatePresence>
+          <FadeIn show={!loading} className="flex-1 flex flex-col">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={viewType}
+                initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -20, scale: 0.98 }}
+                transition={{ 
+                  duration: 0.3, 
+                  ease: [0.4, 0, 0.2, 1]
+                }}
+                className="flex-1 flex flex-col"
+              >
+                {viewType === "list" && renderListView()}
+                {viewType === "day" && renderDayView()}
+                {viewType === "week" && renderWeekView()}
+                {viewType === "month" && renderMonthView()}
+                {viewType === "year" && renderYearView()}
+              </motion.div>
+            </AnimatePresence>
+          </FadeIn>
         )}
       </div>
       
