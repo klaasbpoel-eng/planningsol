@@ -1,162 +1,128 @@
 
-# Optimalisatieplan: Recharts Performance Verbetering
 
-Dit plan beschrijft hoe we de huidige Recharts implementatie optimaliseren met lazy loading, memoization en code splitting voor betere performance zonder volledige migratie naar een andere library.
-
----
+# Plan: Skeleton Loaders met Fade-in Animaties
 
 ## Overzicht
 
-De huidige implementatie bevat 5 grote chart componenten die samen meer dan 4.600 regels code bevatten. Deze worden allemaal direct geladen, zelfs als de gebruiker nooit naar de "Rapportage" tab navigeert.
-
-### Huidige Situatie
-- Alle chart componenten worden direct geimporteerd (geen lazy loading)
-- Geen `React.memo` gebruikt op chart componenten
-- `useMemo` wordt al goed gebruikt voor data processing
-- `useCallback` wordt minimaal gebruikt
-- Geen Vite code splitting configuratie
+Dit plan implementeert professionele skeleton loaders met fade-in animaties voor de belangrijkste componenten. Dit verbetert de perceived performance door gebruikers visuele feedback te geven tijdens het laden van data.
 
 ---
 
-## Implementatiestappen
+## Wat wordt gebouwd
 
-### Stap 1: Lazy Loading voor Zware Componenten
+### 1. Enhanced Skeleton Component
+Uitbreiding van de bestaande `Skeleton` component met:
+- Shimmer animatie effect (al aanwezig in CSS)
+- Varianten voor verschillende content types (text, card, table, chart)
+- Ondersteuning voor fade-in wanneer content laadt
 
-De "Jaarvergelijking" tab bevat 3 zeer zware componenten die alleen geladen hoeven te worden wanneer de gebruiker daadwerkelijk naar die tab navigeert.
+### 2. Fade-in Animatie Wrapper
+Een `FadeIn` component die content smooth laat verschijnen na het laden.
 
-**Bestanden:**
-- `src/components/production/ProductionReports.tsx`
+### 3. Skeleton Templates voor specifieke componenten:
+- **StatCardSkeleton**: Voor de statistiek cards in ProductionPlanning
+- **TableSkeleton**: Voor order tabellen in DryIcePlanning en GasCylinderPlanning
+- **ChartSkeleton**: Voor charts in ProductionReports
+- **TopCustomersSkeleton**: Voor de TopCustomersWidget
+- **CalendarSkeleton**: Voor CalendarOverview
 
-**Wijzigingen:**
-- Importeer `React.lazy` en `Suspense`
-- Vervang directe imports van `YearComparisonReport`, `CumulativeGasTypeChart`, en `CumulativeCylinderSizeChart` door lazy imports
-- Wrap de componenten in `Suspense` met een loading fallback
+---
 
-### Stap 2: React.memo voor Chart Componenten
+## Implementatie Details
 
-Voeg `React.memo` toe aan alle chart componenten om onnodige re-renders te voorkomen wanneer parent componenten updaten maar de props niet veranderen.
+### Stap 1: Tailwind Animaties uitbreiden (tailwind.config.ts)
 
-**Bestanden:**
-- `src/components/production/CumulativeYearChart.tsx`
-- `src/components/production/CumulativeGasTypeChart.tsx`
-- `src/components/production/CumulativeCylinderSizeChart.tsx`
-- `src/components/production/YearComparisonReport.tsx`
-- `src/components/production/TopCustomersWidget.tsx`
+Nieuwe keyframes en animaties toevoegen:
+- `skeleton-shimmer`: Bewegende shimmer over skeleton
+- `fade-in-up`: Combinatie fade + subtle upward movement
 
-**Wijzigingen per component:**
-- Wrap de component export in `React.memo`
-- Voeg `displayName` toe voor betere debugging
+### Stap 2: Skeleton Component uitbreiden (src/components/ui/skeleton.tsx)
 
-### Stap 3: Callback Memoization
+```typescript
+// Nieuwe varianten
+interface SkeletonProps {
+  variant?: "default" | "text" | "circular" | "rectangular";
+  animation?: "pulse" | "shimmer" | "none";
+}
+```
 
-Verbeter `useCallback` gebruik voor event handlers die aan child componenten worden doorgegeven.
+### Stap 3: FadeIn Wrapper Component (src/components/ui/fade-in.tsx)
 
-**Bestanden:**
-- `src/components/production/ProductionReports.tsx`
-- `src/components/production/YearComparisonReport.tsx`
+```typescript
+// Wrapper die children smooth laat verschijnen
+<FadeIn show={!loading}>
+  <ActualContent />
+</FadeIn>
+```
 
-**Wijzigingen:**
-- Wrap `getCustomerRanking`, `getOrdersPerDay`, `getGasTypeDistribution` functies in `useCallback`
-- Memoize filter change handlers
+### Stap 4: Skeleton Templates (src/components/ui/skeletons/)
 
-### Stap 4: Vite Code Splitting Configuratie
+- **stat-card-skeleton.tsx**: 4-5 stat cards als skeletons
+- **table-skeleton.tsx**: Tabel met skeleton rows
+- **chart-skeleton.tsx**: Chart placeholder met golven
+- **customer-list-skeleton.tsx**: Top 5 klanten lijst
 
-Configureer Vite om grote dependencies in aparte chunks te splitsen voor betere caching.
+### Stap 5: Integratie in Componenten
 
-**Bestand:**
-- `vite.config.ts`
+| Component | Huidige Loading | Nieuwe Loading |
+|-----------|-----------------|----------------|
+| ProductionPlanning | Geen skeleton voor stats | StatCardSkeleton + FadeIn |
+| DryIcePlanning | Loader2 spinner | TableSkeleton + FadeIn |
+| GasCylinderPlanning | Loader2 spinner | TableSkeleton + FadeIn |
+| ProductionReports | Loader2 spinner | ChartSkeleton + FadeIn |
+| TopCustomersWidget | Basic skeleton | Enhanced shimmer + FadeIn |
+| CalendarOverview | loading state | CalendarSkeleton + FadeIn |
 
-**Wijzigingen:**
-- Voeg `build.rollupOptions.output.manualChunks` configuratie toe
-- Splits `recharts` in een apart chunk
-- Splits andere grote vendor libraries
+---
 
-### Stap 5: Lazy Loading voor Productie Tabs
+## Visueel Ontwerp
 
-Voeg lazy loading toe aan de hoofd productie tab componenten.
+### Skeleton Stijl
+- Achtergrond: `bg-muted` (huidige)
+- Shimmer: Lineair gradient van transparant naar primary/10 naar transparant
+- Border radius: Afgestemd op het element type
+- Animatie duur: 1.5s voor shimmer, 0.3s voor fade-in
 
-**Bestand:**
-- `src/components/production/ProductionPlanning.tsx`
+### Fade-in Effect
+- Opacity: 0 naar 1
+- Transform: translateY(8px) naar translateY(0)
+- Easing: ease-out
+- Duur: 300ms
 
-**Wijzigingen:**
-- Lazy load `DryIcePlanning`, `GasCylinderPlanning`, en `ProductionReports` componenten
-- Voeg Suspense wrappers toe per tab
+---
+
+## Bestanden die worden aangemaakt
+
+1. `src/components/ui/fade-in.tsx` - FadeIn wrapper component
+2. `src/components/ui/skeletons/stat-card-skeleton.tsx` - Stat card skeletons
+3. `src/components/ui/skeletons/table-skeleton.tsx` - Table skeleton
+4. `src/components/ui/skeletons/chart-skeleton.tsx` - Chart skeleton
+5. `src/components/ui/skeletons/customer-list-skeleton.tsx` - Customer list skeleton
+6. `src/components/ui/skeletons/calendar-skeleton.tsx` - Calendar skeleton
+7. `src/components/ui/skeletons/index.ts` - Export barrel file
+
+## Bestanden die worden aangepast
+
+1. `tailwind.config.ts` - Nieuwe animatie keyframes
+2. `src/components/ui/skeleton.tsx` - Enhanced skeleton met varianten
+3. `src/components/production/ProductionPlanning.tsx` - Skeleton + FadeIn
+4. `src/components/production/DryIcePlanning.tsx` - TableSkeleton + FadeIn
+5. `src/components/production/GasCylinderPlanning.tsx` - TableSkeleton + FadeIn
+6. `src/components/production/ProductionReports.tsx` - ChartSkeleton + FadeIn
+7. `src/components/production/TopCustomersWidget.tsx` - Enhanced skeleton
+8. `src/components/calendar/CalendarOverview.tsx` - CalendarSkeleton + FadeIn
 
 ---
 
 ## Technische Details
 
-### Lazy Loading Pattern
-```text
-┌─────────────────────────────────────────────────────────┐
-│  ProductionPlanning                                     │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │ Tabs                                              │  │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────────────────┐  │  │
-│  │  │Droogijs │ │Cilinders│ │    Rapportage       │  │  │
-│  │  └────┬────┘ └────┬────┘ └──────────┬──────────┘  │  │
-│  │       │           │                 │             │  │
-│  │       ▼           ▼                 ▼             │  │
-│  │  ┌────────┐  ┌────────┐    ┌───────────────────┐  │  │
-│  │  │ Lazy   │  │ Lazy   │    │ Lazy Loading      │  │  │
-│  │  │ Load   │  │ Load   │    │ ┌───────────────┐ │  │  │
-│  │  └────────┘  └────────┘    │ │YearComparison │ │  │  │
-│  │                            │ │(Lazy)         │ │  │  │
-│  │                            │ ├───────────────┤ │  │  │
-│  │                            │ │CumulativeGas  │ │  │  │
-│  │                            │ │(Lazy)         │ │  │  │
-│  │                            │ ├───────────────┤ │  │  │
-│  │                            │ │CumulativeSize │ │  │  │
-│  │                            │ │(Lazy)         │ │  │  │
-│  │                            │ └───────────────┘ │  │  │
-│  │                            └───────────────────┘  │  │
-│  └───────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
-```
+### Performance Overwegingen
+- Skeleton componenten zijn lightweight (geen state, pure rendering)
+- Animaties gebruiken CSS transforms (GPU accelerated)
+- FadeIn wrapper wrapped met React.memo voor re-render prevention
 
-### Vite Chunk Configuratie
-```text
-┌─────────────────────────────────────────────────────────┐
-│  Build Output                                           │
-│  ┌─────────────────┐  ┌─────────────────┐               │
-│  │ main.[hash].js  │  │ vendor.[hash].js│               │
-│  │ (App code)      │  │ (supabase, etc) │               │
-│  └─────────────────┘  └─────────────────┘               │
-│                                                         │
-│  ┌─────────────────┐  ┌─────────────────┐               │
-│  │charts.[hash].js │  │  ui.[hash].js   │               │
-│  │ (recharts)      │  │ (radix-ui)      │               │
-│  └─────────────────┘  └─────────────────┘               │
-│                                                         │
-│  ┌────────────────────────────────────────────────────┐ │
-│  │ Lazy Chunks (only loaded when needed)              │ │
-│  │ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ │ │
-│  │ │YearComparison│ │CumulativeGas │ │CumulativeSize│ │ │
-│  │ └──────────────┘ └──────────────┘ └──────────────┘ │ │
-│  └────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
+### Herbruikbaarheid
+- Alle skeleton componenten accepteren className prop voor customization
+- FadeIn component is generiek en kan overal worden gebruikt
+- Skeleton varianten kunnen in elke context worden toegepast
 
----
-
-## Bestanden die Aangepast Worden
-
-| Bestand | Type Wijziging |
-|---------|----------------|
-| `src/components/production/ProductionReports.tsx` | Lazy imports + Suspense |
-| `src/components/production/ProductionPlanning.tsx` | Lazy imports + Suspense |
-| `src/components/production/CumulativeYearChart.tsx` | React.memo wrapper |
-| `src/components/production/CumulativeGasTypeChart.tsx` | React.memo wrapper + default export |
-| `src/components/production/CumulativeCylinderSizeChart.tsx` | React.memo wrapper + default export |
-| `src/components/production/YearComparisonReport.tsx` | React.memo wrapper + default export + useCallback |
-| `src/components/production/TopCustomersWidget.tsx` | React.memo wrapper |
-| `vite.config.ts` | Code splitting configuratie |
-
----
-
-## Verwachte Resultaten
-
-- **Initiele laadtijd**: ~30-40% sneller (lazy loading van zware componenten)
-- **Bundle grootte**: Betere caching door chunk splitting
-- **Re-render performance**: Minder onnodige re-renders door React.memo
-- **Tab switch**: Alleen de eerste keer laden, daarna instant uit cache
