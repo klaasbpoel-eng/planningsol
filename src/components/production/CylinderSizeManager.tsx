@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Cylinder, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown, AlertTriangle } from "lucide-react";
+import { Cylinder, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -66,6 +66,10 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
   const [sortColumn, setSortColumn] = useState<SortColumn>("capacity_liters");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  
   // Form state
   const [name, setName] = useState("");
   const [capacityLiters, setCapacityLiters] = useState("");
@@ -107,9 +111,16 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
 
   useEffect(() => {
     if (open) {
+      setCurrentPage(1);
       fetchCylinderSizes();
     }
   }, [open, sortColumn, sortDirection]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(cylinderSizes.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedSizes = cylinderSizes.slice(startIndex, endIndex);
 
   const openEditDialog = (size: CylinderSize | null) => {
     if (size) {
@@ -326,7 +337,7 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {cylinderSizes.map((size) => (
+                  {paginatedSizes.map((size) => (
                     <TableRow key={size.id}>
                       <TableCell className="font-medium">{size.name}</TableCell>
                       <TableCell>
@@ -369,6 +380,38 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
                   ))}
                 </TableBody>
               </Table>
+            )}
+
+            {/* Pagination */}
+            {!loading && cylinderSizes.length > itemsPerPage && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <span className="text-sm text-muted-foreground">
+                  {startIndex + 1}-{Math.min(endIndex, cylinderSizes.length)} van {cylinderSizes.length} items
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Vorige
+                  </Button>
+                  <span className="text-sm text-muted-foreground px-2">
+                    Pagina {currentPage} van {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Volgende
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
 
