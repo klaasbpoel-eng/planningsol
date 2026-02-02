@@ -41,6 +41,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { VirtualizedTable } from "@/components/ui/virtualized-table";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ReportExportButtons } from "./ReportExportButtons";
 import {
   AreaChart,
   Area,
@@ -551,6 +552,45 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
                   Laatste 3 maanden
                 </Button>
               </div>
+              
+              {/* Export Button */}
+              <ReportExportButtons
+                tableData={{
+                  title: "Productie Rapport",
+                  subtitle: `Cilinders en Droogijs overzicht`,
+                  columns: [
+                    { header: "Datum", key: "date", width: 12 },
+                    { header: "Klant", key: "customer", width: 25 },
+                    { header: "Type", key: "type", width: 12 },
+                    { header: "Aantal/Kg", key: "quantity", width: 10 },
+                    { header: "Status", key: "status", width: 12 },
+                  ],
+                  rows: [
+                    ...cylinderOrders.map(o => ({
+                      date: format(new Date(o.scheduled_date), "dd-MM-yyyy"),
+                      customer: o.customer_name,
+                      type: "Cilinders",
+                      quantity: o.cylinder_count,
+                      status: o.status === "completed" ? "Voltooid" : o.status === "pending" ? "Gepland" : o.status,
+                    })),
+                    ...dryIceOrders.map(o => ({
+                      date: format(new Date(o.scheduled_date), "dd-MM-yyyy"),
+                      customer: o.customer_name,
+                      type: "Droogijs",
+                      quantity: `${Number(o.quantity_kg)} kg`,
+                      status: o.status === "completed" ? "Voltooid" : o.status === "pending" ? "Gepland" : o.status,
+                    })),
+                  ].sort((a, b) => a.date.localeCompare(b.date)),
+                  dateRange: { from: dateRange.from, to: dateRange.to },
+                  location: location === "all" ? "Alle locaties" : location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg",
+                }}
+                chartElementId="production-chart"
+                chartTitle="Productie Grafiek"
+                chartOptions={{
+                  dateRange: { from: dateRange.from, to: dateRange.to },
+                  location: location === "all" ? "Alle locaties" : location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg",
+                }}
+              />
               <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
@@ -695,7 +735,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
 
         <TabsContent value="overview" className="mt-6 space-y-6">
           {/* Production Chart */}
-          <Card className="glass-card">
+          <Card className="glass-card" id="production-chart">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div>
                 <CardTitle className="text-lg">Productie per dag</CardTitle>
