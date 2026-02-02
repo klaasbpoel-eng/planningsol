@@ -8,6 +8,7 @@ import { DryIceProductTypeManager } from "@/components/production/DryIceProductT
 import { DryIcePackagingManager } from "@/components/production/DryIcePackagingManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const DRY_ICE_CAPACITY_KEY = "dry_ice_daily_capacity_kg";
+const DRY_ICE_DEFAULT_PRODUCT_TYPE_KEY = "dry_ice_default_product_type_id";
 const DEFAULT_CAPACITY = 500;
 
 export function DryIceSettings() {
@@ -30,10 +32,49 @@ export function DryIceSettings() {
   const [loadingCapacity, setLoadingCapacity] = useState(true);
   const [savingCapacity, setSavingCapacity] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  
+  // Default product type setting
+  const [productTypes, setProductTypes] = useState<{ id: string; name: string }[]>([]);
+  const [defaultProductTypeId, setDefaultProductTypeId] = useState<string>("");
+  const [loadingProductTypes, setLoadingProductTypes] = useState(true);
+  const [savingDefaultType, setSavingDefaultType] = useState(false);
 
   useEffect(() => {
     fetchDailyCapacity();
+    fetchProductTypes();
   }, []);
+
+  const fetchProductTypes = async () => {
+    setLoadingProductTypes(true);
+    
+    // Fetch product types
+    const { data: types } = await supabase
+      .from("dry_ice_product_types")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("sort_order");
+    
+    if (types) {
+      setProductTypes(types);
+    }
+    
+    // Fetch current default setting
+    const { data: setting } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", DRY_ICE_DEFAULT_PRODUCT_TYPE_KEY)
+      .maybeSingle();
+    
+    if (setting?.value) {
+      setDefaultProductTypeId(setting.value);
+    } else if (types && types.length > 0) {
+      // Default to first type if no setting exists
+      const defaultType = types.find(t => t.name.toLowerCase().includes("9mm"));
+      setDefaultProductTypeId(defaultType?.id || types[0].id);
+    }
+    
+    setLoadingProductTypes(false);
+  };
 
   const fetchDailyCapacity = async () => {
     setLoadingCapacity(true);
@@ -54,7 +95,6 @@ export function DryIceSettings() {
   const saveDailyCapacity = async () => {
     setSavingCapacity(true);
     
-    // Upsert the setting
     const { error } = await supabase
       .from("app_settings")
       .upsert(
@@ -73,6 +113,30 @@ export function DryIceSettings() {
       toast.success("Dagcapaciteit opgeslagen");
     }
     setSavingCapacity(false);
+  };
+
+  const saveDefaultProductType = async (typeId: string) => {
+    setSavingDefaultType(true);
+    setDefaultProductTypeId(typeId);
+    
+    const { error } = await supabase
+      .from("app_settings")
+      .upsert(
+        {
+          key: DRY_ICE_DEFAULT_PRODUCT_TYPE_KEY,
+          value: typeId,
+          description: "Standaard producttype voor nieuwe droogijs orders"
+        },
+        { onConflict: "key" }
+      );
+
+    if (error) {
+      console.error("Error saving default product type:", error);
+      toast.error("Fout bij opslaan standaard producttype");
+    } else {
+      toast.success("Standaard producttype opgeslagen");
+    }
+    setSavingDefaultType(false);
   };
 
   const handleResetTable = async () => {
@@ -150,6 +214,35 @@ export function DryIceSettings() {
             </div>
             <p className="text-xs text-muted-foreground">
               De maximale hoeveelheid droogijs die per dag geproduceerd kan worden.
+            </p>
+          </div>
+
+          {/* Default Product Type Setting */}
+          <div className="space-y-3">
+            <Label className="flex items-center gap-2 text-sm font-medium">
+              <Package className="h-4 w-4 text-cyan-500" />
+              Standaard producttype
+            </Label>
+            <div className="flex items-center gap-3">
+              {loadingProductTypes ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <div className="flex items-center gap-2">
+                  <SearchableSelect
+                    options={productTypes.map((pt) => ({ value: pt.id, label: pt.name }))}
+                    value={defaultProductTypeId}
+                    onValueChange={saveDefaultProductType}
+                    placeholder="Selecteer standaard type"
+                    searchPlaceholder="Zoek producttype..."
+                    emptyMessage="Geen producttype gevonden."
+                    className="w-48"
+                  />
+                  {savingDefaultType && <Loader2 className="h-4 w-4 animate-spin" />}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Dit producttype wordt automatisch geselecteerd bij nieuwe orders.
             </p>
           </div>
 
