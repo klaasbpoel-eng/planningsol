@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import CalendarPage from "./pages/CalendarPage";
 import ProductionPlanningPage from "./pages/ProductionPlanningPage";
 import NotFound from "./pages/NotFound";
+import { CommandPalette } from "./components/command-palette";
 
 const queryClient = new QueryClient();
 
@@ -18,6 +19,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <CommandPalette />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/kalender" element={<CalendarPage />} />
