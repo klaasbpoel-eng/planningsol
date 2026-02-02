@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -51,7 +51,7 @@ interface StatusConfig {
 }
 
 export function StockSummaryWidget({ refreshKey, isRefreshing, className }: StockSummaryWidgetProps) {
-  const [stockData, setStockData] = useState<StockItem[]>(mockStockData);
+  const [stockData] = useState<StockItem[]>(mockStockData);
 
   // Group items by status
   const statusConfigs = useMemo(() => {
@@ -152,8 +152,8 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
           {statusConfigs.map((config) => {
             const Icon = config.icon;
             return (
-              <HoverCard key={config.status} openDelay={200} closeDelay={100}>
-                <HoverCardTrigger asChild>
+              <Dialog key={config.status}>
+                <DialogTrigger asChild>
                   <div
                     className={cn(
                       "flex flex-col items-center p-1 rounded cursor-pointer transition-all hover:scale-105",
@@ -164,50 +164,48 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
                     <span className={cn("text-sm font-bold", config.color)}>{config.count}</span>
                     <span className="text-[9px] text-muted-foreground">{config.label}</span>
                   </div>
-                </HoverCardTrigger>
-                <HoverCardContent className="w-96 p-0 z-[100]" side="top" align="center">
-                  <div className={cn("px-3 py-2 border-b", config.bgColor)}>
-                    <div className="flex items-center gap-2">
-                      <Icon className={cn("h-4 w-4", config.color)} />
-                      <span className={cn("font-semibold text-sm", config.color)}>
-                        {config.fullLabel}
-                      </span>
-                      <span className="ml-auto text-xs text-muted-foreground">
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Icon className={cn("h-5 w-5", config.color)} />
+                      <span className={config.color}>{config.fullLabel}</span>
+                      <span className="ml-auto text-sm font-normal text-muted-foreground">
                         {config.count} items
                       </span>
-                    </div>
-                  </div>
+                    </DialogTitle>
+                  </DialogHeader>
                   {config.items.length > 0 ? (
-                    <ScrollArea className="max-h-[400px]">
-                      <div className="p-2 space-y-1">
+                    <ScrollArea className="max-h-[60vh]">
+                      <div className="space-y-2">
                         {config.items.map((item) => (
                           <div
                             key={item.subCode}
-                            className="flex items-center justify-between p-2 rounded bg-muted/50 hover:bg-muted transition-colors"
+                            className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                           >
                             <div className="flex-1 min-w-0">
-                              <div className="text-xs font-medium truncate">
+                              <div className="text-sm font-medium">
                                 {item.description}
                               </div>
-                              <div className="text-[10px] text-muted-foreground">
+                              <div className="text-xs text-muted-foreground">
                                 Code: {item.subCode}
                               </div>
                             </div>
-                            <div className="text-right ml-2 flex-shrink-0 space-y-0.5">
-                              <div className="flex items-center justify-end gap-2 text-[10px]">
+                            <div className="text-right ml-3 flex-shrink-0 space-y-1">
+                              <div className="flex items-center justify-end gap-2 text-xs">
                                 <span className="text-muted-foreground">Voorraad:</span>
-                                <span className="font-semibold w-6 text-right">{item.numberOnStock}</span>
+                                <span className="font-semibold w-8 text-right">{item.numberOnStock}</span>
                               </div>
-                              <div className="flex items-center justify-end gap-2 text-[10px]">
+                              <div className="flex items-center justify-end gap-2 text-xs">
                                 <span className="text-muted-foreground">Gem. verbr:</span>
-                                <span className="font-semibold w-6 text-right">{item.averageConsumption}</span>
+                                <span className="font-semibold w-8 text-right">{item.averageConsumption}</span>
                               </div>
                               <div className={cn(
-                                "flex items-center justify-end gap-2 text-[10px] font-semibold",
+                                "flex items-center justify-end gap-2 text-xs font-semibold",
                                 item.difference < 0 ? "text-red-500" : item.difference > 0 ? "text-green-500" : "text-muted-foreground"
                               )}>
                                 <span>Verschil:</span>
-                                <span className="w-6 text-right">{item.difference > 0 ? "+" : ""}{item.difference}</span>
+                                <span className="w-8 text-right">{item.difference > 0 ? "+" : ""}{item.difference}</span>
                               </div>
                             </div>
                           </div>
@@ -215,12 +213,12 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
                       </div>
                     </ScrollArea>
                   ) : (
-                    <div className="p-4 text-center text-sm text-muted-foreground">
+                    <div className="py-8 text-center text-sm text-muted-foreground">
                       Geen items in deze categorie
                     </div>
                   )}
-                </HoverCardContent>
-              </HoverCard>
+                </DialogContent>
+              </Dialog>
             );
           })}
         </div>
