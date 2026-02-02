@@ -60,6 +60,7 @@ export function ExcelImportDialog({
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   const [step, setStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
+  const [cylinderSizes, setCylinderSizes] = useState<string[]>([]);
 
   // Fetch gas types when dialog opens
   const fetchGasTypes = async () => {
@@ -68,6 +69,15 @@ export function ExcelImportDialog({
       .select("id, name")
       .eq("is_active", true);
     if (data) setGasTypes(data);
+  };
+
+  // Fetch cylinder sizes when dialog opens
+  const fetchCylinderSizes = async () => {
+    const { data } = await supabase
+      .from("cylinder_sizes")
+      .select("name")
+      .eq("is_active", true);
+    if (data) setCylinderSizes(data.map(s => s.name));
   };
 
   // Match gas type name to ID from the gas_types table using priority-based matching
@@ -111,33 +121,69 @@ export function ExcelImportDialog({
     return "other";
   };
 
-  // Parse cylinder size from Excel format
-  const parseCylinderSize = (sizeStr: string): { size: string; pressure: number } => {
-    const str = sizeStr.toLowerCase();
+  // Parse cylinder size from Excel format with robust pattern matching
+  const parseCylinderSize = (sizeStr: string, cylinderSizes: string[] = []): { size: string; pressure: number } => {
+    const str = sizeStr.toLowerCase().trim();
+    if (!str) return { size: "50L", pressure: 200 };
+    
     let pressure = 200;
     
-    if (str.includes("300 bar")) pressure = 300;
+    // Extract pressure from string
+    if (str.includes("300 bar") || str.includes("300bar")) pressure = 300;
+    if (str.includes("4 bar") || str.includes("4bar")) pressure = 4; // Voor Dewars
     
-    // Extract size patterns
-    if (str.includes("dewar")) return { size: "Dewar 240L", pressure };
-    if (str.includes("pp 16x50")) return { size: "PP 16 X 50L", pressure };
-    if (str.includes("pp 16x40")) return { size: "PP 16 X 40L", pressure };
-    if (str.includes("pp 12x50")) return { size: "PP 12 X 50L", pressure };
-    if (str.includes("pp 12x40")) return { size: "PP 12 X 40L", pressure };
+    // Dewar patterns (uitgebreid) - check eerst voor specifieke capaciteit
+    if (str.includes("dewar")) {
+      const dewarMatch = str.match(/dewar\s*(\d+)/i);
+      if (dewarMatch) {
+        const dewarSize = `Dewar ${dewarMatch[1]}L`;
+        // Check of deze exact in de database staat
+        const dbMatch = cylinderSizes.find(s => s.toLowerCase() === dewarSize.toLowerCase());
+        return { size: dbMatch || dewarSize, pressure: 4 };
+      }
+      return { size: "Dewar 240L", pressure: 4 };
+    }
     
-    // Single cylinder sizes
-    const sizeMatch = str.match(/(\d+)\s*l/i);
-    if (sizeMatch) {
-      const liters = parseInt(sizeMatch[1]);
-      if (liters <= 2) return { size: "2L", pressure };
-      if (liters <= 4) return { size: "4L", pressure };
-      if (liters <= 5) return { size: "5L", pressure };
-      if (liters <= 10) return { size: "10L", pressure };
-      if (liters <= 13) return { size: "10L", pressure }; // 13L maps to 10L
-      if (liters <= 20) return { size: "20L", pressure };
-      if (liters <= 30) return { size: "30L", pressure };
-      if (liters <= 40) return { size: "40L", pressure };
-      return { size: "50L", pressure };
+    // PP bundel patterns (uitgebreid) - bijv. "PP 16 X 50L", "PP16x50", "pp 12 x 40"
+    const ppMatch = str.match(/pp\s*(\d+)\s*x\s*(\d+)/i);
+    if (ppMatch) {
+      const ppSize = `PP ${ppMatch[1]} X ${ppMatch[2]}L`;
+      const dbMatch = cylinderSizes.find(s => s.toLowerCase() === ppSize.toLowerCase());
+      return { size: dbMatch || ppSize, pressure };
+    }
+    
+    // Liter patroon met komma-ondersteuning (bijv. "0,5 liter", "10 liter cilinder", "50L")
+    const literMatch = str.match(/(\d+[,.]?\d*)\s*l(?:iter)?/i);
+    if (literMatch) {
+      const liters = parseFloat(literMatch[1].replace(',', '.'));
+      
+      // Probeer exacte match met database cylinder_sizes
+      const roundedLiters = Math.round(liters * 10) / 10; // Rond af op 1 decimaal
+      
+      // Exacte match proberen
+      const exactMatch = cylinderSizes.find(s => {
+        const sLiters = parseFloat(s.replace(/[^\d.,]/g, '').replace(',', '.'));
+        return Math.abs(sLiters - roundedLiters) < 0.1;
+      });
+      
+      if (exactMatch) return { size: exactMatch, pressure };
+      
+      // Format as "XL" voor standaard sizes
+      if (roundedLiters < 1) {
+        return { size: `${roundedLiters.toString().replace('.', ',')}L`, pressure };
+      }
+      return { size: `${Math.round(roundedLiters)}L`, pressure };
+    }
+    
+    // Fallback - probeer toch een getal te vinden
+    const numMatch = str.match(/(\d+)/);
+    if (numMatch) {
+      const num = parseInt(numMatch[1]);
+      if (num > 0 && num <= 100) {
+        const sizeStr = `${num}L`;
+        const dbMatch = cylinderSizes.find(s => s === sizeStr);
+        return { size: dbMatch || sizeStr, pressure };
+      }
     }
     
     return { size: "50L", pressure };
@@ -200,8 +246,8 @@ export function ExcelImportDialog({
     
     setFile(selectedFile);
     
-    // Fetch gas types for matching
-    await fetchGasTypes();
+    // Fetch gas types and cylinder sizes for matching
+    await Promise.all([fetchGasTypes(), fetchCylinderSizes()]);
     
     // Get current user profile
     const { data: { user } } = await supabase.auth.getUser();
@@ -248,8 +294,15 @@ export function ExcelImportDialog({
               const cellStr = String(cell || "").toLowerCase().trim();
               if (cellStr.includes("datum")) columnMap.date = idx;
               if (cellStr.includes("gassoort") || cellStr.includes("gastype")) columnMap.gasType = idx;
-              if (cellStr.includes("type vulling") || cellStr.includes("vulling type") || 
-                  cellStr.includes("cilinderinhoud") || cellStr.includes("cilinder inhoud")) columnMap.size = idx;
+              // Detect size column - expanded patterns including "omschrijving" and "inhoud"
+              if (columnMap.size === undefined) {
+                if (cellStr.includes("type vulling") || cellStr.includes("vulling type") || 
+                    cellStr.includes("cilinderinhoud") || cellStr.includes("cilinder inhoud") ||
+                    cellStr.includes("formaat") || cellStr.includes("size") || 
+                    cellStr.includes("grootte") || cellStr === "inhoud") {
+                  columnMap.size = idx;
+                }
+              }
               if (cellStr === "aantal") columnMap.count = idx;
               if (cellStr === "m/t") columnMap.grade = idx;
               // Detect location column
@@ -298,7 +351,7 @@ export function ExcelImportDialog({
           if (!dateValue || dateValue.getFullYear() < 2020) continue;
           
           const gasType = String(row[columnMap.gasType ?? 1] || "").trim();
-          const sizeStr = String(row[columnMap.size ?? 2] || "").trim();
+          let sizeStr = String(row[columnMap.size ?? 2] || "").trim();
           const count = parseInt(String(row[columnMap.count ?? 3] || "0"));
           const gradeCode = String(row[columnMap.grade ?? 4] || "T").toUpperCase();
           const customer = String(row[columnMap.customer ?? 5] || "").trim();
@@ -306,6 +359,11 @@ export function ExcelImportDialog({
           const locationStr = columnMap.location !== undefined 
             ? String(row[columnMap.location] || "").trim() 
             : undefined;
+          
+          // Fallback: als size leeg is, probeer notes/omschrijving kolom
+          if (!sizeStr && notes) {
+            sizeStr = notes;
+          }
           
           if (!gasType || count <= 0) continue;
           
@@ -317,11 +375,13 @@ export function ExcelImportDialog({
               pressure = pressureVal;
             }
           } else {
-            const { pressure: descPressure } = parseCylinderSize(sizeStr);
+            // Try to extract pressure from sizeStr or notes
+            const pressureSource = sizeStr || notes;
+            const { pressure: descPressure } = parseCylinderSize(pressureSource, cylinderSizes);
             pressure = descPressure;
           }
           
-          const { size } = parseCylinderSize(sizeStr);
+          const { size } = parseCylinderSize(sizeStr, cylinderSizes);
           const location = parseLocation(locationStr);
           
           orders.push({
