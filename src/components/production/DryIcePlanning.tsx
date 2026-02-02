@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Snowflake, Calendar, Package, Trash2, Box, Repeat, Edit2, AlertTriangle, Filter, X, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from "lucide-react";
 import { FadeIn } from "@/components/ui/fade-in";
 import { TableSkeleton } from "@/components/ui/skeletons";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
   TableBody,
@@ -444,19 +445,14 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
                   ))}
                 </div>
               ) : filteredOrders.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Snowflake className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="font-medium">
-                    {hasActiveFilters
-                      ? "Geen orders gevonden met de huidige filters" 
-                      : "Geen productieorders gepland"}
-                  </p>
-                  <p className="text-sm">
-                    {hasActiveFilters
-                      ? "Pas de filters aan of voeg een nieuwe order toe" 
-                      : "Voeg een nieuwe productieorder toe om te beginnen"}
-                  </p>
-                </div>
+                <EmptyState
+                  variant={hasActiveFilters ? "search" : "dryice"}
+                  title={hasActiveFilters ? "Geen orders gevonden" : "Geen productieorders gepland"}
+                  description={hasActiveFilters 
+                    ? "Pas de filters aan of voeg een nieuwe order toe." 
+                    : "Voeg een nieuwe productieorder toe om te beginnen."}
+                  size="md"
+                />
               ) : (
                 <Table>
                   <TableHeader>

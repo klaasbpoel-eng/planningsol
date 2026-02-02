@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, Check, CheckCheck, Trash2 } from "lucide-react";
+import { Bell, Check, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,6 +14,7 @@ import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import type { Database } from "@/integrations/supabase/types";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type Notification = Database["public"]["Tables"]["notifications"]["Row"];
 
@@ -153,10 +154,10 @@ export function NotificationBell() {
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
             </div>
           ) : notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-              <Bell className="h-8 w-8 mb-2 opacity-50" />
-              <p className="text-sm">Geen meldingen</p>
-            </div>
+            <EmptyState
+              variant="notifications"
+              size="sm"
+            />
           ) : (
             <div className="divide-y">
               {notifications.map((notification) => (

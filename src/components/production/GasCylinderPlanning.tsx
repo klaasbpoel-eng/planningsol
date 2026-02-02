@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Trash2, Filter, CalendarIcon, X, Edit2, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, MapPin } from "lucide-react";
 import { FadeIn } from "@/components/ui/fade-in";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -594,19 +595,14 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
                 ))}
               </div>
             ) : filteredOrders.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Cylinder className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="font-medium">
-                  {hasActiveFilters
-                    ? "Geen vulorders gevonden met de huidige filters"
-                    : "Geen vulorders gepland"}
-                </p>
-                <p className="text-sm">
-                  {hasActiveFilters
-                    ? "Pas de filters aan of voeg een nieuwe order toe"
-                    : "Voeg een nieuwe vulorder toe om te beginnen"}
-                </p>
-              </div>
+              <EmptyState
+                variant={hasActiveFilters ? "search" : "gascylinder"}
+                title={hasActiveFilters ? "Geen vulorders gevonden" : "Geen vulorders gepland"}
+                description={hasActiveFilters 
+                  ? "Pas de filters aan of voeg een nieuwe order toe." 
+                  : "Voeg een nieuwe vulorder toe om te beginnen."}
+                size="md"
+              />
             ) : (
               <Table>
                 <TableHeader>
