@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Loader2, Trash2, Filter, CalendarIcon, X, Edit2, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, MapPin } from "lucide-react";
+import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Trash2, Filter, CalendarIcon, X, Edit2, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, MapPin } from "lucide-react";
+import { FadeIn } from "@/components/ui/fade-in";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -576,8 +577,21 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <div className="rounded-md border">
+                <div className="border-b bg-muted/30 p-3">
+                  <div className="flex gap-4">
+                    {Array.from({ length: 7 }).map((_, i) => (
+                      <div key={i} className="h-4 w-20 rounded bg-muted animate-pulse" />
+                    ))}
+                  </div>
+                </div>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-4 p-3 border-b last:border-0">
+                    {Array.from({ length: 7 }).map((_, j) => (
+                      <div key={j} className="h-4 w-20 rounded bg-muted animate-pulse" />
+                    ))}
+                  </div>
+                ))}
               </div>
             ) : filteredOrders.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">

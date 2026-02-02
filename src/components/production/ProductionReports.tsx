@@ -14,23 +14,22 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  Loader2,
   GitCompare,
   Sparkles,
   AreaChartIcon
 } from "lucide-react";
 import { GlowLineChart } from "@/components/ui/glow-line-chart";
+import { FadeIn } from "@/components/ui/fade-in";
+import { ChartSkeleton, StatCardSkeleton } from "@/components/ui/skeletons";
 
 // Lazy load heavy chart components
 const YearComparisonReport = lazy(() => import("./YearComparisonReport").then(m => ({ default: m.YearComparisonReport })));
 const CumulativeGasTypeChart = lazy(() => import("./CumulativeGasTypeChart").then(m => ({ default: m.CumulativeGasTypeChart })));
 const CumulativeCylinderSizeChart = lazy(() => import("./CumulativeCylinderSizeChart").then(m => ({ default: m.CumulativeCylinderSizeChart })));
 
-// Loading fallback component
+// Loading fallback component with skeleton
 const ChartLoadingFallback = () => (
-  <div className="flex items-center justify-center py-12">
-    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-  </div>
+  <ChartSkeleton height={300} showLegend={false} />
 );
 import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -459,8 +458,12 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6">
+        <ChartSkeleton height={80} showLegend={false} />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCardSkeleton count={4} />
+        </div>
+        <ChartSkeleton height={350} />
       </div>
     );
   }
