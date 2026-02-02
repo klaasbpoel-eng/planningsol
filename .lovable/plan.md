@@ -1,128 +1,199 @@
 
 
-# Plan: Skeleton Loaders met Fade-in Animaties
+# Data Insight Enhancement Plan
 
-## Overzicht
-
-Dit plan implementeert professionele skeleton loaders met fade-in animaties voor de belangrijkste componenten. Dit verbetert de perceived performance door gebruikers visuele feedback te geven tijdens het laden van data.
-
----
-
-## Wat wordt gebouwd
-
-### 1. Enhanced Skeleton Component
-Uitbreiding van de bestaande `Skeleton` component met:
-- Shimmer animatie effect (al aanwezig in CSS)
-- Varianten voor verschillende content types (text, card, table, chart)
-- Ondersteuning voor fade-in wanneer content laadt
-
-### 2. Fade-in Animatie Wrapper
-Een `FadeIn` component die content smooth laat verschijnen na het laden.
-
-### 3. Skeleton Templates voor specifieke componenten:
-- **StatCardSkeleton**: Voor de statistiek cards in ProductionPlanning
-- **TableSkeleton**: Voor order tabellen in DryIcePlanning en GasCylinderPlanning
-- **ChartSkeleton**: Voor charts in ProductionReports
-- **TopCustomersSkeleton**: Voor de TopCustomersWidget
-- **CalendarSkeleton**: Voor CalendarOverview
+## Overview
+This plan adds advanced analytics features to provide deeper, more actionable insights into your production data. The enhancements focus on predictive analytics, anomaly detection, and executive-level dashboards.
 
 ---
 
-## Implementatie Details
+## 1. KPI Dashboard with Real-Time Metrics
+**Purpose**: At-a-glance view of critical performance indicators
 
-### Stap 1: Tailwind Animaties uitbreiden (tailwind.config.ts)
+**Features**:
+- Production efficiency rate (completed vs planned orders)
+- Average order fulfillment time
+- Capacity utilization percentage
+- Target vs actual production comparison
+- Week-over-week and month-over-month sparklines
 
-Nieuwe keyframes en animaties toevoegen:
-- `skeleton-shimmer`: Bewegende shimmer over skeleton
-- `fade-in-up`: Combinatie fade + subtle upward movement
+**Implementation**:
+- Create `KPIDashboard.tsx` component
+- Add database functions for efficiency calculations
+- Display as collapsible panel at top of Production page
 
-### Stap 2: Skeleton Component uitbreiden (src/components/ui/skeleton.tsx)
+---
 
-```typescript
-// Nieuwe varianten
-interface SkeletonProps {
-  variant?: "default" | "text" | "circular" | "rectangular";
-  animation?: "pulse" | "shimmer" | "none";
-}
+## 2. Predictive Demand Forecasting
+**Purpose**: Anticipate future production needs based on historical patterns
+
+**Features**:
+- 30/60/90 day demand forecast using moving averages
+- Seasonal trend detection (holiday periods, summer/winter patterns)
+- Customer-specific demand projections
+- Visual forecast chart with confidence intervals
+
+**Implementation**:
+- Create `DemandForecastChart.tsx` component
+- Build forecast logic using exponential smoothing
+- Add to Reports tab as new section
+
+---
+
+## 3. Anomaly Detection Alerts
+**Purpose**: Automatically flag unusual production patterns
+
+**Features**:
+- Sudden order volume spikes or drops (> 2 standard deviations)
+- Unusual customer ordering patterns
+- Gas type demand shifts
+- Visual highlighting in charts with alert badges
+- Configurable threshold settings
+
+**Implementation**:
+- Create `AnomalyDetector.tsx` utility
+- Add alert badge component to relevant charts
+- Store thresholds in `app_settings` table
+
+---
+
+## 4. Heat Map Calendar View
+**Purpose**: Visual pattern recognition across time
+
+**Features**:
+- Monthly calendar with color-coded production volume
+- Hover tooltips showing daily breakdown
+- Toggle between cylinders/dry ice views
+- Year-over-year comparison mode
+- Exportable for reporting
+
+**Implementation**:
+- Create `ProductionHeatMap.tsx` component
+- Use color gradient from green (low) to red (high)
+- Add to Reports tab
+
+---
+
+## 5. Customer Segmentation Analysis
+**Purpose**: Understand customer value and behavior
+
+**Features**:
+- Customer tiers (Gold/Silver/Bronze) based on volume
+- Customer growth trajectory (growing/stable/declining)
+- Order frequency analysis
+- Product mix per customer
+- Churn risk indicators (declining orders)
+
+**Implementation**:
+- Create `CustomerSegmentation.tsx` component
+- Add database function for segmentation calculations
+- Display as card grid with drill-down capability
+
+---
+
+## 6. Gas Type Mix Optimization Insights
+**Purpose**: Identify production optimization opportunities
+
+**Features**:
+- Gas type profitability indicators (if cost data available)
+- Capacity planning based on cylinder size mix
+- Cross-sell opportunities (customers buying only one gas type)
+- Underutilized gas type identification
+
+**Implementation**:
+- Create `GasTypeMixAnalysis.tsx` component
+- Add insights cards with actionable recommendations
+- Link to customer details for follow-up
+
+---
+
+## 7. Export & Scheduled Reports
+**Purpose**: Share insights with stakeholders
+
+**Features**:
+- PDF export of current view/charts
+- Excel export with raw data
+- Scheduled email reports (weekly/monthly summaries)
+- Custom date range exports
+- Report templates for different audiences
+
+**Implementation**:
+- Add export buttons to chart components
+- Create `ExportService.ts` for PDF/Excel generation
+- Edge function for scheduled email delivery
+
+---
+
+## 8. Comparison Benchmarks
+**Purpose**: Context for understanding performance
+
+**Features**:
+- Location comparison (Emmen vs Tilburg)
+- Period comparison (this month vs last month)
+- Same-period-last-year overlay
+- Industry benchmarks (if available)
+- Goal tracking with progress bars
+
+**Implementation**:
+- Enhance existing charts with benchmark lines
+- Add benchmark configuration in admin settings
+- Create goal/target management UI
+
+---
+
+## Technical Architecture
+
+```text
++-------------------------------------------+
+|            KPI Dashboard                  |
+|  [Efficiency] [Capacity] [Fulfillment]    |
++-------------------------------------------+
+|                                           |
+|  +------------------+  +----------------+ |
+|  | Production       |  | Demand         | |
+|  | Heat Map         |  | Forecast       | |
+|  +------------------+  +----------------+ |
+|                                           |
+|  +------------------+  +----------------+ |
+|  | Customer         |  | Gas Type Mix   | |
+|  | Segmentation     |  | Analysis       | |
+|  +------------------+  +----------------+ |
+|                                           |
+|  [Anomaly Alerts Banner]                  |
++-------------------------------------------+
 ```
 
-### Stap 3: FadeIn Wrapper Component (src/components/ui/fade-in.tsx)
+---
 
-```typescript
-// Wrapper die children smooth laat verschijnen
-<FadeIn show={!loading}>
-  <ActualContent />
-</FadeIn>
-```
+## Database Functions Required
 
-### Stap 4: Skeleton Templates (src/components/ui/skeletons/)
-
-- **stat-card-skeleton.tsx**: 4-5 stat cards als skeletons
-- **table-skeleton.tsx**: Tabel met skeleton rows
-- **chart-skeleton.tsx**: Chart placeholder met golven
-- **customer-list-skeleton.tsx**: Top 5 klanten lijst
-
-### Stap 5: Integratie in Componenten
-
-| Component | Huidige Loading | Nieuwe Loading |
-|-----------|-----------------|----------------|
-| ProductionPlanning | Geen skeleton voor stats | StatCardSkeleton + FadeIn |
-| DryIcePlanning | Loader2 spinner | TableSkeleton + FadeIn |
-| GasCylinderPlanning | Loader2 spinner | TableSkeleton + FadeIn |
-| ProductionReports | Loader2 spinner | ChartSkeleton + FadeIn |
-| TopCustomersWidget | Basic skeleton | Enhanced shimmer + FadeIn |
-| CalendarOverview | loading state | CalendarSkeleton + FadeIn |
+1. `get_production_efficiency` - Calculate completion rates
+2. `get_demand_forecast_data` - Historical data for forecasting
+3. `get_customer_segments` - Customer tier calculations
+4. `get_anomaly_thresholds` - Statistical baselines
 
 ---
 
-## Visueel Ontwerp
+## Recommended Priority
 
-### Skeleton Stijl
-- Achtergrond: `bg-muted` (huidige)
-- Shimmer: Lineair gradient van transparant naar primary/10 naar transparant
-- Border radius: Afgestemd op het element type
-- Animatie duur: 1.5s voor shimmer, 0.3s voor fade-in
-
-### Fade-in Effect
-- Opacity: 0 naar 1
-- Transform: translateY(8px) naar translateY(0)
-- Easing: ease-out
-- Duur: 300ms
-
----
-
-## Bestanden die worden aangemaakt
-
-1. `src/components/ui/fade-in.tsx` - FadeIn wrapper component
-2. `src/components/ui/skeletons/stat-card-skeleton.tsx` - Stat card skeletons
-3. `src/components/ui/skeletons/table-skeleton.tsx` - Table skeleton
-4. `src/components/ui/skeletons/chart-skeleton.tsx` - Chart skeleton
-5. `src/components/ui/skeletons/customer-list-skeleton.tsx` - Customer list skeleton
-6. `src/components/ui/skeletons/calendar-skeleton.tsx` - Calendar skeleton
-7. `src/components/ui/skeletons/index.ts` - Export barrel file
-
-## Bestanden die worden aangepast
-
-1. `tailwind.config.ts` - Nieuwe animatie keyframes
-2. `src/components/ui/skeleton.tsx` - Enhanced skeleton met varianten
-3. `src/components/production/ProductionPlanning.tsx` - Skeleton + FadeIn
-4. `src/components/production/DryIcePlanning.tsx` - TableSkeleton + FadeIn
-5. `src/components/production/GasCylinderPlanning.tsx` - TableSkeleton + FadeIn
-6. `src/components/production/ProductionReports.tsx` - ChartSkeleton + FadeIn
-7. `src/components/production/TopCustomersWidget.tsx` - Enhanced skeleton
-8. `src/components/calendar/CalendarOverview.tsx` - CalendarSkeleton + FadeIn
+| Priority | Feature | Impact | Effort |
+|----------|---------|--------|--------|
+| 1 | KPI Dashboard | High | Medium |
+| 2 | Heat Map Calendar | High | Low |
+| 3 | Customer Segmentation | High | Medium |
+| 4 | Anomaly Detection | Medium | Medium |
+| 5 | Demand Forecasting | Medium | High |
+| 6 | Export Reports | Medium | Medium |
+| 7 | Gas Mix Analysis | Low | Medium |
+| 8 | Benchmarks | Low | Low |
 
 ---
 
-## Technische Details
+## Quick Wins (Can implement immediately)
 
-### Performance Overwegingen
-- Skeleton componenten zijn lightweight (geen state, pure rendering)
-- Animaties gebruiken CSS transforms (GPU accelerated)
-- FadeIn wrapper wrapped met React.memo voor re-render prevention
-
-### Herbruikbaarheid
-- Alle skeleton componenten accepteren className prop voor customization
-- FadeIn component is generiek en kan overal worden gebruikt
-- Skeleton varianten kunnen in elke context worden toegepast
+1. **Production Efficiency Card** - Add to existing stat cards
+2. **Daily Production Sparklines** - Mini charts in stat cards
+3. **Customer Growth Badges** - Already have trend data, add visual indicators
+4. **Comparison Mode Toggle** - Switch between absolute and percentage views
+5. **Data Quality Indicators** - Show completeness of data
 
