@@ -844,7 +844,7 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
             </Button>
           )}
           {permissions?.canCreateOrders && (
-            <Button className="bg-orange-500 hover:bg-orange-600" onClick={() => setDialogOpen(true)}>
+            <Button variant="accent" onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Nieuwe vulorder
             </Button>

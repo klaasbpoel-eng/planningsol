@@ -550,7 +550,7 @@ export function CreateDryIceOrderCalendarDialog({
           <Button
             onClick={handleCreate}
             disabled={saving || !customerName || !quantityKg || !scheduledDate}
-            className="bg-cyan-600 hover:bg-cyan-700"
+            variant="dryice"
           >
             <Plus className="h-4 w-4 mr-2" />
             {saving ? "Aanmaken..." : "Order aanmaken"}

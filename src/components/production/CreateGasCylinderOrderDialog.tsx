@@ -463,7 +463,7 @@ export function CreateGasCylinderOrderDialog({
           <Button
             onClick={handleCreate}
             disabled={saving || !customerId || !cylinderCount || !scheduledDate}
-            className="bg-orange-500 hover:bg-orange-600"
+            variant="accent"
           >
             <Plus className="h-4 w-4 mr-2" />
             {saving ? "Aanmaken..." : "Order aanmaken"}

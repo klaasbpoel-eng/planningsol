@@ -38,6 +38,9 @@ All colors MUST be HSL.
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
 
+    --dryice: 189 94% 43%;
+    --dryice-foreground: 0 0% 100%;
+
     --border: 214 30% 88%;
     --input: 214 30% 88%;
     --ring: 210 70% 35%;
@@ -84,6 +87,9 @@ All colors MUST be HSL.
 
     --warning: 38 85% 45%;
     --warning-foreground: 0 0% 100%;
+
+    --dryice: 189 85% 38%;
+    --dryice-foreground: 0 0% 100%;
 
     --border: 215 20% 22%;
     --input: 215 20% 22%;

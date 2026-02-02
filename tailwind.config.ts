@@ -47,6 +47,10 @@ export default {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
         },
+        dryice: {
+          DEFAULT: "hsl(var(--dryice))",
+          foreground: "hsl(var(--dryice-foreground))",
+        },
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
