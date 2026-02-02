@@ -193,15 +193,21 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
                                 Code: {item.subCode}
                               </div>
                             </div>
-                            <div className="text-right ml-2 flex-shrink-0">
-                              <div className="text-xs font-semibold">
-                                {item.numberOnStock} op voorraad
+                            <div className="text-right ml-2 flex-shrink-0 space-y-0.5">
+                              <div className="flex items-center justify-end gap-2 text-[10px]">
+                                <span className="text-muted-foreground">Voorraad:</span>
+                                <span className="font-semibold w-6 text-right">{item.numberOnStock}</span>
+                              </div>
+                              <div className="flex items-center justify-end gap-2 text-[10px]">
+                                <span className="text-muted-foreground">Gem. verbr:</span>
+                                <span className="font-semibold w-6 text-right">{item.averageConsumption}</span>
                               </div>
                               <div className={cn(
-                                "text-[10px] font-medium",
-                                item.difference < 0 ? "text-red-500" : "text-green-500"
+                                "flex items-center justify-end gap-2 text-[10px] font-semibold",
+                                item.difference < 0 ? "text-red-500" : item.difference > 0 ? "text-green-500" : "text-muted-foreground"
                               )}>
-                                {item.difference > 0 ? "+" : ""}{item.difference} verschil
+                                <span>Verschil:</span>
+                                <span className="w-6 text-right">{item.difference > 0 ? "+" : ""}{item.difference}</span>
                               </div>
                             </div>
                           </div>
