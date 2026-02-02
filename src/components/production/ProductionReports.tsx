@@ -15,8 +15,11 @@ import {
   Clock,
   XCircle,
   Loader2,
-  GitCompare
+  GitCompare,
+  Sparkles,
+  AreaChartIcon
 } from "lucide-react";
+import { GlowLineChart } from "@/components/ui/glow-line-chart";
 
 // Lazy load heavy chart components
 const YearComparisonReport = lazy(() => import("./YearComparisonReport").then(m => ({ default: m.YearComparisonReport })));
@@ -113,6 +116,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [productionChartView, setProductionChartView] = useState<"both" | "cylinders" | "dryIce">("both");
+  const [chartStyle, setChartStyle] = useState<"area" | "glow">("area");
 
   useEffect(() => {
     fetchGasTypes();
@@ -642,63 +646,97 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
                   {productionChartView === "dryIce" && "Overzicht van droogijs orders"}
                 </CardDescription>
               </div>
-              <ToggleGroup 
-                type="single" 
-                value={productionChartView} 
-                onValueChange={(value) => value && setProductionChartView(value as "both" | "cylinders" | "dryIce")}
-                className="bg-muted/50 rounded-md p-1"
-              >
-                <ToggleGroupItem value="both" aria-label="Beide" className="text-xs px-3 data-[state=on]:bg-background">
-                  Beide
-                </ToggleGroupItem>
-                <ToggleGroupItem value="cylinders" aria-label="Cilinders" className="text-xs px-3 data-[state=on]:bg-orange-500 data-[state=on]:text-white">
-                  <Cylinder className="h-3 w-3 mr-1" />
-                  Cilinders
-                </ToggleGroupItem>
-                <ToggleGroupItem value="dryIce" aria-label="Droogijs" className="text-xs px-3 data-[state=on]:bg-cyan-500 data-[state=on]:text-white">
-                  <Snowflake className="h-3 w-3 mr-1" />
-                  Droogijs
-                </ToggleGroupItem>
-              </ToggleGroup>
+              <div className="flex items-center gap-2">
+                {/* Chart Style Toggle */}
+                <ToggleGroup 
+                  type="single" 
+                  value={chartStyle} 
+                  onValueChange={(value) => value && setChartStyle(value as "area" | "glow")}
+                  className="bg-muted/50 rounded-md p-1"
+                >
+                  <ToggleGroupItem value="area" aria-label="Area Chart" className="text-xs px-2 data-[state=on]:bg-background">
+                    <AreaChartIcon className="h-3.5 w-3.5" />
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="glow" aria-label="Glow Chart" className="text-xs px-2 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                    <Sparkles className="h-3.5 w-3.5" />
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                
+                {/* Data View Toggle */}
+                <ToggleGroup 
+                  type="single" 
+                  value={productionChartView} 
+                  onValueChange={(value) => value && setProductionChartView(value as "both" | "cylinders" | "dryIce")}
+                  className="bg-muted/50 rounded-md p-1"
+                >
+                  <ToggleGroupItem value="both" aria-label="Beide" className="text-xs px-3 data-[state=on]:bg-background">
+                    Beide
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="cylinders" aria-label="Cilinders" className="text-xs px-3 data-[state=on]:bg-orange-500 data-[state=on]:text-white">
+                    <Cylinder className="h-3 w-3 mr-1" />
+                    Cilinders
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="dryIce" aria-label="Droogijs" className="text-xs px-3 data-[state=on]:bg-cyan-500 data-[state=on]:text-white">
+                    <Snowflake className="h-3 w-3 mr-1" />
+                    Droogijs
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
             </CardHeader>
             <CardContent>
               {ordersPerDay.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={ordersPerDay}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="displayDate" className="text-xs" />
-                    <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--background))', 
-                        border: '1px solid hsl(var(--border))' 
-                      }} 
-                    />
-                    <Legend />
-                    {(productionChartView === "both" || productionChartView === "cylinders") && (
-                      <Area 
-                        type="monotone" 
-                        dataKey="cylinders" 
-                        name="Cilinders" 
-                        stackId="1" 
-                        stroke="#f97316" 
-                        fill="#f97316" 
-                        fillOpacity={0.6} 
+                chartStyle === "glow" ? (
+                  <GlowLineChart
+                    data={ordersPerDay}
+                    xAxisKey="displayDate"
+                    height={300}
+                    series={[
+                      ...(productionChartView === "both" || productionChartView === "cylinders" 
+                        ? [{ dataKey: "cylinders", name: "Cilinders", color: "#f97316", glowColor: "#f97316" }] 
+                        : []),
+                      ...(productionChartView === "both" || productionChartView === "dryIce" 
+                        ? [{ dataKey: "dryIce", name: "Droogijs (kg)", color: "#06b6d4", glowColor: "#06b6d4" }] 
+                        : []),
+                    ]}
+                  />
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={ordersPerDay}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="displayDate" className="text-xs" />
+                      <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--background))', 
+                          border: '1px solid hsl(var(--border))' 
+                        }} 
                       />
-                    )}
-                    {(productionChartView === "both" || productionChartView === "dryIce") && (
-                      <Area 
-                        type="monotone" 
-                        dataKey="dryIce" 
-                        name="Droogijs (kg)" 
-                        stackId="2" 
-                        stroke="#06b6d4" 
-                        fill="#06b6d4" 
-                        fillOpacity={0.6} 
-                      />
-                    )}
-                  </AreaChart>
-                </ResponsiveContainer>
+                      <Legend />
+                      {(productionChartView === "both" || productionChartView === "cylinders") && (
+                        <Area 
+                          type="monotone" 
+                          dataKey="cylinders" 
+                          name="Cilinders" 
+                          stackId="1" 
+                          stroke="#f97316" 
+                          fill="#f97316" 
+                          fillOpacity={0.6} 
+                        />
+                      )}
+                      {(productionChartView === "both" || productionChartView === "dryIce") && (
+                        <Area 
+                          type="monotone" 
+                          dataKey="dryIce" 
+                          name="Droogijs (kg)" 
+                          stackId="2" 
+                          stroke="#06b6d4" 
+                          fill="#06b6d4" 
+                          fillOpacity={0.6} 
+                        />
+                      )}
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
                   Geen data voor deze periode
