@@ -131,12 +131,14 @@ export function CreateLeaveRequestDialog({
 
     try {
       // Use profile_id and type_id for the new schema
+      // Admin-created requests are automatically approved
       const { error } = await supabase.from("time_off_requests").insert({
         profile_id: profileId,
         start_date: format(startDate, "yyyy-MM-dd"),
         end_date: format(endDate, "yyyy-MM-dd"),
         type_id: typeId,
         reason: reason.trim() || null,
+        ...(isAdmin && { status: 'approved' }),
       } as any);
 
       if (error) throw error;
