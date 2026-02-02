@@ -23,7 +23,20 @@
   - Horizontale staafgrafiek per cilindergrootte
   - Overzichtstabel met huidige/vorig jaar + trend indicator
 
+### Stap 4: CumulativeCylinderSizeChart ✅
+- Nieuwe component `CumulativeCylinderSizeChart.tsx` gemaakt
+- Cumulatieve lijn grafiek voor cilindergroottes over meerdere jaren
+- Vergelijkbaar met `CumulativeGasTypeChart.tsx`
+- Features:
+  - Twee jaar selectie voor vergelijking
+  - Badge selectie per cilindergrootte met capaciteit info
+  - Top 5 / Alles / Wissen knoppen
+  - Trophy iconen voor top 5 volumes
+  - Groei/krimp percentages per cilindergrootte
+  - Doorgetrokken lijn (jaar 1) vs gestreepte lijn (jaar 2)
+
 ## Technische Details
 - Database functie: `get_monthly_cylinder_totals_by_size(p_year, p_location)`
 - Filter grid uitgebreid naar 3 kolommen
 - Cilindergrootte kaart geplaatst na gastype kaart
+- Cumulatieve grafiek toegevoegd aan "Jaarvergelijking" tab in ProductionReports
