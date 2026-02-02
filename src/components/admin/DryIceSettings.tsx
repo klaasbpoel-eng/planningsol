@@ -3,11 +3,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Snowflake, Package, Box, Gauge, Loader2, Check } from "lucide-react";
+import { Snowflake, Package, Box, Gauge, Loader2, Check, Trash2 } from "lucide-react";
 import { DryIceProductTypeManager } from "@/components/production/DryIceProductTypeManager";
 import { DryIcePackagingManager } from "@/components/production/DryIcePackagingManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const DRY_ICE_CAPACITY_KEY = "dry_ice_daily_capacity_kg";
 const DEFAULT_CAPACITY = 500;
@@ -18,6 +29,7 @@ export function DryIceSettings() {
   const [dailyCapacity, setDailyCapacity] = useState<number>(DEFAULT_CAPACITY);
   const [loadingCapacity, setLoadingCapacity] = useState(true);
   const [savingCapacity, setSavingCapacity] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     fetchDailyCapacity();
@@ -61,6 +73,32 @@ export function DryIceSettings() {
       toast.success("Dagcapaciteit opgeslagen");
     }
     setSavingCapacity(false);
+  };
+
+  const handleResetTable = async () => {
+    setIsResetting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("reset-dry-ice-orders");
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      toast.success("Tabel succesvol gereset", {
+        description: "De dry_ice_orders tabel is verwijderd en opnieuw aangemaakt.",
+      });
+    } catch (error: any) {
+      console.error("Error resetting table:", error);
+      toast.error("Fout bij resetten van tabel", {
+        description: error.message || "Er is een onbekende fout opgetreden.",
+      });
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   return (
@@ -133,6 +171,45 @@ export function DryIceSettings() {
               <Box className="h-4 w-4 text-cyan-500" />
               Verpakkingen beheren
             </Button>
+          </div>
+
+          {/* Dangerous actions */}
+          <div className="border-t pt-4">
+            <h4 className="text-sm font-medium text-muted-foreground mb-2">Gevaarlijke acties</h4>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  className="flex items-center gap-2"
+                  disabled={isResetting}
+                >
+                  {isResetting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Droogijs orders tabel resetten
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Deze actie verwijdert <strong>alle droogijs orders</strong> permanent en
+                    maakt de tabel opnieuw aan. Dit kan niet ongedaan worden gemaakt.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleResetTable}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Ja, reset de tabel
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </CardContent>
       </Card>
