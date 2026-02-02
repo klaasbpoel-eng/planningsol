@@ -8,7 +8,13 @@ import { DryIceProductTypeManager } from "@/components/production/DryIceProductT
 import { DryIcePackagingManager } from "@/components/production/DryIcePackagingManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { SearchableSelect } from "@/components/ui/searchable-select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -228,15 +234,21 @@ export function DryIceSettings() {
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <div className="flex items-center gap-2">
-                  <SearchableSelect
-                    options={productTypes.map((pt) => ({ value: pt.id, label: pt.name }))}
+                  <Select
                     value={defaultProductTypeId}
                     onValueChange={saveDefaultProductType}
-                    placeholder="Selecteer standaard type"
-                    searchPlaceholder="Zoek producttype..."
-                    emptyMessage="Geen producttype gevonden."
-                    className="w-48"
-                  />
+                  >
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Selecteer standaard type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {productTypes.map((pt) => (
+                        <SelectItem key={pt.id} value={pt.id}>
+                          {pt.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {savingDefaultType && <Loader2 className="h-4 w-4 animate-spin" />}
                 </div>
               )}
