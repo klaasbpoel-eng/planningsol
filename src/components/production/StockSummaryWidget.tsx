@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getStockStatus, type StockStatus } from "./StockStatusBadge";
@@ -30,73 +32,82 @@ const mockStockData: StockItem[] = [
   { subCode: "201789", description: "Waterstof 5.0 (50L)", averageConsumption: 1, numberOnStock: 8, difference: 7 },
 ];
 
-interface StatusCount {
+interface StatusConfig {
   status: StockStatus;
   count: number;
   label: string;
+  fullLabel: string;
   icon: typeof ShieldAlert;
   color: string;
   bgColor: string;
+  items: StockItem[];
 }
 
 export function StockSummaryWidget({ refreshKey, isRefreshing, className }: StockSummaryWidgetProps) {
   const [stockData, setStockData] = useState<StockItem[]>(mockStockData);
-  const [statusCounts, setStatusCounts] = useState<StatusCount[]>([]);
 
-  useEffect(() => {
-    // Calculate status counts from stock data
-    const counts: Record<StockStatus, number> = {
-      critical: 0,
-      low: 0,
-      ok: 0,
-      surplus: 0,
+  // Group items by status
+  const statusConfigs = useMemo(() => {
+    const grouped: Record<StockStatus, StockItem[]> = {
+      critical: [],
+      low: [],
+      ok: [],
+      surplus: [],
     };
 
     stockData.forEach((item) => {
       const status = getStockStatus(item.difference);
-      counts[status]++;
+      grouped[status].push(item);
     });
 
-    setStatusCounts([
+    return [
       {
-        status: "critical",
-        count: counts.critical,
+        status: "critical" as StockStatus,
+        count: grouped.critical.length,
         label: "Kritiek",
+        fullLabel: "Kritieke voorraad",
         icon: ShieldAlert,
         color: "text-red-500",
         bgColor: "bg-red-500/10",
+        items: grouped.critical,
       },
       {
-        status: "low",
-        count: counts.low,
+        status: "low" as StockStatus,
+        count: grouped.low.length,
         label: "Laag",
+        fullLabel: "Lage voorraad",
         icon: AlertTriangle,
         color: "text-orange-500",
         bgColor: "bg-orange-500/10",
+        items: grouped.low,
       },
       {
-        status: "ok",
-        count: counts.ok,
+        status: "ok" as StockStatus,
+        count: grouped.ok.length,
         label: "Goed",
+        fullLabel: "Op voorraad",
         icon: CheckCircle,
         color: "text-green-500",
         bgColor: "bg-green-500/10",
+        items: grouped.ok,
       },
       {
-        status: "surplus",
-        count: counts.surplus,
+        status: "surplus" as StockStatus,
+        count: grouped.surplus.length,
         label: "Over",
+        fullLabel: "Overschot",
         icon: TrendingUp,
         color: "text-cyan-500",
         bgColor: "bg-cyan-500/10",
+        items: grouped.surplus,
       },
-    ]);
+    ];
   }, [stockData, refreshKey]);
 
   // Determine overall status for the header
-  const overallStatus = statusCounts.find((s) => s.status === "critical" && s.count > 0)
+  const overallStatus = statusConfigs.find((s) => s.status === "critical" && s.count > 0)
     ? "critical"
-    : statusCounts.find((s) => s.status === "low" && s.count > 0)
+    : statusConfigs.find((s) => s.status === "low" && s.count > 0)
     ? "low"
     : "ok";
 
@@ -131,20 +142,72 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
       <CardContent>
         <div className={cn("text-2xl font-bold mb-2", overallColor)}>{overallLabel}</div>
         <div className="grid grid-cols-4 gap-1">
-          {statusCounts.map((status) => {
-            const Icon = status.icon;
+          {statusConfigs.map((config) => {
+            const Icon = config.icon;
             return (
-              <div
-                key={status.status}
-                className={cn(
-                  "flex flex-col items-center p-1 rounded",
-                  status.bgColor
-                )}
-              >
-                <Icon className={cn("h-3 w-3", status.color)} />
-                <span className={cn("text-sm font-bold", status.color)}>{status.count}</span>
-                <span className="text-[9px] text-muted-foreground">{status.label}</span>
-              </div>
+              <HoverCard key={config.status} openDelay={200} closeDelay={100}>
+                <HoverCardTrigger asChild>
+                  <div
+                    className={cn(
+                      "flex flex-col items-center p-1 rounded cursor-pointer transition-all hover:scale-105",
+                      config.bgColor
+                    )}
+                  >
+                    <Icon className={cn("h-3 w-3", config.color)} />
+                    <span className={cn("text-sm font-bold", config.color)}>{config.count}</span>
+                    <span className="text-[9px] text-muted-foreground">{config.label}</span>
+                  </div>
+                </HoverCardTrigger>
+                <HoverCardContent className="w-72 p-0" side="top" align="center">
+                  <div className={cn("px-3 py-2 border-b", config.bgColor)}>
+                    <div className="flex items-center gap-2">
+                      <Icon className={cn("h-4 w-4", config.color)} />
+                      <span className={cn("font-semibold text-sm", config.color)}>
+                        {config.fullLabel}
+                      </span>
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {config.count} items
+                      </span>
+                    </div>
+                  </div>
+                  {config.items.length > 0 ? (
+                    <ScrollArea className="max-h-48">
+                      <div className="p-2 space-y-1">
+                        {config.items.map((item) => (
+                          <div
+                            key={item.subCode}
+                            className="flex items-center justify-between p-2 rounded bg-muted/50 hover:bg-muted transition-colors"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-medium truncate">
+                                {item.description}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">
+                                Code: {item.subCode}
+                              </div>
+                            </div>
+                            <div className="text-right ml-2 flex-shrink-0">
+                              <div className="text-xs font-semibold">
+                                {item.numberOnStock} op voorraad
+                              </div>
+                              <div className={cn(
+                                "text-[10px] font-medium",
+                                item.difference < 0 ? "text-red-500" : "text-green-500"
+                              )}>
+                                {item.difference > 0 ? "+" : ""}{item.difference} verschil
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  ) : (
+                    <div className="p-4 text-center text-sm text-muted-foreground">
+                      Geen items in deze categorie
+                    </div>
+                  )}
+                </HoverCardContent>
+              </HoverCard>
             );
           })}
         </div>
