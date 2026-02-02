@@ -182,6 +182,59 @@ export function SafetyInstructions() {
                 </div>
               </AccordionContent>
             </AccordionItem>
+
+            <AccordionItem value="pbm-droogijs">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-cyan-500" />
+                  <span>Persoonlijke Beschermingsmiddelen</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-3 text-sm">
+                <div className="grid gap-3">
+                  <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Hand className="h-4 w-4 text-cyan-500" />
+                      <span className="font-medium">Cryogene Handschoenen</span>
+                    </div>
+                    <p className="text-muted-foreground">
+                      Gebruik altijd speciale cryogene of geïsoleerde handschoenen bij het hanteren van droogijs. 
+                      Normale handschoenen bieden onvoldoende bescherming tegen -78,5°C.
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Eye className="h-4 w-4 text-blue-500" />
+                      <span className="font-medium">Oogbescherming</span>
+                    </div>
+                    <p className="text-muted-foreground">
+                      Draag een veiligheidsbril of gelaatsscherm ter bescherming tegen rondspattende 
+                      stukjes droogijs bij het breken of verwerken.
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Shield className="h-4 w-4 text-green-500" />
+                      <span className="font-medium">Beschermende Kleding</span>
+                    </div>
+                    <p className="text-muted-foreground">
+                      Draag lange mouwen, lange broek en gesloten schoenen. Vermijd kleding die 
+                      droogijs kan vasthouden (zoals wijde zakken of open schoenen).
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Wind className="h-4 w-4 text-gray-500" />
+                      <span className="font-medium">Ventilatie & Ademhaling</span>
+                    </div>
+                    <p className="text-muted-foreground">
+                      Werk altijd in goed geventileerde ruimtes. Bij werken in afgesloten ruimtes of 
+                      bij grote hoeveelheden droogijs kan een CO₂-meter of ademhalingsbescherming nodig zijn.
+                    </p>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
         </CardContent>
       </Card>
