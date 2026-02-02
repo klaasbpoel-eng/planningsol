@@ -1168,6 +1168,14 @@ export type Database = {
           total_cylinders: number
         }[]
       }
+      get_monthly_cylinder_totals_by_size: {
+        Args: { p_location?: string; p_year: number }
+        Returns: {
+          cylinder_size: string
+          month: number
+          total_cylinders: number
+        }[]
+      }
       get_monthly_order_totals: {
         Args: { p_location?: string; p_order_type: string; p_year: number }
         Returns: {
