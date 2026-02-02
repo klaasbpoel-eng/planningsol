@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Calendar, LogOut, User, Shield, ArrowLeftRight, CalendarDays, Factory } from "lucide-react";
+import { Calendar, LogOut, User, Shield, ArrowLeftRight, CalendarDays, Factory, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import siteLogo from "@/assets/site_logo.png";
 import type { AppRole } from "@/hooks/useUserPermissions";
+import { CommandPaletteTrigger } from "@/components/command-palette";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
@@ -67,6 +68,17 @@ export function Header({
         </div>
         
         <div className="flex items-center gap-2">
+          <CommandPaletteTrigger 
+            onClick={() => {
+              // Trigger the command palette by dispatching keyboard event
+              const event = new KeyboardEvent('keydown', {
+                key: 'k',
+                metaKey: true,
+                bubbles: true,
+              });
+              document.dispatchEvent(event);
+            }}
+          />
           <ThemeToggle variant="header" />
           <NotificationBell />
           <Link to="/kalender">
