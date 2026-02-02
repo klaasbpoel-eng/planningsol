@@ -1,199 +1,137 @@
 
+# Plan: Trend Indicators voor Productie-Statistieken
 
-# Data Insight Enhancement Plan
-
-## Overview
-This plan adds advanced analytics features to provide deeper, more actionable insights into your production data. The enhancements focus on predictive analytics, anomaly detection, and executive-level dashboards.
-
----
-
-## 1. KPI Dashboard with Real-Time Metrics
-**Purpose**: At-a-glance view of critical performance indicators
-
-**Features**:
-- Production efficiency rate (completed vs planned orders)
-- Average order fulfillment time
-- Capacity utilization percentage
-- Target vs actual production comparison
-- Week-over-week and month-over-month sparklines
-
-**Implementation**:
-- Create `KPIDashboard.tsx` component
-- Add database functions for efficiency calculations
-- Display as collapsible panel at top of Production page
+## Overzicht
+Dit plan voegt trend indicators toe aan de productie-statistieken in twee delen van de applicatie: de "quick stats" op de Productieplanning pagina en de statistiek cards in de Rapportage sectie.
 
 ---
 
-## 2. Predictive Demand Forecasting
-**Purpose**: Anticipate future production needs based on historical patterns
+## Wat wordt aangepast
 
-**Features**:
-- 30/60/90 day demand forecast using moving averages
-- Seasonal trend detection (holiday periods, summer/winter patterns)
-- Customer-specific demand projections
-- Visual forecast chart with confidence intervals
+### 1. ProductionPlanning Quick Stats
+De 4 statistiek cards bovenaan de productieplanning krijgen trend indicators:
 
-**Implementation**:
-- Create `DemandForecastChart.tsx` component
-- Build forecast logic using exponential smoothing
-- Add to Reports tab as new section
+| Card | Huidige waarde | Trend vergelijking |
+|------|----------------|-------------------|
+| Droogijs vandaag | X kg | vs. vorige week zelfde dag |
+| Gascilinders vandaag | X stuks | vs. vorige week zelfde dag |
+| Orders deze week | X orders | vs. vorige week |
+| Voorraadstatus | Status | (geen trend - behoud huidige weergave) |
 
----
+**Visuele weergave:**
+- Groene pijl omhoog met percentage bij toename
+- Rode pijl omlaag met percentage bij afname
+- Grijze streep bij geen verandering
 
-## 3. Anomaly Detection Alerts
-**Purpose**: Automatically flag unusual production patterns
+### 2. ProductionReports Quick Stats
+De 6 statistiek cards in de rapportage sectie krijgen trend indicators:
 
-**Features**:
-- Sudden order volume spikes or drops (> 2 standard deviations)
-- Unusual customer ordering patterns
-- Gas type demand shifts
-- Visual highlighting in charts with alert badges
-- Configurable threshold settings
+| Card | Huidige waarde | Trend vergelijking |
+|------|----------------|-------------------|
+| Cilinder orders | X orders | vs. vorige periode |
+| Totaal cilinders | X stuks | vs. vorige periode |
+| Droogijs orders | X orders | vs. vorige periode |
+| Totaal droogijs | X kg | vs. vorige periode |
+| Voltooid | X orders | vs. vorige periode |
+| Gepland | X orders | vs. vorige periode |
 
-**Implementation**:
-- Create `AnomalyDetector.tsx` utility
-- Add alert badge component to relevant charts
-- Store thresholds in `app_settings` table
-
----
-
-## 4. Heat Map Calendar View
-**Purpose**: Visual pattern recognition across time
-
-**Features**:
-- Monthly calendar with color-coded production volume
-- Hover tooltips showing daily breakdown
-- Toggle between cylinders/dry ice views
-- Year-over-year comparison mode
-- Exportable for reporting
-
-**Implementation**:
-- Create `ProductionHeatMap.tsx` component
-- Use color gradient from green (low) to red (high)
-- Add to Reports tab
+**Logica:** De trend wordt berekend door dezelfde periode in het verleden te vergelijken (bijv. als je "deze maand" selecteert, wordt vergeleken met vorige maand).
 
 ---
 
-## 5. Customer Segmentation Analysis
-**Purpose**: Understand customer value and behavior
+## Technische Implementatie
 
-**Features**:
-- Customer tiers (Gold/Silver/Bronze) based on volume
-- Customer growth trajectory (growing/stable/declining)
-- Order frequency analysis
-- Product mix per customer
-- Churn risk indicators (declining orders)
+### Stap 1: Uitbreiden van ProductionPlanning.tsx
 
-**Implementation**:
-- Create `CustomerSegmentation.tsx` component
-- Add database function for segmentation calculations
-- Display as card grid with drill-down capability
+**Nieuwe state variabelen:**
+```typescript
+const [previousDryIceToday, setPreviousDryIceToday] = useState(0);
+const [previousCylindersToday, setPreviousCylindersToday] = useState(0);
+const [previousWeekOrders, setPreviousWeekOrders] = useState(0);
+```
 
----
+**Uitbreiding fetchStats():**
+- Query voor dezelfde dag vorige week (droogijs/cilinders)
+- Query voor vorige week totaal (orders)
 
-## 6. Gas Type Mix Optimization Insights
-**Purpose**: Identify production optimization opportunities
+**UI aanpassing:**
+- Vervang huidige Card componenten door `StatCard` component
+- Voeg `trend` prop toe met berekende waarde
 
-**Features**:
-- Gas type profitability indicators (if cost data available)
-- Capacity planning based on cylinder size mix
-- Cross-sell opportunities (customers buying only one gas type)
-- Underutilized gas type identification
+### Stap 2: Uitbreiden van ProductionReports.tsx
 
-**Implementation**:
-- Create `GasTypeMixAnalysis.tsx` component
-- Add insights cards with actionable recommendations
-- Link to customer details for follow-up
+**Nieuwe state variabelen:**
+```typescript
+const [previousPeriodStats, setPreviousPeriodStats] = useState({
+  cylinderOrders: 0,
+  totalCylinders: 0,
+  dryIceOrders: 0,
+  totalDryIce: 0,
+  completed: 0,
+  pending: 0
+});
+```
 
----
+**Uitbreiding fetchReportData():**
+- Bereken "vorige periode" datum range (zelfde lengte, direct ervoor)
+- Fetch dezelfde data voor de vorige periode
+- Bereken statistieken voor vergelijking
 
-## 7. Export & Scheduled Reports
-**Purpose**: Share insights with stakeholders
+**UI aanpassing:**
+- Importeer en gebruik `StatCard` component
+- Vervang huidige Cards door StatCards met trend indicators
 
-**Features**:
-- PDF export of current view/charts
-- Excel export with raw data
-- Scheduled email reports (weekly/monthly summaries)
-- Custom date range exports
-- Report templates for different audiences
+### Stap 3: Trend Berekening Utility
 
-**Implementation**:
-- Add export buttons to chart components
-- Create `ExportService.ts` for PDF/Excel generation
-- Edge function for scheduled email delivery
+Hergebruik bestaande `calculateTrend` functie uit KPIDashboard of extraheer naar shared utility:
 
----
-
-## 8. Comparison Benchmarks
-**Purpose**: Context for understanding performance
-
-**Features**:
-- Location comparison (Emmen vs Tilburg)
-- Period comparison (this month vs last month)
-- Same-period-last-year overlay
-- Industry benchmarks (if available)
-- Goal tracking with progress bars
-
-**Implementation**:
-- Enhance existing charts with benchmark lines
-- Add benchmark configuration in admin settings
-- Create goal/target management UI
-
----
-
-## Technical Architecture
-
-```text
-+-------------------------------------------+
-|            KPI Dashboard                  |
-|  [Efficiency] [Capacity] [Fulfillment]    |
-+-------------------------------------------+
-|                                           |
-|  +------------------+  +----------------+ |
-|  | Production       |  | Demand         | |
-|  | Heat Map         |  | Forecast       | |
-|  +------------------+  +----------------+ |
-|                                           |
-|  +------------------+  +----------------+ |
-|  | Customer         |  | Gas Type Mix   | |
-|  | Segmentation     |  | Analysis       | |
-|  +------------------+  +----------------+ |
-|                                           |
-|  [Anomaly Alerts Banner]                  |
-+-------------------------------------------+
+```typescript
+const calculateTrend = (current: number, previous: number): number => {
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 100);
+};
 ```
 
 ---
 
-## Database Functions Required
+## Visueel Resultaat
 
-1. `get_production_efficiency` - Calculate completion rates
-2. `get_demand_forecast_data` - Historical data for forecasting
-3. `get_customer_segments` - Customer tier calculations
-4. `get_anomaly_thresholds` - Statistical baselines
+**ProductionPlanning (voor):**
+```
+┌─────────────────┐ ┌─────────────────┐
+│ Droogijs vandaag│ │ Cilinders vandaag│
+│     250 kg      │ │       45        │
+└─────────────────┘ └─────────────────┘
+```
 
----
-
-## Recommended Priority
-
-| Priority | Feature | Impact | Effort |
-|----------|---------|--------|--------|
-| 1 | KPI Dashboard | High | Medium |
-| 2 | Heat Map Calendar | High | Low |
-| 3 | Customer Segmentation | High | Medium |
-| 4 | Anomaly Detection | Medium | Medium |
-| 5 | Demand Forecasting | Medium | High |
-| 6 | Export Reports | Medium | Medium |
-| 7 | Gas Mix Analysis | Low | Medium |
-| 8 | Benchmarks | Low | Low |
+**ProductionPlanning (na):**
+```
+┌─────────────────┐ ┌─────────────────┐
+│ Droogijs vandaag│ │ Cilinders vandaag│
+│   250 kg  ↑+12% │ │    45     ↓-5%  │
+│ vs. vorige week │ │ vs. vorige week │
+└─────────────────┘ └─────────────────┘
+```
 
 ---
 
-## Quick Wins (Can implement immediately)
+## Bestanden die worden aangepast
 
-1. **Production Efficiency Card** - Add to existing stat cards
-2. **Daily Production Sparklines** - Mini charts in stat cards
-3. **Customer Growth Badges** - Already have trend data, add visual indicators
-4. **Comparison Mode Toggle** - Switch between absolute and percentage views
-5. **Data Quality Indicators** - Show completeness of data
+1. `src/components/production/ProductionPlanning.tsx`
+   - Import StatCard component
+   - Uitbreiden fetchStats met vorige periode queries
+   - Vervangen Card componenten door StatCard met trends
 
+2. `src/components/production/ProductionReports.tsx`
+   - Import StatCard component
+   - Toevoegen state voor vorige periode statistieken
+   - Uitbreiden fetchReportData met vorige periode queries
+   - Vervangen Quick Stats Cards door StatCard met trends
+
+---
+
+## Performance Overwegingen
+
+- **Parallelle queries:** Vorige periode data wordt parallel gefetched met huidige data
+- **Caching:** Trends worden pas herberekend bij datum/locatie wijziging
+- **Minimale overhead:** Slechts 2-3 extra database queries per pagina load
