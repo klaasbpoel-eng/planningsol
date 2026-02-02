@@ -2,11 +2,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format, differenceInDays } from "date-fns";
-import { Calendar, Clock, Trash2, FileText } from "lucide-react";
+import { Calendar, Clock, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 
@@ -67,12 +68,13 @@ export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListPro
   if (requests.length === 0) {
     return (
       <Card className="shadow-lg border-0">
-        <CardContent className="pt-10 pb-10 text-center">
-          <FileText className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
-          <p className="text-muted-foreground">Nog geen verlofaanvragen</p>
-          <p className="text-sm text-muted-foreground/70 mt-1">
-            Gebruik het formulier hierboven om uw eerste aanvraag in te dienen
-          </p>
+        <CardContent className="pt-6 pb-6">
+          <EmptyState
+            variant="calendar"
+            title="Nog geen verlofaanvragen"
+            description="Gebruik het formulier hierboven om uw eerste aanvraag in te dienen."
+            size="md"
+          />
         </CardContent>
       </Card>
     );
