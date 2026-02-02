@@ -22,14 +22,21 @@ interface StockSummaryWidgetProps {
 
 // Mock data based on Excel structure - can be replaced with database fetch
 const mockStockData: StockItem[] = [
-  { subCode: "250049", description: "Lucht Inhalatie (tech) (50L)", averageConsumption: 8, numberOnStock: 4, difference: -4 },
-  { subCode: "201112", description: "CO2 4.5 (50L)", averageConsumption: 12, numberOnStock: 10, difference: -2 },
-  { subCode: "201234", description: "Argon 5.0 (50L)", averageConsumption: 5, numberOnStock: 8, difference: 3 },
-  { subCode: "201345", description: "Stikstof 5.0 (50L)", averageConsumption: 3, numberOnStock: 15, difference: 12 },
-  { subCode: "201456", description: "Zuurstof Medicinaal (50L)", averageConsumption: 6, numberOnStock: 4, difference: -2 },
-  { subCode: "201567", description: "Helium 5.0 (50L)", averageConsumption: 2, numberOnStock: 5, difference: 3 },
-  { subCode: "201678", description: "Acetyleen (50L)", averageConsumption: 4, numberOnStock: 2, difference: -2 },
-  { subCode: "201789", description: "Waterstof 5.0 (50L)", averageConsumption: 1, numberOnStock: 8, difference: 7 },
+  { subCode: "250049", description: "Lucht Inhalatie (tech) (50L)", averageConsumption: 11, numberOnStock: 3, difference: -8 },
+  { subCode: "201112", description: "Zuurstof Medicinaal Gasv. SOL act. geint. 300bar (1L)", averageConsumption: 5, numberOnStock: 1, difference: -4 },
+  { subCode: "201107", description: "Zuurstof Medicinaal Gasv. SOL P.I. (1L)", averageConsumption: 5, numberOnStock: 3, difference: -2 },
+  { subCode: "205408", description: "Kooldioxide E.P. Alu P.I. (5L)", averageConsumption: 2, numberOnStock: 1, difference: -1 },
+  { subCode: "210050", description: "Lucht (10L)", averageConsumption: 2, numberOnStock: 1, difference: -1 },
+  { subCode: "250045", description: "Lucht Synth. Medicinaal Gasv. SOL (50L)", averageConsumption: 3, numberOnStock: 2, difference: -1 },
+  { subCode: "202507", description: "Distikstofoxide Medicinaal SOL P.I. (2L)", averageConsumption: 2, numberOnStock: 2, difference: 0 },
+  { subCode: "205407", description: "Kooldioxide E.P. P.I. (5L)", averageConsumption: 3, numberOnStock: 3, difference: 0 },
+  { subCode: "270382", description: "Pakket AliSOL Stikstof (16x50L)", averageConsumption: 1, numberOnStock: 1, difference: 0 },
+  { subCode: "270840", description: "Pakket Helium 5.0 (16x50L)", averageConsumption: 1, numberOnStock: 1, difference: 0 },
+  { subCode: "250700", description: "Acetyleen (50L)", averageConsumption: 2, numberOnStock: 3, difference: 1 },
+  { subCode: "250288", description: "12% O2 in N2 (50L)", averageConsumption: 3, numberOnStock: 5, difference: 2 },
+  { subCode: "250370", description: "Argon 5.0 300bar (50L)", averageConsumption: 7, numberOnStock: 10, difference: 3 },
+  { subCode: "250383", description: "AliSOL 028 (50L)", averageConsumption: 8, numberOnStock: 13, difference: 5 },
+  { subCode: "250350", description: "Argon 5.0 (50L)", averageConsumption: 1, numberOnStock: 17, difference: 16 },
 ];
 
 interface StatusConfig {
