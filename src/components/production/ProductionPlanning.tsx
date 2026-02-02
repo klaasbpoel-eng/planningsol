@@ -1,19 +1,23 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import { Snowflake, Cylinder, Package, TrendingUp, BarChart3, MapPin, Lock, Loader2 } from "lucide-react";
+import { Snowflake, Cylinder, Package, TrendingUp, BarChart3, MapPin, Lock } from "lucide-react";
 import { TopCustomersWidget } from "./TopCustomersWidget";
+import { FadeIn } from "@/components/ui/fade-in";
+import { TableSkeleton, ChartSkeleton } from "@/components/ui/skeletons";
 
 // Lazy load heavy tab components
 const DryIcePlanning = lazy(() => import("./DryIcePlanning").then(m => ({ default: m.DryIcePlanning })));
 const GasCylinderPlanning = lazy(() => import("./GasCylinderPlanning").then(m => ({ default: m.GasCylinderPlanning })));
 const ProductionReports = lazy(() => import("./ProductionReports").then(m => ({ default: m.ProductionReports })));
 
-// Loading fallback component
+// Loading fallback component with skeleton
 const TabLoadingFallback = () => (
-  <div className="flex items-center justify-center py-12">
-    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-  </div>
+  <TableSkeleton rows={6} columns={5} />
+);
+
+const ReportLoadingFallback = () => (
+  <ChartSkeleton height={350} />
 );
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -379,7 +383,7 @@ export function ProductionPlanning({
         </TabsContent>
 
         <TabsContent value="rapportage" className="mt-6">
-          <Suspense fallback={<TabLoadingFallback />}>
+          <Suspense fallback={<ReportLoadingFallback />}>
             <ProductionReports refreshKey={refreshKey} onDataChanged={handleDataChanged} location={selectedLocation} />
           </Suspense>
         </TabsContent>

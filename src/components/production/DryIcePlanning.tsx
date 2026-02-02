@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Snowflake, Calendar, Package, Loader2, Trash2, Box, Repeat, Edit2, AlertTriangle, Filter, X, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from "lucide-react";
+import { Plus, Snowflake, Calendar, Package, Trash2, Box, Repeat, Edit2, AlertTriangle, Filter, X, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from "lucide-react";
+import { FadeIn } from "@/components/ui/fade-in";
+import { TableSkeleton } from "@/components/ui/skeletons";
 import {
   Table,
   TableBody,
@@ -425,8 +427,21 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <div className="rounded-md border">
+                  <div className="border-b bg-muted/30 p-3">
+                    <div className="flex gap-4">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} className="h-4 w-20 rounded bg-muted animate-pulse" />
+                      ))}
+                    </div>
+                  </div>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-4 p-3 border-b last:border-0">
+                      {Array.from({ length: 6 }).map((_, j) => (
+                        <div key={j} className="h-4 w-20 rounded bg-muted animate-pulse" />
+                      ))}
+                    </div>
+                  ))}
                 </div>
               ) : filteredOrders.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">

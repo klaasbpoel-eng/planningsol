@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn, formatNumber } from "@/lib/utils";
+import { FadeIn } from "@/components/ui/fade-in";
+import { CustomerListSkeleton } from "@/components/ui/skeletons";
 
 interface CustomerData {
   customer_id: string | null;
@@ -112,77 +113,65 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({ refre
   }, []);
 
   if (loading) {
-    return (
-      <Card className="glass-card">
-        <CardHeader className="pb-2">
-          <CardDescription className="flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-yellow-500" />
-            Top 5 Klanten
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full" />
-          ))}
-        </CardContent>
-      </Card>
-    );
+    return <CustomerListSkeleton />;
   }
 
   return (
-    <Card className={cn(
-      "glass-card transition-all duration-300",
-      isRefreshing && "animate-pulse ring-2 ring-primary/30"
-    )}>
-      <CardHeader className="pb-2">
-        <CardDescription className="flex items-center gap-2 flex-wrap">
-          <Trophy className="h-4 w-4 text-yellow-500" />
-          <span>Top 5 Klanten {new Date().getFullYear()}</span>
-          {location !== "all" && (
-            <Badge variant="outline" className="text-[10px] py-0">
-              {location === "sol_emmen" ? "Emmen" : "Tilburg"}
-            </Badge>
-          )}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {customers.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Geen klantdata beschikbaar
-          </p>
-        ) : (
-          customers.map((customer, index) => (
-            <div
-              key={customer.customer_id || customer.customer_name}
-              className="flex items-center justify-between p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <span className={`font-bold text-lg ${getMedalColor(index)}`}>
-                  #{index + 1}
-                </span>
-                <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">{customer.customer_name}</p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{formatNumber(customer.total_cylinders, 0)} cil.</span>
-                    <span>•</span>
-                    <span>{formatNumber(customer.total_dry_ice_kg, 0)} kg</span>
+    <FadeIn show={!loading}>
+      <Card className={cn(
+        "glass-card transition-all duration-300",
+        isRefreshing && "animate-pulse ring-2 ring-primary/30"
+      )}>
+        <CardHeader className="pb-2">
+          <CardDescription className="flex items-center gap-2 flex-wrap">
+            <Trophy className="h-4 w-4 text-yellow-500" />
+            <span>Top 5 Klanten {new Date().getFullYear()}</span>
+            {location !== "all" && (
+              <Badge variant="outline" className="text-[10px] py-0">
+                {location === "sol_emmen" ? "Emmen" : "Tilburg"}
+              </Badge>
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {customers.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Geen klantdata beschikbaar
+            </p>
+          ) : (
+            customers.map((customer, index) => (
+              <div
+                key={customer.customer_id || customer.customer_name}
+                className="flex items-center justify-between p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`font-bold text-lg ${getMedalColor(index)}`}>
+                    #{index + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{customer.customer_name}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{formatNumber(customer.total_cylinders, 0)} cil.</span>
+                      <span>•</span>
+                      <span>{formatNumber(customer.total_dry_ice_kg, 0)} kg</span>
+                    </div>
                   </div>
                 </div>
+                <div className="flex items-center gap-1">
+                  {getTrendIcon(customer.changePercent)}
+                  <Badge 
+                    variant={customer.changePercent >= 0 ? "default" : "destructive"}
+                    className="text-xs"
+                  >
+                    {customer.changePercent >= 0 ? "+" : ""}{customer.changePercent.toFixed(0)}%
+                  </Badge>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                {getTrendIcon(customer.changePercent)}
-                <Badge 
-                  variant={customer.changePercent >= 0 ? "default" : "destructive"}
-                  className="text-xs"
-                >
-                  {customer.changePercent >= 0 ? "+" : ""}{customer.changePercent.toFixed(0)}%
-                </Badge>
-              </div>
-            </div>
-          ))
-        )}
-      </CardContent>
-    </Card>
+            ))
+          )}
+        </CardContent>
+      </Card>
+    </FadeIn>
   );
 });
 
