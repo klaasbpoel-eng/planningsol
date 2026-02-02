@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/layout/Header";
 import { CalendarOverview } from "@/components/calendar/CalendarOverview";
+import { PageTransition } from "@/components/ui/page-transition";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { User } from "@supabase/supabase-js";
@@ -46,13 +47,15 @@ const CalendarPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col gradient-mesh">
-      <Header userEmail={user.email} />
-      
-      <main className="flex-1 flex flex-col">
-        <CalendarOverview />
-      </main>
-    </div>
+    <PageTransition>
+      <div className="min-h-screen flex flex-col gradient-mesh">
+        <Header userEmail={user.email} />
+        
+        <main className="flex-1 flex flex-col">
+          <CalendarOverview />
+        </main>
+      </div>
+    </PageTransition>
   );
 };
 
