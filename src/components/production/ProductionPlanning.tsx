@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Snowflake, Cylinder, Package, TrendingUp, BarChart3, MapPin, Lock } from "lucide-react";
 import { TopCustomersWidget } from "./TopCustomersWidget";
+import { KPIDashboard } from "./KPIDashboard";
 import { FadeIn } from "@/components/ui/fade-in";
 import { TableSkeleton, ChartSkeleton } from "@/components/ui/skeletons";
 
@@ -149,6 +150,9 @@ export function ProductionPlanning({
 
   return (
     <div className="space-y-6">
+      {/* KPI Dashboard */}
+      <KPIDashboard location={selectedLocation} refreshKey={refreshKey} />
+
       {/* Location Filter */}
       <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 border border-border/50">
         <MapPin className="h-4 w-4 text-muted-foreground" />
