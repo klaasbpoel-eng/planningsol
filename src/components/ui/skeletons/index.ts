@@ -3,3 +3,4 @@ export { TableSkeleton } from "./table-skeleton";
 export { ChartSkeleton } from "./chart-skeleton";
 export { CustomerListSkeleton } from "./customer-list-skeleton";
 export { CalendarSkeleton } from "./calendar-skeleton";
+export { TimeOffCalendarSkeleton } from "./time-off-calendar-skeleton";
