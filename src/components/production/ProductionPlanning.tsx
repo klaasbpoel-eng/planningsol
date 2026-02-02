@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Snowflake, Cylinder, Package, TrendingUp, BarChart3, MapPin, Lock } from "lucide-react";
+import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { TopCustomersWidget } from "./TopCustomersWidget";
 import { KPIDashboard } from "./KPIDashboard";
+import { StockSummaryWidget } from "./StockSummaryWidget";
 import { FadeIn } from "@/components/ui/fade-in";
 import { TableSkeleton, ChartSkeleton } from "@/components/ui/skeletons";
 
@@ -380,21 +381,10 @@ export function ProductionPlanning({
           )}
         </div>
         
-        <Card className={cn(
-          "glass-card transition-all duration-300",
-          isRefreshing && "animate-pulse ring-2 ring-primary/30"
-        )}>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-blue-500" />
-              Voorraadstatus
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-500">Goed</div>
-            <p className="text-xs text-muted-foreground">Alle niveaus op peil</p>
-          </CardContent>
-        </Card>
+        <StockSummaryWidget 
+          refreshKey={refreshKey} 
+          isRefreshing={isRefreshing} 
+        />
 
         {/* Top 5 Customers Widget */}
         <TopCustomersWidget 
