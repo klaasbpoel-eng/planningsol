@@ -15,8 +15,14 @@ import {
   Eye,
   Shield,
   Flame,
-  Droplets
+  Droplets,
+  Footprints
 } from "lucide-react";
+
+// PPE Images
+import cryogenicGloves from "@/assets/ppe/cryogenic-gloves.jpg";
+import protectiveClothing from "@/assets/ppe/protective-clothing.jpg";
+import safetyShoes from "@/assets/ppe/safety-shoes.jpg";
 
 export function SafetyInstructions() {
   return (
@@ -190,7 +196,41 @@ export function SafetyInstructions() {
                   <span>Persoonlijke Beschermingsmiddelen</span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="space-y-3 text-sm">
+              <AccordionContent className="space-y-4 text-sm">
+                {/* PPE Images Grid */}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-full aspect-square rounded-lg overflow-hidden border border-border/50 bg-white">
+                      <img 
+                        src={cryogenicGloves} 
+                        alt="Cryogene handschoenen" 
+                        className="w-full h-full object-contain p-2"
+                      />
+                    </div>
+                    <span className="text-xs text-center text-muted-foreground">Cryogene handschoenen</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-full aspect-square rounded-lg overflow-hidden border border-border/50 bg-white">
+                      <img 
+                        src={protectiveClothing} 
+                        alt="Beschermende kleding" 
+                        className="w-full h-full object-contain p-2"
+                      />
+                    </div>
+                    <span className="text-xs text-center text-muted-foreground">Beschermende kleding</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-full aspect-square rounded-lg overflow-hidden border border-border/50 bg-white">
+                      <img 
+                        src={safetyShoes} 
+                        alt="Veiligheidsschoenen" 
+                        className="w-full h-full object-contain p-2"
+                      />
+                    </div>
+                    <span className="text-xs text-center text-muted-foreground">Veiligheidsschoenen</span>
+                  </div>
+                </div>
+
                 <div className="grid gap-3">
                   <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
                     <div className="flex items-center gap-2 mb-1">
@@ -220,6 +260,16 @@ export function SafetyInstructions() {
                     <p className="text-muted-foreground">
                       Draag lange mouwen, lange broek en gesloten schoenen. Vermijd kleding die 
                       droogijs kan vasthouden (zoals wijde zakken of open schoenen).
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Footprints className="h-4 w-4 text-amber-600" />
+                      <span className="font-medium">Veiligheidsschoenen</span>
+                    </div>
+                    <p className="text-muted-foreground">
+                      Draag gesloten veiligheidsschoenen met stalen neuzen. Open schoenen of sandalen 
+                      zijn verboden bij het werken met droogijs.
                     </p>
                   </div>
                   <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
