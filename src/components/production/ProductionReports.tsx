@@ -33,14 +33,7 @@ import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek } f
 import { nl } from "date-fns/locale";
 import { cn, formatNumber } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { VirtualizedTable } from "@/components/ui/virtualized-table";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -793,53 +786,44 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {cylinderOrders.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Order</TableHead>
-                      <TableHead>Klant</TableHead>
-                      <TableHead>Gastype</TableHead>
-                      <TableHead>M/T</TableHead>
-                      <TableHead>Aantal</TableHead>
-                      <TableHead>Druk</TableHead>
-                      <TableHead>Datum</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {cylinderOrders.map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.order_number}</TableCell>
-                        <TableCell>{order.customer_name}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div 
-                              className="w-2 h-2 rounded-full flex-shrink-0" 
-                              style={{ backgroundColor: getGasTypeColor(order) }}
-                            />
-                            {getGasTypeLabel(order)}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={order.gas_grade === "medical" ? "default" : "secondary"}>
-                            {order.gas_grade === "medical" ? "M" : "T"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{formatNumber(order.cylinder_count, 0)} st.</TableCell>
-                        <TableCell>{formatNumber(order.pressure, 0)} bar</TableCell>
-                        <TableCell>{format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}</TableCell>
-                        <TableCell>{getStatusBadge(order.status)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Cylinder className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Geen cilinder orders in deze periode</p>
-                </div>
-              )}
+              <VirtualizedTable
+                data={cylinderOrders}
+                maxHeight={500}
+                emptyMessage={
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Cylinder className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Geen cilinder orders in deze periode</p>
+                  </div>
+                }
+                columns={[
+                  { header: "Order", accessor: (order) => <span className="font-medium">{order.order_number}</span> },
+                  { header: "Klant", accessor: (order) => order.customer_name },
+                  { 
+                    header: "Gastype", 
+                    accessor: (order) => (
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-2 h-2 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: getGasTypeColor(order) }}
+                        />
+                        {getGasTypeLabel(order)}
+                      </div>
+                    )
+                  },
+                  { 
+                    header: "M/T", 
+                    accessor: (order) => (
+                      <Badge variant={order.gas_grade === "medical" ? "default" : "secondary"}>
+                        {order.gas_grade === "medical" ? "M" : "T"}
+                      </Badge>
+                    )
+                  },
+                  { header: "Aantal", accessor: (order) => `${formatNumber(order.cylinder_count, 0)} st.` },
+                  { header: "Druk", accessor: (order) => `${formatNumber(order.pressure, 0)} bar` },
+                  { header: "Datum", accessor: (order) => format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl }) },
+                  { header: "Status", accessor: (order) => getStatusBadge(order.status) },
+                ]}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -856,37 +840,24 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {dryIceOrders.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Order</TableHead>
-                      <TableHead>Klant</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Hoeveelheid</TableHead>
-                      <TableHead>Datum</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {dryIceOrders.map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.order_number}</TableCell>
-                        <TableCell>{order.customer_name}</TableCell>
-                        <TableCell>{order.product_type}</TableCell>
-                        <TableCell>{formatNumber(order.quantity_kg, 0)} kg</TableCell>
-                        <TableCell>{format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}</TableCell>
-                        <TableCell>{getStatusBadge(order.status)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Snowflake className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Geen droogijs orders in deze periode</p>
-                </div>
-              )}
+              <VirtualizedTable
+                data={dryIceOrders}
+                maxHeight={500}
+                emptyMessage={
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Snowflake className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Geen droogijs orders in deze periode</p>
+                  </div>
+                }
+                columns={[
+                  { header: "Order", accessor: (order) => <span className="font-medium">{order.order_number}</span> },
+                  { header: "Klant", accessor: (order) => order.customer_name },
+                  { header: "Type", accessor: (order) => order.product_type },
+                  { header: "Hoeveelheid", accessor: (order) => `${formatNumber(order.quantity_kg, 0)} kg` },
+                  { header: "Datum", accessor: (order) => format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl }) },
+                  { header: "Status", accessor: (order) => getStatusBadge(order.status) },
+                ]}
+              />
             </CardContent>
           </Card>
 
