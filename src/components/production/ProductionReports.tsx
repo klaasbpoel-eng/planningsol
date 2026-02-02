@@ -26,6 +26,8 @@ import { ChartSkeleton, StatCardSkeleton } from "@/components/ui/skeletons";
 const YearComparisonReport = lazy(() => import("./YearComparisonReport").then(m => ({ default: m.YearComparisonReport })));
 const CumulativeGasTypeChart = lazy(() => import("./CumulativeGasTypeChart").then(m => ({ default: m.CumulativeGasTypeChart })));
 const CumulativeCylinderSizeChart = lazy(() => import("./CumulativeCylinderSizeChart").then(m => ({ default: m.CumulativeCylinderSizeChart })));
+const ProductionHeatMap = lazy(() => import("./ProductionHeatMap").then(m => ({ default: m.ProductionHeatMap })));
+const CustomerSegmentation = lazy(() => import("./CustomerSegmentation").then(m => ({ default: m.CustomerSegmentation })));
 
 // Loading fallback component with skeleton
 const ChartLoadingFallback = () => (
@@ -618,10 +620,14 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
 
       {/* Detailed Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-2xl grid-cols-4 bg-muted/50 backdrop-blur-sm">
+        <TabsList className="grid w-full max-w-3xl grid-cols-5 bg-muted/50 backdrop-blur-sm">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Overzicht
+          </TabsTrigger>
+          <TabsTrigger value="insights" className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Insights
           </TabsTrigger>
           <TabsTrigger value="cylinders" className="flex items-center gap-2">
             <Cylinder className="h-4 w-4" />
@@ -931,6 +937,17 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="insights" className="mt-6 space-y-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <Suspense fallback={<ChartLoadingFallback />}>
+              <ProductionHeatMap location={location} refreshKey={refreshKey} />
+            </Suspense>
+            <Suspense fallback={<ChartLoadingFallback />}>
+              <CustomerSegmentation location={location} refreshKey={refreshKey} />
+            </Suspense>
+          </div>
         </TabsContent>
 
         <TabsContent value="comparison" className="mt-6 space-y-6">
