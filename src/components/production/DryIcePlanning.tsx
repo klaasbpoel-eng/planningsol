@@ -377,7 +377,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
             </Button>
           )}
           {permissions?.canCreateOrders && (
-            <Button className="bg-cyan-500 hover:bg-cyan-600" onClick={() => setDialogOpen(true)}>
+            <Button variant="dryice" onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Nieuwe productieorder
             </Button>

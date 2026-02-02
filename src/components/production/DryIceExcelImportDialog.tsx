@@ -629,7 +629,7 @@ export function DryIceExcelImportDialog({
               <Button 
                 onClick={handleImport} 
                 disabled={parsedData.length === 0}
-                className="bg-cyan-500 hover:bg-cyan-600"
+                variant="dryice"
               >
                 <Upload className="h-4 w-4 mr-2" />
                 {parsedData.length} orders importeren

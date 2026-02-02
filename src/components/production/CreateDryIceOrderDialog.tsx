@@ -627,7 +627,7 @@ export function CreateDryIceOrderDialog({
           <Button
             onClick={handleCreate}
             disabled={saving || !customerId || !quantityKg || !scheduledDate || !productTypeId || (isEpsPackaging && !boxCount) || (isKunststofContainer && containerHasWheels === null) || (isRecurring && !isInfiniteRecurrence && !recurrenceEndDate)}
-            className="bg-cyan-500 hover:bg-cyan-600"
+            variant="dryice"
           >
             <Plus className="h-4 w-4 mr-2" />
             {saving ? "Aanmaken..." : isRecurring ? "Orders aanmaken" : "Order aanmaken"}
