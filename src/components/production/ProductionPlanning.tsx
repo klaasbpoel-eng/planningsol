@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock } from "lucide-react";
+import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock, ShieldAlert } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { TopCustomersWidget } from "./TopCustomersWidget";
 import { KPIDashboard } from "./KPIDashboard";
@@ -12,6 +12,7 @@ import { TableSkeleton, ChartSkeleton } from "@/components/ui/skeletons";
 const DryIcePlanning = lazy(() => import("./DryIcePlanning").then(m => ({ default: m.DryIcePlanning })));
 const GasCylinderPlanning = lazy(() => import("./GasCylinderPlanning").then(m => ({ default: m.GasCylinderPlanning })));
 const ProductionReports = lazy(() => import("./ProductionReports").then(m => ({ default: m.ProductionReports })));
+const SafetyInstructions = lazy(() => import("./SafetyInstructions").then(m => ({ default: m.SafetyInstructions })));
 
 // Loading fallback component with skeleton
 const TabLoadingFallback = () => (
@@ -396,7 +397,7 @@ export function ProductionPlanning({
 
       {/* Main content tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-lg grid-cols-3 bg-muted/50 backdrop-blur-sm">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4 bg-muted/50 backdrop-blur-sm">
           <TabsTrigger 
             value="droogijs" 
             className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white flex items-center gap-2"
@@ -417,6 +418,13 @@ export function ProductionPlanning({
           >
             <BarChart3 className="h-4 w-4" />
             Rapportage
+          </TabsTrigger>
+          <TabsTrigger 
+            value="veiligheid"
+            className="data-[state=active]:bg-red-500 data-[state=active]:text-white flex items-center gap-2"
+          >
+            <ShieldAlert className="h-4 w-4" />
+            Veiligheid
           </TabsTrigger>
         </TabsList>
 
@@ -441,6 +449,12 @@ export function ProductionPlanning({
         <TabsContent value="rapportage" className="mt-6">
           <Suspense fallback={<ReportLoadingFallback />}>
             <ProductionReports refreshKey={refreshKey} onDataChanged={handleDataChanged} location={selectedLocation} />
+          </Suspense>
+        </TabsContent>
+
+        <TabsContent value="veiligheid" className="mt-6">
+          <Suspense fallback={<TabLoadingFallback />}>
+            <SafetyInstructions />
           </Suspense>
         </TabsContent>
       </Tabs>
