@@ -30,6 +30,8 @@ import { CreateDryIceOrderDialog } from "./CreateDryIceOrderDialog";
 import { DryIceOrderDialog } from "@/components/calendar/DryIceOrderDialog";
 import { DryIceExcelImportDialog } from "./DryIceExcelImportDialog";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileOrderCard, OrderDetail } from "./MobileOrderCard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -454,135 +456,166 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
                   size="md"
                 />
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>
-                        <div className="space-y-1">
-                          <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("customer_name")}>
-                            Klant<SortIcon column="customer_name" />
+              <>
+                {/* Mobile Card Layout */}
+                <div className="md:hidden space-y-3">
+                  {sortedOrders.map((order) => (
+                    <MobileOrderCard
+                      key={order.id}
+                      id={order.id}
+                      customerName={order.customer_name}
+                      scheduledDate={order.scheduled_date}
+                      status={order.status}
+                      onStatusChange={permissions?.canEditOrders ? handleStatusChange : undefined}
+                      onEdit={() => handleEditOrder(order)}
+                      onDelete={() => handleDeleteClick(order)}
+                      canEdit={permissions?.canEditOrders}
+                      canDelete={permissions?.canDeleteOrders}
+                      isRecurring={order.is_recurring ?? false}
+                    >
+                      <OrderDetail label="Type" value={getProductTypeLabel(order)} />
+                      <OrderDetail label="Hoeveelheid" value={`${formatNumber(order.quantity_kg, 0)} kg`} />
+                      <OrderDetail label="Verpakking" value={getPackagingLabel(order)} />
+                      {order.box_count && (
+                        <OrderDetail label="Dozen" value={order.box_count} />
+                      )}
+                    </MobileOrderCard>
+                  ))}
+                </div>
+
+                {/* Desktop Table Layout */}
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>
+                          <div className="space-y-1">
+                            <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("customer_name")}>
+                              Klant<SortIcon column="customer_name" />
+                            </div>
+                            <Select value={customerFilter} onValueChange={(v) => setCustomerFilter(v)}>
+                              <SelectTrigger className="h-7 text-xs bg-background w-full">
+                                <SelectValue placeholder="Alle" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-background border shadow-lg z-50 max-h-[300px]">
+                                <SelectItem value="all">Alle klanten</SelectItem>
+                                {uniqueCustomers.map((customer) => (
+                                  <SelectItem key={customer} value={customer}>{customer}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
-                          <Select value={customerFilter} onValueChange={(v) => setCustomerFilter(v)}>
-                            <SelectTrigger className="h-7 text-xs bg-background w-full">
-                              <SelectValue placeholder="Alle" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-background border shadow-lg z-50 max-h-[300px]">
-                              <SelectItem value="all">Alle klanten</SelectItem>
-                              {uniqueCustomers.map((customer) => (
-                                <SelectItem key={customer} value={customer}>{customer}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </TableHead>
-                      <TableHead>
-                        <div className="space-y-1">
-                          <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("product_type")}>
-                            Type<SortIcon column="product_type" />
-                          </div>
-                          <Select value={productTypeFilter} onValueChange={(v) => setProductTypeFilter(v)}>
-                            <SelectTrigger className="h-7 text-xs bg-background w-full">
-                              <SelectValue placeholder="Alle" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-background border shadow-lg z-50">
-                              <SelectItem value="all">Alle types</SelectItem>
-                              {productTypes.map((pt) => (
-                                <SelectItem key={pt.id} value={pt.id}>{pt.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("quantity_kg")}>
-                        <div className="flex items-center">Hoeveelheid<SortIcon column="quantity_kg" /></div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("scheduled_date")}>
-                        <div className="flex items-center">Datum<SortIcon column="scheduled_date" /></div>
-                      </TableHead>
-                      <TableHead>
-                        <div className="space-y-1">
-                          <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("status")}>
-                            Status<SortIcon column="status" />
-                          </div>
-                          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-                            <SelectTrigger className="h-7 text-xs bg-background w-full">
-                              <SelectValue placeholder="Alle" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-background border shadow-lg z-50">
-                              <SelectItem value="all">Alle</SelectItem>
-                              {Object.entries(statusLabels).map(([value, label]) => (
-                                <SelectItem key={value} value={value}>{label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </TableHead>
-                      {(permissions?.canEditOrders || permissions?.canDeleteOrders) && <TableHead className="w-[80px]"></TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedOrders.map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {order.customer_name}
-                            {order.is_recurring && (
-                              <span title="Onderdeel van herhalende reeks" className="text-cyan-500">
-                                <Repeat className="h-3.5 w-3.5" />
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>{getProductTypeLabel(order)}</TableCell>
-                        <TableCell>{formatNumber(order.quantity_kg, 0)} kg</TableCell>
-                        <TableCell>
-                          {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
-                        </TableCell>
-                        <TableCell>
-                          {permissions?.canEditOrders ? (
-                            <Select 
-                              value={order.status} 
-                              onValueChange={(newStatus) => handleStatusChange(order.id, newStatus)}
-                            >
-                              <SelectTrigger className="h-8 w-[130px] bg-background">
-                                <SelectValue />
+                        </TableHead>
+                        <TableHead>
+                          <div className="space-y-1">
+                            <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("product_type")}>
+                              Type<SortIcon column="product_type" />
+                            </div>
+                            <Select value={productTypeFilter} onValueChange={(v) => setProductTypeFilter(v)}>
+                              <SelectTrigger className="h-7 text-xs bg-background w-full">
+                                <SelectValue placeholder="Alle" />
                               </SelectTrigger>
                               <SelectContent className="bg-background border shadow-lg z-50">
+                                <SelectItem value="all">Alle types</SelectItem>
+                                {productTypes.map((pt) => (
+                                  <SelectItem key={pt.id} value={pt.id}>{pt.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("quantity_kg")}>
+                          <div className="flex items-center">Hoeveelheid<SortIcon column="quantity_kg" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("scheduled_date")}>
+                          <div className="flex items-center">Datum<SortIcon column="scheduled_date" /></div>
+                        </TableHead>
+                        <TableHead>
+                          <div className="space-y-1">
+                            <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("status")}>
+                              Status<SortIcon column="status" />
+                            </div>
+                            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                              <SelectTrigger className="h-7 text-xs bg-background w-full">
+                                <SelectValue placeholder="Alle" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-background border shadow-lg z-50">
+                                <SelectItem value="all">Alle</SelectItem>
                                 {Object.entries(statusLabels).map(([value, label]) => (
                                   <SelectItem key={value} value={value}>{label}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-                          ) : (
-                            getStatusBadge(order.status)
-                          )}
-                        </TableCell>
-                        {(permissions?.canEditOrders || permissions?.canDeleteOrders) && (
+                          </div>
+                        </TableHead>
+                        {(permissions?.canEditOrders || permissions?.canDeleteOrders) && <TableHead className="w-[80px]"></TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedOrders.map((order) => (
+                        <TableRow key={order.id}>
                           <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleEditOrder(order)}
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive hover:text-destructive"
-                                onClick={() => handleDeleteClick(order)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                            <div className="flex items-center gap-2">
+                              {order.customer_name}
+                              {order.is_recurring && (
+                                <span title="Onderdeel van herhalende reeks" className="text-cyan-500">
+                                  <Repeat className="h-3.5 w-3.5" />
+                                </span>
+                              )}
                             </div>
                           </TableCell>
-                        )}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                          <TableCell>{getProductTypeLabel(order)}</TableCell>
+                          <TableCell>{formatNumber(order.quantity_kg, 0)} kg</TableCell>
+                          <TableCell>
+                            {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
+                          </TableCell>
+                          <TableCell>
+                            {permissions?.canEditOrders ? (
+                              <Select 
+                                value={order.status} 
+                                onValueChange={(newStatus) => handleStatusChange(order.id, newStatus)}
+                              >
+                                <SelectTrigger className="h-8 w-[130px] bg-background">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-background border shadow-lg z-50">
+                                  {Object.entries(statusLabels).map(([value, label]) => (
+                                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              getStatusBadge(order.status)
+                            )}
+                          </TableCell>
+                          {(permissions?.canEditOrders || permissions?.canDeleteOrders) && (
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleEditOrder(order)}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  onClick={() => handleDeleteClick(order)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
               )}
             </CardContent>
           </Card>
