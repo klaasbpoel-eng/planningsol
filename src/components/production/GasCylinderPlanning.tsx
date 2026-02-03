@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Trash2, Filter, CalendarIcon, X, Edit2, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, MapPin } from "lucide-react";
+import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { FadeIn } from "@/components/ui/fade-in";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -971,6 +972,15 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
           onDataChanged?.();
         }}
       />
+
+      {/* Floating Action Button for mobile */}
+      {permissions.canCreateOrders && (
+        <FloatingActionButton
+          onClick={() => setDialogOpen(true)}
+          label="Nieuwe gascilinder order"
+          variant="accent"
+        />
+      )}
     </div>
   );
 }

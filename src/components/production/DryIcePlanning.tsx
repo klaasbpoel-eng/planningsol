@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Snowflake, Calendar, Package, Trash2, Box, Repeat, Edit2, AlertTriangle, Filter, X, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from "lucide-react";
+import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { FadeIn } from "@/components/ui/fade-in";
 import { TableSkeleton } from "@/components/ui/skeletons";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -717,6 +718,15 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
           onDataChanged?.();
         }}
       />
+
+      {/* Floating Action Button for mobile */}
+      {permissions.canCreateOrders && (
+        <FloatingActionButton
+          onClick={() => setDialogOpen(true)}
+          label="Nieuwe droogijs order"
+          variant="dryice"
+        />
+      )}
     </div>
   );
 }
