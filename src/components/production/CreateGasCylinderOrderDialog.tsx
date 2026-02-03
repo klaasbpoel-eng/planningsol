@@ -129,7 +129,7 @@ export function CreateGasCylinderOrderDialog({
         .from("cylinder_sizes")
         .select("id, name, capacity_liters")
         .eq("is_active", true)
-        .order("capacity_liters", { ascending: true });
+        .order("sort_order", { ascending: true });
       
       if (data) {
         setCylinderSizes(data);
