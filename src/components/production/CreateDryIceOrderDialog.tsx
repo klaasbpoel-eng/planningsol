@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -306,23 +306,23 @@ export function CreateDryIceOrderDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={handleClose}>
+      <ResponsiveDialogContent>
+        <ResponsiveDialogHeader>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-cyan-500/10">
               <Snowflake className="h-5 w-5 text-cyan-500" />
             </div>
             <div className="flex-1">
-              <DialogTitle className="text-lg">Nieuwe droogijs order</DialogTitle>
-              <DialogDescription>
+              <ResponsiveDialogTitle className="text-lg">Nieuwe droogijs order</ResponsiveDialogTitle>
+              <ResponsiveDialogDescription>
                 Maak een nieuwe productieorder voor droogijs
-              </DialogDescription>
+              </ResponsiveDialogDescription>
             </div>
           </div>
-        </DialogHeader>
+        </ResponsiveDialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 px-4 sm:px-0">
           <div className="space-y-2">
             <Label>
               Klant <span className="text-destructive">*</span>
@@ -336,7 +336,7 @@ export function CreateDryIceOrderDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="quantityKg">
                 Hoeveelheid (kg) <span className="text-destructive">*</span>
@@ -349,7 +349,7 @@ export function CreateDryIceOrderDialog({
                 value={quantityKg}
                 onChange={(e) => setQuantityKg(e.target.value)}
                 placeholder="0"
-                className="bg-background"
+                className="bg-background h-11 sm:h-10"
               />
             </div>
 
@@ -366,7 +366,7 @@ export function CreateDryIceOrderDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Verpakking</Label>
               <SearchableSelect
@@ -429,7 +429,7 @@ export function CreateDryIceOrderDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>
                 Geplande datum <span className="text-destructive">*</span>
@@ -439,7 +439,7 @@ export function CreateDryIceOrderDialog({
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
+                      "w-full justify-start text-left font-normal h-11 sm:h-10",
                       !scheduledDate && "text-muted-foreground"
                     )}
                   >
@@ -472,7 +472,7 @@ export function CreateDryIceOrderDialog({
                 onValueChange={(v) => setLocation(v as "sol_emmen" | "sol_tilburg")}
                 disabled={!canSelectLocation}
               >
-                <SelectTrigger className="bg-background">
+                <SelectTrigger className="bg-background h-11 sm:h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
@@ -553,7 +553,7 @@ export function CreateDryIceOrderDialog({
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full justify-start text-left font-normal",
+                            "w-full justify-start text-left font-normal h-11 sm:h-10",
                             !recurrenceEndDate && "text-muted-foreground"
                           )}
                         >
@@ -614,26 +614,27 @@ export function CreateDryIceOrderDialog({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optionele notities..."
-              className="bg-background resize-none"
+              className="bg-background resize-none min-h-[80px]"
               rows={3}
             />
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={saving}>
+        <ResponsiveDialogFooter>
+          <Button variant="outline" onClick={handleClose} disabled={saving} className="h-11 sm:h-10 w-full sm:w-auto">
             Annuleren
           </Button>
           <Button
             onClick={handleCreate}
             disabled={saving || !customerId || !quantityKg || !scheduledDate || !productTypeId || (isEpsPackaging && !boxCount) || (isKunststofContainer && containerHasWheels === null) || (isRecurring && !isInfiniteRecurrence && !recurrenceEndDate)}
             variant="dryice"
+            className="h-11 sm:h-10 w-full sm:w-auto"
           >
             <Plus className="h-4 w-4 mr-2" />
             {saving ? "Aanmaken..." : isRecurring ? "Orders aanmaken" : "Order aanmaken"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
