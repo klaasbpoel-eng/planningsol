@@ -113,6 +113,8 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground antialiased;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
   }
   
   /* Smooth theme transition */
@@ -127,6 +129,27 @@ All colors MUST be HSL.
                 border-color 0.3s ease-out,
                 box-shadow 0.3s ease-out,
                 opacity 0.3s ease-out !important;
+  }
+  
+  /* Safe area padding for notched devices */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+  
+  /* Minimum touch target size */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Improve scrolling on mobile */
+  .scroll-smooth-touch {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
   }
 }
 

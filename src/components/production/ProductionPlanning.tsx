@@ -397,34 +397,38 @@ export function ProductionPlanning({
 
       {/* Main content tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-4 bg-muted/50 backdrop-blur-sm">
+        <TabsList className="w-full max-w-2xl grid grid-cols-4 bg-muted/50 backdrop-blur-sm overflow-x-auto">
           <TabsTrigger 
             value="droogijs" 
-            className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white flex items-center gap-2"
+            className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
           >
-            <Snowflake className="h-4 w-4" />
-            Droogijs
+            <Snowflake className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline">Droogijs</span>
+            <span className="sm:hidden">IJs</span>
           </TabsTrigger>
           <TabsTrigger 
             value="gascilinders"
-            className="data-[state=active]:bg-orange-500 data-[state=active]:text-white flex items-center gap-2"
+            className="data-[state=active]:bg-orange-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
           >
-            <Cylinder className="h-4 w-4" />
-            Gascilinders
+            <Cylinder className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline">Gascilinders</span>
+            <span className="sm:hidden">Gas</span>
           </TabsTrigger>
           <TabsTrigger 
             value="rapportage"
-            className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-2"
+            className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
           >
-            <BarChart3 className="h-4 w-4" />
-            Rapportage
+            <BarChart3 className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline">Rapportage</span>
+            <span className="sm:hidden">Stats</span>
           </TabsTrigger>
           <TabsTrigger 
             value="veiligheid"
-            className="data-[state=active]:bg-red-500 data-[state=active]:text-white flex items-center gap-2"
+            className="data-[state=active]:bg-red-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
           >
-            <ShieldAlert className="h-4 w-4" />
-            Veiligheid
+            <ShieldAlert className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline">Veiligheid</span>
+            <span className="sm:hidden">Veilig</span>
           </TabsTrigger>
         </TabsList>
 

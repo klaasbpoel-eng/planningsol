@@ -8,11 +8,13 @@ import { AdminFilters, FilterState } from "@/components/admin/AdminFilters";
 import { AdminSettings } from "@/components/admin/AdminSettings";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, CalendarCheck, Clock, XCircle, Users, CalendarDays, ListChecks, UserCog, ClipboardList, Settings } from "lucide-react";
 import { parseISO, isWithinInterval, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 import type { RolePermissions, AppRole } from "@/hooks/useUserPermissions";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -31,6 +33,8 @@ interface AdminDashboardProps {
 export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: AdminDashboardProps) {
   const [requests, setRequests] = useState<RequestWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("requests");
+  const isMobile = useIsMobile();
   const [filters, setFilters] = useState<FilterState>({
     employeeId: null,
     status: "all",
@@ -211,29 +215,70 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
         </div>
 
         {/* Tabs for Requests and Calendar */}
-        <Tabs defaultValue="requests" className="space-y-6">
-          <TabsList className="bg-muted/50">
-            <TabsTrigger value="requests" className="gap-2">
-              <ListChecks className="h-4 w-4" />
-              Aanvragen
-            </TabsTrigger>
-            <TabsTrigger value="tasks" className="gap-2">
-              <ClipboardList className="h-4 w-4" />
-              Taken
-            </TabsTrigger>
-            <TabsTrigger value="calendar" className="gap-2">
-              <CalendarDays className="h-4 w-4" />
-              Teamkalender
-            </TabsTrigger>
-            <TabsTrigger value="employees" className="gap-2">
-              <UserCog className="h-4 w-4" />
-              Medewerkers
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Instellingen
-            </TabsTrigger>
-          </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          {/* Mobile: Use dropdown for tab selection */}
+          {isMobile ? (
+            <Select value={activeTab} onValueChange={setActiveTab}>
+              <SelectTrigger className="w-full bg-muted/50 h-11">
+                <SelectValue placeholder="Selecteer weergave" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="requests">
+                  <div className="flex items-center gap-2">
+                    <ListChecks className="h-4 w-4" />
+                    Aanvragen
+                  </div>
+                </SelectItem>
+                <SelectItem value="tasks">
+                  <div className="flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4" />
+                    Taken
+                  </div>
+                </SelectItem>
+                <SelectItem value="calendar">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4" />
+                    Teamkalender
+                  </div>
+                </SelectItem>
+                <SelectItem value="employees">
+                  <div className="flex items-center gap-2">
+                    <UserCog className="h-4 w-4" />
+                    Medewerkers
+                  </div>
+                </SelectItem>
+                <SelectItem value="settings">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    Instellingen
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <TabsList className="bg-muted/50">
+              <TabsTrigger value="requests" className="gap-2">
+                <ListChecks className="h-4 w-4" />
+                Aanvragen
+              </TabsTrigger>
+              <TabsTrigger value="tasks" className="gap-2">
+                <ClipboardList className="h-4 w-4" />
+                Taken
+              </TabsTrigger>
+              <TabsTrigger value="calendar" className="gap-2">
+                <CalendarDays className="h-4 w-4" />
+                Teamkalender
+              </TabsTrigger>
+              <TabsTrigger value="employees" className="gap-2">
+                <UserCog className="h-4 w-4" />
+                Medewerkers
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Instellingen
+              </TabsTrigger>
+            </TabsList>
+          )}
           
           <TabsContent value="requests">
             <AdminRequestList requests={filteredRequests} onUpdate={fetchRequests} />
