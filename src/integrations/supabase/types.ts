@@ -592,6 +592,92 @@ export type Database = {
           },
         ]
       }
+      internal_order_items: {
+        Row: {
+          article_id: string
+          article_name: string
+          created_at: string
+          id: string
+          order_id: string
+          quantity: number
+        }
+        Insert: {
+          article_id: string
+          article_name: string
+          created_at?: string
+          id?: string
+          order_id: string
+          quantity?: number
+        }
+        Update: {
+          article_id?: string
+          article_name?: string
+          created_at?: string
+          id?: string
+          order_id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "internal_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      internal_orders: {
+        Row: {
+          created_at: string
+          created_by: string
+          from_location: Database["public"]["Enums"]["production_location"]
+          id: string
+          notes: string | null
+          order_number: string
+          status: string
+          to_location: Database["public"]["Enums"]["production_location"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          from_location: Database["public"]["Enums"]["production_location"]
+          id?: string
+          notes?: string | null
+          order_number: string
+          status?: string
+          to_location: Database["public"]["Enums"]["production_location"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          from_location?: Database["public"]["Enums"]["production_location"]
+          id?: string
+          notes?: string | null
+          order_number?: string
+          status?: string
+          to_location?: Database["public"]["Enums"]["production_location"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_limited"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string

@@ -6,20 +6,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeftRight, Truck, Package, Plus, Trash2, CheckCircle2, Clock } from "lucide-react";
+import { ArrowLeftRight, Truck, Plus, Trash2 } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { useInternalOrders } from "@/hooks/useInternalOrders";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
-import { format } from "date-fns";
-import { nl } from "date-fns/locale";
+import type { Database } from "@/integrations/supabase/types";
 
 import { ARTICLES } from "@/data/articles";
 import { generateOrderPDF } from "@/utils/generateOrderPDF";
+import { OrdersTable } from "@/components/internal-orders/OrdersTable";
+
+type ProductionLocation = Database["public"]["Enums"]["production_location"];
 
 interface OrderItem {
     articleId: string;
@@ -27,51 +29,27 @@ interface OrderItem {
     quantity: number;
 }
 
-interface InternalOrder {
-    id: string;
-    date: Date;
-    from: string;
-    to: string;
-    items: OrderItem[];
-    status: "pending" | "shipped" | "received";
-}
-
 const InternalOrdersPage = () => {
     const [user, setUser] = useState<User | null>(null);
     const { role, productionLocation } = useUserPermissions(user?.id);
 
     // Form State
-    const [fromLocation, setFromLocation] = useState<string>("sol_emmen");
-    const [toLocation, setToLocation] = useState<string>("sol_tilburg");
+    const [fromLocation, setFromLocation] = useState<ProductionLocation>("sol_emmen");
+    const [toLocation, setToLocation] = useState<ProductionLocation>("sol_tilburg");
     const [selectedArticle, setSelectedArticle] = useState<string>("");
     const [quantity, setQuantity] = useState<number>(1);
     const [currentOrderItems, setCurrentOrderItems] = useState<OrderItem[]>([]);
     const [activeTab, setActiveTab] = useState("incoming");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // State for orders (Restored mock data for history visibility)
-    const [orders, setOrders] = useState<InternalOrder[]>([
-        {
-            id: "ORD-2024-001",
-            date: new Date(2024, 1, 28, 14, 30),
-            from: "sol_tilburg",
-            to: "sol_emmen",
-            items: [
-                { articleId: "250200", articleName: "Stikstof 4.8 (20L)", quantity: 5 },
-                { articleId: "710250", articleName: "Stikstof 5.0 (10L)", quantity: 2 }
-            ],
-            status: "received"
-        },
-        {
-            id: "ORD-2024-002",
-            date: new Date(2024, 2, 10, 9, 15),
-            from: "sol_emmen",
-            to: "sol_tilburg",
-            items: [
-                { articleId: "90450", articleName: "Droogijs (3mm)", quantity: 20 }
-            ],
-            status: "shipped"
-        }
-    ]);
+    // Database orders hook
+    const {
+        loading,
+        createOrder,
+        updateOrderStatus,
+        getIncomingOrders,
+        getOutgoingOrders
+    } = useInternalOrders(productionLocation as ProductionLocation | null);
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -80,11 +58,10 @@ const InternalOrdersPage = () => {
     }, []);
 
     // Update logic when location permissions change
-    // Update logic when location permissions change
     // Requesting means: To = My Location, From = Other Location
     useEffect(() => {
         if (productionLocation) {
-            setToLocation(productionLocation);
+            setToLocation(productionLocation as ProductionLocation);
             setFromLocation(productionLocation === "sol_emmen" ? "sol_tilburg" : "sol_emmen");
         }
     }, [productionLocation]);
@@ -131,34 +108,57 @@ const InternalOrdersPage = () => {
         setCurrentOrderItems(prev => prev.filter((_, i) => i !== index));
     };
 
-    const submitOrder = () => {
+    const submitOrder = async () => {
         if (currentOrderItems.length === 0) return;
 
-        const newOrder: InternalOrder = {
-            id: `ORD-${Math.floor(Math.random() * 10000)}`,
-            date: new Date(),
-            from: fromLocation,
-            to: toLocation,
-            items: [...currentOrderItems],
-            status: "pending"
-        };
-
-        // Switch to INCOMING tab because we just REQUESTED an order TO us
-        setActiveTab("incoming");
-
-        // Generate PDF
+        setIsSubmitting(true);
         try {
-            generateOrderPDF(newOrder);
-            toast.success("Interne bestelling geplaatst en PDF gedownload!");
-        } catch (error) {
-            console.error("PDF generation failed:", error);
-            toast.error("Bestelling geplaatst, maar PDF generatie mislukt.");
+            const newOrder = await createOrder(
+                fromLocation,
+                toLocation,
+                currentOrderItems.map(item => ({
+                    articleId: item.articleId,
+                    articleName: item.articleName,
+                    quantity: item.quantity
+                }))
+            );
+
+            if (newOrder) {
+                // Clear form
+                setCurrentOrderItems([]);
+
+                // Switch to INCOMING tab because we just REQUESTED an order TO us
+                setActiveTab("incoming");
+
+                // Generate PDF
+                try {
+                    generateOrderPDF({
+                        id: newOrder.id,
+                        order_number: newOrder.order_number,
+                        date: newOrder.date,
+                        from: newOrder.from_location,
+                        to: newOrder.to_location,
+                        items: newOrder.items,
+                        status: newOrder.status
+                    });
+                    toast.success("Interne bestelling geplaatst en PDF gedownload!");
+                } catch (error) {
+                    console.error("PDF generation failed:", error);
+                    toast.success("Bestelling geplaatst!");
+                    toast.error("PDF generatie mislukt.");
+                }
+            }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const LocationLabel = ({ value }: { value: string }) => {
         return value === "sol_emmen" ? <span>SOL Emmen</span> : <span>SOL Tilburg</span>;
     };
+
+    const incomingOrders = getIncomingOrders();
+    const outgoingOrders = getOutgoingOrders();
 
     return (
         <PageTransition>
@@ -265,9 +265,9 @@ const InternalOrdersPage = () => {
                                         className="w-full mt-4"
                                         size="lg"
                                         onClick={submitOrder}
-                                        disabled={currentOrderItems.length === 0}
+                                        disabled={currentOrderItems.length === 0 || isSubmitting}
                                     >
-                                        Bestelling Plaatsen
+                                        {isSubmitting ? "Bezig..." : "Bestelling Plaatsen"}
                                     </Button>
                                 </CardContent>
                             </Card>
@@ -277,8 +277,12 @@ const InternalOrdersPage = () => {
                         <div className="lg:col-span-2">
                             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                                 <TabsList className="grid w-full grid-cols-2">
-                                    <TabsTrigger value="incoming">Inkomend (Naar {productionLocation === 'sol_emmen' ? 'Emmen' : 'Tilburg'})</TabsTrigger>
-                                    <TabsTrigger value="outgoing">Uitgaand (Van {productionLocation === 'sol_emmen' ? 'Emmen' : 'Tilburg'})</TabsTrigger>
+                                    <TabsTrigger value="incoming">
+                                        Inkomend (Naar {productionLocation === "sol_emmen" ? "Emmen" : "Tilburg"})
+                                    </TabsTrigger>
+                                    <TabsTrigger value="outgoing">
+                                        Uitgaand (Van {productionLocation === "sol_emmen" ? "Emmen" : "Tilburg"})
+                                    </TabsTrigger>
                                 </TabsList>
 
                                 <TabsContent value="incoming" className="mt-4">
@@ -288,7 +292,13 @@ const InternalOrdersPage = () => {
                                             <CardDescription>Orders die onderweg zijn naar jouw locatie</CardDescription>
                                         </CardHeader>
                                         <CardContent>
-                                            <OrdersTable orders={orders.filter(o => o.to === productionLocation)} type="incoming" />
+                                            <OrdersTable
+                                                orders={incomingOrders}
+                                                type="incoming"
+                                                productionLocation={productionLocation as ProductionLocation}
+                                                onUpdateStatus={updateOrderStatus}
+                                                loading={loading}
+                                            />
                                         </CardContent>
                                     </Card>
                                 </TabsContent>
@@ -300,7 +310,13 @@ const InternalOrdersPage = () => {
                                             <CardDescription>Orders die jij hebt geplaatst voor verzending</CardDescription>
                                         </CardHeader>
                                         <CardContent>
-                                            <OrdersTable orders={orders.filter(o => o.from === productionLocation)} type="outgoing" />
+                                            <OrdersTable
+                                                orders={outgoingOrders}
+                                                type="outgoing"
+                                                productionLocation={productionLocation as ProductionLocation}
+                                                onUpdateStatus={updateOrderStatus}
+                                                loading={loading}
+                                            />
                                         </CardContent>
                                     </Card>
                                 </TabsContent>
@@ -310,60 +326,6 @@ const InternalOrdersPage = () => {
                 </main>
             </div>
         </PageTransition>
-    );
-};
-
-// Helper Component for Orders Table
-const OrdersTable = ({ orders, type }: { orders: InternalOrder[], type: 'incoming' | 'outgoing' }) => {
-    if (orders.length === 0) {
-        return (
-            <div className="text-center py-12 text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
-                <Package className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                <p>Geen {type === 'incoming' ? 'inkomende' : 'uitgaande'} bestellingen gevonden.</p>
-            </div>
-        );
-    }
-
-    return (
-        <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead>Order #</TableHead>
-                    <TableHead>Datum</TableHead>
-                    <TableHead>{type === 'incoming' ? 'Van' : 'Naar'}</TableHead>
-                    <TableHead>Artikelen</TableHead>
-                    <TableHead>Status</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {orders.map(order => (
-                    <TableRow key={order.id}>
-                        <TableCell className="font-mono font-medium">{order.id}</TableCell>
-                        <TableCell>{format(order.date, 'd MMM yyyy', { locale: nl })}</TableCell>
-                        <TableCell>
-                            {type === 'incoming'
-                                ? (order.from === 'sol_emmen' ? 'SOL Emmen' : 'SOL Tilburg')
-                                : (order.to === 'sol_emmen' ? 'SOL Emmen' : 'SOL Tilburg')
-                            }
-                        </TableCell>
-                        <TableCell>
-                            <div className="flex flex-col gap-1">
-                                {order.items.map((item, i) => (
-                                    <span key={i} className="text-xs">
-                                        <b className="text-foreground">{item.quantity}x</b> {item.articleName}
-                                    </span>
-                                ))}
-                            </div>
-                        </TableCell>
-                        <TableCell>
-                            {order.status === 'pending' && <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" /> In behandeling</Badge>}
-                            {order.status === 'shipped' && <Badge className="bg-blue-500 gap-1"><Truck className="h-3 w-3" /> Onderweg</Badge>}
-                            {order.status === 'received' && <Badge variant="outline" className="border-green-500 text-green-600 gap-1"><CheckCircle2 className="h-3 w-3" /> Ontvangen</Badge>}
-                        </TableCell>
-                    </TableRow>
-                ))}
-            </TableBody>
-        </Table>
     );
 };
 
