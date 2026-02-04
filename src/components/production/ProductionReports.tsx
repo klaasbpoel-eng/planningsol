@@ -16,7 +16,8 @@ import {
   XCircle,
   GitCompare,
   Sparkles,
-  AreaChartIcon
+  AreaChartIcon,
+  Map as MapIcon
 } from "lucide-react";
 import { GlowLineChart } from "@/components/ui/glow-line-chart";
 import { FadeIn } from "@/components/ui/fade-in";
@@ -29,6 +30,7 @@ const CumulativeGasTypeChart = lazy(() => import("./CumulativeGasTypeChart").the
 const CumulativeCylinderSizeChart = lazy(() => import("./CumulativeCylinderSizeChart").then(m => ({ default: m.CumulativeCylinderSizeChart })));
 const ProductionHeatMap = lazy(() => import("./ProductionHeatMap").then(m => ({ default: m.ProductionHeatMap })));
 const CustomerSegmentation = lazy(() => import("./CustomerSegmentation").then(m => ({ default: m.CustomerSegmentation })));
+const SiteMap = lazy(() => import("./SiteMap").then(m => ({ default: m.SiteMap })));
 
 // Loading fallback component with skeleton
 const ChartLoadingFallback = () => (
@@ -718,28 +720,32 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
 
       {/* Detailed Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-3xl grid-cols-5 bg-muted/50 backdrop-blur-sm">
+        <TabsList className="grid w-full max-w-4xl grid-cols-6 bg-muted/50 backdrop-blur-sm">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Overzicht
+            <span className="hidden sm:inline">Overzicht</span>
           </TabsTrigger>
           <TabsTrigger value="insights" className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
-            Insights
+            <span className="hidden sm:inline">Insights</span>
           </TabsTrigger>
           <TabsTrigger value="cylinders" className="flex items-center gap-2">
             <Cylinder className="h-4 w-4" />
-            Cilinders
+            <span className="hidden sm:inline">Cilinders</span>
           </TabsTrigger>
           {showDryIce && (
             <TabsTrigger value="dryice" className="flex items-center gap-2">
               <Snowflake className="h-4 w-4" />
-              Droogijs
+              <span className="hidden sm:inline">Droogijs</span>
             </TabsTrigger>
           )}
           <TabsTrigger value="comparison" className="flex items-center gap-2">
             <GitCompare className="h-4 w-4" />
-            Jaarvergelijking
+            <span className="hidden sm:inline">Jaarvergelijking</span>
+          </TabsTrigger>
+          <TabsTrigger value="map" className="flex items-center gap-2">
+            <MapIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Site Map</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1089,6 +1095,16 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
           </Suspense>
           <Suspense fallback={<ChartLoadingFallback />}>
             <CumulativeCylinderSizeChart location={location} />
+          </Suspense>
+          <Suspense fallback={<ChartLoadingFallback />}>
+            <CumulativeCylinderSizeChart location={location} />
+          </Suspense>
+        </TabsContent>
+
+
+        <TabsContent value="map" className="mt-6 space-y-6">
+          <Suspense fallback={<ChartLoadingFallback />}>
+            <SiteMap location={location} />
           </Suspense>
         </TabsContent>
       </Tabs>

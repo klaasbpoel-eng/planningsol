@@ -61,13 +61,11 @@ export function Header({
         <Button
           variant={mobile ? "ghost" : "ghost"}
           size={mobile ? "lg" : "sm"}
-          className={`${
-            mobile ? "w-full justify-start text-base h-12" : ""
-          } text-primary hover:bg-primary/10 hover:text-primary ${
-            location.pathname === "/kalender"
+          className={`${mobile ? "w-full justify-start text-base h-12" : ""
+            } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/kalender"
               ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
               : ""
-          }`}
+            }`}
         >
           <CalendarDays className="h-4 w-4 mr-2" />
           Kalender
@@ -77,13 +75,11 @@ export function Header({
         <Button
           variant={mobile ? "ghost" : "ghost"}
           size={mobile ? "lg" : "sm"}
-          className={`${
-            mobile ? "w-full justify-start text-base h-12" : ""
-          } text-primary hover:bg-primary/10 hover:text-primary ${
-            location.pathname === "/productie"
+          className={`${mobile ? "w-full justify-start text-base h-12" : ""
+            } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/productie"
               ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
               : ""
-          }`}
+            }`}
         >
           <Factory className="h-4 w-4 mr-2" />
           Productie
@@ -97,9 +93,8 @@ export function Header({
             onSwitchView();
             if (mobile) closeMobileMenu();
           }}
-          className={`${
-            mobile ? "w-full justify-start text-base h-12" : ""
-          } text-primary hover:bg-primary/10 hover:text-primary`}
+          className={`${mobile ? "w-full justify-start text-base h-12" : ""
+            } text-primary hover:bg-primary/10 hover:text-primary`}
         >
           <ArrowLeftRight className="h-4 w-4 mr-2" />
           Medewerkersweergave
