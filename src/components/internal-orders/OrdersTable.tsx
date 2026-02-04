@@ -31,7 +31,8 @@ export const OrdersTable = ({ orders, type, productionLocation, onUpdateStatus, 
             from: order.from_location,
             to: order.to_location,
             items: order.items,
-            status: order.status
+            status: order.status,
+            notes: order.notes
         });
     };
 
@@ -61,6 +62,7 @@ export const OrdersTable = ({ orders, type, productionLocation, onUpdateStatus, 
                     <TableHead>Datum</TableHead>
                     <TableHead>{type === "incoming" ? "Van" : "Naar"}</TableHead>
                     <TableHead>Artikelen</TableHead>
+                    <TableHead>Notities</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Acties</TableHead>
                 </TableRow>
@@ -88,6 +90,13 @@ export const OrdersTable = ({ orders, type, productionLocation, onUpdateStatus, 
                                     </span>
                                 ))}
                             </div>
+                        </TableCell>
+                        <TableCell>
+                            {order.notes ? (
+                                <span className="text-xs text-muted-foreground line-clamp-2">{order.notes}</span>
+                            ) : (
+                                <span className="text-xs text-muted-foreground/50">—</span>
+                            )}
                         </TableCell>
                         <TableCell>
                             {order.status === "pending" && (

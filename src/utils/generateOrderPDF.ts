@@ -18,6 +18,7 @@ export interface InternalOrder {
     to: string;
     items: OrderItem[];
     status: "pending" | "shipped" | "received";
+    notes?: string;
 }
 
 const getLocationName = (loc: string) => {
@@ -91,6 +92,24 @@ export const generateOrderPDF = (order: InternalOrder) => {
             2: { halign: 'center', cellWidth: 30 }   // Quantity column
         },
     });
+
+    // Get the final Y position after the table
+    const finalY = (doc as any).lastAutoTable?.finalY || 100;
+
+    // Notes section
+    if (order.notes) {
+        doc.setFontSize(11);
+        doc.setTextColor(0);
+        doc.setFont("helvetica", "bold");
+        doc.text("Notities:", 14, finalY + 10);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.setTextColor(60);
+        
+        // Wrap long notes
+        const splitNotes = doc.splitTextToSize(order.notes, 180);
+        doc.text(splitNotes, 14, finalY + 17);
+    }
 
     // Footer
     const pageHeight = doc.internal.pageSize.height || 297;
