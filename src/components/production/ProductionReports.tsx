@@ -1028,7 +1028,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
                   columns={[
                     { header: "Order", accessor: (order) => <span className="font-medium">{order.order_number}</span> },
                     { header: "Klant", accessor: (order) => order.customer_name },
-                    { header: "Type", accessor: (order) => order.product_type },
+                    { header: "Type", accessor: (order) => order.product_type === "blocks" ? "pellets 9mm" : order.product_type },
                     { header: "Hoeveelheid", accessor: (order) => `${formatNumber(order.quantity_kg, 0)} kg` },
                     { header: "Datum", accessor: (order) => format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl }) },
                     { header: "Status", accessor: (order) => getStatusBadge(order.status) },
