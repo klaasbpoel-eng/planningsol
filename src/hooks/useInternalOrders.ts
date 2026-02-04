@@ -68,7 +68,7 @@ export const useInternalOrders = (productionLocation: ProductionLocation | null)
                     .select("id")
                     .eq("user_id", session.user.id)
                     .single();
-                
+
                 if (profile) {
                     setProfileId(profile.id);
                 }
@@ -236,7 +236,7 @@ export const useInternalOrders = (productionLocation: ProductionLocation | null)
             if (error) throw error;
 
             await fetchOrders();
-            
+
             const statusLabels = {
                 pending: "In behandeling",
                 shipped: "Verzonden",
@@ -269,11 +269,96 @@ export const useInternalOrders = (productionLocation: ProductionLocation | null)
         return orders.filter(o => o.from_location === productionLocation);
     };
 
+    const deleteOrder = async (orderId: string): Promise<boolean> => {
+        try {
+            const { error } = await supabase
+                .from("internal_orders")
+                .delete()
+                .eq("id", orderId);
+
+            if (error) throw error;
+
+            await fetchOrders();
+            toast.success("Bestelling verwijderd");
+            return true;
+        } catch (error) {
+            console.error("Error deleting order:", error);
+            toast.error("Kon bestelling niet verwijderen");
+            return false;
+        }
+    };
+
+    const updateOrder = async (
+        orderId: string,
+        updates: {
+            fromLocation?: ProductionLocation;
+            toLocation?: ProductionLocation;
+            items?: InternalOrderItem[];
+            notes?: string;
+            status?: "pending" | "shipped" | "received";
+        }
+    ): Promise<boolean> => {
+        try {
+            // Update order details
+            const orderUpdates: any = {};
+            if (updates.fromLocation) orderUpdates.from_location = updates.fromLocation;
+            if (updates.toLocation) orderUpdates.to_location = updates.toLocation;
+            if (updates.notes !== undefined) orderUpdates.notes = updates.notes;
+            if (updates.status) orderUpdates.status = updates.status;
+
+            if (Object.keys(orderUpdates).length > 0) {
+                const { error: orderError } = await supabase
+                    .from("internal_orders")
+                    .update(orderUpdates)
+                    .eq("id", orderId);
+
+                if (orderError) throw orderError;
+            }
+
+            // Update items if provided
+            if (updates.items) {
+                // First delete existing items
+                const { error: deleteError } = await supabase
+                    .from("internal_order_items")
+                    .delete()
+                    .eq("order_id", orderId);
+
+                if (deleteError) throw deleteError;
+
+                // Insert new items
+                if (updates.items.length > 0) {
+                    const { error: itemsError } = await supabase
+                        .from("internal_order_items")
+                        .insert(
+                            updates.items.map(item => ({
+                                order_id: orderId,
+                                article_id: item.articleId,
+                                article_name: item.articleName,
+                                quantity: item.quantity
+                            }))
+                        );
+
+                    if (itemsError) throw itemsError;
+                }
+            }
+
+            await fetchOrders();
+            toast.success("Bestelling bijgewerkt");
+            return true;
+        } catch (error) {
+            console.error("Error updating order:", error);
+            toast.error("Kon bestelling niet bijwerken");
+            return false;
+        }
+    };
+
     return {
         orders,
         loading,
         createOrder,
         updateOrderStatus,
+        deleteOrder,
+        updateOrder,
         getIncomingOrders,
         getOutgoingOrders,
         refreshOrders: fetchOrders

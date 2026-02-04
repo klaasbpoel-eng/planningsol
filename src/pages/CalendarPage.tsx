@@ -50,8 +50,8 @@ const CalendarPage = () => {
     <PageTransition>
       <div className="min-h-screen flex flex-col gradient-mesh">
         <Header userEmail={user.email} />
-        
-        <main className="flex-1 flex flex-col">
+
+        <main className="flex-1 flex flex-col w-full px-[10%]">
           <CalendarOverview />
         </main>
       </div>

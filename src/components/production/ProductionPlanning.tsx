@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock, ShieldAlert } from "lucide-react";
+import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock, ShieldAlert, Truck } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { TopCustomersWidget } from "./TopCustomersWidget";
 import { KPIDashboard } from "./KPIDashboard";
@@ -13,6 +13,12 @@ const DryIcePlanning = lazy(() => import("./DryIcePlanning").then(m => ({ defaul
 const GasCylinderPlanning = lazy(() => import("./GasCylinderPlanning").then(m => ({ default: m.GasCylinderPlanning })));
 const ProductionReports = lazy(() => import("./ProductionReports").then(m => ({ default: m.ProductionReports })));
 const SafetyInstructions = lazy(() => import("./SafetyInstructions").then(m => ({ default: m.SafetyInstructions })));
+const SiteMap = lazy(() => import("./SiteMap").then(m => ({ default: m.SiteMap })));
+const TrailerPlanning = lazy(() => import("./TrailerPlanning").then(m => ({ default: m.TrailerPlanning })));
+
+// ... (existing code)
+
+
 
 // Loading fallback component with skeleton
 const TabLoadingFallback = () => (
@@ -40,10 +46,10 @@ interface ProductionPlanningProps {
   permissions?: RolePermissions;
 }
 
-export function ProductionPlanning({ 
-  userProductionLocation, 
+export function ProductionPlanning({
+  userProductionLocation,
   canViewAllLocations = true,
-  permissions 
+  permissions
 }: ProductionPlanningProps) {
   const [activeTab, setActiveTab] = useState("droogijs");
   const [dryIceToday, setDryIceToday] = useState(0);
@@ -54,14 +60,14 @@ export function ProductionPlanning({
   const [previousWeekOrders, setPreviousWeekOrders] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+
   // Determine initial and allowed location based on user's assigned location
   const getInitialLocation = (): ProductionLocation => {
     if (canViewAllLocations) return "all";
     if (userProductionLocation) return userProductionLocation;
     return "all";
   };
-  
+
   const [selectedLocation, setSelectedLocation] = useState<ProductionLocation>(getInitialLocation());
 
   // Update selected location when user's production location changes
@@ -99,16 +105,16 @@ export function ProductionPlanning({
   const fetchStats = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
     const lastWeekSameDay = format(subWeeks(new Date(), 1), "yyyy-MM-dd");
-    
+
     // Fetch dry ice orders for today
     let dryIceQuery = supabase
       .from("dry_ice_orders")
       .select("quantity_kg")
       .eq("scheduled_date", today)
       .neq("status", "cancelled");
-    
+
     const { data: dryIceData } = await dryIceQuery;
-    
+
     if (dryIceData) {
       setDryIceToday(dryIceData.reduce((sum, o) => sum + Number(o.quantity_kg), 0));
     }
@@ -119,7 +125,7 @@ export function ProductionPlanning({
       .select("quantity_kg")
       .eq("scheduled_date", lastWeekSameDay)
       .neq("status", "cancelled");
-    
+
     if (prevDryIceData) {
       setPreviousDryIceToday(prevDryIceData.reduce((sum, o) => sum + Number(o.quantity_kg), 0));
     }
@@ -130,13 +136,13 @@ export function ProductionPlanning({
       .select("cylinder_count")
       .eq("scheduled_date", today)
       .neq("status", "cancelled");
-    
+
     if (selectedLocation !== "all") {
       cylinderQuery = cylinderQuery.eq("location", selectedLocation);
     }
-    
+
     const { data: cylinderData } = await cylinderQuery;
-    
+
     if (cylinderData) {
       setCylindersToday(cylinderData.reduce((sum, o) => sum + o.cylinder_count, 0));
     }
@@ -147,13 +153,13 @@ export function ProductionPlanning({
       .select("cylinder_count")
       .eq("scheduled_date", lastWeekSameDay)
       .neq("status", "cancelled");
-    
+
     if (selectedLocation !== "all") {
       prevCylinderQuery = prevCylinderQuery.eq("location", selectedLocation);
     }
-    
+
     const { data: prevCylinderData } = await prevCylinderQuery;
-    
+
     if (prevCylinderData) {
       setPreviousCylindersToday(prevCylinderData.reduce((sum, o) => sum + o.cylinder_count, 0));
     }
@@ -180,11 +186,11 @@ export function ProductionPlanning({
       .select("*", { count: "exact", head: true })
       .gte("scheduled_date", format(weekStart, "yyyy-MM-dd"))
       .lte("scheduled_date", format(weekEnd, "yyyy-MM-dd"));
-    
+
     if (selectedLocation !== "all") {
       weekCylinderQuery = weekCylinderQuery.eq("location", selectedLocation);
     }
-    
+
     const { count: cylinderCount } = await weekCylinderQuery;
 
     setWeekOrders((dryIceCount || 0) + (cylinderCount || 0));
@@ -201,11 +207,11 @@ export function ProductionPlanning({
       .select("*", { count: "exact", head: true })
       .gte("scheduled_date", format(prevWeekStart, "yyyy-MM-dd"))
       .lte("scheduled_date", format(prevWeekEnd, "yyyy-MM-dd"));
-    
+
     if (selectedLocation !== "all") {
       prevWeekCylinderQuery = prevWeekCylinderQuery.eq("location", selectedLocation);
     }
-    
+
     const { count: prevCylinderCount } = await prevWeekCylinderQuery;
 
     setPreviousWeekOrders((prevDryIceCount || 0) + (prevCylinderCount || 0));
@@ -224,7 +230,7 @@ export function ProductionPlanning({
           <div className="flex gap-1">
             {/* "Alle locaties" - only clickable for admins */}
             {canViewAllLocations ? (
-              <Badge 
+              <Badge
                 variant={selectedLocation === "all" ? "default" : "outline"}
                 className="cursor-pointer hover:bg-primary/80"
                 onClick={() => setSelectedLocation("all")}
@@ -234,7 +240,7 @@ export function ProductionPlanning({
             ) : (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge 
+                  <Badge
                     variant="outline"
                     className="cursor-not-allowed opacity-50 flex items-center gap-1"
                   >
@@ -247,15 +253,15 @@ export function ProductionPlanning({
                 </TooltipContent>
               </Tooltip>
             )}
-            
+
             {/* SOL Emmen */}
             {canViewAllLocations || userProductionLocation === "sol_emmen" ? (
-              <Badge 
+              <Badge
                 variant={selectedLocation === "sol_emmen" ? "default" : "outline"}
                 className={cn(
                   "cursor-pointer",
-                  selectedLocation === "sol_emmen" 
-                    ? "bg-orange-500 hover:bg-orange-600 text-white" 
+                  selectedLocation === "sol_emmen"
+                    ? "bg-orange-500 hover:bg-orange-600 text-white"
                     : "hover:bg-orange-100 dark:hover:bg-orange-900/30"
                 )}
                 onClick={() => setSelectedLocation("sol_emmen")}
@@ -265,7 +271,7 @@ export function ProductionPlanning({
             ) : (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge 
+                  <Badge
                     variant="outline"
                     className="cursor-not-allowed opacity-50 flex items-center gap-1"
                   >
@@ -278,15 +284,15 @@ export function ProductionPlanning({
                 </TooltipContent>
               </Tooltip>
             )}
-            
+
             {/* SOL Tilburg */}
             {canViewAllLocations || userProductionLocation === "sol_tilburg" ? (
-              <Badge 
+              <Badge
                 variant={selectedLocation === "sol_tilburg" ? "default" : "outline"}
                 className={cn(
                   "cursor-pointer",
-                  selectedLocation === "sol_tilburg" 
-                    ? "bg-blue-500 hover:bg-blue-600 text-white" 
+                  selectedLocation === "sol_tilburg"
+                    ? "bg-blue-500 hover:bg-blue-600 text-white"
                     : "hover:bg-blue-100 dark:hover:bg-blue-900/30"
                 )}
                 onClick={() => setSelectedLocation("sol_tilburg")}
@@ -296,7 +302,7 @@ export function ProductionPlanning({
             ) : (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge 
+                  <Badge
                     variant="outline"
                     className="cursor-not-allowed opacity-50 flex items-center gap-1"
                   >
@@ -311,7 +317,7 @@ export function ProductionPlanning({
             )}
           </div>
         </TooltipProvider>
-        
+
         {/* Show user's assigned location info if restricted */}
         {!canViewAllLocations && userProductionLocation && (
           <span className="text-xs text-muted-foreground ml-2 flex items-center gap-1">
@@ -337,7 +343,7 @@ export function ProductionPlanning({
             isRefreshing && "animate-pulse ring-2 ring-primary/30"
           )}
         />
-        
+
         <div className="relative">
           <StatCard
             value={cylindersToday}
@@ -359,7 +365,7 @@ export function ProductionPlanning({
             </Badge>
           )}
         </div>
-        
+
         <div className="relative">
           <StatCard
             value={weekOrders}
@@ -381,40 +387,40 @@ export function ProductionPlanning({
             </Badge>
           )}
         </div>
-        
-        <StockSummaryWidget 
-          refreshKey={refreshKey} 
-          isRefreshing={isRefreshing} 
+
+        <StockSummaryWidget
+          refreshKey={refreshKey}
+          isRefreshing={isRefreshing}
         />
 
         {/* Top 5 Customers Widget */}
-        <TopCustomersWidget 
-          refreshKey={refreshKey} 
-          isRefreshing={isRefreshing} 
+        <TopCustomersWidget
+          refreshKey={refreshKey}
+          isRefreshing={isRefreshing}
           location={selectedLocation}
         />
       </div>
 
       {/* Main content tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full max-w-2xl grid grid-cols-4 bg-muted/50 backdrop-blur-sm overflow-x-auto">
-          <TabsTrigger 
-            value="droogijs" 
-            className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+        <TabsList className="w-full max-w-5xl grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 bg-muted/50 backdrop-blur-sm overflow-x-auto">
+          <TabsTrigger
+            value="droogijs"
+            className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
           >
             <Snowflake className="h-4 w-4 flex-shrink-0" />
             <span className="hidden sm:inline">Droogijs</span>
             <span className="sm:hidden">IJs</span>
           </TabsTrigger>
-          <TabsTrigger 
+          <TabsTrigger
             value="gascilinders"
-            className="data-[state=active]:bg-orange-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+            className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
           >
             <Cylinder className="h-4 w-4 flex-shrink-0" />
             <span className="hidden sm:inline">Gascilinders</span>
             <span className="sm:hidden">Gas</span>
           </TabsTrigger>
-          <TabsTrigger 
+          <TabsTrigger
             value="rapportage"
             className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
           >
@@ -422,7 +428,7 @@ export function ProductionPlanning({
             <span className="hidden sm:inline">Rapportage</span>
             <span className="sm:hidden">Stats</span>
           </TabsTrigger>
-          <TabsTrigger 
+          <TabsTrigger
             value="veiligheid"
             className="data-[state=active]:bg-red-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
           >
@@ -430,12 +436,28 @@ export function ProductionPlanning({
             <span className="hidden sm:inline">Veiligheid</span>
             <span className="sm:hidden">Veilig</span>
           </TabsTrigger>
+          <TabsTrigger
+            value="sitemap"
+            className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+          >
+            <MapPin className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline">Site Map</span>
+            <span className="sm:hidden">Map</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="trailer"
+            className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+          >
+            <Truck className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline">Trailer</span>
+            <span className="sm:hidden">Truck</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="droogijs" className="mt-6">
           <Suspense fallback={<TabLoadingFallback />}>
-            <DryIcePlanning 
-              onDataChanged={handleDataChanged} 
+            <DryIcePlanning
+              onDataChanged={handleDataChanged}
               location={selectedLocation}
             />
           </Suspense>
@@ -443,8 +465,8 @@ export function ProductionPlanning({
 
         <TabsContent value="gascilinders" className="mt-6">
           <Suspense fallback={<TabLoadingFallback />}>
-            <GasCylinderPlanning 
-              onDataChanged={handleDataChanged} 
+            <GasCylinderPlanning
+              onDataChanged={handleDataChanged}
               location={selectedLocation}
             />
           </Suspense>
@@ -459,6 +481,18 @@ export function ProductionPlanning({
         <TabsContent value="veiligheid" className="mt-6">
           <Suspense fallback={<TabLoadingFallback />}>
             <SafetyInstructions />
+          </Suspense>
+        </TabsContent>
+
+        <TabsContent value="sitemap" className="mt-6">
+          <Suspense fallback={<TabLoadingFallback />}>
+            <SiteMap location={selectedLocation} />
+          </Suspense>
+        </TabsContent>
+
+        <TabsContent value="trailer" className="mt-6">
+          <Suspense fallback={<TabLoadingFallback />}>
+            <TrailerPlanning location={selectedLocation} />
           </Suspense>
         </TabsContent>
       </Tabs>

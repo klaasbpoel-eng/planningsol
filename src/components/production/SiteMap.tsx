@@ -27,11 +27,13 @@ interface SiteMapProps {
 export function SiteMap({ location }: SiteMapProps) {
     const [mode, setMode] = useState<"view" | "edit">("view");
     const [zones, setZones] = useState<StorageZone[]>([
-        { id: "z1", x: 250, y: 300, type: "oxygen", label: "Zuurstof", rotation: 0, scale: 1, variant: 'default' },
-        { id: "z2", x: 280, y: 300, type: "nitrogen", label: "Stikstof", rotation: 0, scale: 1, variant: 'default' },
+        { id: "z1", x: 300, y: 770, type: "oxygen", label: "Zuurstof", rotation: -90, scale: 1, variant: 'default' },
+        { id: "z2", x: 300, y: 740, type: "nitrogen", label: "Stikstof", rotation: -90, scale: 1, variant: 'default' },
     ]);
     const [rotatingZoneId, setRotatingZoneId] = useState<string | null>(null);
     const [scalingZoneId, setScalingZoneId] = useState<string | null>(null);
+    const [isRotatingMap, setIsRotatingMap] = useState(false);
+    const [mapRotation, setMapRotation] = useState(0);
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
@@ -73,8 +75,17 @@ export function SiteMap({ location }: SiteMapProps) {
                 }
             }
 
-            // Handle Panning
-            if (isPanning) {
+            // Handle Map Rotation (Shift + Drag)
+            if (isRotatingMap) {
+                const deltaX = e.clientX - lastMousePos.current.x;
+                lastMousePos.current = { x: e.clientX, y: e.clientY };
+
+                // Sensitivity: 1px = 0.5 deg
+                setMapRotation(prev => prev + deltaX * 0.5);
+            }
+
+            // Handle Panning (No Shift)
+            if (isPanning && !isRotatingMap) {
                 const deltaX = e.clientX - lastMousePos.current.x;
                 const deltaY = e.clientY - lastMousePos.current.y;
                 lastMousePos.current = { x: e.clientX, y: e.clientY };
@@ -87,6 +98,7 @@ export function SiteMap({ location }: SiteMapProps) {
             setRotatingZoneId(null);
             setScalingZoneId(null);
             setIsPanning(false);
+            setIsRotatingMap(false);
         };
 
         // Keydown for Esc to exit fullscreen
@@ -96,7 +108,7 @@ export function SiteMap({ location }: SiteMapProps) {
             }
         };
 
-        if (rotatingZoneId || scalingZoneId || isPanning) {
+        if (rotatingZoneId || scalingZoneId || isPanning || isRotatingMap) {
             window.addEventListener("mousemove", handleGlobalMouseMove);
             window.addEventListener("mouseup", handleGlobalMouseUp);
         }
@@ -107,7 +119,7 @@ export function SiteMap({ location }: SiteMapProps) {
             window.removeEventListener("mouseup", handleGlobalMouseUp);
             window.removeEventListener("keydown", handleKeyDown);
         };
-    }, [rotatingZoneId, scalingZoneId, isPanning, zones, zoom, isFullscreen]);
+    }, [rotatingZoneId, scalingZoneId, isPanning, isRotatingMap, zones, zoom, isFullscreen]);
 
     // Wheel Zoom Handler
     const handleWheel = (e: React.WheelEvent) => {
@@ -125,8 +137,13 @@ export function SiteMap({ location }: SiteMapProps) {
         if (e.defaultPrevented) return;
         if ((e.target as HTMLElement).closest('button, input, .cursor-move')) return;
 
-        setIsPanning(true);
         lastMousePos.current = { x: e.clientX, y: e.clientY };
+
+        if (e.shiftKey) {
+            setIsRotatingMap(true);
+        } else {
+            setIsPanning(true);
+        }
     };
 
     const handleDoubleClick = (e: React.MouseEvent) => {
@@ -137,11 +154,11 @@ export function SiteMap({ location }: SiteMapProps) {
 
     // Mock data for tank levels
     const tanks = [
-        { id: "t1", type: "LIN", level: 85, capacity: "20.000L", x: 120, y: 220 },
-        { id: "t2", type: "LOX", level: 62, capacity: "15.000L", x: 120, y: 260 },
-        { id: "t3", type: "LAR", level: 45, capacity: "10.000L", x: 120, y: 300 },
-        { id: "t4", type: "LCO2", level: 91, capacity: "25.000L", x: 120, y: 340 },
-        { id: "t5", type: "LCO2", level: 78, capacity: "25.000L", x: 120, y: 380 },
+        { id: "t1", type: "LIN", level: 85, capacity: "20.000L", x: 220, y: 900 },
+        { id: "t2", type: "LOX", level: 62, capacity: "15.000L", x: 260, y: 900 },
+        { id: "t3", type: "LAR", level: 45, capacity: "10.000L", x: 300, y: 900 },
+        { id: "t4", type: "LCO2", level: 91, capacity: "25.000L", x: 340, y: 900 },
+        { id: "t5", type: "LCO2", level: 78, capacity: "25.000L", x: 380, y: 900 },
     ];
 
     const handleDragEnd = (id: string, info: any) => {
@@ -203,6 +220,13 @@ export function SiteMap({ location }: SiteMapProps) {
                 </div>
                 <div className="flex gap-2">
                     <div className="flex items-center gap-1 mr-4 bg-muted/20 p-1 rounded-md">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setMapRotation(r => r - 90)} title="Draai Links">
+                            <RotateCcw className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setMapRotation(r => r + 90)} title="Draai Rechts">
+                            <RotateCw className="h-4 w-4" />
+                        </Button>
+                        <div className="w-px h-4 bg-border mx-1"></div>
                         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setZoom(z => Math.max(z - 0.2, 0.5))}>
                             <ZoomOut className="h-4 w-4" />
                         </Button>
@@ -211,7 +235,7 @@ export function SiteMap({ location }: SiteMapProps) {
                             <ZoomIn className="h-4 w-4" />
                         </Button>
                         <div className="w-px h-4 bg-border mx-1"></div>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setPan({ x: 0, y: 0 }); setZoom(1); }} title="Reset View">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setPan({ x: 0, y: 0 }); setZoom(1); setMapRotation(0); }} title="Reset View">
                             <Move className="h-3 w-3" />
                         </Button>
                         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setIsFullscreen(!isFullscreen)} title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}>
@@ -244,7 +268,7 @@ export function SiteMap({ location }: SiteMapProps) {
             <CardContent
                 className={cn(
                     "p-0 relative bg-muted/10 min-h-[900px] overflow-hidden select-none",
-                    isPanning ? "cursor-grabbing" : "cursor-grab",
+                    isPanning || isRotatingMap ? "cursor-grabbing" : "cursor-grab",
                     isFullscreen ? "h-[calc(100vh-80px)]" : ""
                 )}
                 ref={containerRef}
@@ -254,15 +278,24 @@ export function SiteMap({ location }: SiteMapProps) {
             >
                 <motion.div
                     ref={mapRef}
-                    className="w-full h-full origin-top-left"
-                    animate={{ scale: zoom, x: pan.x, y: pan.y }}
+                    className="w-full h-full origin-center"
+                    animate={{ scale: zoom, x: pan.x, y: pan.y, rotate: mapRotation }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
                     style={{ width: '100%', height: '100%', minHeight: '900px' }}
                 >
                     {/* SVG Map Layer */}
                     <svg viewBox="0 0 1024 1024" className="w-full h-full absolute inset-0 pointer-events-none">
-                        {/* Background Image */}
-                        <image href="/site-map-background.png" x="0" y="0" width="1024" height="1024" preserveAspectRatio="xMidYMid slice" opacity="0.9" />
+                        {/* Background Image - Rotated 90deg CW */}
+                        <image
+                            href="/site-map-background.png"
+                            x="0"
+                            y="0"
+                            width="1024"
+                            height="1024"
+                            preserveAspectRatio="xMidYMid slice"
+                            opacity="0.9"
+                            transform="rotate(90, 512, 512)"
+                        />
                         <defs>
                             <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
                                 <path d="M 50 0 L 0 0 0 50" fill="none" stroke="currentColor" strokeOpacity="0.03" />

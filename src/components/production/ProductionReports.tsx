@@ -30,7 +30,8 @@ const CumulativeGasTypeChart = lazy(() => import("./CumulativeGasTypeChart").the
 const CumulativeCylinderSizeChart = lazy(() => import("./CumulativeCylinderSizeChart").then(m => ({ default: m.CumulativeCylinderSizeChart })));
 const ProductionHeatMap = lazy(() => import("./ProductionHeatMap").then(m => ({ default: m.ProductionHeatMap })));
 const CustomerSegmentation = lazy(() => import("./CustomerSegmentation").then(m => ({ default: m.CustomerSegmentation })));
-const SiteMap = lazy(() => import("./SiteMap").then(m => ({ default: m.SiteMap })));
+
+
 
 // Loading fallback component with skeleton
 const ChartLoadingFallback = () => (
@@ -743,10 +744,6 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
             <GitCompare className="h-4 w-4" />
             <span className="hidden sm:inline">Jaarvergelijking</span>
           </TabsTrigger>
-          <TabsTrigger value="map" className="flex items-center gap-2">
-            <MapIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">Site Map</span>
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6 space-y-6">
@@ -1102,11 +1099,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
         </TabsContent>
 
 
-        <TabsContent value="map" className="mt-6 space-y-6">
-          <Suspense fallback={<ChartLoadingFallback />}>
-            <SiteMap location={location} />
-          </Suspense>
-        </TabsContent>
+
       </Tabs>
     </div>
   );

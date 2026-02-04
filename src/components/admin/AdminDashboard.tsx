@@ -56,7 +56,7 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
       const requestsAny = requestsData as any[];
       const profileIds = [...new Set(requestsAny.filter(r => r.profile_id).map(r => r.profile_id))];
       const userIds = [...new Set((requestsData || []).filter(r => r.user_id).map(r => r.user_id))];
-      
+
       const { data: profilesData } = await supabase
         .from("profiles")
         .select("*");
@@ -64,10 +64,10 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
       // Map profiles to requests - try profile_id first, then user_id
       const profilesById = new Map((profilesData || []).map(p => [p.id, p]));
       const profilesByUserId = new Map((profilesData || []).map(p => [p.user_id, p]));
-      
+
       const requestsWithProfiles = (requestsData || []).map(request => {
         const requestAny = request as any;
-        const profile = requestAny.profile_id 
+        const profile = requestAny.profile_id
           ? profilesById.get(requestAny.profile_id)
           : profilesByUserId.get(request.user_id) || null;
         return {
@@ -154,13 +154,13 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
   return (
     <div className="min-h-screen bg-background">
       <Header userEmail={userEmail} isAdmin onSwitchView={onSwitchView} role={role} />
-      
-      <main className="container mx-auto px-4 py-8">
+
+      <main className="w-full px-[10%] py-8">
         {/* Filters */}
-        <AdminFilters 
-          employees={employees} 
-          filters={filters} 
-          onFiltersChange={setFilters} 
+        <AdminFilters
+          employees={employees}
+          filters={filters}
+          onFiltersChange={setFilters}
         />
 
         {/* Stats */}
@@ -176,7 +176,7 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="shadow-md border-0 bg-warning/5">
             <CardContent className="pt-6 flex items-center gap-4">
               <div className="p-3 rounded-xl bg-warning/10">
@@ -188,7 +188,7 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="shadow-md border-0 bg-success/5">
             <CardContent className="pt-6 flex items-center gap-4">
               <div className="p-3 rounded-xl bg-success/10">
@@ -200,7 +200,7 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="shadow-md border-0 bg-destructive/5">
             <CardContent className="pt-6 flex items-center gap-4">
               <div className="p-3 rounded-xl bg-destructive/10">
@@ -279,23 +279,23 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
               </TabsTrigger>
             </TabsList>
           )}
-          
+
           <TabsContent value="requests">
             <AdminRequestList requests={filteredRequests} onUpdate={fetchRequests} />
           </TabsContent>
-          
+
           <TabsContent value="tasks">
             <TaskList />
           </TabsContent>
-          
+
           <TabsContent value="calendar">
             <TeamCalendar requests={filteredRequests} />
           </TabsContent>
-          
+
           <TabsContent value="employees">
             <EmployeeList />
           </TabsContent>
-          
+
           <TabsContent value="settings">
             <AdminSettings />
           </TabsContent>

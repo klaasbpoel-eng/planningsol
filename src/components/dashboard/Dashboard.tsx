@@ -87,7 +87,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
 
     const currentApproved = requests.filter((r) => r.status === "approved" && isInCurrentMonth(r.created_at)).length;
     const prevApproved = requests.filter((r) => r.status === "approved" && isInPrevMonth(r.created_at)).length;
-    
+
     const currentRejected = requests.filter((r) => r.status === "rejected" && isInCurrentMonth(r.created_at)).length;
     const prevRejected = requests.filter((r) => r.status === "rejected" && isInPrevMonth(r.created_at)).length;
 
@@ -106,20 +106,20 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
     return (
       <div className="min-h-screen bg-background">
         <Header userEmail={userEmail} role={role} />
-        <main className="container mx-auto px-4 py-8">
+        <main className="w-full px-[10%] py-8">
           {/* Role buttons skeleton */}
           <div className="flex flex-wrap gap-3 mb-6">
             <div className="h-10 w-44 rounded-md bg-muted animate-pulse" />
             <div className="h-10 w-36 rounded-md bg-muted animate-pulse" />
           </div>
-          
+
           {/* Stats skeleton */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             <StatCardSkeleton />
             <StatCardSkeleton />
             <StatCardSkeleton />
           </div>
-          
+
           {/* Main content skeleton */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
@@ -137,9 +137,9 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
   return (
     <div className="min-h-screen bg-background">
       <Header userEmail={userEmail} role={role} />
-      
+
       <FadeIn show={!loading}>
-        <main className="container mx-auto px-4 py-8">
+        <main className="w-full px-[10%] py-8">
           {/* Role-based action buttons */}
           <div className="flex flex-wrap gap-3 mb-6">
             {isAdmin && onSwitchToAdmin && (
@@ -151,7 +151,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
                 Naar Beheerderspaneel
               </Button>
             )}
-            
+
             {permissions?.canViewOrders && (
               <Button
                 onClick={() => navigate("/productie")}
@@ -161,7 +161,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
                 Productieplanning
               </Button>
             )}
-            
+
             {role === "admin" && (
               <Button
                 onClick={() => navigate("/klanten")}
@@ -182,7 +182,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
               iconBgColor="bg-warning/10"
               cardBgColor="bg-warning/5"
             />
-            
+
             <StatCard
               value={stats.approved}
               label="Goedgekeurd"
@@ -191,7 +191,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
               cardBgColor="bg-success/5"
               trend={stats.approved > 0 ? { value: trends.approved, label: "vs vorige maand" } : undefined}
             />
-            
+
             <StatCard
               value={stats.rejected}
               label="Afgewezen"

@@ -2,13 +2,16 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Package, Truck, CheckCircle2, Clock, FileDown, Send, PackageCheck, Eye } from "lucide-react";
+import { Package, Truck, CheckCircle2, Clock, FileDown, Send, PackageCheck, Eye, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { generateOrderPDF } from "@/utils/generateOrderPDF";
 import { OrderDetailDialog } from "./OrderDetailDialog";
+import { EditOrderDialog } from "./EditOrderDialog";
 import type { InternalOrder } from "@/hooks/useInternalOrders";
 import type { Database } from "@/integrations/supabase/types";
+import { InternalOrderFormData } from "./InternalOrderForm";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type ProductionLocation = Database["public"]["Enums"]["production_location"];
 
@@ -18,19 +21,54 @@ interface OrdersTableProps {
     productionLocation: ProductionLocation | null;
     onUpdateStatus: (orderId: string, status: "pending" | "shipped" | "received") => Promise<boolean>;
     loading?: boolean;
+    isAdmin?: boolean;
+    onDelete?: (orderId: string) => Promise<boolean>;
+    onUpdate?: (orderId: string, data: InternalOrderFormData) => Promise<boolean>;
 }
 
 const getLocationLabel = (location: ProductionLocation) => {
     return location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg";
 };
 
-export const OrdersTable = ({ orders, type, productionLocation, onUpdateStatus, loading }: OrdersTableProps) => {
+export const OrdersTable = ({ orders, type, productionLocation, onUpdateStatus, loading, isAdmin, onDelete, onUpdate }: OrdersTableProps) => {
     const [selectedOrder, setSelectedOrder] = useState<InternalOrder | null>(null);
     const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+
+    // Edit & delete state
+    const [editOrder, setEditOrder] = useState<InternalOrder | null>(null);
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [deleteOrder, setDeleteOrder] = useState<InternalOrder | null>(null);
+    const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
 
     const handleViewDetails = (order: InternalOrder) => {
         setSelectedOrder(order);
         setDetailDialogOpen(true);
+    };
+
+    const handleEdit = (order: InternalOrder, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditOrder(order);
+        setEditDialogOpen(true);
+    };
+
+    const handleDeleteClick = (order: InternalOrder, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setDeleteOrder(order);
+        setDeleteAlertOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (deleteOrder && onDelete) {
+            await onDelete(deleteOrder.id);
+            setDeleteAlertOpen(false);
+            setDeleteOrder(null);
+        }
+    };
+
+    const handleUpdateOrder = async (orderId: string, data: InternalOrderFormData) => {
+        if (onUpdate) {
+            await onUpdate(orderId, data);
+        }
     };
 
     const handleDownloadPDF = (order: InternalOrder) => {
@@ -80,8 +118,8 @@ export const OrdersTable = ({ orders, type, productionLocation, onUpdateStatus, 
                 </TableHeader>
                 <TableBody>
                     {orders.map(order => (
-                        <TableRow 
-                            key={order.id} 
+                        <TableRow
+                            key={order.id}
                             className="cursor-pointer hover:bg-muted/50"
                             onClick={() => handleViewDetails(order)}
                         >
@@ -137,17 +175,30 @@ export const OrdersTable = ({ orders, type, productionLocation, onUpdateStatus, 
                             </TableCell>
                             <TableCell>
                                 <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                                    {/* View details button */}
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleViewDetails(order)}
-                                        title="Bekijk details"
-                                    >
-                                        <Eye className="h-4 w-4" />
-                                    </Button>
+                                    {/* Admin Actions */}
+                                    {isAdmin && (
+                                        <>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={(e) => handleEdit(order, e)}
+                                                className="h-8 w-8 p-0"
+                                            >
+                                                <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={(e) => handleDeleteClick(order, e)}
+                                                className="h-8 w-8 p-0"
+                                            >
+                                                <Trash2 className="h-4 w-4 text-destructive hover:text-red-700" />
+                                            </Button>
+                                        </>
+                                    )}
+
                                     {/* Status update buttons based on context */}
-                                    {type === "outgoing" && order.status === "pending" && (
+                                    {(type === "outgoing" && order.status === "pending" && !isAdmin) && (
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -158,7 +209,7 @@ export const OrdersTable = ({ orders, type, productionLocation, onUpdateStatus, 
                                             Verzenden
                                         </Button>
                                     )}
-                                    {type === "incoming" && order.status === "shipped" && (
+                                    {(type === "incoming" && order.status === "shipped" && !isAdmin) && (
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -189,6 +240,30 @@ export const OrdersTable = ({ orders, type, productionLocation, onUpdateStatus, 
                 open={detailDialogOpen}
                 onOpenChange={setDetailDialogOpen}
             />
+
+            <EditOrderDialog
+                order={editOrder}
+                open={editDialogOpen}
+                onOpenChange={setEditDialogOpen}
+                onUpdate={handleUpdateOrder}
+            />
+
+            <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Dit zal bestelling <b>{deleteOrder?.order_number}</b> permanent verwijderen. Deze actie kan niet ongedaan worden gemaakt.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            Verwijderen
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 };
