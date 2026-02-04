@@ -4,14 +4,15 @@ import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 
 // Define interface locally or import from types if available shared
-interface OrderItem {
+export interface OrderItem {
     articleId: string;
     articleName: string;
     quantity: number;
 }
 
-interface InternalOrder {
+export interface InternalOrder {
     id: string;
+    order_number?: string;
     date: Date;
     from: string;
     to: string;
@@ -26,6 +27,9 @@ const getLocationName = (loc: string) => {
 export const generateOrderPDF = (order: InternalOrder) => {
     const doc = new jsPDF();
 
+    // Use order_number if available, otherwise fall back to id
+    const displayOrderNumber = order.order_number || order.id;
+
     // Color settings
     const primaryColor = [0, 82, 155] as [number, number, number]; // SOL Blue-ish check
     const secondaryColor = [247, 148, 29] as [number, number, number]; // SOL Orange-ish
@@ -37,7 +41,7 @@ export const generateOrderPDF = (order: InternalOrder) => {
 
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text(`Ordernummer: ${order.id}`, 14, 30);
+    doc.text(`Ordernummer: ${displayOrderNumber}`, 14, 30);
     doc.text(`Datum: ${format(order.date, "d MMMM yyyy, HH:mm", { locale: nl })}`, 14, 35);
 
     // Line
@@ -95,5 +99,5 @@ export const generateOrderPDF = (order: InternalOrder) => {
     doc.text("Gegenereerd door PlanningSOL", 14, pageHeight - 10);
 
     // Save
-    doc.save(`Bestelling_${order.id}.pdf`);
+    doc.save(`Bestelling_${displayOrderNumber}.pdf`);
 };
