@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
+import { useUserRole } from "@/hooks/useUserRole";
 
 type ProductionLocation = Database["public"]["Enums"]["production_location"];
 
@@ -53,12 +54,15 @@ export const useInternalOrders = (productionLocation: ProductionLocation | null)
     const [orders, setOrders] = useState<InternalOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [profileId, setProfileId] = useState<string | null>(null);
+    const [userId, setUserId] = useState<string | undefined>(undefined);
+    const { isAdmin, loading: roleLoading } = useUserRole(userId);
 
-    // Get profile ID
+    // Get user session and profile
     useEffect(() => {
-        const fetchProfile = async () => {
+        const fetchUserData = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user) {
+                setUserId(session.user.id);
                 const { data: profile } = await supabase
                     .from("profiles")
                     .select("id")
@@ -70,7 +74,7 @@ export const useInternalOrders = (productionLocation: ProductionLocation | null)
                 }
             }
         };
-        fetchProfile();
+        fetchUserData();
     }, []);
 
     const fetchOrders = useCallback(async () => {
@@ -246,11 +250,19 @@ export const useInternalOrders = (productionLocation: ProductionLocation | null)
     };
 
     const getIncomingOrders = () => {
+        // Admins see all orders, other users only see orders for their location
+        if (isAdmin) {
+            return orders;
+        }
         if (!productionLocation) return [];
         return orders.filter(o => o.to_location === productionLocation);
     };
 
     const getOutgoingOrders = () => {
+        // Admins see all orders, other users only see orders for their location
+        if (isAdmin) {
+            return orders;
+        }
         if (!productionLocation) return [];
         return orders.filter(o => o.from_location === productionLocation);
     };
