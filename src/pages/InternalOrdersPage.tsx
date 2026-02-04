@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeftRight, Truck, Plus, Trash2 } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
@@ -39,6 +40,7 @@ const InternalOrdersPage = () => {
     const [selectedArticle, setSelectedArticle] = useState<string>("");
     const [quantity, setQuantity] = useState<number>(1);
     const [currentOrderItems, setCurrentOrderItems] = useState<OrderItem[]>([]);
+    const [notes, setNotes] = useState<string>("");
     const [activeTab, setActiveTab] = useState("incoming");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -120,12 +122,14 @@ const InternalOrdersPage = () => {
                     articleId: item.articleId,
                     articleName: item.articleName,
                     quantity: item.quantity
-                }))
+                })),
+                notes.trim() || undefined
             );
 
             if (newOrder) {
                 // Clear form
                 setCurrentOrderItems([]);
+                setNotes("");
 
                 // Switch to INCOMING tab because we just REQUESTED an order TO us
                 setActiveTab("incoming");
@@ -260,6 +264,19 @@ const InternalOrdersPage = () => {
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Notes field */}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="notes">Notities (optioneel)</Label>
+                                        <Textarea
+                                            id="notes"
+                                            placeholder="Voeg eventuele opmerkingen toe..."
+                                            value={notes}
+                                            onChange={(e) => setNotes(e.target.value)}
+                                            className="resize-none"
+                                            rows={3}
+                                        />
+                                    </div>
 
                                     <Button
                                         className="w-full mt-4"
