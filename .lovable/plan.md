@@ -1,163 +1,74 @@
 
+# Fix Plan: Loading Icon Stuck on Internal Orders Page
 
-# Plan: Interne Bestellingen Opslaan in Database
+## Problem Analysis
 
-## Huidige Situatie
+The loading spinner runs indefinitely for admin users because of a logic flaw in `useInternalOrders.ts`:
 
-De pagina "Interne Bestellingen" gebruikt momenteel **hardcoded mock data** (regels 52-74 in InternalOrdersPage.tsx). Wanneer een gebruiker een bestelling plaatst:
-- Wordt alleen een PDF gegenereerd
-- Worden de orders NIET opgeslagen in de database
-- Verdwijnen de orders bij het verversen van de pagina
+1. The `fetchOrders` function exits early when `productionLocation` is `null` (line 81)
+2. Admin users often have no assigned production location (as confirmed in network requests: `production_location: null`)
+3. Even though `getIncomingOrders()` and `getOutgoingOrders()` handle the admin case correctly, the underlying `orders` array is never populated because `fetchOrders` never runs
 
-## Oplossing
+## Solution
 
-We maken twee nieuwe database tabellen aan om interne bestellingen permanent op te slaan, en passen de frontend aan om deze data te lezen en schrijven.
+Modify the hook to account for admin users who should see all orders regardless of production location:
 
----
+### Changes to `src/hooks/useInternalOrders.ts`
 
-## Database Wijzigingen
-
-### Tabel 1: `internal_orders`
-
-| Kolom | Type | Beschrijving |
-|-------|------|--------------|
-| id | uuid | Primary key |
-| order_number | text | Uniek ordernummer (bijv. "INT-20260204-001") |
-| from_location | production_location | Verzendlocatie (sol_emmen / sol_tilburg) |
-| to_location | production_location | Ontvangstlocatie |
-| status | text | pending / shipped / received |
-| notes | text | Optionele notities |
-| created_by | uuid | Referentie naar profiles.id |
-| created_at | timestamptz | Aanmaakdatum |
-| updated_at | timestamptz | Laatst bijgewerkt |
-
-### Tabel 2: `internal_order_items`
-
-| Kolom | Type | Beschrijving |
-|-------|------|--------------|
-| id | uuid | Primary key |
-| order_id | uuid | FK naar internal_orders |
-| article_id | text | Artikelnummer uit ARTICLES lijst |
-| article_name | text | Artikelnaam |
-| quantity | integer | Aantal |
-| created_at | timestamptz | Aanmaakdatum |
-
-### RLS Policies
-
-- **SELECT**: Gebruikers met elevated roles (admin, supervisor, operator) kunnen orders zien voor hun locatie
-- **INSERT**: Alleen admins en supervisors kunnen orders aanmaken
-- **UPDATE**: Alleen admins kunnen status updaten
-- **DELETE**: Alleen admins kunnen orders verwijderen
-
----
-
-## Frontend Wijzigingen
-
-### 1. Data Fetching (Nieuw)
-
-Toevoegen van useEffect voor het ophalen van bestaande orders:
+1. **Update `fetchOrders` condition** - Allow fetching if user is admin OR has a production location
+2. **Wait for role loading** - Don't attempt fetch until we know the user's role
+3. **Update realtime subscription** - Same logic for setting up subscription
 
 ```text
-- Fetch orders bij component mount
-- Filter op productionLocation (inkomend = to_location, uitgaand = from_location)
-- Join met internal_order_items voor de artikelen
-- Realtime subscriptie voor live updates
+Current flow:
+  productionLocation = null → fetchOrders exits → loading = true forever
+
+Fixed flow:
+  Wait for roleLoading → isAdmin = true → fetchOrders runs → loading = false
 ```
 
-### 2. Order Aanmaken (Wijzigen)
+### Specific Code Changes
 
-De `submitOrder` functie wordt aangepast:
+**fetchOrders function (around line 80-81)**
+- Change: `if (!productionLocation) return;`
+- To: `if (!productionLocation && !isAdmin) return;`
 
-```text
-1. Genereer ordernummer: INT-YYYYMMDD-XXX
-2. Insert in internal_orders tabel
-3. Insert items in internal_order_items tabel
-4. Refresh orders lijst
-5. Genereer PDF (bestaande functionaliteit)
-6. Toon success toast
-```
+**useEffect for fetchOrders (around line 126-128)**
+- Add `isAdmin` and `roleLoading` to dependencies
+- Add guard: Don't run while `roleLoading` is true
 
-### 3. Status Updates (Nieuw)
+**useEffect for realtime subscription (around line 131-152)**
+- Update condition to also check for admin status
+- Add `isAdmin` to dependencies
 
-Knoppen toevoegen voor status wijzigingen:
-- "Verzonden" knop (pending -> shipped)
-- "Ontvangen" knop (shipped -> received)
+### Technical Details
 
----
-
-## Bestanden die Gewijzigd Worden
-
-| Bestand | Actie | Beschrijving |
-|---------|-------|--------------|
-| Database migratie | Nieuw | Tabellen en RLS policies aanmaken |
-| `src/pages/InternalOrdersPage.tsx` | Wijzigen | Database integratie toevoegen |
-| `src/utils/generateOrderPDF.ts` | Wijzigen | Aanpassen voor database order format |
-
----
-
-## Technische Details
-
-### Ordernummer Generatie
+File: `src/hooks/useInternalOrders.ts`
 
 ```typescript
-const generateOrderNumber = () => {
-  const date = format(new Date(), "yyyyMMdd");
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
-  return `INT-${date}-${random}`;
-};
+// Line 80-82: Update fetchOrders guard
+const fetchOrders = useCallback(async () => {
+    // Allow admins to fetch all orders, others need a location
+    if (!productionLocation && !isAdmin) return;
+    // ... rest of function
+}, [productionLocation, isAdmin]);
+
+// Line 126-129: Update fetchOrders useEffect
+useEffect(() => {
+    if (roleLoading) return; // Wait for role check
+    fetchOrders();
+}, [fetchOrders, roleLoading]);
+
+// Line 131-152: Update realtime subscription
+useEffect(() => {
+    if (!productionLocation && !isAdmin) return;
+    // ... subscription setup
+}, [productionLocation, isAdmin, fetchOrders]);
 ```
 
-### Database Query Voorbeeld
+## Expected Result
 
-```typescript
-const { data: orders } = await supabase
-  .from("internal_orders")
-  .select(`
-    *,
-    items:internal_order_items(*)
-  `)
-  .or(`to_location.eq.${productionLocation},from_location.eq.${productionLocation}`)
-  .order("created_at", { ascending: false });
-```
-
-### Insert Flow
-
-```typescript
-// 1. Insert order
-const { data: order } = await supabase
-  .from("internal_orders")
-  .insert({
-    order_number: generateOrderNumber(),
-    from_location: fromLocation,
-    to_location: toLocation,
-    status: "pending",
-    created_by: profileId
-  })
-  .select()
-  .single();
-
-// 2. Insert items
-await supabase
-  .from("internal_order_items")
-  .insert(
-    currentOrderItems.map(item => ({
-      order_id: order.id,
-      article_id: item.articleId,
-      article_name: item.articleName,
-      quantity: item.quantity
-    }))
-  );
-```
-
----
-
-## Resultaat
-
-Na implementatie:
-- Orders worden permanent opgeslagen in de database
-- De orderlijst toont echte data in plaats van mock data
-- Orders blijven zichtbaar na page refresh
-- Meerdere gebruikers kunnen dezelfde orders zien
-- Status kan worden bijgewerkt (pending -> shipped -> received)
-- PDF generatie blijft werken
-
+After these changes:
+- Admin users will see all orders load immediately
+- Non-admin users will continue to see only orders for their location
+- Loading spinner will properly disappear once data is fetched
