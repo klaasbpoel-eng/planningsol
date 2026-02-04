@@ -21,8 +21,14 @@ interface SearchableSelectOption {
   label: string;
 }
 
+interface SearchableSelectGroup {
+  heading: string;
+  items: SearchableSelectOption[];
+}
+
 interface SearchableSelectProps {
-  options: SearchableSelectOption[];
+  options?: SearchableSelectOption[];
+  groups?: SearchableSelectGroup[];
   value: string;
   onValueChange: (value: string) => void;
   placeholder?: string;
@@ -33,7 +39,8 @@ interface SearchableSelectProps {
 }
 
 export function SearchableSelect({
-  options,
+  options = [],
+  groups = [],
   value,
   onValueChange,
   placeholder = "Selecteer...",
@@ -44,7 +51,19 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
 
-  const selectedOption = options.find((option) => option.value === value);
+  // Find selected label from either flat options or groups
+  let selectedLabel = "";
+  if (options.length > 0) {
+    selectedLabel = options.find((option) => option.value === value)?.label || "";
+  } else {
+    for (const group of groups) {
+      const found = group.items.find((item) => item.value === value);
+      if (found) {
+        selectedLabel = found.label;
+        break;
+      }
+    }
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -57,7 +76,7 @@ export function SearchableSelect({
           className={cn("w-full justify-between bg-background", className)}
         >
           <span className="truncate">
-            {selectedOption ? selectedOption.label : placeholder}
+            {selectedLabel || placeholder}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -67,29 +86,59 @@ export function SearchableSelect({
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
             <CommandEmpty>{emptyMessage}</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={option.label}
-                  onSelect={() => {
-                    onValueChange(option.value);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === option.value ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {option.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
+
+            {/* Render flat options if provided */}
+            {options.length > 0 && (
+              <CommandGroup>
+                {options.map((option) => (
+                  <CommandItem
+                    key={option.value}
+                    value={option.label}
+                    onSelect={() => {
+                      onValueChange(option.value);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === option.value ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    {option.label}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+
+            {/* Render groups if provided */}
+            {groups.length > 0 && groups.map((group) => (
+              <CommandGroup key={group.heading} heading={group.heading}>
+                {group.items.map((option) => (
+                  <CommandItem
+                    key={option.value}
+                    value={option.label}
+                    onSelect={() => {
+                      onValueChange(option.value);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === option.value ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    {option.label}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
+
           </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
   );
 }
+
