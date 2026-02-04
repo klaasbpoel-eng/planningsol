@@ -8,7 +8,7 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import siteLogo from "@/assets/site_logo.png";
 import type { AppRole } from "@/hooks/useUserPermissions";
-import { CommandPaletteTrigger } from "@/components/command-palette";
+
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
@@ -133,18 +133,6 @@ export function Header({
 
         {/* Right side - Actions */}
         <div className="flex items-center gap-2">
-          {/* Command palette - always visible */}
-          <CommandPaletteTrigger
-            onClick={() => {
-              const event = new KeyboardEvent("keydown", {
-                key: "k",
-                metaKey: true,
-                bubbles: true,
-              });
-              document.dispatchEvent(event);
-            }}
-          />
-
           {/* Theme toggle - always visible */}
           <ThemeToggle variant="header" />
 
