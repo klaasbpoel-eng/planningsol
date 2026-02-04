@@ -78,7 +78,8 @@ export const useInternalOrders = (productionLocation: ProductionLocation | null)
     }, []);
 
     const fetchOrders = useCallback(async () => {
-        if (!productionLocation) return;
+        // Allow admins to fetch all orders, others need a location
+        if (!productionLocation && !isAdmin) return;
 
         setLoading(true);
         try {
@@ -121,15 +122,16 @@ export const useInternalOrders = (productionLocation: ProductionLocation | null)
         } finally {
             setLoading(false);
         }
-    }, [productionLocation]);
+    }, [productionLocation, isAdmin]);
 
     useEffect(() => {
+        if (roleLoading) return; // Wait for role check to complete
         fetchOrders();
-    }, [fetchOrders]);
+    }, [fetchOrders, roleLoading]);
 
     // Set up realtime subscription
     useEffect(() => {
-        if (!productionLocation) return;
+        if (!productionLocation && !isAdmin) return;
 
         const channel = supabase
             .channel("internal-orders-changes")
@@ -149,7 +151,7 @@ export const useInternalOrders = (productionLocation: ProductionLocation | null)
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [productionLocation, fetchOrders]);
+    }, [productionLocation, isAdmin, fetchOrders]);
 
     const createOrder = async (
         fromLocation: ProductionLocation,
