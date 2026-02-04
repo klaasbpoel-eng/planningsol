@@ -1,198 +1,163 @@
 
-# Plan: Mobile-Friendly Layout Improvements
 
-## Overview
+# Plan: Interne Bestellingen Opslaan in Database
 
-This plan outlines comprehensive improvements to make the application more user-friendly on mobile phones. The current implementation has some responsive elements, but several key areas need optimization for touch interfaces and smaller screens.
+## Huidige Situatie
 
-## Key Areas for Improvement
+De pagina "Interne Bestellingen" gebruikt momenteel **hardcoded mock data** (regels 52-74 in InternalOrdersPage.tsx). Wanneer een gebruiker een bestelling plaatst:
+- Wordt alleen een PDF gegenereerd
+- Worden de orders NIET opgeslagen in de database
+- Verdwijnen de orders bij het verversen van de pagina
 
-### 1. Header Navigation (Mobile Menu)
+## Oplossing
 
-**Current State:** The header shows/hides text labels using `hidden sm:inline` but still displays multiple buttons horizontally, causing cramped layouts on small screens.
-
-**Proposed Changes:**
-- Create a mobile hamburger menu that collapses navigation items into a slide-out drawer
-- Move secondary actions (Calendar, Production, Switch View) into the mobile menu
-- Keep only essential quick-access items (Theme toggle, Notifications, Logout) visible in header
-- Make the search/command palette trigger more prominent on mobile
-
-**File:** `src/components/layout/Header.tsx`
-
-### 2. Dialog to Drawer Conversion on Mobile
-
-**Current State:** All dialogs use centered modals which can be difficult to interact with on mobile (small tap targets, awkward scrolling).
-
-**Proposed Changes:**
-- Create a `ResponsiveDialog` wrapper component that renders as a bottom Drawer on mobile and Dialog on desktop
-- Apply to key dialogs:
-  - `CreateGasCylinderOrderDialog`
-  - `CreateDryIceOrderDialog`
-  - `GasCylinderOrderDialog` (edit)
-  - `DryIceOrderDialog` (edit)
-
-**New File:** `src/components/ui/responsive-dialog.tsx`
-
-### 3. Form Input Improvements for Mobile
-
-**Current State:** Form inputs use standard sizing which can be small for touch targets.
-
-**Proposed Changes:**
-- Increase minimum touch target size to 44px (Apple HIG recommendation)
-- Make form fields stack vertically on mobile instead of grid layouts
-- Add better spacing between form elements
-- Make buttons full-width on mobile for easier tapping
-
-**Files:** 
-- `src/components/production/CreateGasCylinderOrderDialog.tsx`
-- `src/components/production/CreateDryIceOrderDialog.tsx`
-- `src/components/time-off/TimeOffRequestForm.tsx`
-
-### 4. Admin Dashboard Tabs
-
-**Current State:** TabsList uses horizontal scrolling which can be awkward on mobile.
-
-**Proposed Changes:**
-- Use a dropdown/select pattern on mobile for tab navigation
-- Show current tab name with dropdown trigger
-- Add swipe gesture support for tab switching (optional enhancement)
-
-**File:** `src/components/admin/AdminDashboard.tsx`
-
-### 5. Production Planning Tabs
-
-**Current State:** Fixed grid of 4 tabs can overflow on small screens.
-
-**Proposed Changes:**
-- Make tabs scrollable horizontally with visible scroll indicators
-- Or convert to a dropdown selector on mobile
-- Adjust location badge layout for mobile
-
-**File:** `src/components/production/ProductionPlanning.tsx`
-
-### 6. Table Responsiveness
-
-**Current State:** Tables display with horizontal scroll, but cells can be cramped.
-
-**Proposed Changes:**
-- Hide less important columns on mobile (using responsive classes)
-- Convert key tables to card-based layouts on mobile
-- Add expandable row details for hidden columns
-- Increase row height for better touch targets
-
-**Files:**
-- `src/components/production/GasCylinderPlanning.tsx`
-- `src/components/production/DryIcePlanning.tsx`
-
-### 7. Filter Section Mobile Optimization
-
-**Current State:** Filters use inline flex layout which can overflow.
-
-**Proposed Changes:**
-- Stack filters vertically on mobile
-- Use collapsible filter section (already partially implemented in AdminFilters)
-- Make filter dropdowns full-width on mobile
-- Add floating action button for "New Order" on mobile
-
-**Files:**
-- `src/components/admin/AdminFilters.tsx`
-- `src/components/production/GasCylinderPlanning.tsx`
-
-### 8. Stats Cards Layout
-
-**Current State:** Stats use `grid-cols-1 md:grid-cols-2 lg:grid-cols-5` but can still be crowded.
-
-**Proposed Changes:**
-- Reduce stat card padding on mobile
-- Use horizontal scroll for KPI section on mobile
-- Make values more prominent (larger font)
-
-**Files:**
-- `src/components/production/ProductionPlanning.tsx`
-- `src/components/dashboard/Dashboard.tsx`
-
-### 9. Global Mobile CSS Improvements
-
-**Proposed Changes:**
-- Add mobile-specific utility classes
-- Improve safe-area handling for notched devices
-- Add touch-action optimizations
-- Improve scroll behavior
-
-**File:** `src/index.css`
+We maken twee nieuwe database tabellen aan om interne bestellingen permanent op te slaan, en passen de frontend aan om deze data te lezen en schrijven.
 
 ---
 
-## Technical Implementation Details
+## Database Wijzigingen
 
-### New Component: ResponsiveDialog
+### Tabel 1: `internal_orders`
 
-```typescript
-// Uses useIsMobile hook to conditionally render
-// Drawer on mobile, Dialog on desktop
-// Provides consistent API for both
+| Kolom | Type | Beschrijving |
+|-------|------|--------------|
+| id | uuid | Primary key |
+| order_number | text | Uniek ordernummer (bijv. "INT-20260204-001") |
+| from_location | production_location | Verzendlocatie (sol_emmen / sol_tilburg) |
+| to_location | production_location | Ontvangstlocatie |
+| status | text | pending / shipped / received |
+| notes | text | Optionele notities |
+| created_by | uuid | Referentie naar profiles.id |
+| created_at | timestamptz | Aanmaakdatum |
+| updated_at | timestamptz | Laatst bijgewerkt |
+
+### Tabel 2: `internal_order_items`
+
+| Kolom | Type | Beschrijving |
+|-------|------|--------------|
+| id | uuid | Primary key |
+| order_id | uuid | FK naar internal_orders |
+| article_id | text | Artikelnummer uit ARTICLES lijst |
+| article_name | text | Artikelnaam |
+| quantity | integer | Aantal |
+| created_at | timestamptz | Aanmaakdatum |
+
+### RLS Policies
+
+- **SELECT**: Gebruikers met elevated roles (admin, supervisor, operator) kunnen orders zien voor hun locatie
+- **INSERT**: Alleen admins en supervisors kunnen orders aanmaken
+- **UPDATE**: Alleen admins kunnen status updaten
+- **DELETE**: Alleen admins kunnen orders verwijderen
+
+---
+
+## Frontend Wijzigingen
+
+### 1. Data Fetching (Nieuw)
+
+Toevoegen van useEffect voor het ophalen van bestaande orders:
+
+```text
+- Fetch orders bij component mount
+- Filter op productionLocation (inkomend = to_location, uitgaand = from_location)
+- Join met internal_order_items voor de artikelen
+- Realtime subscriptie voor live updates
 ```
 
-### Header Mobile Menu
+### 2. Order Aanmaken (Wijzigen)
 
-```typescript
-// New Sheet-based mobile menu
-// Triggered by hamburger icon (visible only on mobile)
-// Contains: Navigation links, user info, switch view button
+De `submitOrder` functie wordt aangepast:
+
+```text
+1. Genereer ordernummer: INT-YYYYMMDD-XXX
+2. Insert in internal_orders tabel
+3. Insert items in internal_order_items tabel
+4. Refresh orders lijst
+5. Genereer PDF (bestaande functionaliteit)
+6. Toon success toast
 ```
 
-### Form Layout Changes
+### 3. Status Updates (Nieuw)
+
+Knoppen toevoegen voor status wijzigingen:
+- "Verzonden" knop (pending -> shipped)
+- "Ontvangen" knop (shipped -> received)
+
+---
+
+## Bestanden die Gewijzigd Worden
+
+| Bestand | Actie | Beschrijving |
+|---------|-------|--------------|
+| Database migratie | Nieuw | Tabellen en RLS policies aanmaken |
+| `src/pages/InternalOrdersPage.tsx` | Wijzigen | Database integratie toevoegen |
+| `src/utils/generateOrderPDF.ts` | Wijzigen | Aanpassen voor database order format |
+
+---
+
+## Technische Details
+
+### Ordernummer Generatie
 
 ```typescript
-// Change: grid-cols-2 → grid-cols-1 sm:grid-cols-2
-// Increase input heights on mobile
-// Full-width buttons on mobile
+const generateOrderNumber = () => {
+  const date = format(new Date(), "yyyyMMdd");
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
+  return `INT-${date}-${random}`;
+};
 ```
 
-### Table Mobile Cards
+### Database Query Voorbeeld
 
 ```typescript
-// Conditional rendering based on useIsMobile
-// Card layout shows: key info (customer, date, status)
-// Expandable section for details
-// Swipe actions for quick status changes (optional)
+const { data: orders } = await supabase
+  .from("internal_orders")
+  .select(`
+    *,
+    items:internal_order_items(*)
+  `)
+  .or(`to_location.eq.${productionLocation},from_location.eq.${productionLocation}`)
+  .order("created_at", { ascending: false });
+```
+
+### Insert Flow
+
+```typescript
+// 1. Insert order
+const { data: order } = await supabase
+  .from("internal_orders")
+  .insert({
+    order_number: generateOrderNumber(),
+    from_location: fromLocation,
+    to_location: toLocation,
+    status: "pending",
+    created_by: profileId
+  })
+  .select()
+  .single();
+
+// 2. Insert items
+await supabase
+  .from("internal_order_items")
+  .insert(
+    currentOrderItems.map(item => ({
+      order_id: order.id,
+      article_id: item.articleId,
+      article_name: item.articleName,
+      quantity: item.quantity
+    }))
+  );
 ```
 
 ---
 
-## Files to Modify
+## Resultaat
 
-| File | Changes |
-|------|---------|
-| `src/components/layout/Header.tsx` | Mobile hamburger menu, reorganize nav items |
-| `src/components/ui/responsive-dialog.tsx` | New component (Drawer/Dialog hybrid) |
-| `src/components/production/CreateGasCylinderOrderDialog.tsx` | Use ResponsiveDialog, stack form fields |
-| `src/components/production/CreateDryIceOrderDialog.tsx` | Use ResponsiveDialog, stack form fields |
-| `src/components/admin/AdminDashboard.tsx` | Mobile tab navigation |
-| `src/components/production/ProductionPlanning.tsx` | Mobile tab navigation, stats layout |
-| `src/components/production/GasCylinderPlanning.tsx` | Mobile table cards, filter stacking |
-| `src/components/production/DryIcePlanning.tsx` | Mobile table cards, filter stacking |
-| `src/components/dashboard/Dashboard.tsx` | Stats spacing, button layout |
-| `src/components/time-off/TimeOffRequestForm.tsx` | Form field stacking |
-| `src/components/admin/AdminFilters.tsx` | Already mobile-optimized, minor tweaks |
-| `src/index.css` | Mobile utility classes, safe-area padding |
+Na implementatie:
+- Orders worden permanent opgeslagen in de database
+- De orderlijst toont echte data in plaats van mock data
+- Orders blijven zichtbaar na page refresh
+- Meerdere gebruikers kunnen dezelfde orders zien
+- Status kan worden bijgewerkt (pending -> shipped -> received)
+- PDF generatie blijft werken
 
----
-
-## Priority Order
-
-1. **High Priority:** Header mobile menu, ResponsiveDialog, form layouts
-2. **Medium Priority:** Table mobile cards, tab navigation
-3. **Lower Priority:** Stats layout, additional gestures
-
----
-
-## Expected Outcome
-
-After implementation:
-- Touch targets will be at least 44px for easy tapping
-- Forms will be easy to fill out on mobile with proper spacing
-- Navigation will be accessible through a mobile menu
-- Dialogs will slide up from the bottom (more natural on mobile)
-- Tables will show essential info with expandable details
-- The app will feel native and responsive on all device sizes
