@@ -155,7 +155,7 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
     <div className="min-h-screen bg-background">
       <Header userEmail={userEmail} isAdmin onSwitchView={onSwitchView} role={role} />
 
-      <main className="w-full px-[10%] py-8">
+      <main className="w-full px-[1%] md:px-[10%] py-8">
         {/* Filters */}
         <AdminFilters
           employees={employees}

@@ -51,7 +51,7 @@ const CalendarPage = () => {
       <div className="min-h-screen flex flex-col gradient-mesh">
         <Header userEmail={user.email} />
 
-        <main className="flex-1 flex flex-col w-full px-[10%]">
+        <main className="flex-1 flex flex-col w-full px-[1%] md:px-[10%]">
           <CalendarOverview />
         </main>
       </div>

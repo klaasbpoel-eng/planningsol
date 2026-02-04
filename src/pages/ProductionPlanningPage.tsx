@@ -53,7 +53,7 @@ const ProductionPlanningPage = () => {
       <div className="min-h-screen gradient-mesh">
         <Header userEmail={user.email} role={role} />
 
-        <main className="px-[10%] py-8 w-full">
+        <main className="px-[1%] md:px-[10%] py-8 w-full">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gradient">Productieplanning</h1>
             <p className="text-muted-foreground mt-1">

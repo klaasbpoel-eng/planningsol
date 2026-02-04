@@ -94,7 +94,7 @@ const InternalOrdersPage = () => {
             <div className="min-h-screen gradient-mesh">
                 <Header userEmail={user?.email} role={role} />
 
-                <main className="w-full px-[10%] py-8">
+                <main className="w-full px-[1%] md:px-[10%] py-8">
                     <div className="mb-8 flex items-center justify-between">
                         <div>
                             <h1 className="text-3xl font-bold text-gradient flex items-center gap-3">

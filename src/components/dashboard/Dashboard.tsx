@@ -139,7 +139,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
       <Header userEmail={userEmail} role={role} />
 
       <FadeIn show={!loading}>
-        <main className="w-full px-[10%] py-8">
+        <main className="w-full px-[1%] md:px-[10%] py-8">
           {/* Role-based action buttons */}
           <div className="flex flex-wrap gap-3 mb-6">
             {isAdmin && onSwitchToAdmin && (
