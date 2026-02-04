@@ -111,6 +111,7 @@ interface MonthlyCustomerCylinderData {
 }
 
 export const YearComparisonReport = React.memo(function YearComparisonReport({ location = "all" }: YearComparisonReportProps) {
+  const showDryIce = location !== "sol_tilburg";
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [cylinderData, setCylinderData] = useState<MonthlyData[]>([]);
@@ -131,7 +132,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
     current: Map<number, MonthlyCustomerCylinderData[]>;
     previous: Map<number, MonthlyCustomerCylinderData[]>;
   }>({ current: new Map(), previous: new Map() });
-  
+
   // Cylinder size state
   const [cylinderSizes, setCylinderSizes] = useState<{ id: string; name: string; capacity_liters: number | null }[]>([]);
   const [selectedCylinderSizes, setSelectedCylinderSizes] = useState<string[]>([]);
@@ -140,7 +141,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   const isSignificantGrowth = (percent: number) => percent > 10 || percent < -10;
 
   // =================== FILTERED DATA CALCULATIONS ===================
-  
+
   // Gefilterde gastype vergelijking data
   const filteredGasTypeData = useMemo(() => {
     if (selectedGasTypes.length === 0) return gasTypeComparison;
@@ -151,7 +152,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   const filteredCylinderTotals = useMemo(() => {
     if (selectedGasTypes.length === 0) return cylinderTotals;
     if (!cylinderTotals) return null;
-    
+
     // Bereken totalen alleen voor geselecteerde gastypes
     const currentTotal = filteredGasTypeData.reduce((sum, gt) => sum + gt.currentYear, 0);
     const previousTotal = filteredGasTypeData.reduce((sum, gt) => sum + gt.previousYear, 0);
@@ -163,7 +164,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   // Gefilterde maandelijkse data voor cilinders per gastype
   const filteredMonthlyGasTypeData = useMemo(() => {
     if (selectedGasTypes.length === 0) return monthlyGasTypeData;
-    
+
     const filterMonthData = (data: MonthlyGasTypeChartData[]) => {
       return data.map(month => {
         const filtered: MonthlyGasTypeChartData = { month: month.month, monthName: month.monthName };
@@ -173,7 +174,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
         return filtered;
       });
     };
-    
+
     return {
       current: filterMonthData(monthlyGasTypeData.current),
       previous: filterMonthData(monthlyGasTypeData.previous)
@@ -183,20 +184,20 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   // Herberekende cylinder maanddata op basis van gastype filter
   const filteredCylinderData = useMemo(() => {
     if (selectedGasTypes.length === 0) return cylinderData;
-    
+
     // Bereken nieuwe maandtotalen uit gefilterde gastype data
     return cylinderData.map((month, idx) => {
       const currentMonthData = filteredMonthlyGasTypeData.current[idx];
       const previousMonthData = filteredMonthlyGasTypeData.previous[idx];
-      
-      const currentTotal = selectedGasTypes.reduce((sum, gtId) => 
+
+      const currentTotal = selectedGasTypes.reduce((sum, gtId) =>
         sum + (Number(currentMonthData?.[gtId]) || 0), 0);
-      const previousTotal = selectedGasTypes.reduce((sum, gtId) => 
+      const previousTotal = selectedGasTypes.reduce((sum, gtId) =>
         sum + (Number(previousMonthData?.[gtId]) || 0), 0);
-      
+
       const change = currentTotal - previousTotal;
       const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
-      
+
       return {
         ...month,
         currentYear: currentTotal,
@@ -220,7 +221,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   const filteredDryIceTotals = useMemo(() => {
     if (selectedCustomers.length === 0) return dryIceTotals;
     if (!dryIceTotals) return null;
-    
+
     const currentTotal = filteredCustomerComparison.reduce((sum, c) => sum + c.currentDryIce, 0);
     const previousTotal = filteredCustomerComparison.reduce((sum, c) => sum + c.previousDryIce, 0);
     const change = currentTotal - previousTotal;
@@ -232,23 +233,23 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   const filteredCylinderDataByCustomer = useMemo(() => {
     // Geen klantfilter actief = gebruik de gastype gefilterde data
     if (selectedCustomers.length === 0) return filteredCylinderData;
-    
+
     // Herbereken maandtotalen uit klant-specifieke data
     return cylinderData.map((month) => {
       const currentMonthCustomerData = monthlyCustomerCylinderData.current.get(month.month) || [];
       const previousMonthCustomerData = monthlyCustomerCylinderData.previous.get(month.month) || [];
-      
+
       const currentTotal = currentMonthCustomerData
         .filter(c => selectedCustomers.includes(c.customer_id || c.customer_name))
         .reduce((sum, c) => sum + Number(c.total_cylinders), 0);
-      
+
       const previousTotal = previousMonthCustomerData
         .filter(c => selectedCustomers.includes(c.customer_id || c.customer_name))
         .reduce((sum, c) => sum + Number(c.total_cylinders), 0);
-      
+
       const change = currentTotal - previousTotal;
       const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
-      
+
       return {
         ...month,
         currentYear: currentTotal,
@@ -264,7 +265,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
     // Geen klantfilter = gebruik de gastype gefilterde totalen
     if (selectedCustomers.length === 0) return filteredCylinderTotals;
     if (!cylinderTotals) return null;
-    
+
     // Bereken totalen alleen voor geselecteerde klanten
     const currentTotal = filteredCustomerComparison.reduce((sum, c) => sum + c.currentCylinders, 0);
     const previousTotal = filteredCustomerComparison.reduce((sum, c) => sum + c.previousCylinders, 0);
@@ -287,7 +288,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       years.push(y);
     }
     setAvailableYears(years);
-    
+
     // Fetch gas types and cylinder sizes for filters
     fetchGasTypes();
     fetchCylinderSizes();
@@ -299,7 +300,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       .select("id, name, color")
       .eq("is_active", true)
       .order("sort_order");
-    
+
     if (data) {
       setGasTypes(data);
     }
@@ -311,7 +312,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       .select("id, name, capacity_liters")
       .eq("is_active", true)
       .order("sort_order");
-    
+
     if (data) {
       setCylinderSizes(data);
     }
@@ -325,16 +326,16 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
 
   const fetchYearComparisonData = async () => {
     setLoading(true);
-    
+
     const currentYear = selectedYear;
     const previousYear = selectedYear - 1;
     const locationFilter = location === "all" ? null : location;
 
     // Use database function to get aggregated monthly totals - bypasses the 1000 row limit
     const [
-      currentCylinderRes, 
-      previousCylinderRes, 
-      currentDryIceRes, 
+      currentCylinderRes,
+      previousCylinderRes,
+      currentDryIceRes,
       previousDryIceRes,
       currentGasTypeRes,
       previousGasTypeRes,
@@ -347,8 +348,8 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
     ] = await Promise.all([
       supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "cylinder", p_location: locationFilter }),
       supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "cylinder", p_location: locationFilter }),
-      supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "dry_ice" }),
-      supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "dry_ice" }),
+      supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "dry_ice", p_location: locationFilter }),
+      supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "dry_ice", p_location: locationFilter }),
       supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: currentYear, p_location: locationFilter }),
       supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: previousYear, p_location: locationFilter }),
       supabase.rpc("get_yearly_totals_by_customer", { p_year: currentYear, p_location: locationFilter }),
@@ -394,19 +395,19 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
     // Process monthly customer cylinder data
     const currentMonthlyCustMap = new Map<number, MonthlyCustomerCylinderData[]>();
     const previousMonthlyCustMap = new Map<number, MonthlyCustomerCylinderData[]>();
-    
+
     (currentMonthlyCustCylRes.data || []).forEach((item: MonthlyCustomerCylinderData) => {
       const existing = currentMonthlyCustMap.get(item.month) || [];
       existing.push(item);
       currentMonthlyCustMap.set(item.month, existing);
     });
-    
+
     (previousMonthlyCustCylRes.data || []).forEach((item: MonthlyCustomerCylinderData) => {
       const existing = previousMonthlyCustMap.get(item.month) || [];
       existing.push(item);
       previousMonthlyCustMap.set(item.month, existing);
     });
-    
+
     setMonthlyCustomerCylinderData({
       current: currentMonthlyCustMap,
       previous: previousMonthlyCustMap
@@ -466,13 +467,13 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       const previous = previousMap.get(key) || { cylinders: 0, dryIce: 0 };
 
       const cylinderChange = current.cylinders - previous.cylinders;
-      const cylinderChangePercent = previous.cylinders > 0 
-        ? ((cylinderChange / previous.cylinders) * 100) 
+      const cylinderChangePercent = previous.cylinders > 0
+        ? ((cylinderChange / previous.cylinders) * 100)
         : (current.cylinders > 0 ? 100 : 0);
 
       const dryIceChange = current.dryIce - previous.dryIce;
-      const dryIceChangePercent = previous.dryIce > 0 
-        ? ((dryIceChange / previous.dryIce) * 100) 
+      const dryIceChangePercent = previous.dryIce > 0
+        ? ((dryIceChange / previous.dryIce) * 100)
         : (current.dryIce > 0 ? 100 : 0);
 
       result.push({
@@ -543,7 +544,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   ) => {
     // Build gas type info map
     const typeInfo = new Map<string, { name: string; color: string }>();
-    
+
     // Process for yearly comparison
     const currentYearMap = new Map<string, { name: string; color: string; total: number }>();
     const previousYearMap = new Map<string, { name: string; color: string; total: number }>();
@@ -560,7 +561,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
 
     currentData.forEach(item => {
       if (!item.gas_type_id) return;
-      
+
       // Store type info
       if (!typeInfo.has(item.gas_type_id)) {
         typeInfo.set(item.gas_type_id, {
@@ -568,7 +569,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           color: item.gas_type_color || "#94a3b8"
         });
       }
-      
+
       // Yearly totals
       const existing = currentYearMap.get(item.gas_type_id);
       if (existing) {
@@ -580,7 +581,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           total: Number(item.total_cylinders) || 0
         });
       }
-      
+
       // Monthly data
       const monthMap = currentMonthlyMap.get(item.month);
       if (monthMap) {
@@ -590,7 +591,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
 
     previousData.forEach(item => {
       if (!item.gas_type_id) return;
-      
+
       // Store type info
       if (!typeInfo.has(item.gas_type_id)) {
         typeInfo.set(item.gas_type_id, {
@@ -598,7 +599,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           color: item.gas_type_color || "#94a3b8"
         });
       }
-      
+
       // Yearly totals
       const existing = previousYearMap.get(item.gas_type_id);
       if (existing) {
@@ -610,7 +611,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           total: Number(item.total_cylinders) || 0
         });
       }
-      
+
       // Monthly data
       const monthMap = previousMonthlyMap.get(item.month);
       if (monthMap) {
@@ -648,13 +649,13 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
     const previousMonthlyData: MonthlyGasTypeChartData[] = [];
 
     for (let m = 1; m <= 12; m++) {
-      const currentEntry: MonthlyGasTypeChartData = { 
-        monthName: MONTH_NAMES[m - 1], 
-        month: m 
+      const currentEntry: MonthlyGasTypeChartData = {
+        monthName: MONTH_NAMES[m - 1],
+        month: m
       };
-      const previousEntry: MonthlyGasTypeChartData = { 
-        monthName: MONTH_NAMES[m - 1], 
-        month: m 
+      const previousEntry: MonthlyGasTypeChartData = {
+        monthName: MONTH_NAMES[m - 1],
+        month: m
       };
 
       allGasTypeIds.forEach(id => {
@@ -666,8 +667,8 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       previousMonthlyData.push(previousEntry);
     }
 
-    return { 
-      comparison, 
+    return {
+      comparison,
       monthlyData: { current: currentMonthlyData, previous: previousMonthlyData },
       typeInfo
     };
@@ -714,7 +715,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   const getGrowthHighlights = (data: MonthlyData[]) => {
     // Filter months with data (at least one of the years has values)
     const validMonths = data.filter(m => m.currentYear > 0 || m.previousYear > 0);
-    
+
     if (validMonths.length === 0) {
       return { best: null, worst: null };
     }
@@ -825,9 +826,9 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                   Filter op klant
                 </Label>
                 <CustomerMultiSelect
-                  customers={customerComparison.map(c => ({ 
-                    id: c.customer_id, 
-                    name: c.customer_name 
+                  customers={customerComparison.map(c => ({
+                    id: c.customer_id,
+                    name: c.customer_name
                   }))}
                   selectedCustomers={selectedCustomers}
                   onSelectionChange={setSelectedCustomers}
@@ -887,51 +888,52 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           </CardContent>
         </Card>
 
-        {/* Dry Ice Totals */}
-        <Card className="glass-card border-cyan-500/20">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Snowflake className="h-5 w-5 text-cyan-500" />
-              Droogijs Jaartotaal (kg)
-              {selectedCustomers.length > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {selectedCustomers.length} klant(en) gefilterd
-                </Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {filteredDryIceTotals && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{selectedYear}</p>
-                    <p className="text-2xl font-bold">{formatNumber(filteredDryIceTotals.currentYear, 0)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">{selectedYear - 1}</p>
-                    <p className="text-2xl font-bold text-muted-foreground">{formatNumber(filteredDryIceTotals.previousYear, 0)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {getTrendIcon(filteredDryIceTotals.changePercent)}
-                  <span className={`font-medium ${getChangeColor(filteredDryIceTotals.changePercent)}`}>
-                    {filteredDryIceTotals.change >= 0 ? "+" : ""}{formatNumber(filteredDryIceTotals.change, 0)} kg
-                  </span>
-                  <Badge variant={filteredDryIceTotals.changePercent >= 0 ? "default" : "destructive"}>
-                    {filteredDryIceTotals.changePercent >= 0 ? "+" : ""}{filteredDryIceTotals.changePercent.toFixed(1)}%
+        {showDryIce && (
+          <Card className="glass-card border-cyan-500/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Snowflake className="h-5 w-5 text-cyan-500" />
+                Droogijs Jaartotaal (kg)
+                {selectedCustomers.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {selectedCustomers.length} klant(en) gefilterd
                   </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {filteredDryIceTotals && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{selectedYear}</p>
+                      <p className="text-2xl font-bold">{formatNumber(filteredDryIceTotals.currentYear, 0)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">{selectedYear - 1}</p>
+                      <p className="text-2xl font-bold text-muted-foreground">{formatNumber(filteredDryIceTotals.previousYear, 0)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {getTrendIcon(filteredDryIceTotals.changePercent)}
+                    <span className={`font-medium ${getChangeColor(filteredDryIceTotals.changePercent)}`}>
+                      {filteredDryIceTotals.change >= 0 ? "+" : ""}{formatNumber(filteredDryIceTotals.change, 0)} kg
+                    </span>
+                    <Badge variant={filteredDryIceTotals.changePercent >= 0 ? "default" : "destructive"}>
+                      {filteredDryIceTotals.changePercent >= 0 ? "+" : ""}{filteredDryIceTotals.changePercent.toFixed(1)}%
+                    </Badge>
+                  </div>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Cumulative Year Charts */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <CumulativeYearChart type="cylinders" />
-        <CumulativeYearChart type="dryIce" />
+      <div className={`grid grid-cols-1 ${showDryIce ? 'xl:grid-cols-2' : ''} gap-6`}>
+        <CumulativeYearChart type="cylinders" location={location} />
+        {showDryIce && <CumulativeYearChart type="dryIce" location={location} />}
       </div>
 
       {/* Cumulative Gas Type Chart */}
@@ -1017,59 +1019,61 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
             </div>
 
             {/* Dry Ice Highlights */}
-            <div className="space-y-4">
-              <h4 className="font-medium flex items-center gap-2">
-                <Snowflake className="h-4 w-4 text-cyan-500" />
-                Droogijs
-              </h4>
-              {(() => {
-                const highlights = getGrowthHighlights(dryIceData);
-                return (
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Best Month */}
-                    <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                      <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 mb-1">
-                        <TrendingUp className="h-4 w-4" />
-                        <span className="text-xs font-medium">Beste maand</span>
+            {showDryIce && (
+              <div className="space-y-4">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Snowflake className="h-4 w-4 text-cyan-500" />
+                  Droogijs
+                </h4>
+                {(() => {
+                  const highlights = getGrowthHighlights(dryIceData);
+                  return (
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Best Month */}
+                      <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                        <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 mb-1">
+                          <TrendingUp className="h-4 w-4" />
+                          <span className="text-xs font-medium">Beste maand</span>
+                        </div>
+                        {highlights.best ? (
+                          <>
+                            <p className="text-lg font-bold">{highlights.best.monthName}</p>
+                            <p className="text-sm text-green-600 dark:text-green-400">
+                              {highlights.best.changePercent >= 0 ? "+" : ""}{highlights.best.changePercent.toFixed(1)}%
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {formatNumber(highlights.best.currentYear, 0)} kg vs {formatNumber(highlights.best.previousYear, 0)} kg
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Geen data</p>
+                        )}
                       </div>
-                      {highlights.best ? (
-                        <>
-                          <p className="text-lg font-bold">{highlights.best.monthName}</p>
-                          <p className="text-sm text-green-600 dark:text-green-400">
-                            {highlights.best.changePercent >= 0 ? "+" : ""}{highlights.best.changePercent.toFixed(1)}%
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {formatNumber(highlights.best.currentYear, 0)} kg vs {formatNumber(highlights.best.previousYear, 0)} kg
-                          </p>
-                        </>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">Geen data</p>
-                      )}
-                    </div>
-                    {/* Worst Month */}
-                    <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                      <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400 mb-1">
-                        <TrendingDown className="h-4 w-4" />
-                        <span className="text-xs font-medium">Slechtste maand</span>
+                      {/* Worst Month */}
+                      <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                        <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400 mb-1">
+                          <TrendingDown className="h-4 w-4" />
+                          <span className="text-xs font-medium">Slechtste maand</span>
+                        </div>
+                        {highlights.worst ? (
+                          <>
+                            <p className="text-lg font-bold">{highlights.worst.monthName}</p>
+                            <p className="text-sm text-red-600 dark:text-red-400">
+                              {highlights.worst.changePercent >= 0 ? "+" : ""}{highlights.worst.changePercent.toFixed(1)}%
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {formatNumber(highlights.worst.currentYear, 0)} kg vs {formatNumber(highlights.worst.previousYear, 0)} kg
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Geen data</p>
+                        )}
                       </div>
-                      {highlights.worst ? (
-                        <>
-                          <p className="text-lg font-bold">{highlights.worst.monthName}</p>
-                          <p className="text-sm text-red-600 dark:text-red-400">
-                            {highlights.worst.changePercent >= 0 ? "+" : ""}{highlights.worst.changePercent.toFixed(1)}%
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {formatNumber(highlights.worst.currentYear, 0)} kg vs {formatNumber(highlights.worst.previousYear, 0)} kg
-                          </p>
-                        </>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">Geen data</p>
-                      )}
                     </div>
-                  </div>
-                );
-              })()}
-            </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1107,86 +1111,86 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
               }
 
               return (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Bar Chart */}
-              <div>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart
-                    data={filteredGasTypeComparison}
-                    layout="vertical"
-                    margin={{ left: 80 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis type="number" className="text-xs" />
-                    <YAxis 
-                      type="category" 
-                      dataKey="gas_type_name" 
-                      className="text-xs"
-                      width={75}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))'
-                      }}
-                      formatter={(value: number, name: string) => [
-                        formatNumber(value, 0),
-                        name === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()
-                      ]}
-                    />
-                    <Legend
-                      formatter={(value) => value === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()}
-                    />
-                    <Bar dataKey="previousYear" name="previousYear" fill="#94a3b8" radius={[0, 4, 4, 0]} />
-                    <Bar dataKey="currentYear" name="currentYear" radius={[0, 4, 4, 0]}>
-                      {filteredGasTypeComparison.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.gas_type_color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Details Table */}
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-muted-foreground mb-3">
-                  Overzicht per gastype
-                </div>
-                <div className="space-y-2 max-h-[280px] overflow-y-auto">
-                  {filteredGasTypeComparison.map((gasType) => (
-                    <div 
-                      key={gasType.gas_type_id}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card/50"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div 
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: gasType.gas_type_color }}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Bar Chart */}
+                  <div>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart
+                        data={filteredGasTypeComparison}
+                        layout="vertical"
+                        margin={{ left: 80 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis type="number" className="text-xs" />
+                        <YAxis
+                          type="category"
+                          dataKey="gas_type_name"
+                          className="text-xs"
+                          width={75}
                         />
-                        <span className="font-medium">{gasType.gas_type_name}</span>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm">
-                        <div className="text-right">
-                          <div className="font-medium">{formatNumber(gasType.currentYear, 0)}</div>
-                          <div className="text-xs text-muted-foreground">
-                            vs {formatNumber(gasType.previousYear, 0)}
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--background))',
+                            border: '1px solid hsl(var(--border))'
+                          }}
+                          formatter={(value: number, name: string) => [
+                            formatNumber(value, 0),
+                            name === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()
+                          ]}
+                        />
+                        <Legend
+                          formatter={(value) => value === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()}
+                        />
+                        <Bar dataKey="previousYear" name="previousYear" fill="#94a3b8" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="currentYear" name="currentYear" radius={[0, 4, 4, 0]}>
+                          {filteredGasTypeComparison.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.gas_type_color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Details Table */}
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-muted-foreground mb-3">
+                      Overzicht per gastype
+                    </div>
+                    <div className="space-y-2 max-h-[280px] overflow-y-auto">
+                      {filteredGasTypeComparison.map((gasType) => (
+                        <div
+                          key={gasType.gas_type_id}
+                          className="flex items-center justify-between p-3 rounded-lg border bg-card/50"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: gasType.gas_type_color }}
+                            />
+                            <span className="font-medium">{gasType.gas_type_name}</span>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <div className="text-right">
+                              <div className="font-medium">{formatNumber(gasType.currentYear, 0)}</div>
+                              <div className="text-xs text-muted-foreground">
+                                vs {formatNumber(gasType.previousYear, 0)}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 min-w-[80px] justify-end">
+                              {getTrendIcon(gasType.changePercent)}
+                              <Badge
+                                variant={gasType.changePercent >= 0 ? "default" : "destructive"}
+                                className="text-xs"
+                              >
+                                {gasType.changePercent >= 0 ? "+" : ""}{gasType.changePercent.toFixed(1)}%
+                              </Badge>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 min-w-[80px] justify-end">
-                          {getTrendIcon(gasType.changePercent)}
-                          <Badge 
-                            variant={gasType.changePercent >= 0 ? "default" : "destructive"}
-                            className="text-xs"
-                          >
-                            {gasType.changePercent >= 0 ? "+" : ""}{gasType.changePercent.toFixed(1)}%
-                          </Badge>
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </div>
-            </div>
               );
             })()}
           </CardContent>
@@ -1232,9 +1236,9 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                       >
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis type="number" className="text-xs" />
-                        <YAxis 
-                          type="category" 
-                          dataKey="cylinder_size" 
+                        <YAxis
+                          type="category"
+                          dataKey="cylinder_size"
                           className="text-xs"
                           width={75}
                         />
@@ -1264,7 +1268,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                     </div>
                     <div className="space-y-2 max-h-[380px] overflow-y-auto">
                       {filteredCylinderSizeComparison.map((size) => (
-                        <div 
+                        <div
                           key={size.cylinder_size}
                           className="flex items-center justify-between p-3 rounded-lg border bg-card/50"
                         >
@@ -1281,7 +1285,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                             </div>
                             <div className="flex items-center gap-1 min-w-[80px] justify-end">
                               {getTrendIcon(size.changePercent)}
-                              <Badge 
+                              <Badge
                                 variant={size.changePercent >= 0 ? "default" : "destructive"}
                                 className="text-xs"
                               >
@@ -1320,7 +1324,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           <CardContent>
             {(() => {
               // Get all gas type IDs to display
-              const displayGasTypes = selectedGasTypes.length > 0 
+              const displayGasTypes = selectedGasTypes.length > 0
                 ? gasTypeComparison.filter(gt => selectedGasTypes.includes(gt.gas_type_id))
                 : gasTypeComparison;
 
@@ -1347,8 +1351,8 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                   <ResponsiveContainer width="100%" height={350}>
                     <BarChart data={combinedData} margin={{ bottom: 60 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis 
-                        dataKey="name" 
+                      <XAxis
+                        dataKey="name"
                         className="text-xs"
                         angle={-45}
                         textAnchor="end"
@@ -1367,19 +1371,19 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                         ]}
                         labelFormatter={(label) => label}
                       />
-                      <Legend 
+                      <Legend
                         formatter={(value) => value === "currentYear" ? `${selectedYear}` : `${selectedYear - 1}`}
                         verticalAlign="top"
                       />
-                      <Bar 
-                        dataKey="previousYear" 
-                        name="previousYear" 
-                        fill="#94a3b8" 
+                      <Bar
+                        dataKey="previousYear"
+                        name="previousYear"
+                        fill="#94a3b8"
                         radius={[4, 4, 0, 0]}
                       />
-                      <Bar 
-                        dataKey="currentYear" 
-                        name="currentYear" 
+                      <Bar
+                        dataKey="currentYear"
+                        name="currentYear"
                         radius={[4, 4, 0, 0]}
                       >
                         {combinedData.map((entry, index) => (
@@ -1392,11 +1396,11 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                   {/* Growth Summary per Gas Type */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
                     {displayGasTypes.map((gasType) => (
-                      <div 
+                      <div
                         key={gasType.gas_type_id}
                         className="p-3 rounded-lg border bg-card/50 text-center"
                       >
-                        <div 
+                        <div
                           className="w-3 h-3 rounded-full mx-auto mb-2"
                           style={{ backgroundColor: gasType.gas_type_color }}
                         />
@@ -1440,7 +1444,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           <CardContent>
             {(() => {
               // Get all gas type IDs to display
-              const displayGasTypes = selectedGasTypes.length > 0 
+              const displayGasTypes = selectedGasTypes.length > 0
                 ? gasTypeComparison.filter(gt => selectedGasTypes.includes(gt.gas_type_id))
                 : gasTypeComparison;
 
@@ -1472,16 +1476,16 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                             return [formatNumber(value, 0), info?.name || name];
                           }}
                         />
-                        <Legend 
+                        <Legend
                           formatter={(value) => {
                             const info = gasTypeInfo.get(value);
                             return info?.name || value;
                           }}
                         />
                         {displayGasTypes.map((gasType) => (
-                          <Bar 
+                          <Bar
                             key={gasType.gas_type_id}
-                            dataKey={gasType.gas_type_id} 
+                            dataKey={gasType.gas_type_id}
                             name={gasType.gas_type_id}
                             stackId="a"
                             fill={gasType.gas_type_color}
@@ -1509,16 +1513,16 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                             return [formatNumber(value, 0), info?.name || name];
                           }}
                         />
-                        <Legend 
+                        <Legend
                           formatter={(value) => {
                             const info = gasTypeInfo.get(value);
                             return info?.name || value;
                           }}
                         />
                         {displayGasTypes.map((gasType) => (
-                          <Bar 
+                          <Bar
                             key={gasType.gas_type_id}
-                            dataKey={gasType.gas_type_id} 
+                            dataKey={gasType.gas_type_id}
                             name={gasType.gas_type_id}
                             stackId="a"
                             fill={gasType.gas_type_color}
@@ -1579,41 +1583,43 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
         </Card>
 
         {/* Dry Ice Monthly Comparison */}
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Snowflake className="h-5 w-5 text-cyan-500" />
-              Droogijs per maand (kg)
-            </CardTitle>
-            <CardDescription>
-              Vergelijking {selectedYear} vs {selectedYear - 1}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={dryIceData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="monthName" className="text-xs" />
-                <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))'
-                  }}
-                  formatter={(value: number, name: string) => [
-                    formatNumber(value, 0) + " kg",
-                    name === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()
-                  ]}
-                />
-                <Legend
-                  formatter={(value) => value === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()}
-                />
-                <Bar dataKey="previousYear" name="previousYear" fill="#94a3b8" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="currentYear" name="currentYear" fill="#06b6d4" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {showDryIce && (
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Snowflake className="h-5 w-5 text-cyan-500" />
+                Droogijs per maand (kg)
+              </CardTitle>
+              <CardDescription>
+                Vergelijking {selectedYear} vs {selectedYear - 1}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={dryIceData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="monthName" className="text-xs" />
+                  <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--background))',
+                      border: '1px solid hsl(var(--border))'
+                    }}
+                    formatter={(value: number, name: string) => [
+                      formatNumber(value, 0) + " kg",
+                      name === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()
+                    ]}
+                  />
+                  <Legend
+                    formatter={(value) => value === "currentYear" ? selectedYear.toString() : (selectedYear - 1).toString()}
+                  />
+                  <Bar dataKey="previousYear" name="previousYear" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="currentYear" name="currentYear" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Growth Trend Area Chart */}
@@ -1643,18 +1649,18 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
             >
               <defs>
                 <linearGradient id="colorCylinders" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="colorDryIce" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="monthName" className="text-xs" />
-              <YAxis 
-                className="text-xs" 
+              <YAxis
+                className="text-xs"
                 tickFormatter={(v) => `${v}%`}
                 domain={['dataMin - 10', 'dataMax + 10']}
               />
@@ -1681,15 +1687,17 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                 fillOpacity={1}
                 fill="url(#colorCylinders)"
               />
-              <Area
-                type="monotone"
-                dataKey="dryIce"
-                name="Droogijs"
-                stroke="#06b6d4"
-                strokeWidth={2}
-                fillOpacity={1}
-                fill="url(#colorDryIce)"
-              />
+              {showDryIce && (
+                <Area
+                  type="monotone"
+                  dataKey="dryIce"
+                  name="Droogijs"
+                  stroke="#06b6d4"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#colorDryIce)"
+                />
+              )}
             </AreaChart>
           </ResponsiveContainer>
         </CardContent>
@@ -1737,40 +1745,42 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-cyan-500/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Snowflake className="h-4 w-4 text-cyan-500" />
-              Droogijs groeitrend
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={dryIceData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="monthName" className="text-xs" tick={{ fontSize: 10 }} />
-                <YAxis className="text-xs" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} />
-                <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))'
-                  }}
-                  formatter={(value: number) => [`${value >= 0 ? '+' : ''}${value.toFixed(1)}%`, 'Groei']}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="changePercent"
-                  name="Groei %"
-                  stroke="#06b6d4"
-                  strokeWidth={2}
-                  dot={{ fill: "#06b6d4", r: 4 }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {showDryIce && (
+          <Card className="glass-card border-cyan-500/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Snowflake className="h-4 w-4 text-cyan-500" />
+                Droogijs groeitrend
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={dryIceData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="monthName" className="text-xs" tick={{ fontSize: 10 }} />
+                  <YAxis className="text-xs" tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} />
+                  <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--background))',
+                      border: '1px solid hsl(var(--border))'
+                    }}
+                    formatter={(value: number) => [`${value >= 0 ? '+' : ''}${value.toFixed(1)}%`, 'Groei']}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="changePercent"
+                    name="Groei %"
+                    stroke="#06b6d4"
+                    strokeWidth={2}
+                    dot={{ fill: "#06b6d4", r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Monthly Details Table */}
@@ -1807,16 +1817,20 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                 <tr className="border-b">
                   <th className="text-left py-3 px-2 font-medium">Maand</th>
                   <th className="text-right py-3 px-2 font-medium" colSpan={3}>Cilinders</th>
-                  <th className="text-right py-3 px-2 font-medium" colSpan={3}>Droogijs (kg)</th>
+                  {showDryIce && <th className="text-right py-3 px-2 font-medium" colSpan={3}>Droogijs (kg)</th>}
                 </tr>
                 <tr className="border-b text-muted-foreground">
                   <th></th>
                   <th className="text-right py-2 px-2 text-xs">{selectedYear}</th>
                   <th className="text-right py-2 px-2 text-xs">{selectedYear - 1}</th>
                   <th className="text-right py-2 px-2 text-xs">Δ%</th>
-                  <th className="text-right py-2 px-2 text-xs">{selectedYear}</th>
-                  <th className="text-right py-2 px-2 text-xs">{selectedYear - 1}</th>
-                  <th className="text-right py-2 px-2 text-xs">Δ%</th>
+                  {showDryIce && (
+                    <>
+                      <th className="text-right py-2 px-2 text-xs">{selectedYear}</th>
+                      <th className="text-right py-2 px-2 text-xs">{selectedYear - 1}</th>
+                      <th className="text-right py-2 px-2 text-xs">Δ%</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -1824,24 +1838,23 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                   const dryIce = dryIceData[i];
                   const cylinderSignificant = isSignificantGrowth(cylinder.changePercent);
                   const dryIceSignificant = isSignificantGrowth(dryIce?.changePercent || 0);
-                  const rowHighlight = highlightSignificant && (cylinderSignificant || dryIceSignificant);
-                  
+                  const rowHighlight = highlightSignificant && (cylinderSignificant || (showDryIce && dryIceSignificant));
+
                   return (
-                    <tr 
-                      key={cylinder.month} 
-                      className={`border-b hover:bg-muted/50 ${
-                        rowHighlight 
-                          ? cylinderSignificant && cylinder.changePercent > 10 || dryIceSignificant && (dryIce?.changePercent || 0) > 10
-                            ? "bg-green-500/10"
-                            : "bg-red-500/10"
-                          : ""
-                      }`}
+                    <tr
+                      key={cylinder.month}
+                      className={`border-b hover:bg-muted/50 ${rowHighlight
+                        ? cylinderSignificant && cylinder.changePercent > 10 || (showDryIce && dryIceSignificant && (dryIce?.changePercent || 0) > 10)
+                          ? "bg-green-500/10"
+                          : "bg-red-500/10"
+                        : ""
+                        }`}
                     >
                       <td className="py-3 px-2 font-medium">
                         {cylinder.monthName}
-                        {highlightSignificant && (cylinderSignificant || dryIceSignificant) && (
-                          <Badge 
-                            variant={cylinder.changePercent > 10 || (dryIce?.changePercent || 0) > 10 ? "default" : "destructive"} 
+                        {highlightSignificant && (cylinderSignificant || (showDryIce && dryIceSignificant)) && (
+                          <Badge
+                            variant={cylinder.changePercent > 10 || (showDryIce && (dryIce?.changePercent || 0) > 10) ? "default" : "destructive"}
                             className="ml-2 text-[10px] px-1.5 py-0"
                           >
                             Significant
@@ -1855,13 +1868,17 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                       <td className={`text-right py-3 px-2 ${getChangeColor(cylinder.changePercent)} ${highlightSignificant && cylinderSignificant ? "font-bold" : ""}`}>
                         {cylinder.changePercent >= 0 ? "+" : ""}{cylinder.changePercent.toFixed(1)}%
                       </td>
-                      <td className={`text-right py-3 px-2 ${highlightSignificant && dryIceSignificant ? "font-semibold" : ""}`}>
-                        {formatNumber(dryIce?.currentYear || 0, 0)}
-                      </td>
-                      <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(dryIce?.previousYear || 0, 0)}</td>
-                      <td className={`text-right py-3 px-2 ${getChangeColor(dryIce?.changePercent || 0)} ${highlightSignificant && dryIceSignificant ? "font-bold" : ""}`}>
-                        {(dryIce?.changePercent || 0) >= 0 ? "+" : ""}{(dryIce?.changePercent || 0).toFixed(1)}%
-                      </td>
+                      {showDryIce && (
+                        <>
+                          <td className={`text-right py-3 px-2 ${highlightSignificant && dryIceSignificant ? "font-semibold" : ""}`}>
+                            {formatNumber(dryIce?.currentYear || 0, 0)}
+                          </td>
+                          <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(dryIce?.previousYear || 0, 0)}</td>
+                          <td className={`text-right py-3 px-2 ${getChangeColor(dryIce?.changePercent || 0)} ${highlightSignificant && dryIceSignificant ? "font-bold" : ""}`}>
+                            {(dryIce?.changePercent || 0) >= 0 ? "+" : ""}{(dryIce?.changePercent || 0).toFixed(1)}%
+                          </td>
+                        </>
+                      )}
                     </tr>
                   );
                 })}
@@ -1873,11 +1890,15 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                   <td className={`text-right py-3 px-2 ${getChangeColor(filteredCylinderTotalsByCustomer?.changePercent || 0)}`}>
                     {(filteredCylinderTotalsByCustomer?.changePercent || 0) >= 0 ? "+" : ""}{(filteredCylinderTotalsByCustomer?.changePercent || 0).toFixed(1)}%
                   </td>
-                  <td className="text-right py-3 px-2">{formatNumber(filteredDryIceTotals?.currentYear || 0, 0)}</td>
-                  <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(filteredDryIceTotals?.previousYear || 0, 0)}</td>
-                  <td className={`text-right py-3 px-2 ${getChangeColor(filteredDryIceTotals?.changePercent || 0)}`}>
-                    {(filteredDryIceTotals?.changePercent || 0) >= 0 ? "+" : ""}{(filteredDryIceTotals?.changePercent || 0).toFixed(1)}%
-                  </td>
+                  {showDryIce && (
+                    <>
+                      <td className="text-right py-3 px-2">{formatNumber(filteredDryIceTotals?.currentYear || 0, 0)}</td>
+                      <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(filteredDryIceTotals?.previousYear || 0, 0)}</td>
+                      <td className={`text-right py-3 px-2 ${getChangeColor(filteredDryIceTotals?.changePercent || 0)}`}>
+                        {(filteredDryIceTotals?.changePercent || 0) >= 0 ? "+" : ""}{(filteredDryIceTotals?.changePercent || 0).toFixed(1)}%
+                      </td>
+                    </>
+                  )}
                 </tr>
               </tbody>
             </table>
@@ -1908,7 +1929,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                   <SelectContent>
                     <SelectItem value="total">Totaal</SelectItem>
                     <SelectItem value="cylinders">Cilinders</SelectItem>
-                    <SelectItem value="dryIce">Droogijs</SelectItem>
+                    {showDryIce && <SelectItem value="dryIce">Droogijs</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -1917,12 +1938,12 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           <CardContent>
             {(() => {
               // Filter customers based on selection
-              const filteredCustomers = selectedCustomers.length === 0 
-                ? customerComparison 
+              const filteredCustomers = selectedCustomers.length === 0
+                ? customerComparison
                 : customerComparison.filter(c => {
-                    const customerKey = c.customer_id || c.customer_name;
-                    return selectedCustomers.includes(customerKey);
-                  });
+                  const customerKey = c.customer_id || c.customer_name;
+                  return selectedCustomers.includes(customerKey);
+                });
 
               // Sort customers based on selected criteria
               const sortedCustomers = [...filteredCustomers].sort((a, b) => {
@@ -1944,16 +1965,16 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                 <div className="space-y-6">
                   {/* Customer Chart */}
                   <ResponsiveContainer width="100%" height={400}>
-                    <BarChart 
-                      data={topCustomers} 
-                      layout="vertical" 
+                    <BarChart
+                      data={topCustomers}
+                      layout="vertical"
                       margin={{ left: 120, right: 20 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis type="number" className="text-xs" />
-                      <YAxis 
-                        type="category" 
-                        dataKey="customer_name" 
+                      <YAxis
+                        type="category"
+                        dataKey="customer_name"
                         className="text-xs"
                         width={115}
                         tick={{ fontSize: 11 }}
@@ -1965,13 +1986,13 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                         }}
                         formatter={(value: number, name: string) => {
                           const label = name === "currentCylinders" ? `Cilinders ${selectedYear}` :
-                                        name === "previousCylinders" ? `Cilinders ${selectedYear - 1}` :
-                                        name === "currentDryIce" ? `Droogijs ${selectedYear} (kg)` :
-                                        `Droogijs ${selectedYear - 1} (kg)`;
+                            name === "previousCylinders" ? `Cilinders ${selectedYear - 1}` :
+                              name === "currentDryIce" ? `Droogijs ${selectedYear} (kg)` :
+                                `Droogijs ${selectedYear - 1} (kg)`;
                           return [value.toLocaleString(), label];
                         }}
                       />
-                      <Legend 
+                      <Legend
                         formatter={(value) => {
                           if (value === "currentCylinders") return `Cilinders ${selectedYear}`;
                           if (value === "previousCylinders") return `Cilinders ${selectedYear - 1}`;
@@ -1986,7 +2007,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                           <Bar dataKey="currentCylinders" name="currentCylinders" fill="#f97316" radius={[0, 4, 4, 0]} />
                         </>
                       )}
-                      {customerSortBy !== "cylinders" && (
+                      {customerSortBy !== "cylinders" && showDryIce && (
                         <>
                           <Bar dataKey="previousDryIce" name="previousDryIce" fill="#64748b" radius={[0, 4, 4, 0]} />
                           <Bar dataKey="currentDryIce" name="currentDryIce" fill="#06b6d4" radius={[0, 4, 4, 0]} />
@@ -2002,26 +2023,30 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                         <tr className="border-b">
                           <th className="text-left py-3 px-2 font-medium">Klant</th>
                           <th className="text-right py-3 px-2 font-medium" colSpan={3}>Cilinders</th>
-                          <th className="text-right py-3 px-2 font-medium" colSpan={3}>Droogijs (kg)</th>
+                          {showDryIce && <th className="text-right py-3 px-2 font-medium" colSpan={3}>Droogijs (kg)</th>}
                         </tr>
                         <tr className="border-b text-muted-foreground">
                           <th></th>
                           <th className="text-right py-2 px-2 text-xs">{selectedYear}</th>
                           <th className="text-right py-2 px-2 text-xs">{selectedYear - 1}</th>
                           <th className="text-right py-2 px-2 text-xs">Δ%</th>
-                          <th className="text-right py-2 px-2 text-xs">{selectedYear}</th>
-                          <th className="text-right py-2 px-2 text-xs">{selectedYear - 1}</th>
-                          <th className="text-right py-2 px-2 text-xs">Δ%</th>
+                          {showDryIce && (
+                            <>
+                              <th className="text-right py-2 px-2 text-xs">{selectedYear}</th>
+                              <th className="text-right py-2 px-2 text-xs">{selectedYear - 1}</th>
+                              <th className="text-right py-2 px-2 text-xs">Δ%</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
                         {sortedCustomers.map((customer) => {
                           const cylinderSignificant = isSignificantGrowth(customer.cylinderChangePercent);
                           const dryIceSignificant = isSignificantGrowth(customer.dryIceChangePercent);
-                          
+
                           return (
-                            <tr 
-                              key={customer.customer_id || customer.customer_name} 
+                            <tr
+                              key={customer.customer_id || customer.customer_name}
                               className="border-b hover:bg-muted/50"
                             >
                               <td className="py-3 px-2 font-medium max-w-[200px] truncate">
@@ -2037,30 +2062,34 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                                 {customer.cylinderChangePercent >= 0 ? "+" : ""}{customer.cylinderChangePercent.toFixed(1)}%
                                 {cylinderSignificant && (
                                   <span className="ml-1">
-                                    {customer.cylinderChangePercent > 0 ? 
-                                      <TrendingUp className="h-3 w-3 inline" /> : 
+                                    {customer.cylinderChangePercent > 0 ?
+                                      <TrendingUp className="h-3 w-3 inline" /> :
                                       <TrendingDown className="h-3 w-3 inline" />
                                     }
                                   </span>
                                 )}
                               </td>
-                              <td className="text-right py-3 px-2">
-                                {customer.currentDryIce.toLocaleString()}
-                              </td>
-                              <td className="text-right py-3 px-2 text-muted-foreground">
-                                {customer.previousDryIce.toLocaleString()}
-                              </td>
-                              <td className={`text-right py-3 px-2 ${getChangeColor(customer.dryIceChangePercent)}`}>
-                                {customer.dryIceChangePercent >= 0 ? "+" : ""}{customer.dryIceChangePercent.toFixed(1)}%
-                                {dryIceSignificant && (
-                                  <span className="ml-1">
-                                    {customer.dryIceChangePercent > 0 ? 
-                                      <TrendingUp className="h-3 w-3 inline" /> : 
-                                      <TrendingDown className="h-3 w-3 inline" />
-                                    }
-                                  </span>
-                                )}
-                              </td>
+                              {showDryIce && (
+                                <>
+                                  <td className="text-right py-3 px-2">
+                                    {customer.currentDryIce.toLocaleString()}
+                                  </td>
+                                  <td className="text-right py-3 px-2 text-muted-foreground">
+                                    {customer.previousDryIce.toLocaleString()}
+                                  </td>
+                                  <td className={`text-right py-3 px-2 ${getChangeColor(customer.dryIceChangePercent)}`}>
+                                    {customer.dryIceChangePercent >= 0 ? "+" : ""}{customer.dryIceChangePercent.toFixed(1)}%
+                                    {dryIceSignificant && (
+                                      <span className="ml-1">
+                                        {customer.dryIceChangePercent > 0 ?
+                                          <TrendingUp className="h-3 w-3 inline" /> :
+                                          <TrendingDown className="h-3 w-3 inline" />
+                                        }
+                                      </span>
+                                    )}
+                                  </td>
+                                </>
+                              )}
                             </tr>
                           );
                         })}

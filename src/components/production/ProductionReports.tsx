@@ -4,12 +4,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { 
-  BarChart3, 
-  Cylinder, 
-  Snowflake, 
-  CalendarIcon, 
-  TrendingUp, 
+import {
+  BarChart3,
+  Cylinder,
+  Snowflake,
+  CalendarIcon,
+  TrendingUp,
   Package,
   CheckCircle2,
   Clock,
@@ -120,7 +120,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
   const [activeTab, setActiveTab] = useState("overview");
   const [productionChartView, setProductionChartView] = useState<"both" | "cylinders" | "dryIce">("both");
   const [chartStyle, setChartStyle] = useState<"area" | "glow">("area");
-  
+
   // Previous period stats for trend calculations
   const [previousPeriodStats, setPreviousPeriodStats] = useState({
     cylinderOrders: 0,
@@ -131,6 +131,9 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
     pending: 0
   });
 
+  // Determine if dry ice should be shown (only for Emmen or All)
+  const showDryIce = location !== "sol_tilburg";
+
   useEffect(() => {
     fetchGasTypes();
   }, []);
@@ -139,21 +142,13 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
     fetchReportData();
   }, [dateRange, refreshKey, location]);
 
-  useEffect(() => {
-    fetchGasTypes();
-  }, []);
-
-  useEffect(() => {
-    fetchReportData();
-  }, [dateRange, location]);
-
   const fetchGasTypes = async () => {
     const { data } = await supabase
       .from("gas_types")
       .select("id, name, color")
       .eq("is_active", true)
       .order("name");
-    
+
     if (data) {
       setGasTypes(data);
     }
@@ -164,7 +159,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
     const months: { year: number; month: number }[] = [];
     const current = new Date(from.getFullYear(), from.getMonth(), 1);
     const end = new Date(to.getFullYear(), to.getMonth(), 1);
-    
+
     while (current <= end) {
       months.push({ year: current.getFullYear(), month: current.getMonth() + 1 });
       current.setMonth(current.getMonth() + 1);
@@ -178,7 +173,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
     const monthStr = String(month).padStart(2, '0');
     const lastDay = new Date(year, month, 0).getDate();
     let currentDay = 1;
-    
+
     while (currentDay <= lastDay) {
       const endDay = Math.min(currentDay + 6, lastDay);
       weeks.push({
@@ -201,33 +196,33 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
       .gte("scheduled_date", startDate)
       .lte("scheduled_date", endDate)
       .order("scheduled_date", { ascending: true });
-    
+
     if (location !== "all") {
       query = query.eq("location", location);
     }
-    
+
     return query;
   };
 
   // Fetch cylinder orders for a single month using weekly chunking to bypass 1000-row limit
   const fetchCylinderMonthData = async (year: number, month: number, fromDate: string, toDate: string) => {
     const weeks = getWeeksInMonth(year, month);
-    
+
     // Clamp weeks to actual date range
-    const relevantWeeks = weeks.filter(week => 
+    const relevantWeeks = weeks.filter(week =>
       week.endDate >= fromDate && week.startDate <= toDate
     ).map(week => ({
       startDate: week.startDate < fromDate ? fromDate : week.startDate,
       endDate: week.endDate > toDate ? toDate : week.endDate
     }));
-    
-    const weekPromises = relevantWeeks.map(week => 
+
+    const weekPromises = relevantWeeks.map(week =>
       fetchCylinderWeekData(week.startDate, week.endDate)
     );
-    
+
     const results = await Promise.all(weekPromises);
     const allOrders = results.flatMap(res => res.data || []);
-    
+
     // Deduplicate by ID and return as array
     const uniqueOrders = Array.from(new Map(allOrders.map(o => [o.id, o])).values());
     return { data: uniqueOrders, error: null };
@@ -239,18 +234,25 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
     const monthStartDate = `${year}-${monthStr}-01`;
     const lastDay = new Date(year, month, 0).getDate();
     const monthEndDate = `${year}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
-    
+
     // Clamp to the actual date range
     const effectiveStart = monthStartDate < fromDate ? fromDate : monthStartDate;
     const effectiveEnd = monthEndDate > toDate ? toDate : monthEndDate;
-    
-    return supabase
+
+    let query = supabase
       .from("dry_ice_orders")
       .select("*")
       .gte("scheduled_date", effectiveStart)
       .lte("scheduled_date", effectiveEnd)
       .order("scheduled_date", { ascending: true })
       .limit(5000);
+
+    // Add location filter (only sol_emmen has dry ice production)
+    if (location !== "all") {
+      query = query.eq("location", location);
+    }
+
+    return query;
   };
 
   const fetchReportData = async () => {
@@ -268,20 +270,20 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
     // Get all months in the range
     const months = getMonthsInRange(dateRange.from, dateRange.to);
     const prevMonths = getMonthsInRange(prevFrom, prevTo);
-    
+
     // Fetch data for each month in parallel
-    const cylinderPromises = months.map(({ year, month }) => 
+    const cylinderPromises = months.map(({ year, month }) =>
       fetchCylinderMonthData(year, month, fromDate, toDate)
     );
-    const dryIcePromises = months.map(({ year, month }) => 
+    const dryIcePromises = months.map(({ year, month }) =>
       fetchDryIceMonthData(year, month, fromDate, toDate)
     );
 
     // Fetch previous period data
-    const prevCylinderPromises = prevMonths.map(({ year, month }) => 
+    const prevCylinderPromises = prevMonths.map(({ year, month }) =>
       fetchCylinderMonthData(year, month, prevFromDate, prevToDate)
     );
-    const prevDryIcePromises = prevMonths.map(({ year, month }) => 
+    const prevDryIcePromises = prevMonths.map(({ year, month }) =>
       fetchDryIceMonthData(year, month, prevFromDate, prevToDate)
     );
 
@@ -302,7 +304,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
     const uniqueCylinderOrders = Array.from(
       new Map(allCylinderOrders.map(o => [o.id, o])).values()
     ).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
-    
+
     const uniqueDryIceOrders = Array.from(
       new Map(allDryIceOrders.map(o => [o.id, o])).values()
     ).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
@@ -387,7 +389,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
   // Prepare chart data - orders per day
   const getOrdersPerDay = () => {
     const dayMap = new Map<string, { date: string; cylinders: number; dryIce: number }>();
-    
+
     cylinderOrders.forEach(order => {
       const date = order.scheduled_date;
       const existing = dayMap.get(date) || { date, cylinders: 0, dryIce: 0 };
@@ -413,12 +415,12 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
   // Gas type distribution - use gas_type_id/gas_type_ref when available
   const getGasTypeDistribution = () => {
     const gasMap = new Map<string, { count: number; color: string }>();
-    
+
     cylinderOrders.filter(o => o.status !== "cancelled").forEach(order => {
       // Get gas type name - prioritize joined data
       let gasTypeName: string;
       let gasTypeColor = "#3b82f6"; // default blue
-      
+
       if (order.gas_type_ref?.name) {
         gasTypeName = order.gas_type_ref.name;
         gasTypeColor = order.gas_type_ref.color;
@@ -434,7 +436,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
       } else {
         gasTypeName = gasTypeLabels[order.gas_type] || order.gas_type;
       }
-      
+
       const current = gasMap.get(gasTypeName) || { count: 0, color: gasTypeColor };
       current.count += order.cylinder_count;
       gasMap.set(gasTypeName, current);
@@ -453,11 +455,11 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
   const getCustomerRanking = (type: "cylinder" | "dryIce") => {
     const customerMap = new Map<string, number>();
     const orders = type === "cylinder" ? cylinderOrders : dryIceOrders;
-    
+
     orders.filter(o => o.status !== "cancelled").forEach(order => {
       const current = customerMap.get(order.customer_name) || 0;
-      const value = type === "cylinder" 
-        ? (order as GasCylinderOrder).cylinder_count 
+      const value = type === "cylinder"
+        ? (order as GasCylinderOrder).cylinder_count
         : Number((order as DryIceOrder).quantity_kg);
       customerMap.set(order.customer_name, current + value);
     });
@@ -477,7 +479,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
     if (order.gas_type_ref?.name) {
       return order.gas_type_ref.name;
     }
-    
+
     // Then check if we can match by gas_type_id
     if (order.gas_type_id) {
       const matchedType = gasTypes.find(gt => gt.id === order.gas_type_id);
@@ -485,7 +487,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
         return matchedType.name;
       }
     }
-    
+
     // Fallback to enum labels
     return gasTypeLabels[order.gas_type] || order.gas_type;
   };
@@ -554,7 +556,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
                   Laatste 3 maanden
                 </Button>
               </div>
-              
+
               {/* Export Button */}
               <ReportExportButtons
                 tableData={{
@@ -661,29 +663,33 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
           className="glass-card border-orange-500/20"
         />
 
-        <StatCard
-          value={dryIceStats.total}
-          label="Droogijs orders"
-          icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
-          iconBgColor="bg-cyan-500/10"
-          trend={{
-            value: calculateTrend(dryIceStats.total, previousPeriodStats.dryIceOrders),
-            label: "vs. vorige periode"
-          }}
-          className="glass-card border-cyan-500/20"
-        />
+        {showDryIce && (
+          <>
+            <StatCard
+              value={dryIceStats.total}
+              label="Droogijs orders"
+              icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
+              iconBgColor="bg-cyan-500/10"
+              trend={{
+                value: calculateTrend(dryIceStats.total, previousPeriodStats.dryIceOrders),
+                label: "vs. vorige periode"
+              }}
+              className="glass-card border-cyan-500/20"
+            />
 
-        <StatCard
-          value={`${formatNumber(dryIceStats.totalKg, 0)} kg`}
-          label="Totaal droogijs"
-          icon={<TrendingUp className="h-5 w-5 text-cyan-500" />}
-          iconBgColor="bg-cyan-500/10"
-          trend={{
-            value: calculateTrend(dryIceStats.totalKg, previousPeriodStats.totalDryIce),
-            label: "vs. vorige periode"
-          }}
-          className="glass-card border-cyan-500/20"
-        />
+            <StatCard
+              value={`${formatNumber(dryIceStats.totalKg, 0)} kg`}
+              label="Totaal droogijs"
+              icon={<TrendingUp className="h-5 w-5 text-cyan-500" />}
+              iconBgColor="bg-cyan-500/10"
+              trend={{
+                value: calculateTrend(dryIceStats.totalKg, previousPeriodStats.totalDryIce),
+                label: "vs. vorige periode"
+              }}
+              className="glass-card border-cyan-500/20"
+            />
+          </>
+        )}
 
         <StatCard
           value={cylinderStats.completed + dryIceStats.completed}
@@ -725,10 +731,12 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
             <Cylinder className="h-4 w-4" />
             Cilinders
           </TabsTrigger>
-          <TabsTrigger value="dryice" className="flex items-center gap-2">
-            <Snowflake className="h-4 w-4" />
-            Droogijs
-          </TabsTrigger>
+          {showDryIce && (
+            <TabsTrigger value="dryice" className="flex items-center gap-2">
+              <Snowflake className="h-4 w-4" />
+              Droogijs
+            </TabsTrigger>
+          )}
           <TabsTrigger value="comparison" className="flex items-center gap-2">
             <GitCompare className="h-4 w-4" />
             Jaarvergelijking
@@ -749,9 +757,9 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
               </div>
               <div className="flex items-center gap-2">
                 {/* Chart Style Toggle */}
-                <ToggleGroup 
-                  type="single" 
-                  value={chartStyle} 
+                <ToggleGroup
+                  type="single"
+                  value={chartStyle}
                   onValueChange={(value) => value && setChartStyle(value as "area" | "glow")}
                   className="bg-muted/50 rounded-md p-1"
                 >
@@ -762,25 +770,29 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
                     <Sparkles className="h-3.5 w-3.5" />
                   </ToggleGroupItem>
                 </ToggleGroup>
-                
+
                 {/* Data View Toggle */}
-                <ToggleGroup 
-                  type="single" 
-                  value={productionChartView} 
+                <ToggleGroup
+                  type="single"
+                  value={productionChartView}
                   onValueChange={(value) => value && setProductionChartView(value as "both" | "cylinders" | "dryIce")}
                   className="bg-muted/50 rounded-md p-1"
                 >
-                  <ToggleGroupItem value="both" aria-label="Beide" className="text-xs px-3 data-[state=on]:bg-background">
-                    Beide
-                  </ToggleGroupItem>
+                  {showDryIce && (
+                    <ToggleGroupItem value="both" aria-label="Beide" className="text-xs px-3 data-[state=on]:bg-background">
+                      Beide
+                    </ToggleGroupItem>
+                  )}
                   <ToggleGroupItem value="cylinders" aria-label="Cilinders" className="text-xs px-3 data-[state=on]:bg-orange-500 data-[state=on]:text-white">
                     <Cylinder className="h-3 w-3 mr-1" />
                     Cilinders
                   </ToggleGroupItem>
-                  <ToggleGroupItem value="dryIce" aria-label="Droogijs" className="text-xs px-3 data-[state=on]:bg-cyan-500 data-[state=on]:text-white">
-                    <Snowflake className="h-3 w-3 mr-1" />
-                    Droogijs
-                  </ToggleGroupItem>
+                  {showDryIce && (
+                    <ToggleGroupItem value="dryIce" aria-label="Droogijs" className="text-xs px-3 data-[state=on]:bg-cyan-500 data-[state=on]:text-white">
+                      <Snowflake className="h-3 w-3 mr-1" />
+                      Droogijs
+                    </ToggleGroupItem>
+                  )}
                 </ToggleGroup>
               </div>
             </CardHeader>
@@ -792,11 +804,11 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
                     xAxisKey="displayDate"
                     height={300}
                     series={[
-                      ...(productionChartView === "both" || productionChartView === "cylinders" 
-                        ? [{ dataKey: "cylinders", name: "Cilinders", color: "#f97316", glowColor: "#f97316" }] 
+                      ...(productionChartView === "both" || productionChartView === "cylinders"
+                        ? [{ dataKey: "cylinders", name: "Cilinders", color: "#f97316", glowColor: "#f97316" }]
                         : []),
-                      ...(productionChartView === "both" || productionChartView === "dryIce" 
-                        ? [{ dataKey: "dryIce", name: "Droogijs (kg)", color: "#06b6d4", glowColor: "#06b6d4" }] 
+                      ...(productionChartView === "both" || productionChartView === "dryIce"
+                        ? [{ dataKey: "dryIce", name: "Droogijs (kg)", color: "#06b6d4", glowColor: "#06b6d4" }]
                         : []),
                     ]}
                   />
@@ -806,33 +818,33 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis dataKey="displayDate" className="text-xs" />
                       <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--background))', 
-                          border: '1px solid hsl(var(--border))' 
-                        }} 
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--background))',
+                          border: '1px solid hsl(var(--border))'
+                        }}
                       />
                       <Legend />
                       {(productionChartView === "both" || productionChartView === "cylinders") && (
-                        <Area 
-                          type="monotone" 
-                          dataKey="cylinders" 
-                          name="Cilinders" 
-                          stackId="1" 
-                          stroke="#f97316" 
-                          fill="#f97316" 
-                          fillOpacity={0.6} 
+                        <Area
+                          type="monotone"
+                          dataKey="cylinders"
+                          name="Cilinders"
+                          stackId="1"
+                          stroke="#f97316"
+                          fill="#f97316"
+                          fillOpacity={0.6}
                         />
                       )}
                       {(productionChartView === "both" || productionChartView === "dryIce") && (
-                        <Area 
-                          type="monotone" 
-                          dataKey="dryIce" 
-                          name="Droogijs (kg)" 
-                          stackId="2" 
-                          stroke="#06b6d4" 
-                          fill="#06b6d4" 
-                          fillOpacity={0.6} 
+                        <Area
+                          type="monotone"
+                          dataKey="dryIce"
+                          name="Droogijs (kg)"
+                          stackId="2"
+                          stroke="#06b6d4"
+                          fill="#06b6d4"
+                          fillOpacity={0.6}
                         />
                       )}
                     </AreaChart>
@@ -856,37 +868,37 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
               <CardContent>
                 {gasTypeDistribution.length > 0 ? (
                   <ResponsiveContainer width="100%" height={Math.max(250, gasTypeDistribution.length * 40)}>
-                    <BarChart 
-                      data={gasTypeDistribution} 
+                    <BarChart
+                      data={gasTypeDistribution}
                       layout="vertical"
                       margin={{ left: 10, right: 60 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
-                      <XAxis 
-                        type="number" 
-                        className="text-xs" 
-                        tickFormatter={(value) => formatNumber(value, 0)} 
+                      <XAxis
+                        type="number"
+                        className="text-xs"
+                        tickFormatter={(value) => formatNumber(value, 0)}
                       />
-                      <YAxis 
-                        dataKey="name" 
-                        type="category" 
-                        width={140} 
+                      <YAxis
+                        dataKey="name"
+                        type="category"
+                        width={140}
                         className="text-xs"
                         tick={{ fontSize: 11 }}
                       />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--background))', 
-                          border: '1px solid hsl(var(--border))' 
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--background))',
+                          border: '1px solid hsl(var(--border))'
                         }}
                         formatter={(value: number) => [formatNumber(value, 0), "Cilinders"]}
                       />
-                      <Bar 
-                        dataKey="value" 
-                        name="Cilinders" 
+                      <Bar
+                        dataKey="value"
+                        name="Cilinders"
                         radius={[0, 4, 4, 0]}
-                        label={{ 
-                          position: 'right', 
+                        label={{
+                          position: 'right',
                           formatter: (value: number) => formatNumber(value, 0),
                           fontSize: 11,
                           fill: 'hsl(var(--foreground))'
@@ -918,11 +930,11 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis type="number" className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
                       <YAxis dataKey="name" type="category" width={120} className="text-xs" />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--background))', 
-                          border: '1px solid hsl(var(--border))' 
-                        }} 
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--background))',
+                          border: '1px solid hsl(var(--border))'
+                        }}
                       />
                       <Bar dataKey="value" name="Cilinders" fill="#f97316" radius={[0, 4, 4, 0]} />
                     </BarChart>
@@ -961,20 +973,20 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
                 columns={[
                   { header: "Order", accessor: (order) => <span className="font-medium">{order.order_number}</span> },
                   { header: "Klant", accessor: (order) => order.customer_name },
-                  { 
-                    header: "Gastype", 
+                  {
+                    header: "Gastype",
                     accessor: (order) => (
                       <div className="flex items-center gap-2">
-                        <div 
-                          className="w-2 h-2 rounded-full flex-shrink-0" 
+                        <div
+                          className="w-2 h-2 rounded-full flex-shrink-0"
                           style={{ backgroundColor: getGasTypeColor(order) }}
                         />
                         {getGasTypeLabel(order)}
                       </div>
                     )
                   },
-                  { 
-                    header: "M/T", 
+                  {
+                    header: "M/T",
                     accessor: (order) => (
                       <Badge variant={order.gas_grade === "medical" ? "default" : "secondary"}>
                         {order.gas_grade === "medical" ? "M" : "T"}
@@ -991,69 +1003,71 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
           </Card>
         </TabsContent>
 
-        <TabsContent value="dryice" className="mt-6 space-y-6">
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Snowflake className="h-5 w-5 text-cyan-500" />
-                Droogijs orders
-              </CardTitle>
-              <CardDescription>
-                {dryIceStats.total} orders | {formatNumber(dryIceStats.totalKg, 0)} kg totaal
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <VirtualizedTable
-                data={dryIceOrders}
-                maxHeight={500}
-                emptyMessage={
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Snowflake className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>Geen droogijs orders in deze periode</p>
-                  </div>
-                }
-                columns={[
-                  { header: "Order", accessor: (order) => <span className="font-medium">{order.order_number}</span> },
-                  { header: "Klant", accessor: (order) => order.customer_name },
-                  { header: "Type", accessor: (order) => order.product_type },
-                  { header: "Hoeveelheid", accessor: (order) => `${formatNumber(order.quantity_kg, 0)} kg` },
-                  { header: "Datum", accessor: (order) => format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl }) },
-                  { header: "Status", accessor: (order) => getStatusBadge(order.status) },
-                ]}
-              />
-            </CardContent>
-          </Card>
+        {showDryIce && (
+          <TabsContent value="dryice" className="mt-6 space-y-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Snowflake className="h-5 w-5 text-cyan-500" />
+                  Droogijs orders
+                </CardTitle>
+                <CardDescription>
+                  {dryIceStats.total} orders | {formatNumber(dryIceStats.totalKg, 0)} kg totaal
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <VirtualizedTable
+                  data={dryIceOrders}
+                  maxHeight={500}
+                  emptyMessage={
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Snowflake className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Geen droogijs orders in deze periode</p>
+                    </div>
+                  }
+                  columns={[
+                    { header: "Order", accessor: (order) => <span className="font-medium">{order.order_number}</span> },
+                    { header: "Klant", accessor: (order) => order.customer_name },
+                    { header: "Type", accessor: (order) => order.product_type },
+                    { header: "Hoeveelheid", accessor: (order) => `${formatNumber(order.quantity_kg, 0)} kg` },
+                    { header: "Datum", accessor: (order) => format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl }) },
+                    { header: "Status", accessor: (order) => getStatusBadge(order.status) },
+                  ]}
+                />
+              </CardContent>
+            </Card>
 
-          {/* Top customers for dry ice */}
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="text-lg">Top 5 klanten - Droogijs</CardTitle>
-              <CardDescription>Klanten met de meeste droogijs orders (kg)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {getCustomerRanking("dryIce").length > 0 ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={getCustomerRanking("dryIce")} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis type="number" className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
-                    <YAxis dataKey="name" type="category" width={120} className="text-xs" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--background))', 
-                        border: '1px solid hsl(var(--border))' 
-                      }} 
-                    />
-                    <Bar dataKey="value" name="Droogijs (kg)" fill="#06b6d4" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  Geen data voor deze periode
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+            {/* Top customers for dry ice */}
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-lg">Top 5 klanten - Droogijs</CardTitle>
+                <CardDescription>Klanten met de meeste droogijs orders (kg)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {getCustomerRanking("dryIce").length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={getCustomerRanking("dryIce")} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis type="number" className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
+                      <YAxis dataKey="name" type="category" width={120} className="text-xs" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--background))',
+                          border: '1px solid hsl(var(--border))'
+                        }}
+                      />
+                      <Bar dataKey="value" name="Droogijs (kg)" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    Geen data voor deze periode
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="insights" className="mt-6 space-y-6">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

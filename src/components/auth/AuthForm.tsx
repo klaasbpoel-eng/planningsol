@@ -11,8 +11,6 @@ export function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,23 +26,11 @@ export function AuthForm() {
         if (error) throw error;
         toast.success("Welkom terug!");
       } else {
-        // Validate name fields for registration
-        if (!firstName.trim() || !lastName.trim()) {
-          toast.error("Vul uw voor- en achternaam in");
-          setLoading(false);
-          return;
-        }
-
-        const fullName = `${firstName.trim()} ${lastName.trim()}`;
-        
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: {
-              full_name: fullName,
-            },
           },
         });
         if (error) throw error;
@@ -77,34 +63,6 @@ export function AuthForm() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4 pt-4">
-            {!isLogin && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">Voornaam</Label>
-                  <Input
-                    id="firstName"
-                    type="text"
-                    placeholder="Jan"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required={!isLogin}
-                    className="h-11"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Achternaam</Label>
-                  <Input
-                    id="lastName"
-                    type="text"
-                    placeholder="Jansen"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    required={!isLogin}
-                    className="h-11"
-                  />
-                </div>
-              </div>
-            )}
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
               <Input

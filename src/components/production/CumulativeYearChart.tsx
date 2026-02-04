@@ -53,11 +53,15 @@ const getYearColor = (year: number): string => {
   return YEAR_COLORS[year] || `hsl(${(year * 47) % 360}, 70%, 50%)`;
 };
 
+// Define type locally if not imported
+type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
+
 interface CumulativeYearChartProps {
   type: "cylinders" | "dryIce";
+  location?: ProductionLocation;
 }
 
-export const CumulativeYearChart = React.memo(function CumulativeYearChart({ type }: CumulativeYearChartProps) {
+export const CumulativeYearChart = React.memo(function CumulativeYearChart({ type, location = "all" }: CumulativeYearChartProps) {
   const [loading, setLoading] = useState(true);
   const [yearlyData, setYearlyData] = useState<YearlyMonthlyData[]>([]);
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
@@ -68,7 +72,7 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
 
   useEffect(() => {
     fetchAllYearsData();
-  }, [type]);
+  }, [type, location]);
 
   const fetchAllYearsData = async () => {
     setLoading(true);
@@ -76,17 +80,18 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
     const currentYear = new Date().getFullYear();
     const startYear = 2017;
     const years: number[] = [];
-    
+
     for (let y = currentYear; y >= startYear; y--) {
       years.push(y);
     }
 
     // Fetch data for all years in parallel
     const orderType = type === "cylinders" ? "cylinder" : "dry_ice";
-    const promises = years.map(year => 
-      supabase.rpc("get_monthly_order_totals", { 
-        p_year: year, 
-        p_order_type: orderType 
+    const promises = years.map(year =>
+      supabase.rpc("get_monthly_order_totals", {
+        p_year: year,
+        p_order_type: orderType,
+        p_location: location === "all" ? null : location
       })
     );
 
@@ -119,7 +124,7 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
 
     setYearlyData(allYearData);
     setAvailableYears(allYearData.map(d => d.year));
-    
+
     // Default: select current year and previous 2 years that have data
     const defaultYears = allYearData.slice(0, 4).map(d => d.year);
     setSelectedYears(defaultYears);
@@ -220,15 +225,15 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
     );
   }
 
-  const icon = type === "cylinders" 
+  const icon = type === "cylinders"
     ? <Cylinder className="h-5 w-5 text-orange-500" />
     : <Snowflake className="h-5 w-5 text-cyan-500" />;
-  
-  const title = type === "cylinders" 
+
+  const title = type === "cylinders"
     ? "Cilindervullingen per jaar cumulatief"
     : "Droogijs per jaar cumulatief (kg)";
 
-  const borderColor = type === "cylinders" 
+  const borderColor = type === "cylinders"
     ? "border-orange-500/20"
     : "border-cyan-500/20";
 
@@ -250,21 +255,21 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
           <div className="flex items-center justify-between">
             <Label className="text-sm text-muted-foreground">Selecteer jaren</Label>
             <div className="flex gap-2">
-              <button 
+              <button
                 onClick={selectTopFive}
                 className="text-xs text-primary font-medium px-2 py-1 rounded-md transition-all duration-200 hover:bg-primary/10 hover:scale-105 active:scale-95"
               >
                 Top 5
               </button>
               <span className="text-muted-foreground">|</span>
-              <button 
+              <button
                 onClick={selectAllYears}
                 className="text-xs text-primary font-medium px-2 py-1 rounded-md transition-all duration-200 hover:bg-primary/10 hover:scale-105 active:scale-95"
               >
                 Alles
               </button>
               <span className="text-muted-foreground">|</span>
-              <button 
+              <button
                 onClick={clearYears}
                 className="text-xs text-primary font-medium px-2 py-1 rounded-md transition-all duration-200 hover:bg-primary/10 hover:scale-105 active:scale-95"
               >
@@ -277,23 +282,22 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
               const isSelected = selectedYears.includes(year);
               const isTopFive = topFiveYears.includes(year);
               const topRank = topFiveYears.indexOf(year);
-              const shouldAnimate = 
-                (animatingTopFive && isTopFive) || 
-                animatingAll || 
+              const shouldAnimate =
+                (animatingTopFive && isTopFive) ||
+                animatingAll ||
                 (animatingClear && isSelected);
               const yearVolume = getYearVolume(year);
-              
+
               return (
                 <TooltipProvider key={year} delayDuration={0}>
                   <UITooltip>
                     <TooltipTrigger asChild>
                       <Badge
                         variant={isSelected ? "default" : "outline"}
-                        className={`cursor-pointer transition-all duration-200 flex items-center gap-1 hover:scale-105 hover:shadow-md active:scale-95 ${
-                          shouldAnimate 
-                            ? "animate-[pulse_0.3s_ease-in-out_2] scale-110" 
+                        className={`cursor-pointer transition-all duration-200 flex items-center gap-1 hover:scale-105 hover:shadow-md active:scale-95 ${shouldAnimate
+                            ? "animate-[pulse_0.3s_ease-in-out_2] scale-110"
                             : ""
-                        }`}
+                          }`}
                         style={{
                           backgroundColor: isSelected ? getYearColor(year) : undefined,
                           borderColor: getYearColor(year),
@@ -302,13 +306,12 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
                         onClick={() => toggleYear(year)}
                       >
                         {isTopFive && (
-                          <Trophy 
-                            className={`h-3 w-3 ${
-                              topRank === 0 ? "text-yellow-400" : 
-                              topRank === 1 ? "text-gray-300" : 
-                              topRank === 2 ? "text-amber-600" : 
-                              isSelected ? "text-white/70" : "opacity-50"
-                            }`} 
+                          <Trophy
+                            className={`h-3 w-3 ${topRank === 0 ? "text-yellow-400" :
+                                topRank === 1 ? "text-gray-300" :
+                                  topRank === 2 ? "text-amber-600" :
+                                    isSelected ? "text-white/70" : "opacity-50"
+                              }`}
                           />
                         )}
                         {year}
@@ -339,11 +342,11 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
           <ResponsiveContainer width="100%" height={400}>
             <LineChart data={cumulativeChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey="monthName" 
+              <XAxis
+                dataKey="monthName"
                 className="text-xs"
               />
-              <YAxis 
+              <YAxis
                 className="text-xs"
                 tickFormatter={(value) => formatNumber(value, 0)}
               />
@@ -407,7 +410,7 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
                   return (
                     <tr key={year} className="border-b hover:bg-muted/50">
                       <td className="py-2 px-2 font-medium">
-                        <span 
+                        <span
                           className="inline-block w-3 h-3 rounded-full mr-2"
                           style={{ backgroundColor: getYearColor(year) }}
                         />

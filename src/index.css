@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -112,7 +114,7 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground antialiased font-sans;
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
   }
@@ -157,6 +159,56 @@ All colors MUST be HSL.
   .glass-card {
     @apply bg-card/80 backdrop-blur-xl border border-border/50 shadow-xl;
   }
+
+  /* PREMIUM UTILITIES START */
+  .glass-card-premium {
+    @apply bg-white/70 dark:bg-black/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 shadow-2xl;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+  }
+
+  .text-gradient-primary {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent;
+  }
+
+  .bg-mesh-animate {
+    background-color: hsla(210, 70%, 35%, 1);
+    /* Fallback color */
+    background-image:
+      radial-gradient(at 0% 0%, hsla(210, 70%, 35%, 1) 0px, transparent 50%),
+      radial-gradient(at 50% 0%, hsla(32, 95%, 52%, 1) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(210, 70%, 35%, 1) 0px, transparent 50%),
+      radial-gradient(at 0% 50%, hsla(210, 20%, 98%, 1) 0px, transparent 50%),
+      radial-gradient(at 100% 50%, hsla(210, 20%, 96%, 1) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsla(210, 70%, 35%, 1) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, hsla(32, 95%, 52%, 1) 0px, transparent 50%);
+    background-size: 200% 200%;
+    animation: mesh-move 15s ease infinite alternate;
+  }
+
+  /* Dark mode mesh adjustment */
+  .dark .bg-mesh-animate {
+    background-color: hsla(215, 25%, 12%, 1);
+    background-image:
+      radial-gradient(at 0% 0%, hsla(210, 70%, 35%, 0.4) 0px, transparent 50%),
+      radial-gradient(at 50% 0%, hsla(32, 95%, 52%, 0.2) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(210, 70%, 35%, 0.4) 0px, transparent 50%),
+      radial-gradient(at 0% 50%, hsla(215, 25%, 12%, 1) 0px, transparent 50%),
+      radial-gradient(at 100% 50%, hsla(215, 25%, 14%, 1) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsla(210, 70%, 35%, 0.4) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, hsla(32, 95%, 52%, 0.2) 0px, transparent 50%);
+  }
+
+  @keyframes mesh-move {
+    0% {
+      background-position: 0% 0%;
+    }
+
+    100% {
+      background-position: 100% 100%;
+    }
+  }
+
+  /* PREMIUM UTILITIES END */
 
   .glass-card-subtle {
     @apply bg-card/60 backdrop-blur-md border border-border/30;
