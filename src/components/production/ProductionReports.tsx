@@ -34,6 +34,13 @@ interface DryIceEfficiencyData {
   completed_kg: number;
 }
 
+interface CustomerTotalsData {
+  customer_id: string | null;
+  customer_name: string;
+  total_cylinders: number;
+  total_dry_ice_kg: number;
+}
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -147,6 +154,7 @@ export function ProductionReports({
   const [dryIceEfficiency, setDryIceEfficiency] = useState<DryIceEfficiencyData | null>(null);
   const [prevCylinderEfficiency, setPrevCylinderEfficiency] = useState<EfficiencyData | null>(null);
   const [prevDryIceEfficiency, setPrevDryIceEfficiency] = useState<DryIceEfficiencyData | null>(null);
+  const [customerTotals, setCustomerTotals] = useState<CustomerTotalsData[]>([]);
   
   const [internalDateRange, setInternalDateRange] = useState<DateRange>({
     from: startOfMonth(new Date()),
@@ -211,7 +219,8 @@ export function ProductionReports({
        cylinderEffRes,
        dryIceEffRes,
        prevCylinderEffRes,
-       prevDryIceEffRes
+       prevDryIceEffRes,
+       customerTotalsRes
      ] = await Promise.all([
        // Daily production data for charts
        supabase.rpc("get_daily_production_by_period", {
@@ -248,6 +257,12 @@ export function ProductionReports({
          p_from_date: prevFromDate,
          p_to_date: prevToDate,
          p_location: locationParam
+       }),
+       // Customer totals for ranking
+       supabase.rpc("get_customer_totals_by_period", {
+         p_from_date: fromDate,
+         p_to_date: toDate,
+         p_location: locationParam
        })
      ]);
 
@@ -256,18 +271,23 @@ export function ProductionReports({
      console.log("[ProductionReports] Gas type distribution RPC:", gasTypeRes.data?.length || 0, "types");
      console.log("[ProductionReports] Cylinder efficiency RPC:", cylinderEffRes.data);
      console.log("[ProductionReports] Dry ice efficiency RPC:", dryIceEffRes.data);
+     console.log("[ProductionReports] Customer totals RPC:", customerTotalsRes.data?.length || 0, "customers");
 
      // Handle errors
      if (dailyRes.error) console.error("[ProductionReports] Daily production RPC error:", dailyRes.error);
      if (gasTypeRes.error) console.error("[ProductionReports] Gas type distribution RPC error:", gasTypeRes.error);
      if (cylinderEffRes.error) console.error("[ProductionReports] Cylinder efficiency RPC error:", cylinderEffRes.error);
      if (dryIceEffRes.error) console.error("[ProductionReports] Dry ice efficiency RPC error:", dryIceEffRes.error);
+     if (customerTotalsRes.error) console.error("[ProductionReports] Customer totals RPC error:", customerTotalsRes.error);
 
      // Set daily production data
      setDailyProduction(dailyRes.data || []);
 
      // Set gas type distribution
      setGasTypeDistributionData(gasTypeRes.data || []);
+
+     // Set customer totals
+     setCustomerTotals(customerTotalsRes.data || []);
 
      // Set current period efficiency data
      const cylEff = cylinderEffRes.data?.[0] || null;
@@ -371,11 +391,28 @@ export function ProductionReports({
     }));
   }, [gasTypeDistributionData]);
 
-  // Customer ranking - placeholder for now (needs RPC in future)
-  const getCustomerRanking = useCallback((type: "cylinder" | "dryIce") => {
-    // TODO: Use get_customer_totals_by_period RPC
-    return [];
-  }, []);
+  // Customer ranking from RPC data
+  const cylinderCustomerRanking = useMemo(() => {
+    return customerTotals
+      .filter(c => c.total_cylinders > 0)
+      .sort((a, b) => Number(b.total_cylinders) - Number(a.total_cylinders))
+      .slice(0, 5)
+      .map(c => ({
+        name: c.customer_name,
+        value: Number(c.total_cylinders)
+      }));
+  }, [customerTotals]);
+
+  const dryIceCustomerRanking = useMemo(() => {
+    return customerTotals
+      .filter(c => c.total_dry_ice_kg > 0)
+      .sort((a, b) => Number(b.total_dry_ice_kg) - Number(a.total_dry_ice_kg))
+      .slice(0, 5)
+      .map(c => ({
+        name: c.customer_name,
+        value: Number(c.total_dry_ice_kg)
+      }));
+  }, [customerTotals]);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
@@ -801,9 +838,9 @@ export function ProductionReports({
                 <CardDescription>Klanten met de meeste cilinder orders</CardDescription>
               </CardHeader>
               <CardContent>
-                {getCustomerRanking("cylinder").length > 0 ? (
+                {cylinderCustomerRanking.length > 0 ? (
                   <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={getCustomerRanking("cylinder")} layout="vertical">
+                    <BarChart data={cylinderCustomerRanking} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis type="number" className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
                       <YAxis dataKey="name" type="category" width={120} className="text-xs" />
@@ -813,7 +850,7 @@ export function ProductionReports({
                           border: '1px solid hsl(var(--border))'
                         }}
                       />
-                      <Bar dataKey="value" name="Cilinders" fill="#f97316" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="value" name="Cilinders" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -941,9 +978,26 @@ export function ProductionReports({
                 <CardDescription>Klanten met de meeste droogijs orders (kg)</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12 text-muted-foreground">
-                  <p>Klantoverzicht beschikbaar via TopCustomersWidget</p>
-                </div>
+                {dryIceCustomerRanking.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={dryIceCustomerRanking} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis type="number" className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
+                      <YAxis dataKey="name" type="category" width={120} className="text-xs" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--background))',
+                          border: '1px solid hsl(var(--border))'
+                        }}
+                      />
+                      <Bar dataKey="value" name="Droogijs (kg)" fill="hsl(var(--accent))" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    Geen data voor deze periode
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

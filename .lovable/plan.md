@@ -27,6 +27,8 @@
  
  ### Technische Implementatie (Update 1)
  
+ **Update 2 (5 feb 2026):** `get_customer_totals_by_period` RPC geïntegreerd in ProductionReports.tsx voor server-side klantranglijsten.
+ 
  #### Database Functies
  ```sql
  -- Efficiency berekening
@@ -51,6 +53,7 @@
    supabase.rpc("get_gas_type_distribution_by_period", { p_from_date, p_to_date, p_location }),
    supabase.rpc("get_production_efficiency_by_period", { p_from_date, p_to_date, p_location }),
    supabase.rpc("get_dry_ice_efficiency_by_period", { p_from_date, p_to_date, p_location: null }),
+   supabase.rpc("get_customer_totals_by_period", { p_from_date, p_to_date, p_location }),
    // + prev period calls for trend calculations
  ]);
  ```
