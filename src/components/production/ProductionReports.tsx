@@ -379,6 +379,9 @@ export function ProductionReports({
         const lastYear = subYears(now, 1);
         setDateRange({ from: startOfYear(lastYear), to: endOfYear(lastYear) });
         break;
+      case "this-year":
+        setDateRange({ from: startOfYear(now), to: endOfYear(now) });
+        break;
     }
   };
 
@@ -580,6 +583,9 @@ export function ProductionReports({
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setPresetRange("quarter")}>
                   Laatste 3 maanden
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setPresetRange("this-year")}>
+                  Dit jaar
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setPresetRange("last-year")}>
                   Vorig jaar
