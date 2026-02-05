@@ -1250,6 +1250,15 @@ export type Database = {
           trend: string
         }[]
       }
+      get_customer_totals_by_period: {
+        Args: { p_from_date: string; p_location?: string; p_to_date: string }
+        Returns: {
+          customer_id: string
+          customer_name: string
+          total_cylinders: number
+          total_dry_ice_kg: number
+        }[]
+      }
       get_daily_production_totals: {
         Args: { p_location?: string; p_month?: number; p_year: number }
         Returns: {
@@ -1294,6 +1303,18 @@ export type Database = {
       }
       get_production_efficiency: {
         Args: { p_location?: string; p_year: number }
+        Returns: {
+          cancelled_orders: number
+          completed_cylinders: number
+          completed_orders: number
+          efficiency_rate: number
+          pending_orders: number
+          total_cylinders: number
+          total_orders: number
+        }[]
+      }
+      get_production_efficiency_by_period: {
+        Args: { p_from_date: string; p_location?: string; p_to_date: string }
         Returns: {
           cancelled_orders: number
           completed_cylinders: number
