@@ -109,14 +109,33 @@ interface ProductionReportsProps {
   refreshKey?: number;
   onDataChanged?: () => void;
   location?: ProductionLocation;
+  dateRange?: DateRange;
+  onDateRangeChange?: (range: DateRange) => void;
 }
 
-export function ProductionReports({ refreshKey = 0, onDataChanged, location = "all" }: ProductionReportsProps) {
+export function ProductionReports({ 
+  refreshKey = 0, 
+  onDataChanged, 
+  location = "all",
+  dateRange: externalDateRange,
+  onDateRangeChange 
+}: ProductionReportsProps) {
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState<DateRange>({
+  const [internalDateRange, setInternalDateRange] = useState<DateRange>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
   });
+  
+  // Use external dateRange if provided, otherwise use internal state
+  const dateRange = externalDateRange || internalDateRange;
+  const setDateRange = (range: DateRange) => {
+    if (onDateRangeChange) {
+      onDateRangeChange(range);
+    } else {
+      setInternalDateRange(range);
+    }
+  };
+
   const [cylinderOrders, setCylinderOrders] = useState<GasCylinderOrder[]>([]);
   const [dryIceOrders, setDryIceOrders] = useState<DryIceOrder[]>([]);
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
@@ -617,7 +636,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
                     <Calendar
                       mode="single"
                       selected={dateRange.from}
-                      onSelect={(date) => date && setDateRange(prev => ({ ...prev, from: date }))}
+                      onSelect={(date) => date && setDateRange({ ...dateRange, from: date })}
                       locale={nl}
                       className={cn("p-3 pointer-events-auto")}
                     />
@@ -635,7 +654,7 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
                     <Calendar
                       mode="single"
                       selected={dateRange.to}
-                      onSelect={(date) => date && setDateRange(prev => ({ ...prev, to: date }))}
+                      onSelect={(date) => date && setDateRange({ ...dateRange, to: date })}
                       locale={nl}
                       className={cn("p-3 pointer-events-auto")}
                     />

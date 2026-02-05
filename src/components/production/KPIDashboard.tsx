@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,9 +31,15 @@ import { AnomalyAlertBadge, AnomalyAlertsPanel } from "./AnomalyAlertBadge";
 
 type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 
+type DateRange = {
+  from: Date;
+  to: Date;
+};
+
 interface KPIDashboardProps {
   location: ProductionLocation;
   refreshKey?: number;
+  dateRange?: DateRange;
 }
 
 interface EfficiencyData {
@@ -51,47 +57,125 @@ interface SparklineData {
   value: number;
 }
 
-export function KPIDashboard({ location, refreshKey = 0 }: KPIDashboardProps) {
+export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboardProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [currentYearData, setCurrentYearData] = useState<EfficiencyData | null>(null);
   const [previousYearData, setPreviousYearData] = useState<EfficiencyData | null>(null);
+  const [periodData, setPeriodData] = useState<{ current: EfficiencyData | null; previous: EfficiencyData | null }>({ current: null, previous: null });
   const [weeklyData, setWeeklyData] = useState<SparklineData[]>([]);
   const [historicalWeeklyData, setHistoricalWeeklyData] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
 
   const currentYear = new Date().getFullYear();
+  
+  // Check if using custom date range
+  const isCustomPeriod = !!dateRange;
 
   useEffect(() => {
     fetchKPIData();
-  }, [location, refreshKey]);
+  }, [location, refreshKey, dateRange]);
 
-  const fetchKPIData = async () => {
+  const fetchKPIData = useCallback(async () => {
     setLoading(true);
     
     const locationParam = location === "all" ? null : location;
     
-    // Fetch current year and previous year efficiency
-    const [currentResult, previousResult] = await Promise.all([
-      supabase.rpc("get_production_efficiency", { 
-        p_year: currentYear, 
-        p_location: locationParam 
-      }),
-      supabase.rpc("get_production_efficiency", { 
-        p_year: currentYear - 1, 
-        p_location: locationParam 
-      })
-    ]);
+    if (dateRange) {
+      // Calculate period-based data
+      const fromDate = dateRange.from.toISOString().split('T')[0];
+      const toDate = dateRange.to.toISOString().split('T')[0];
+      
+      // Calculate previous period (same length, immediately before)
+      const periodLength = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
+      const prevTo = new Date(dateRange.from);
+      prevTo.setDate(prevTo.getDate() - 1);
+      const prevFrom = new Date(prevTo);
+      prevFrom.setDate(prevFrom.getDate() - periodLength);
+      const prevFromDate = prevFrom.toISOString().split('T')[0];
+      const prevToDate = prevTo.toISOString().split('T')[0];
+      
+      // Fetch current period data
+      let currentQuery = supabase
+        .from("gas_cylinder_orders")
+        .select("id, status, cylinder_count")
+        .gte("scheduled_date", fromDate)
+        .lte("scheduled_date", toDate);
+      
+      let prevQuery = supabase
+        .from("gas_cylinder_orders")
+        .select("id, status, cylinder_count")
+        .gte("scheduled_date", prevFromDate)
+        .lte("scheduled_date", prevToDate);
+      
+      if (locationParam) {
+        currentQuery = currentQuery.eq("location", locationParam);
+        prevQuery = prevQuery.eq("location", locationParam);
+      }
+      
+      const [currentRes, prevRes] = await Promise.all([currentQuery, prevQuery]);
+      
+      const calculateEfficiency = (orders: typeof currentRes.data) => {
+        if (!orders || orders.length === 0) {
+          return {
+            total_orders: 0,
+            completed_orders: 0,
+            pending_orders: 0,
+            cancelled_orders: 0,
+            efficiency_rate: 0,
+            total_cylinders: 0,
+            completed_cylinders: 0
+          };
+        }
+        
+        const totalOrders = orders.length;
+        const completed = orders.filter(o => o.status === "completed");
+        const pending = orders.filter(o => o.status === "pending");
+        const cancelled = orders.filter(o => o.status === "cancelled");
+        const nonCancelled = totalOrders - cancelled.length;
+        
+        return {
+          total_orders: totalOrders,
+          completed_orders: completed.length,
+          pending_orders: pending.length,
+          cancelled_orders: cancelled.length,
+          efficiency_rate: nonCancelled > 0 ? Math.round((completed.length / nonCancelled) * 100) : 0,
+          total_cylinders: orders.filter(o => o.status !== "cancelled").reduce((sum, o) => sum + o.cylinder_count, 0),
+          completed_cylinders: completed.reduce((sum, o) => sum + o.cylinder_count, 0)
+        };
+      };
+      
+      const currentData = calculateEfficiency(currentRes.data);
+      const previousData = calculateEfficiency(prevRes.data);
+      
+      setPeriodData({ current: currentData, previous: previousData });
+      setCurrentYearData(currentData);
+      setPreviousYearData(previousData);
+    } else {
+      // Fetch current year and previous year efficiency
+      const [currentResult, previousResult] = await Promise.all([
+        supabase.rpc("get_production_efficiency", { 
+          p_year: currentYear, 
+          p_location: locationParam 
+        }),
+        supabase.rpc("get_production_efficiency", { 
+          p_year: currentYear - 1, 
+          p_location: locationParam 
+        })
+      ]);
 
-    if (currentResult.data && currentResult.data.length > 0) {
-      setCurrentYearData(currentResult.data[0]);
-    }
-    
-    if (previousResult.data && previousResult.data.length > 0) {
-      setPreviousYearData(previousResult.data[0]);
+      if (currentResult.data && currentResult.data.length > 0) {
+        setCurrentYearData(currentResult.data[0]);
+      }
+      
+      if (previousResult.data && previousResult.data.length > 0) {
+        setPreviousYearData(previousResult.data[0]);
+      }
+      
+      setPeriodData({ current: null, previous: null });
     }
 
-    // Fetch weekly sparkline data (last 8 weeks)
-    const weeklySparkline = await fetchWeeklySparkline(locationParam);
+    // Fetch weekly sparkline data (last 8 weeks or within date range)
+    const weeklySparkline = await fetchWeeklySparkline(locationParam, dateRange);
     setWeeklyData(weeklySparkline);
     
     // Store historical values for anomaly detection (exclude current week)
@@ -99,11 +183,11 @@ export function KPIDashboard({ location, refreshKey = 0 }: KPIDashboardProps) {
     setHistoricalWeeklyData(historicalValues);
     
     setLoading(false);
-  };
+  }, [location, dateRange, currentYear]);
 
-  const fetchWeeklySparkline = async (locationParam: string | null): Promise<SparklineData[]> => {
+  const fetchWeeklySparkline = async (locationParam: string | null, dateRange?: DateRange): Promise<SparklineData[]> => {
     const weeks: SparklineData[] = [];
-    const today = new Date();
+    const today = dateRange?.to || new Date();
     
     for (let i = 7; i >= 0; i--) {
       const weekStart = new Date(today);
@@ -225,7 +309,10 @@ export function KPIDashboard({ location, refreshKey = 0 }: KPIDashboardProps) {
                 <Activity className="h-5 w-5 text-primary" />
                 KPI Dashboard
                 <Badge variant="outline" className="ml-2 text-xs">
-                  {currentYear}
+                  {isCustomPeriod && dateRange 
+                    ? `${dateRange.from.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} - ${dateRange.to.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                    : currentYear
+                  }
                 </Badge>
                 {activeAnomalies.length > 0 && (
                   <Badge 
@@ -278,6 +365,9 @@ export function KPIDashboard({ location, refreshKey = 0 }: KPIDashboardProps) {
                     <div className="flex items-center gap-2">
                       <BarChart3 className="h-4 w-4 text-orange-500" />
                       <span className="text-xs font-medium text-muted-foreground">Volume YTD</span>
+                    {isCustomPeriod && (
+                      <Badge variant="outline" className="text-[10px] py-0 h-4">Periode</Badge>
+                    )}
                     </div>
                     <div className={cn("flex items-center gap-1 text-xs font-medium", getTrendColor(volumeTrend))}>
                       {getTrendIcon(volumeTrend)}
@@ -288,7 +378,7 @@ export function KPIDashboard({ location, refreshKey = 0 }: KPIDashboardProps) {
                     {formatNumber(currentYearData?.total_cylinders || 0, 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Cilinders dit jaar
+                    {isCustomPeriod ? "Cilinders in periode" : "Cilinders dit jaar"}
                   </p>
                 </div>
 
