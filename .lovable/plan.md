@@ -1,78 +1,145 @@
 
 
-# Fix: KPI Dashboard toont nog steeds 1000 orders voor 2025
+# RPC Functies voor Droogijs Statistieken
 
-## Probleem Analyse
+## Analyse
 
-Na code-review blijkt dat de KPI Dashboard code **correct is aangepast** om de `get_production_efficiency_by_period` RPC te gebruiken. De RPC functies bestaan in de database en berekenen correct:
-- **19.398** voltooide orders voor 2025
-- **321.674** totale cilinders
+De huidige code haalt dry ice statistieken op door individuele rijen te fetchen en client-side te aggregeren. Dit kan dezelfde 1.000-rijlimiet problematiek veroorzaken die we net voor gascilinders hebben opgelost.
 
-Het probleem is dat:
-1. **Foutafhandeling ontbreekt**: Als de RPC faalt (bijv. autorisatie), wordt dit stil genegeerd
-2. **De preview moet mogelijk verversen** om de nieuwe code te laden
+### Huidige situatie droogijs data:
+- 2026: **158 orders** / **47.880 kg**
+- 2027: **4 orders** / **1.080 kg**
+- 2025: Geen data
+
+Hoewel de huidige volumes nog binnen de limiet vallen, is het verstandig om dit proactief op te lossen voor toekomstige schaalbaarheid.
+
+### Componenten die droogijs statistieken ophalen:
+1. **ProductionPlanning.tsx** - `fetchStats()` haalt `quantity_kg` op per order
+2. **ProductionReports.tsx** - Haalt volledige droogijs orders op voor rapportage
+3. **TopCustomersWidget.tsx** - Gebruikt al de nieuwe `get_customer_totals_by_period` RPC
 
 ## Oplossing
 
-### Stap 1: Voeg error logging toe aan KPIDashboard
+Maak twee nieuwe database functies:
 
-Voeg console.error logging en optioneel een toast melding toe wanneer de RPC faalt:
+### 1. `get_dry_ice_efficiency_by_period`
+Vergelijkbaar met `get_production_efficiency_by_period` maar voor droogijs orders:
 
-```typescript
-const [currentRes, prevRes] = await Promise.all([
-  supabase.rpc("get_production_efficiency_by_period", { ... }),
-  supabase.rpc("get_production_efficiency_by_period", { ... })
-]);
-
-// Voeg error handling toe
-if (currentRes.error) {
-  console.error("Error fetching current period data:", currentRes.error);
-}
-if (prevRes.error) {
-  console.error("Error fetching previous period data:", prevRes.error);
-}
+```sql
+CREATE OR REPLACE FUNCTION public.get_dry_ice_efficiency_by_period(
+  p_from_date date,
+  p_to_date date,
+  p_location text DEFAULT NULL
+)
+RETURNS TABLE(
+  total_orders bigint,
+  completed_orders bigint,
+  pending_orders bigint,
+  cancelled_orders bigint,
+  efficiency_rate numeric,
+  total_kg numeric,
+  completed_kg numeric
+)
 ```
 
-### Stap 2: Voeg try-catch wrapper toe
+### 2. Update ProductionPlanning.tsx
 
-Omring de hele fetch operatie met try-catch voor betere foutopsporing:
+Vervang de client-side aggregatie door een RPC call:
 
 ```typescript
-const fetchKPIData = useCallback(async () => {
-  setLoading(true);
-  
-  try {
-    // ... existing code
-  } catch (error) {
-    console.error("Error fetching KPI data:", error);
-  } finally {
-    setLoading(false);
-  }
-}, [location, dateRange, currentYear]);
+// Huidige code (problematisch bij >1000 orders):
+const { data: dryIceData } = await supabase
+  .from("dry_ice_orders")
+  .select("quantity_kg")
+  .gte("scheduled_date", fromDate)
+  .lte("scheduled_date", toDate);
+
+if (dryIceData) {
+  setDryIceToday(dryIceData.reduce((sum, o) => sum + Number(o.quantity_kg), 0));
+}
+
+// Nieuwe code (server-side aggregatie):
+const { data } = await supabase.rpc("get_dry_ice_efficiency_by_period", {
+  p_from_date: fromDate,
+  p_to_date: toDate,
+  p_location: null // droogijs alleen in Emmen
+});
+
+if (data?.[0]) {
+  setDryIceToday(data[0].total_kg);
+}
 ```
-
-### Stap 3: Verifieer deployment
-
-Na de wijzigingen, ververs de preview en test met "Vorig jaar" (2025) om te bevestigen dat de correcte aantallen worden getoond.
 
 ## Bestanden te wijzigen
 
 | Bestand | Wijziging |
 |---------|-----------|
-| `src/components/production/KPIDashboard.tsx` | Voeg error handling en logging toe |
+| Database migratie | Nieuwe RPC functie `get_dry_ice_efficiency_by_period` |
+| `src/components/production/ProductionPlanning.tsx` | Vervang fetch-all door RPC calls in `fetchStats()` |
+
+## Technische Details
+
+### Database Functie Specificatie
+
+```sql
+CREATE OR REPLACE FUNCTION public.get_dry_ice_efficiency_by_period(
+  p_from_date date,
+  p_to_date date,
+  p_location text DEFAULT NULL
+)
+RETURNS TABLE(
+  total_orders bigint,
+  completed_orders bigint,
+  pending_orders bigint,
+  cancelled_orders bigint,
+  efficiency_rate numeric,
+  total_kg numeric,
+  completed_kg numeric
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF NOT (public.is_admin() OR public.has_role(auth.uid(), 'supervisor')) THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  RETURN QUERY
+  SELECT 
+    COUNT(*)::bigint as total_orders,
+    COUNT(*) FILTER (WHERE status = 'completed')::bigint as completed_orders,
+    COUNT(*) FILTER (WHERE status = 'pending')::bigint as pending_orders,
+    COUNT(*) FILTER (WHERE status = 'cancelled')::bigint as cancelled_orders,
+    CASE 
+      WHEN COUNT(*) FILTER (WHERE status != 'cancelled') = 0 THEN 0
+      ELSE ROUND(
+        COUNT(*) FILTER (WHERE status = 'completed')::numeric * 100 / 
+        NULLIF(COUNT(*) FILTER (WHERE status != 'cancelled'), 0), 1
+      )
+    END as efficiency_rate,
+    COALESCE(SUM(quantity_kg) FILTER (WHERE status != 'cancelled'), 0)::numeric as total_kg,
+    COALESCE(SUM(quantity_kg) FILTER (WHERE status = 'completed'), 0)::numeric as completed_kg
+  FROM public.dry_ice_orders
+  WHERE scheduled_date >= p_from_date
+    AND scheduled_date <= p_to_date
+    AND (p_location IS NULL OR location::text = p_location);
+END;
+$$;
+```
+
+### Frontend Wijzigingen (ProductionPlanning.tsx)
+
+De `fetchStats()` functie wordt geoptimaliseerd:
+
+1. **Droogijs data**: Vervang individuele row fetch door `get_dry_ice_efficiency_by_period` RPC
+2. **Cilinder data**: Behoudt de bestaande `get_production_efficiency_by_period` RPC (al geïmplementeerd)
+3. **Order counts**: Gebruik de totalen uit de RPC responses in plaats van aparte count queries
 
 ## Verwacht Resultaat
 
-Na implementatie:
-- Het KPI Dashboard toont **19.398** voltooide orders voor 2025
-- Eventuele fouten worden gelogd naar de console voor debugging
-- Bij een fout wordt een fallback weergegeven in plaats van stille 0-waarden
-
-## Verificatie Stappen
-
-1. Open de Productie pagina
-2. Ga naar de Rapportage tab
-3. Selecteer "Vorig jaar" om 2025 te bekijken
-4. Controleer of het KPI Dashboard nu 19.398 voltooide orders toont
-5. Check de browser console voor eventuele foutmeldingen
+- Alle droogijs statistieken worden server-side berekend
+- Geen 1.000-rij limiet problemen bij grote datasets
+- Consistente aanpak voor zowel cilinder- als droogijsproductie
+- Betere performance door minder database roundtrips
 
