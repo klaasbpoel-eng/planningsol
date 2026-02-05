@@ -95,28 +95,23 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
       const prevToDate = prevTo.toISOString().split('T')[0];
       
       // Fetch current period data
-      let currentQuery = supabase
-        .from("gas_cylinder_orders")
-        .select("id, status, cylinder_count")
-        .gte("scheduled_date", fromDate)
-        .lte("scheduled_date", toDate);
+      // Use RPC function for server-side aggregation (avoids 1000 row limit)
+      const [currentRes, prevRes] = await Promise.all([
+        supabase.rpc("get_production_efficiency_by_period", {
+          p_from_date: fromDate,
+          p_to_date: toDate,
+          p_location: locationParam
+        }),
+        supabase.rpc("get_production_efficiency_by_period", {
+          p_from_date: prevFromDate,
+          p_to_date: prevToDate,
+          p_location: locationParam
+        })
+      ]);
       
-      let prevQuery = supabase
-        .from("gas_cylinder_orders")
-        .select("id, status, cylinder_count")
-        .gte("scheduled_date", prevFromDate)
-        .lte("scheduled_date", prevToDate);
-      
-      if (locationParam) {
-        currentQuery = currentQuery.eq("location", locationParam);
-        prevQuery = prevQuery.eq("location", locationParam);
-      }
-      
-      const [currentRes, prevRes] = await Promise.all([currentQuery, prevQuery]);
-      
-      const calculateEfficiency = (orders: typeof currentRes.data) => {
-        if (!orders || orders.length === 0) {
-          return {
+      const currentData = currentRes.data && currentRes.data.length > 0 
+        ? currentRes.data[0] 
+        : {
             total_orders: 0,
             completed_orders: 0,
             pending_orders: 0,
@@ -125,27 +120,18 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
             total_cylinders: 0,
             completed_cylinders: 0
           };
-        }
-        
-        const totalOrders = orders.length;
-        const completed = orders.filter(o => o.status === "completed");
-        const pending = orders.filter(o => o.status === "pending");
-        const cancelled = orders.filter(o => o.status === "cancelled");
-        const nonCancelled = totalOrders - cancelled.length;
-        
-        return {
-          total_orders: totalOrders,
-          completed_orders: completed.length,
-          pending_orders: pending.length,
-          cancelled_orders: cancelled.length,
-          efficiency_rate: nonCancelled > 0 ? Math.round((completed.length / nonCancelled) * 100) : 0,
-          total_cylinders: orders.filter(o => o.status !== "cancelled").reduce((sum, o) => sum + o.cylinder_count, 0),
-          completed_cylinders: completed.reduce((sum, o) => sum + o.cylinder_count, 0)
-        };
-      };
       
-      const currentData = calculateEfficiency(currentRes.data);
-      const previousData = calculateEfficiency(prevRes.data);
+      const previousData = prevRes.data && prevRes.data.length > 0 
+        ? prevRes.data[0] 
+        : {
+            total_orders: 0,
+            completed_orders: 0,
+            pending_orders: 0,
+            cancelled_orders: 0,
+            efficiency_rate: 0,
+            total_cylinders: 0,
+            completed_cylinders: 0
+          };
       
       setPeriodData({ current: currentData, previous: previousData });
       setCurrentYearData(currentData);

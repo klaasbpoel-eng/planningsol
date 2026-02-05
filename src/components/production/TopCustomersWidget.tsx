@@ -132,95 +132,47 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
     const prevFromDate = format(prevFrom, "yyyy-MM-dd");
     const prevToDate = format(prevTo, "yyyy-MM-dd");
     
-    // Fetch current period cylinder orders grouped by customer
-    let currentCylinderQuery = supabase
-      .from("gas_cylinder_orders")
-      .select("customer_id, customer_name, cylinder_count")
-      .gte("scheduled_date", fromDate)
-      .lte("scheduled_date", toDate)
-      .neq("status", "cancelled");
+    const locationFilter = location === "all" ? null : location;
     
-    let currentDryIceQuery = supabase
-      .from("dry_ice_orders")
-      .select("customer_id, customer_name, quantity_kg")
-      .gte("scheduled_date", fromDate)
-      .lte("scheduled_date", toDate)
-      .neq("status", "cancelled");
-    
-    // Fetch previous period data
-    let prevCylinderQuery = supabase
-      .from("gas_cylinder_orders")
-      .select("customer_id, customer_name, cylinder_count")
-      .gte("scheduled_date", prevFromDate)
-      .lte("scheduled_date", prevToDate)
-      .neq("status", "cancelled");
-    
-    let prevDryIceQuery = supabase
-      .from("dry_ice_orders")
-      .select("customer_id, customer_name, quantity_kg")
-      .gte("scheduled_date", prevFromDate)
-      .lte("scheduled_date", prevToDate)
-      .neq("status", "cancelled");
-    
-    // Apply location filter
-    if (location !== "all") {
-      currentCylinderQuery = currentCylinderQuery.eq("location", location);
-      currentDryIceQuery = currentDryIceQuery.eq("location", location);
-      prevCylinderQuery = prevCylinderQuery.eq("location", location);
-      prevDryIceQuery = prevDryIceQuery.eq("location", location);
-    }
-    
-    const [currentCylinders, currentDryIce, prevCylinders, prevDryIce] = await Promise.all([
-      currentCylinderQuery,
-      currentDryIceQuery,
-      prevCylinderQuery,
-      prevDryIceQuery
+    // Use RPC function for server-side aggregation (avoids 1000 row limit)
+    const [currentRes, previousRes] = await Promise.all([
+      supabase.rpc("get_customer_totals_by_period", {
+        p_from_date: fromDate,
+        p_to_date: toDate,
+        p_location: locationFilter
+      }),
+      supabase.rpc("get_customer_totals_by_period", {
+        p_from_date: prevFromDate,
+        p_to_date: prevToDate,
+        p_location: locationFilter
+      })
     ]);
     
-    // Aggregate current period data by customer
-    const customerMap = new Map<string, { id: string | null; name: string; cylinders: number; dryIce: number }>();
-    
-    (currentCylinders.data || []).forEach(order => {
-      const existing = customerMap.get(order.customer_name) || { id: order.customer_id, name: order.customer_name, cylinders: 0, dryIce: 0 };
-      existing.cylinders += order.cylinder_count;
-      customerMap.set(order.customer_name, existing);
-    });
-    
-    (currentDryIce.data || []).forEach(order => {
-      const existing = customerMap.get(order.customer_name) || { id: order.customer_id, name: order.customer_name, cylinders: 0, dryIce: 0 };
-      existing.dryIce += Number(order.quantity_kg);
-      customerMap.set(order.customer_name, existing);
-    });
-    
-    // Aggregate previous period data
+    // Build previous period map for trend calculation
     const prevMap = new Map<string, { cylinders: number; dryIce: number }>();
-    
-    (prevCylinders.data || []).forEach(order => {
-      const existing = prevMap.get(order.customer_name) || { cylinders: 0, dryIce: 0 };
-      existing.cylinders += order.cylinder_count;
-      prevMap.set(order.customer_name, existing);
-    });
-    
-    (prevDryIce.data || []).forEach(order => {
-      const existing = prevMap.get(order.customer_name) || { cylinders: 0, dryIce: 0 };
-      existing.dryIce += Number(order.quantity_kg);
-      prevMap.set(order.customer_name, existing);
-    });
+    if (previousRes.data) {
+      previousRes.data.forEach((c: { customer_name: string; total_cylinders: number; total_dry_ice_kg: number }) => {
+        prevMap.set(c.customer_name, {
+          cylinders: Number(c.total_cylinders) || 0,
+          dryIce: Number(c.total_dry_ice_kg) || 0
+        });
+      });
+    }
     
     // Build enriched customer data
-    const enriched: CustomerData[] = Array.from(customerMap.values()).map(c => {
-      const prev = prevMap.get(c.name) || { cylinders: 0, dryIce: 0 };
-      const currentTotal = c.cylinders + c.dryIce;
+    const enriched: CustomerData[] = (currentRes.data || []).map((c: { customer_id: string | null; customer_name: string; total_cylinders: number; total_dry_ice_kg: number }) => {
+      const prev = prevMap.get(c.customer_name) || { cylinders: 0, dryIce: 0 };
+      const currentTotal = Number(c.total_cylinders) + Number(c.total_dry_ice_kg);
       const previousTotal = prev.cylinders + prev.dryIce;
       const changePercent = previousTotal > 0 
         ? ((currentTotal - previousTotal) / previousTotal) * 100 
         : currentTotal > 0 ? 100 : 0;
 
       return {
-        customer_id: c.id,
-        customer_name: c.name,
-        total_cylinders: c.cylinders,
-        total_dry_ice_kg: c.dryIce,
+        customer_id: c.customer_id,
+        customer_name: c.customer_name,
+        total_cylinders: Number(c.total_cylinders) || 0,
+        total_dry_ice_kg: Number(c.total_dry_ice_kg) || 0,
         previousCylinders: prev.cylinders,
         previousDryIce: prev.dryIce,
         totalVolume: currentTotal,
