@@ -18,7 +18,7 @@
  | `get_monthly_cylinder_totals_by_customer` | Maandelijkse cilinders per klant | YearComparisonReport |
  | `get_yearly_totals_by_customer` | Jaarlijkse totalen per klant | TopCustomersWidget, YearComparisonReport |
  | `get_customer_totals_by_period` | Klant totalen voor periode | TopCustomersWidget |
- | `get_customer_segments` | Klantsegmentatie analyse | CustomerSegmentation |
+| `get_customer_segments` | Klantsegmentatie analyse | CustomerSegmentation, ProductionReports |
  | `bulk_delete_orders_by_year` | Bulk verwijdering orders | Admin functies |
  | `get_user_role` | Gebruikersrol ophalen | Auth hooks |
  | `get_user_production_location` | Gebruiker productielocatie | Auth hooks |
@@ -263,7 +263,7 @@
  }[]
  ```
  
- **Gebruikt in:** `TopCustomersWidget.tsx` (periode modus)
+**Gebruikt in:** `TopCustomersWidget.tsx` (periode modus), `ProductionReports.tsx` (klantranglijst)
  
  ---
  
