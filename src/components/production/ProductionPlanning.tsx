@@ -186,110 +186,74 @@ export function ProductionPlanning({
     const prevFromDate = format(prevFrom, "yyyy-MM-dd");
     const prevToDate = format(prevTo, "yyyy-MM-dd");
 
-    // Fetch dry ice orders for date range
-    let dryIceQuery = supabase
-      .from("dry_ice_orders")
-      .select("quantity_kg")
-      .gte("scheduled_date", fromDate)
-      .lte("scheduled_date", toDate)
-      .neq("status", "cancelled");
+   // Use RPC functions for server-side aggregation (avoids 1000 row limit)
+   const locationParam = selectedLocation === "all" ? null : selectedLocation;
 
-    const { data: dryIceData } = await dryIceQuery;
+   try {
+     // Fetch current period stats using RPC functions (parallel calls)
+     const [dryIceRes, cylinderRes, prevDryIceRes, prevCylinderRes] = await Promise.all([
+       supabase.rpc("get_dry_ice_efficiency_by_period", {
+         p_from_date: fromDate,
+         p_to_date: toDate,
+         p_location: null // Dry ice is only in Emmen, no location filter needed
+       }),
+       supabase.rpc("get_production_efficiency_by_period", {
+         p_from_date: fromDate,
+         p_to_date: toDate,
+         p_location: locationParam
+       }),
+       supabase.rpc("get_dry_ice_efficiency_by_period", {
+         p_from_date: prevFromDate,
+         p_to_date: prevToDate,
+         p_location: null
+       }),
+       supabase.rpc("get_production_efficiency_by_period", {
+         p_from_date: prevFromDate,
+         p_to_date: prevToDate,
+         p_location: locationParam
+       })
+     ]);
 
-    if (dryIceData) {
-      setDryIceToday(dryIceData.reduce((sum, o) => sum + Number(o.quantity_kg), 0));
-    }
+     // Handle dry ice current period
+     if (dryIceRes.error) {
+       console.error("[ProductionPlanning] Dry ice RPC error:", dryIceRes.error);
+     } else if (dryIceRes.data?.[0]) {
+       setDryIceToday(Number(dryIceRes.data[0].total_kg) || 0);
+     }
 
-    // Fetch dry ice orders for previous period (for trend)
-    const { data: prevDryIceData } = await supabase
-      .from("dry_ice_orders")
-      .select("quantity_kg")
-      .gte("scheduled_date", prevFromDate)
-      .lte("scheduled_date", prevToDate)
-      .neq("status", "cancelled");
+     // Handle cylinder current period
+     if (cylinderRes.error) {
+       console.error("[ProductionPlanning] Cylinder RPC error:", cylinderRes.error);
+     } else if (cylinderRes.data?.[0]) {
+       setCylindersToday(Number(cylinderRes.data[0].total_cylinders) || 0);
+     }
 
-    if (prevDryIceData) {
-      setPreviousDryIceToday(prevDryIceData.reduce((sum, o) => sum + Number(o.quantity_kg), 0));
-    }
+     // Handle dry ice previous period
+     if (prevDryIceRes.error) {
+       console.error("[ProductionPlanning] Prev dry ice RPC error:", prevDryIceRes.error);
+     } else if (prevDryIceRes.data?.[0]) {
+       setPreviousDryIceToday(Number(prevDryIceRes.data[0].total_kg) || 0);
+     }
 
-    // Fetch cylinder orders for date range (filtered by location)
-    let cylinderQuery = supabase
-      .from("gas_cylinder_orders")
-      .select("cylinder_count")
-      .gte("scheduled_date", fromDate)
-      .lte("scheduled_date", toDate)
-      .neq("status", "cancelled");
+     // Handle cylinder previous period
+     if (prevCylinderRes.error) {
+       console.error("[ProductionPlanning] Prev cylinder RPC error:", prevCylinderRes.error);
+     } else if (prevCylinderRes.data?.[0]) {
+       setPreviousCylindersToday(Number(prevCylinderRes.data[0].total_cylinders) || 0);
+     }
 
-    if (selectedLocation !== "all") {
-      cylinderQuery = cylinderQuery.eq("location", selectedLocation);
-    }
+     // Calculate total orders from RPC responses
+     const currentDryIceOrders = dryIceRes.data?.[0]?.total_orders || 0;
+     const currentCylinderOrders = cylinderRes.data?.[0]?.total_orders || 0;
+     setWeekOrders(Number(currentDryIceOrders) + Number(currentCylinderOrders));
 
-    const { data: cylinderData } = await cylinderQuery;
+     const prevDryIceOrders = prevDryIceRes.data?.[0]?.total_orders || 0;
+     const prevCylinderOrders = prevCylinderRes.data?.[0]?.total_orders || 0;
+     setPreviousWeekOrders(Number(prevDryIceOrders) + Number(prevCylinderOrders));
 
-    if (cylinderData) {
-      setCylindersToday(cylinderData.reduce((sum, o) => sum + o.cylinder_count, 0));
-    }
-
-    // Fetch cylinder orders for previous period (for trend)
-    let prevCylinderQuery = supabase
-      .from("gas_cylinder_orders")
-      .select("cylinder_count")
-      .gte("scheduled_date", prevFromDate)
-      .lte("scheduled_date", prevToDate)
-      .neq("status", "cancelled");
-
-    if (selectedLocation !== "all") {
-      prevCylinderQuery = prevCylinderQuery.eq("location", selectedLocation);
-    }
-
-    const { data: prevCylinderData } = await prevCylinderQuery;
-
-    if (prevCylinderData) {
-      setPreviousCylindersToday(prevCylinderData.reduce((sum, o) => sum + o.cylinder_count, 0));
-    }
-
-    // Fetch total orders count for date range
-    const { count: dryIceCount } = await supabase
-      .from("dry_ice_orders")
-      .select("*", { count: "exact", head: true })
-      .gte("scheduled_date", fromDate)
-      .lte("scheduled_date", toDate);
-
-    // Cylinder count with location filter
-    let periodCylinderQuery = supabase
-      .from("gas_cylinder_orders")
-      .select("*", { count: "exact", head: true })
-      .gte("scheduled_date", fromDate)
-      .lte("scheduled_date", toDate);
-
-    if (selectedLocation !== "all") {
-      periodCylinderQuery = periodCylinderQuery.eq("location", selectedLocation);
-    }
-
-    const { count: cylinderCount } = await periodCylinderQuery;
-
-    setWeekOrders((dryIceCount || 0) + (cylinderCount || 0));
-
-    // Fetch previous period orders count (for trend)
-    const { count: prevDryIceCount } = await supabase
-      .from("dry_ice_orders")
-      .select("*", { count: "exact", head: true })
-      .gte("scheduled_date", prevFromDate)
-      .lte("scheduled_date", prevToDate);
-
-    let prevPeriodCylinderQuery = supabase
-      .from("gas_cylinder_orders")
-      .select("*", { count: "exact", head: true })
-      .gte("scheduled_date", prevFromDate)
-      .lte("scheduled_date", prevToDate);
-
-    if (selectedLocation !== "all") {
-      prevPeriodCylinderQuery = prevPeriodCylinderQuery.eq("location", selectedLocation);
-    }
-
-    const { count: prevCylinderCount } = await prevPeriodCylinderQuery;
-
-    setPreviousWeekOrders((prevDryIceCount || 0) + (prevCylinderCount || 0));
+   } catch (error) {
+     console.error("[ProductionPlanning] Error fetching stats:", error);
+   }
   };
 
   return (

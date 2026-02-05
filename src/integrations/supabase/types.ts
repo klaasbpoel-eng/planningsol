@@ -1267,6 +1267,18 @@ export type Database = {
           production_date: string
         }[]
       }
+      get_dry_ice_efficiency_by_period: {
+        Args: { p_from_date: string; p_location?: string; p_to_date: string }
+        Returns: {
+          cancelled_orders: number
+          completed_kg: number
+          completed_orders: number
+          efficiency_rate: number
+          pending_orders: number
+          total_kg: number
+          total_orders: number
+        }[]
+      }
       get_monthly_cylinder_totals_by_customer: {
         Args: { p_location?: string; p_year: number }
         Returns: {
