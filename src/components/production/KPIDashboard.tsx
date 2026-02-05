@@ -76,99 +76,130 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
   }, [location, refreshKey, dateRange]);
 
   const fetchKPIData = useCallback(async () => {
+    console.log("[KPIDashboard] Fetching KPI data...", { location, dateRange });
     setLoading(true);
-    
-    const locationParam = location === "all" ? null : location;
-    
-    if (dateRange) {
-      // Calculate period-based data
-      const fromDate = dateRange.from.toISOString().split('T')[0];
-      const toDate = dateRange.to.toISOString().split('T')[0];
-      
-      // Calculate previous period (same length, immediately before)
-      const periodLength = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
-      const prevTo = new Date(dateRange.from);
-      prevTo.setDate(prevTo.getDate() - 1);
-      const prevFrom = new Date(prevTo);
-      prevFrom.setDate(prevFrom.getDate() - periodLength);
-      const prevFromDate = prevFrom.toISOString().split('T')[0];
-      const prevToDate = prevTo.toISOString().split('T')[0];
-      
-      // Fetch current period data
-      // Use RPC function for server-side aggregation (avoids 1000 row limit)
-      const [currentRes, prevRes] = await Promise.all([
-        supabase.rpc("get_production_efficiency_by_period", {
-          p_from_date: fromDate,
-          p_to_date: toDate,
-          p_location: locationParam
-        }),
-        supabase.rpc("get_production_efficiency_by_period", {
-          p_from_date: prevFromDate,
-          p_to_date: prevToDate,
-          p_location: locationParam
-        })
-      ]);
-      
-      const currentData = currentRes.data && currentRes.data.length > 0 
-        ? currentRes.data[0] 
-        : {
-            total_orders: 0,
-            completed_orders: 0,
-            pending_orders: 0,
-            cancelled_orders: 0,
-            efficiency_rate: 0,
-            total_cylinders: 0,
-            completed_cylinders: 0
-          };
-      
-      const previousData = prevRes.data && prevRes.data.length > 0 
-        ? prevRes.data[0] 
-        : {
-            total_orders: 0,
-            completed_orders: 0,
-            pending_orders: 0,
-            cancelled_orders: 0,
-            efficiency_rate: 0,
-            total_cylinders: 0,
-            completed_cylinders: 0
-          };
-      
-      setPeriodData({ current: currentData, previous: previousData });
-      setCurrentYearData(currentData);
-      setPreviousYearData(previousData);
-    } else {
-      // Fetch current year and previous year efficiency
-      const [currentResult, previousResult] = await Promise.all([
-        supabase.rpc("get_production_efficiency", { 
-          p_year: currentYear, 
-          p_location: locationParam 
-        }),
-        supabase.rpc("get_production_efficiency", { 
-          p_year: currentYear - 1, 
-          p_location: locationParam 
-        })
-      ]);
 
-      if (currentResult.data && currentResult.data.length > 0) {
-        setCurrentYearData(currentResult.data[0]);
-      }
+    try {
+      const locationParam = location === "all" ? null : location;
       
-      if (previousResult.data && previousResult.data.length > 0) {
-        setPreviousYearData(previousResult.data[0]);
+      if (dateRange) {
+        // Calculate period-based data
+        const fromDate = dateRange.from.toISOString().split('T')[0];
+        const toDate = dateRange.to.toISOString().split('T')[0];
+        
+        console.log("[KPIDashboard] Calling RPC with date range:", { fromDate, toDate, locationParam });
+        
+        // Calculate previous period (same length, immediately before)
+        const periodLength = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
+        const prevTo = new Date(dateRange.from);
+        prevTo.setDate(prevTo.getDate() - 1);
+        const prevFrom = new Date(prevTo);
+        prevFrom.setDate(prevFrom.getDate() - periodLength);
+        const prevFromDate = prevFrom.toISOString().split('T')[0];
+        const prevToDate = prevTo.toISOString().split('T')[0];
+        
+        // Fetch current period data
+        // Use RPC function for server-side aggregation (avoids 1000 row limit)
+        const [currentRes, prevRes] = await Promise.all([
+          supabase.rpc("get_production_efficiency_by_period", {
+            p_from_date: fromDate,
+            p_to_date: toDate,
+            p_location: locationParam
+          }),
+          supabase.rpc("get_production_efficiency_by_period", {
+            p_from_date: prevFromDate,
+            p_to_date: prevToDate,
+            p_location: locationParam
+          })
+        ]);
+        
+        // Log errors if any
+        if (currentRes.error) {
+          console.error("[KPIDashboard] Error fetching current period data:", currentRes.error);
+        }
+        if (prevRes.error) {
+          console.error("[KPIDashboard] Error fetching previous period data:", prevRes.error);
+        }
+        
+        console.log("[KPIDashboard] RPC Response - current:", currentRes.data, "previous:", prevRes.data);
+        
+        const currentData = currentRes.data && currentRes.data.length > 0 
+          ? currentRes.data[0] 
+          : {
+              total_orders: 0,
+              completed_orders: 0,
+              pending_orders: 0,
+              cancelled_orders: 0,
+              efficiency_rate: 0,
+              total_cylinders: 0,
+              completed_cylinders: 0
+            };
+        
+        const previousData = prevRes.data && prevRes.data.length > 0 
+          ? prevRes.data[0] 
+          : {
+              total_orders: 0,
+              completed_orders: 0,
+              pending_orders: 0,
+              cancelled_orders: 0,
+              efficiency_rate: 0,
+              total_cylinders: 0,
+              completed_cylinders: 0
+            };
+        
+        console.log("[KPIDashboard] Setting data - completed_orders:", currentData.completed_orders, "total_cylinders:", currentData.total_cylinders);
+        
+        setPeriodData({ current: currentData, previous: previousData });
+        setCurrentYearData(currentData);
+        setPreviousYearData(previousData);
+      } else {
+        // Fetch current year and previous year efficiency
+        console.log("[KPIDashboard] Calling year-based RPC:", { currentYear, locationParam });
+        
+        const [currentResult, previousResult] = await Promise.all([
+          supabase.rpc("get_production_efficiency", { 
+            p_year: currentYear, 
+            p_location: locationParam 
+          }),
+          supabase.rpc("get_production_efficiency", { 
+            p_year: currentYear - 1, 
+            p_location: locationParam 
+          })
+        ]);
+        
+        // Log errors if any
+        if (currentResult.error) {
+          console.error("[KPIDashboard] Error fetching current year data:", currentResult.error);
+        }
+        if (previousResult.error) {
+          console.error("[KPIDashboard] Error fetching previous year data:", previousResult.error);
+        }
+        
+        console.log("[KPIDashboard] Year RPC Response - current:", currentResult.data, "previous:", previousResult.data);
+
+        if (currentResult.data && currentResult.data.length > 0) {
+          setCurrentYearData(currentResult.data[0]);
+        }
+        
+        if (previousResult.data && previousResult.data.length > 0) {
+          setPreviousYearData(previousResult.data[0]);
+        }
+        
+        setPeriodData({ current: null, previous: null });
       }
+
+      // Fetch weekly sparkline data (last 8 weeks or within date range)
+      const weeklySparkline = await fetchWeeklySparkline(locationParam, dateRange);
+      setWeeklyData(weeklySparkline);
       
-      setPeriodData({ current: null, previous: null });
+      // Store historical values for anomaly detection (exclude current week)
+      const historicalValues = weeklySparkline.slice(0, -1).map(w => w.value);
+      setHistoricalWeeklyData(historicalValues);
+    } catch (error) {
+      console.error("[KPIDashboard] Error fetching KPI data:", error);
+    } finally {
+      setLoading(false);
     }
-
-    // Fetch weekly sparkline data (last 8 weeks or within date range)
-    const weeklySparkline = await fetchWeeklySparkline(locationParam, dateRange);
-    setWeeklyData(weeklySparkline);
-    
-    // Store historical values for anomaly detection (exclude current week)
-    const historicalValues = weeklySparkline.slice(0, -1).map(w => w.value);
-    setHistoricalWeeklyData(historicalValues);
-    
-    setLoading(false);
   }, [location, dateRange, currentYear]);
 
   const fetchWeeklySparkline = async (locationParam: string | null, dateRange?: DateRange): Promise<SparklineData[]> => {
