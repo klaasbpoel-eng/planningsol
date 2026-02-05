@@ -3,12 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { 
-  Activity, 
-  TrendingUp, 
+import {
+  Activity,
+  TrendingUp,
   TrendingDown,
-  CheckCircle2, 
-  Clock, 
+  CheckCircle2,
+  Clock,
   Target,
   ChevronDown,
   ChevronUp,
@@ -67,7 +67,7 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
   const [loading, setLoading] = useState(true);
 
   const currentYear = new Date().getFullYear();
-  
+
   // Check if using custom date range
   const isCustomPeriod = !!dateRange;
 
@@ -81,14 +81,14 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
 
     try {
       const locationParam = location === "all" ? null : location;
-      
+
       if (dateRange) {
         // Calculate period-based data
         const fromDate = dateRange.from.toISOString().split('T')[0];
         const toDate = dateRange.to.toISOString().split('T')[0];
-        
+
         console.log("[KPIDashboard] Calling RPC with date range:", { fromDate, toDate, locationParam });
-        
+
         // Calculate previous period (same length, immediately before)
         const periodLength = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
         const prevTo = new Date(dateRange.from);
@@ -97,7 +97,7 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
         prevFrom.setDate(prevFrom.getDate() - periodLength);
         const prevFromDate = prevFrom.toISOString().split('T')[0];
         const prevToDate = prevTo.toISOString().split('T')[0];
-        
+
         // Fetch current period data
         // Use RPC function for server-side aggregation (avoids 1000 row limit)
         const [currentRes, prevRes] = await Promise.all([
@@ -112,7 +112,7 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
             p_location: locationParam
           })
         ]);
-        
+
         // Log errors if any
         if (currentRes.error) {
           console.error("[KPIDashboard] Error fetching current period data:", currentRes.error);
@@ -120,53 +120,53 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
         if (prevRes.error) {
           console.error("[KPIDashboard] Error fetching previous period data:", prevRes.error);
         }
-        
+
         console.log("[KPIDashboard] RPC Response - current:", currentRes.data, "previous:", prevRes.data);
-        
-        const currentData = currentRes.data && currentRes.data.length > 0 
-          ? currentRes.data[0] 
+
+        const currentData = currentRes.data && currentRes.data.length > 0
+          ? currentRes.data[0]
           : {
-              total_orders: 0,
-              completed_orders: 0,
-              pending_orders: 0,
-              cancelled_orders: 0,
-              efficiency_rate: 0,
-              total_cylinders: 0,
-              completed_cylinders: 0
-            };
-        
-        const previousData = prevRes.data && prevRes.data.length > 0 
-          ? prevRes.data[0] 
+            total_orders: 0,
+            completed_orders: 0,
+            pending_orders: 0,
+            cancelled_orders: 0,
+            efficiency_rate: 0,
+            total_cylinders: 0,
+            completed_cylinders: 0
+          };
+
+        const previousData = prevRes.data && prevRes.data.length > 0
+          ? prevRes.data[0]
           : {
-              total_orders: 0,
-              completed_orders: 0,
-              pending_orders: 0,
-              cancelled_orders: 0,
-              efficiency_rate: 0,
-              total_cylinders: 0,
-              completed_cylinders: 0
-            };
-        
+            total_orders: 0,
+            completed_orders: 0,
+            pending_orders: 0,
+            cancelled_orders: 0,
+            efficiency_rate: 0,
+            total_cylinders: 0,
+            completed_cylinders: 0
+          };
+
         console.log("[KPIDashboard] Setting data - completed_orders:", currentData.completed_orders, "total_cylinders:", currentData.total_cylinders);
-        
+
         setPeriodData({ current: currentData, previous: previousData });
         setCurrentYearData(currentData);
         setPreviousYearData(previousData);
       } else {
         // Fetch current year and previous year efficiency
         console.log("[KPIDashboard] Calling year-based RPC:", { currentYear, locationParam });
-        
+
         const [currentResult, previousResult] = await Promise.all([
-          supabase.rpc("get_production_efficiency", { 
-            p_year: currentYear, 
-            p_location: locationParam 
+          supabase.rpc("get_production_efficiency", {
+            p_year: currentYear,
+            p_location: locationParam
           }),
-          supabase.rpc("get_production_efficiency", { 
-            p_year: currentYear - 1, 
-            p_location: locationParam 
+          supabase.rpc("get_production_efficiency", {
+            p_year: currentYear - 1,
+            p_location: locationParam
           })
         ]);
-        
+
         // Log errors if any
         if (currentResult.error) {
           console.error("[KPIDashboard] Error fetching current year data:", currentResult.error);
@@ -174,24 +174,24 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
         if (previousResult.error) {
           console.error("[KPIDashboard] Error fetching previous year data:", previousResult.error);
         }
-        
+
         console.log("[KPIDashboard] Year RPC Response - current:", currentResult.data, "previous:", previousResult.data);
 
         if (currentResult.data && currentResult.data.length > 0) {
           setCurrentYearData(currentResult.data[0]);
         }
-        
+
         if (previousResult.data && previousResult.data.length > 0) {
           setPreviousYearData(previousResult.data[0]);
         }
-        
+
         setPeriodData({ current: null, previous: null });
       }
 
       // Fetch weekly sparkline data (last 8 weeks or within date range)
       const weeklySparkline = await fetchWeeklySparkline(locationParam, dateRange);
       setWeeklyData(weeklySparkline);
-      
+
       // Store historical values for anomaly detection (exclude current week)
       const historicalValues = weeklySparkline.slice(0, -1).map(w => w.value);
       setHistoricalWeeklyData(historicalValues);
@@ -205,36 +205,36 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
   const fetchWeeklySparkline = async (locationParam: string | null, dateRange?: DateRange): Promise<SparklineData[]> => {
     const weeks: SparklineData[] = [];
     const today = dateRange?.to || new Date();
-    
+
     for (let i = 7; i >= 0; i--) {
       const weekStart = new Date(today);
       weekStart.setDate(today.getDate() - (i * 7) - today.getDay() + 1);
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 6);
-      
+
       const startStr = weekStart.toISOString().split('T')[0];
       const endStr = weekEnd.toISOString().split('T')[0];
-      
+
       let query = supabase
         .from("gas_cylinder_orders")
         .select("cylinder_count")
         .gte("scheduled_date", startStr)
         .lte("scheduled_date", endStr)
         .neq("status", "cancelled");
-      
+
       if (locationParam === "sol_emmen" || locationParam === "sol_tilburg") {
         query = query.eq("location", locationParam);
       }
-      
+
       const { data } = await query;
       const total = data?.reduce((sum, o) => sum + o.cylinder_count, 0) || 0;
-      
+
       weeks.push({
         week: `W${8 - i}`,
         value: total
       });
     }
-    
+
     return weeks;
   };
 
@@ -281,7 +281,7 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
   // Anomaly detection for current week volume
   const anomalies = useMemo(() => {
     const currentWeekValue = weeklyData.length > 0 ? weeklyData[weeklyData.length - 1]?.value || 0 : 0;
-    
+
     return analyzeAnomalies([
       {
         label: "Cilinders deze week",
@@ -326,14 +326,14 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
                 <Activity className="h-5 w-5 text-primary" />
                 KPI Dashboard
                 <Badge variant="outline" className="ml-2 text-xs">
-                  {isCustomPeriod && dateRange 
+                  {isCustomPeriod && dateRange
                     ? `${dateRange.from.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} - ${dateRange.to.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}`
                     : currentYear
                   }
                 </Badge>
                 {activeAnomalies.length > 0 && (
-                  <Badge 
-                    variant="outline" 
+                  <Badge
+                    variant="outline"
                     className="ml-1 gap-1 bg-warning/10 text-warning border-warning/30 text-xs animate-pulse"
                   >
                     <AlertTriangle className="h-3 w-3" />
@@ -351,7 +351,7 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
             </div>
           </CardHeader>
         </CollapsibleTrigger>
-        
+
         <CollapsibleContent>
           <CardContent className="pt-0">
             <FadeIn show={true}>
@@ -382,9 +382,9 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
                     <div className="flex items-center gap-2">
                       <BarChart3 className="h-4 w-4 text-orange-500" />
                       <span className="text-xs font-medium text-muted-foreground">Volume YTD</span>
-                    {isCustomPeriod && (
-                      <Badge variant="outline" className="text-[10px] py-0 h-4">Periode</Badge>
-                    )}
+                      {isCustomPeriod && (
+                        <Badge variant="outline" className="text-[10px] py-0 h-4">Periode</Badge>
+                      )}
                     </div>
                     <div className={cn("flex items-center gap-1 text-xs font-medium", getTrendColor(volumeTrend))}>
                       {getTrendIcon(volumeTrend)}
@@ -412,7 +412,7 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
                   </div>
                   <div className="flex items-center gap-2 mt-1">
                     <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-green-500 rounded-full transition-all duration-500"
                         style={{ width: `${completionRate}%` }}
                       />
@@ -424,9 +424,9 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
                 {/* Weekly Trend Sparkline */}
                 <div className={cn(
                   "p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border relative",
-                  volumeAnomaly?.isAnomaly 
-                    ? volumeAnomaly.severity === "high" 
-                      ? "border-destructive/40 ring-1 ring-destructive/20" 
+                  volumeAnomaly?.isAnomaly
+                    ? volumeAnomaly.severity === "high"
+                      ? "border-destructive/40 ring-1 ring-destructive/20"
                       : "border-warning/40 ring-1 ring-warning/20"
                     : "border-blue-500/20"
                 )}>
@@ -444,21 +444,21 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
                   <div className="h-12">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={weeklyData}>
-                        <Tooltip 
+                        <Tooltip
                           content={({ active, payload }) => {
                             if (active && payload && payload.length) {
                               return (
                                 <div className="bg-popover border rounded-lg px-2 py-1 text-xs shadow-md">
-                                  <span className="font-medium">{payload[0].value} cilinders</span>
+                                  <span className="font-medium">{formatNumber(payload[0].value as number, 0)} cilinders</span>
                                 </div>
                               );
                             }
                             return null;
                           }}
                         />
-                        <Line 
-                          type="monotone" 
-                          dataKey="value" 
+                        <Line
+                          type="monotone"
+                          dataKey="value"
                           stroke="hsl(var(--primary))"
                           strokeWidth={2}
                           dot={false}
@@ -483,7 +483,7 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
                     <p className="text-xs text-muted-foreground">Openstaand</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-primary/10">
                     <Target className="h-4 w-4 text-primary" />

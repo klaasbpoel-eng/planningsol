@@ -33,8 +33,8 @@ export function SiteMap({ location }: SiteMapProps) {
     const [rotatingZoneId, setRotatingZoneId] = useState<string | null>(null);
     const [scalingZoneId, setScalingZoneId] = useState<string | null>(null);
     const [isRotatingMap, setIsRotatingMap] = useState(false);
-    const [mapRotation, setMapRotation] = useState(0);
-    const [zoom, setZoom] = useState(1);
+    const [mapRotation, setMapRotation] = useState(-135);
+    const [zoom, setZoom] = useState(1.5);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);

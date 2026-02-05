@@ -138,15 +138,15 @@ interface ProductionReportsProps {
   onDateRangeChange?: (range: DateRange) => void;
 }
 
-export function ProductionReports({ 
-  refreshKey = 0, 
-  onDataChanged, 
+export function ProductionReports({
+  refreshKey = 0,
+  onDataChanged,
   location = "all",
   dateRange: externalDateRange,
-  onDateRangeChange 
+  onDateRangeChange
 }: ProductionReportsProps) {
   const [loading, setLoading] = useState(true);
-  
+
   // Server-side aggregated data
   const [dailyProduction, setDailyProduction] = useState<DailyProductionData[]>([]);
   const [gasTypeDistributionData, setGasTypeDistributionData] = useState<GasTypeDistributionData[]>([]);
@@ -155,12 +155,12 @@ export function ProductionReports({
   const [prevCylinderEfficiency, setPrevCylinderEfficiency] = useState<EfficiencyData | null>(null);
   const [prevDryIceEfficiency, setPrevDryIceEfficiency] = useState<DryIceEfficiencyData | null>(null);
   const [customerTotals, setCustomerTotals] = useState<CustomerTotalsData[]>([]);
-  
+
   const [internalDateRange, setInternalDateRange] = useState<DateRange>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
   });
-  
+
   // Use external dateRange if provided, otherwise use internal state
   const dateRange = externalDateRange || internalDateRange;
   const setDateRange = (range: DateRange) => {
@@ -196,129 +196,129 @@ export function ProductionReports({
 
   const fetchReportData = async () => {
     setLoading(true);
-   
-   try {
-     const fromDate = format(dateRange.from, "yyyy-MM-dd");
-     const toDate = format(dateRange.to, "yyyy-MM-dd");
 
-     // Calculate previous period (same length, immediately before)
-     const periodLength = differenceInDays(dateRange.to, dateRange.from);
-     const prevTo = subDays(dateRange.from, 1);
-     const prevFrom = subDays(prevTo, periodLength);
-     const prevFromDate = format(prevFrom, "yyyy-MM-dd");
-     const prevToDate = format(prevTo, "yyyy-MM-dd");
+    try {
+      const fromDate = format(dateRange.from, "yyyy-MM-dd");
+      const toDate = format(dateRange.to, "yyyy-MM-dd");
 
-     console.log("[ProductionReports] Fetching RPC data for period:", { fromDate, toDate, location });
-     
-     const locationParam = location === "all" ? null : location;
+      // Calculate previous period (same length, immediately before)
+      const periodLength = differenceInDays(dateRange.to, dateRange.from);
+      const prevTo = subDays(dateRange.from, 1);
+      const prevFrom = subDays(prevTo, periodLength);
+      const prevFromDate = format(prevFrom, "yyyy-MM-dd");
+      const prevToDate = format(prevTo, "yyyy-MM-dd");
 
-     // Fetch all data in parallel using RPC calls
-     const [
-       dailyRes,
-       gasTypeRes,
-       cylinderEffRes,
-       dryIceEffRes,
-       prevCylinderEffRes,
-       prevDryIceEffRes,
-       customerTotalsRes
-     ] = await Promise.all([
-       // Daily production data for charts
-       supabase.rpc("get_daily_production_by_period", {
-         p_from_date: fromDate,
-         p_to_date: toDate,
-         p_location: locationParam
-       }),
-       // Gas type distribution
-       supabase.rpc("get_gas_type_distribution_by_period", {
-         p_from_date: fromDate,
-         p_to_date: toDate,
-         p_location: locationParam
-       }),
-       // Current period efficiency stats (cylinders)
-       supabase.rpc("get_production_efficiency_by_period", {
-         p_from_date: fromDate,
-         p_to_date: toDate,
-         p_location: locationParam
-       }),
-       // Current period efficiency stats (dry ice)
-       supabase.rpc("get_dry_ice_efficiency_by_period", {
-         p_from_date: fromDate,
-         p_to_date: toDate,
-         p_location: locationParam
-       }),
-       // Previous period efficiency (cylinders)
-       supabase.rpc("get_production_efficiency_by_period", {
-         p_from_date: prevFromDate,
-         p_to_date: prevToDate,
-         p_location: locationParam
-       }),
-       // Previous period efficiency (dry ice)
-       supabase.rpc("get_dry_ice_efficiency_by_period", {
-         p_from_date: prevFromDate,
-         p_to_date: prevToDate,
-         p_location: locationParam
-       }),
-       // Customer totals for ranking
-       supabase.rpc("get_customer_totals_by_period", {
-         p_from_date: fromDate,
-         p_to_date: toDate,
-         p_location: locationParam
-       })
-     ]);
+      console.log("[ProductionReports] Fetching RPC data for period:", { fromDate, toDate, location });
 
-     // Log RPC responses for debugging
-     console.log("[ProductionReports] Daily production RPC:", dailyRes.data?.length || 0, "days");
-     console.log("[ProductionReports] Gas type distribution RPC:", gasTypeRes.data?.length || 0, "types");
-     console.log("[ProductionReports] Cylinder efficiency RPC:", cylinderEffRes.data);
-     console.log("[ProductionReports] Dry ice efficiency RPC:", dryIceEffRes.data);
-     console.log("[ProductionReports] Customer totals RPC:", customerTotalsRes.data?.length || 0, "customers");
+      const locationParam = location === "all" ? null : location;
 
-     // Handle errors
-     if (dailyRes.error) console.error("[ProductionReports] Daily production RPC error:", dailyRes.error);
-     if (gasTypeRes.error) console.error("[ProductionReports] Gas type distribution RPC error:", gasTypeRes.error);
-     if (cylinderEffRes.error) console.error("[ProductionReports] Cylinder efficiency RPC error:", cylinderEffRes.error);
-     if (dryIceEffRes.error) console.error("[ProductionReports] Dry ice efficiency RPC error:", dryIceEffRes.error);
-     if (customerTotalsRes.error) console.error("[ProductionReports] Customer totals RPC error:", customerTotalsRes.error);
+      // Fetch all data in parallel using RPC calls
+      const [
+        dailyRes,
+        gasTypeRes,
+        cylinderEffRes,
+        dryIceEffRes,
+        prevCylinderEffRes,
+        prevDryIceEffRes,
+        customerTotalsRes
+      ] = await Promise.all([
+        // Daily production data for charts
+        supabase.rpc("get_daily_production_by_period", {
+          p_from_date: fromDate,
+          p_to_date: toDate,
+          p_location: locationParam
+        }),
+        // Gas type distribution
+        supabase.rpc("get_gas_type_distribution_by_period", {
+          p_from_date: fromDate,
+          p_to_date: toDate,
+          p_location: locationParam
+        }),
+        // Current period efficiency stats (cylinders)
+        supabase.rpc("get_production_efficiency_by_period", {
+          p_from_date: fromDate,
+          p_to_date: toDate,
+          p_location: locationParam
+        }),
+        // Current period efficiency stats (dry ice)
+        supabase.rpc("get_dry_ice_efficiency_by_period", {
+          p_from_date: fromDate,
+          p_to_date: toDate,
+          p_location: locationParam
+        }),
+        // Previous period efficiency (cylinders)
+        supabase.rpc("get_production_efficiency_by_period", {
+          p_from_date: prevFromDate,
+          p_to_date: prevToDate,
+          p_location: locationParam
+        }),
+        // Previous period efficiency (dry ice)
+        supabase.rpc("get_dry_ice_efficiency_by_period", {
+          p_from_date: prevFromDate,
+          p_to_date: prevToDate,
+          p_location: locationParam
+        }),
+        // Customer totals for ranking
+        supabase.rpc("get_customer_totals_by_period", {
+          p_from_date: fromDate,
+          p_to_date: toDate,
+          p_location: locationParam
+        })
+      ]);
 
-     // Set daily production data
-     setDailyProduction(dailyRes.data || []);
+      // Log RPC responses for debugging
+      console.log("[ProductionReports] Daily production RPC:", dailyRes.data?.length || 0, "days");
+      console.log("[ProductionReports] Gas type distribution RPC:", gasTypeRes.data?.length || 0, "types");
+      console.log("[ProductionReports] Cylinder efficiency RPC:", cylinderEffRes.data);
+      console.log("[ProductionReports] Dry ice efficiency RPC:", dryIceEffRes.data);
+      console.log("[ProductionReports] Customer totals RPC:", customerTotalsRes.data?.length || 0, "customers");
 
-     // Set gas type distribution
-     setGasTypeDistributionData(gasTypeRes.data || []);
+      // Handle errors
+      if (dailyRes.error) console.error("[ProductionReports] Daily production RPC error:", dailyRes.error);
+      if (gasTypeRes.error) console.error("[ProductionReports] Gas type distribution RPC error:", gasTypeRes.error);
+      if (cylinderEffRes.error) console.error("[ProductionReports] Cylinder efficiency RPC error:", cylinderEffRes.error);
+      if (dryIceEffRes.error) console.error("[ProductionReports] Dry ice efficiency RPC error:", dryIceEffRes.error);
+      if (customerTotalsRes.error) console.error("[ProductionReports] Customer totals RPC error:", customerTotalsRes.error);
 
-     // Set customer totals
-     setCustomerTotals(customerTotalsRes.data || []);
+      // Set daily production data
+      setDailyProduction(dailyRes.data || []);
 
-     // Set current period efficiency data
-     const cylEff = cylinderEffRes.data?.[0] || null;
-     const dryIceEff = dryIceEffRes.data?.[0] || null;
-     setCylinderEfficiency(cylEff);
-     setDryIceEfficiency(dryIceEff);
+      // Set gas type distribution
+      setGasTypeDistributionData(gasTypeRes.data || []);
 
-     // Set previous period efficiency data
-     const prevCylEff = prevCylinderEffRes.data?.[0] || null;
-     const prevDryIceEff = prevDryIceEffRes.data?.[0] || null;
-     setPrevCylinderEfficiency(prevCylEff);
-     setPrevDryIceEfficiency(prevDryIceEff);
+      // Set customer totals
+      setCustomerTotals(customerTotalsRes.data || []);
 
-     // Calculate previous period stats for trend calculations
-     setPreviousPeriodStats({
-       cylinderOrders: prevCylEff?.total_orders || 0,
-       totalCylinders: prevCylEff?.total_cylinders || 0,
-       dryIceOrders: prevDryIceEff?.total_orders || 0,
-       totalDryIce: prevDryIceEff?.total_kg || 0,
-       completed: (prevCylEff?.completed_orders || 0) + (prevDryIceEff?.completed_orders || 0),
-       pending: (prevCylEff?.pending_orders || 0) + (prevDryIceEff?.pending_orders || 0)
-     });
+      // Set current period efficiency data
+      const cylEff = cylinderEffRes.data?.[0] || null;
+      const dryIceEff = dryIceEffRes.data?.[0] || null;
+      setCylinderEfficiency(cylEff);
+      setDryIceEfficiency(dryIceEff);
 
-     // Clear individual orders (no longer needed for overview statistics)
-     setCylinderOrders([]);
-     setDryIceOrders([]);
-   } catch (error) {
-     console.error("[ProductionReports] Error fetching report data:", error);
-   } finally {
-     setLoading(false);
-   }
+      // Set previous period efficiency data
+      const prevCylEff = prevCylinderEffRes.data?.[0] || null;
+      const prevDryIceEff = prevDryIceEffRes.data?.[0] || null;
+      setPrevCylinderEfficiency(prevCylEff);
+      setPrevDryIceEfficiency(prevDryIceEff);
+
+      // Calculate previous period stats for trend calculations
+      setPreviousPeriodStats({
+        cylinderOrders: prevCylEff?.total_orders || 0,
+        totalCylinders: prevCylEff?.total_cylinders || 0,
+        dryIceOrders: prevDryIceEff?.total_orders || 0,
+        totalDryIce: prevDryIceEff?.total_kg || 0,
+        completed: (prevCylEff?.completed_orders || 0) + (prevDryIceEff?.completed_orders || 0),
+        pending: (prevCylEff?.pending_orders || 0) + (prevDryIceEff?.pending_orders || 0)
+      });
+
+      // Clear individual orders (no longer needed for overview statistics)
+      setCylinderOrders([]);
+      setDryIceOrders([]);
+    } catch (error) {
+      console.error("[ProductionReports] Error fetching report data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Helper function to calculate trend percentage
@@ -488,14 +488,14 @@ export function ProductionReports({
                       date: format(new Date(o.scheduled_date), "dd-MM-yyyy"),
                       customer: o.customer_name,
                       type: "Cilinders",
-                      quantity: o.cylinder_count,
+                      quantity: formatNumber(o.cylinder_count, 0),
                       status: o.status === "completed" ? "Voltooid" : o.status === "pending" ? "Gepland" : o.status,
                     })),
                     ...dryIceOrders.map(o => ({
                       date: format(new Date(o.scheduled_date), "dd-MM-yyyy"),
                       customer: o.customer_name,
                       type: "Droogijs",
-                      quantity: `${Number(o.quantity_kg)} kg`,
+                      quantity: `${formatNumber(o.quantity_kg, 0)} kg`,
                       status: o.status === "completed" ? "Voltooid" : o.status === "pending" ? "Gepland" : o.status,
                     })),
                   ].sort((a, b) => a.date.localeCompare(b.date)),
@@ -554,7 +554,7 @@ export function ProductionReports({
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         <StatCard
-          value={cylinderStats.total}
+          value={formatNumber(cylinderStats.total, 0)}
           label="Cilinder orders"
           icon={<Cylinder className="h-5 w-5 text-orange-500" />}
           iconBgColor="bg-orange-500/10"
@@ -580,7 +580,7 @@ export function ProductionReports({
         {showDryIce && (
           <>
             <StatCard
-              value={dryIceStats.total}
+              value={formatNumber(dryIceStats.total, 0)}
               label="Droogijs orders"
               icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
               iconBgColor="bg-cyan-500/10"
@@ -606,7 +606,7 @@ export function ProductionReports({
         )}
 
         <StatCard
-          value={cylinderStats.completed + dryIceStats.completed}
+          value={formatNumber(cylinderStats.completed + dryIceStats.completed, 0)}
           label="Voltooid"
           icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
           iconBgColor="bg-green-500/10"
@@ -618,7 +618,7 @@ export function ProductionReports({
         />
 
         <StatCard
-          value={cylinderStats.pending + dryIceStats.pending}
+          value={formatNumber(cylinderStats.pending + dryIceStats.pending, 0)}
           label="Gepland"
           icon={<Clock className="h-5 w-5 text-yellow-500" />}
           iconBgColor="bg-yellow-500/10"
@@ -849,6 +849,7 @@ export function ProductionReports({
                           backgroundColor: 'hsl(var(--background))',
                           border: '1px solid hsl(var(--border))'
                         }}
+                        formatter={(value: number) => [formatNumber(value, 0), "Cilinders"]}
                       />
                       <Bar dataKey="value" name="Cilinders" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
                     </BarChart>
@@ -895,7 +896,7 @@ export function ProductionReports({
                     <div className="text-sm text-muted-foreground">Gepland</div>
                   </div>
                 </div>
-                
+
                 {/* Gas type breakdown from RPC */}
                 <div className="pt-4">
                   <h4 className="text-sm font-medium mb-3">Verdeling per gastype</h4>
@@ -958,7 +959,7 @@ export function ProductionReports({
                       <div className="text-sm text-muted-foreground">Gepland</div>
                     </div>
                   </div>
-                  
+
                   {dryIceEfficiency && (
                     <div className="pt-4">
                       <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-cyan-500/10">
@@ -989,6 +990,7 @@ export function ProductionReports({
                           backgroundColor: 'hsl(var(--background))',
                           border: '1px solid hsl(var(--border))'
                         }}
+                        formatter={(value: number) => [formatNumber(value, 0), "Droogijs (kg)"]}
                       />
                       <Bar dataKey="value" name="Droogijs (kg)" fill="hsl(var(--accent))" radius={[0, 4, 4, 0]} />
                     </BarChart>
