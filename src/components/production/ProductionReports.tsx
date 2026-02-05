@@ -37,7 +37,7 @@ const CustomerSegmentation = lazy(() => import("./CustomerSegmentation").then(m 
 const ChartLoadingFallback = () => (
   <ChartSkeleton height={300} showLegend={false} />
 );
-import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, differenceInDays, subDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, differenceInDays, subDays, startOfYear, endOfYear, subYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn, formatNumber } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -356,6 +356,10 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
       case "quarter":
         setDateRange({ from: subMonths(startOfMonth(now), 2), to: endOfMonth(now) });
         break;
+      case "last-year":
+        const lastYear = subYears(now, 1);
+        setDateRange({ from: startOfYear(lastYear), to: endOfYear(lastYear) });
+        break;
     }
   };
 
@@ -557,6 +561,9 @@ export function ProductionReports({ refreshKey = 0, onDataChanged, location = "a
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setPresetRange("quarter")}>
                   Laatste 3 maanden
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setPresetRange("last-year")}>
+                  Vorig jaar
                 </Button>
               </div>
 
