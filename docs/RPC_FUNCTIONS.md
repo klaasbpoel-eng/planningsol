@@ -1,6 +1,191 @@
  # Database RPC Functies Documentatie
  
  Dit document bevat een overzicht van alle PostgreSQL RPC functies die beschikbaar zijn in de Supabase database en worden gebruikt in de frontend applicatie.
+
+## Architectuur Diagram
+
+```mermaid
+flowchart TB
+    subgraph Frontend["Frontend Componenten"]
+        subgraph Planning["Productie Planning"]
+            PP[ProductionPlanning]
+            DP[DryIcePlanning]
+            GP[GasCylinderPlanning]
+        end
+        
+        subgraph Reports["Rapportage"]
+            PR[ProductionReports]
+            YCR[YearComparisonReport]
+            CYC[CumulativeYearChart]
+            CGTC[CumulativeGasTypeChart]
+            CSC[CumulativeCylinderSizeChart]
+        end
+        
+        subgraph Analytics["Analytics"]
+            KPI[KPIDashboard]
+            PHM[ProductionHeatMap]
+            TCW[TopCustomersWidget]
+            CS[CustomerSegmentation]
+        end
+        
+        subgraph Auth["Authenticatie"]
+            AH[Auth Hooks]
+            RLS[RLS Policies]
+        end
+    end
+    
+    subgraph RPC["Database RPC Functies"]
+        subgraph Efficiency["Efficiency Stats"]
+            GPE[get_production_efficiency]
+            GPEP[get_production_efficiency_by_period]
+            GDIEP[get_dry_ice_efficiency_by_period]
+        end
+        
+        subgraph Daily["Dagelijkse Productie"]
+            GDPBP[get_daily_production_by_period]
+            GDPT[get_daily_production_totals]
+        end
+        
+        subgraph Monthly["Maandelijkse Aggregatie"]
+            GMOT[get_monthly_order_totals]
+            GMCTGT[get_monthly_cylinder_totals_by_gas_type]
+            GMCTS[get_monthly_cylinder_totals_by_size]
+            GMCTC[get_monthly_cylinder_totals_by_customer]
+        end
+        
+        subgraph Customer["Klant Analytics"]
+            GYTC[get_yearly_totals_by_customer]
+            GCTBP[get_customer_totals_by_period]
+            GCS[get_customer_segments]
+            GGTDBP[get_gas_type_distribution_by_period]
+        end
+        
+        subgraph AuthRPC["Auth Functies"]
+            GUR[get_user_role]
+            GUPL[get_user_production_location]
+            HR[has_role]
+            HER[has_elevated_role]
+            IA[is_admin]
+            IUA[is_user_approved]
+        end
+        
+        subgraph Admin["Admin"]
+            BDOY[bulk_delete_orders_by_year]
+        end
+    end
+    
+    %% Efficiency connections
+    KPI --> GPE
+    KPI --> GPEP
+    PP --> GPEP
+    PR --> GPEP
+    PP --> GDIEP
+    PR --> GDIEP
+    
+    %% Daily production connections
+    PR --> GDPBP
+    PHM --> GDPT
+    
+    %% Monthly aggregation connections
+    CYC --> GMOT
+    YCR --> GMOT
+    CGTC --> GMCTGT
+    YCR --> GMCTGT
+    YCR --> GMCTS
+    CSC --> GMCTS
+    YCR --> GMCTC
+    
+    %% Customer analytics connections
+    TCW --> GYTC
+    YCR --> GYTC
+    TCW --> GCTBP
+    PR --> GCTBP
+    CS --> GCS
+    PR --> GGTDBP
+    
+    %% Auth connections
+    AH --> GUR
+    AH --> GUPL
+    AH --> IUA
+    RLS --> HR
+    RLS --> HER
+    RLS --> IA
+    
+    %% Styling
+    classDef planning fill:#f97316,stroke:#ea580c,color:#fff
+    classDef reports fill:#3b82f6,stroke:#2563eb,color:#fff
+    classDef analytics fill:#10b981,stroke:#059669,color:#fff
+    classDef auth fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    classDef rpc fill:#64748b,stroke:#475569,color:#fff
+    
+    class PP,DP,GP planning
+    class PR,YCR,CYC,CGTC,CSC reports
+    class KPI,PHM,TCW,CS analytics
+    class AH,RLS auth
+```
+
+## Data Flow Diagram
+
+```mermaid
+flowchart LR
+    subgraph User["Gebruiker"]
+        UI[UI Interactie]
+    end
+    
+    subgraph Filters["Filter Opties"]
+        LOC[Locatie]
+        DATE[Datum Bereik]
+        YEAR[Jaar]
+    end
+    
+    subgraph Components["React Components"]
+        COMP[Component State]
+    end
+    
+    subgraph Supabase["Supabase"]
+        RPC[RPC Functies]
+        DB[(PostgreSQL)]
+    end
+    
+    UI --> Filters
+    Filters --> COMP
+    COMP -->|"supabase.rpc()"| RPC
+    RPC -->|"Aggregatie Query"| DB
+    DB -->|"Geaggregeerde Data"| RPC
+    RPC -->|"JSON Response"| COMP
+    COMP -->|"Render"| UI
+```
+
+## Component Dependencies
+
+```mermaid
+graph TD
+    subgraph ProductionPlanningPage["Productie Planning Pagina"]
+        PlanningTabs[Tabs Component]
+        PlanningTabs --> PP[ProductionPlanning]
+        PlanningTabs --> Reports[Rapportage Tab]
+        
+        Reports --> PR[ProductionReports]
+        Reports --> YCR[YearComparisonReport]
+        Reports --> CYC[CumulativeYearChart]
+        Reports --> CGTC[CumulativeGasTypeChart]
+        Reports --> CSC[CumulativeCylinderSizeChart]
+        
+        PP --> KPI[KPIDashboard]
+        PP --> PHM[ProductionHeatMap]
+        PP --> TCW[TopCustomersWidget]
+    end
+    
+    subgraph SharedHooks["Gedeelde Hooks"]
+        useUserRole
+        useUserPermissions
+        useApprovalStatus
+    end
+    
+    PP --> useUserRole
+    PP --> useUserPermissions
+    KPI --> useUserPermissions
+```
  
  ## Overzicht
  
