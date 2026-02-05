@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Loader2, Cylinder, Snowflake, LineChart as LineChartIcon, Trophy } from "lucide-react";
+import { Cylinder, Snowflake, LineChart as LineChartIcon, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
+import { ChartSkeleton } from "@/components/ui/skeletons/chart-skeleton";
 import {
   LineChart,
   Line,
@@ -18,24 +18,13 @@ import {
   Legend,
 } from "recharts";
 
-interface YearlyMonthlyData {
-  year: number;
-  months: number[];
-}
-
-interface CumulativeChartData {
-  month: number;
-  monthName: string;
-  [key: string]: number | string; // Dynamic keys for each year
-}
-
-const MONTH_NAMES = [
+// Constants
+export const MONTH_NAMES = [
   "Jan", "Feb", "Mrt", "Apr", "Mei", "Jun",
   "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"
 ];
 
-// Colors for different years - distinct and accessible
-const YEAR_COLORS: Record<number, string> = {
+export const YEAR_COLORS: Record<number, string> = {
   2017: "#1e40af", // blue-800
   2018: "#7c3aed", // violet-600
   2019: "#059669", // emerald-600
@@ -49,12 +38,23 @@ const YEAR_COLORS: Record<number, string> = {
   2027: "#8b5cf6", // violet-500
 };
 
-const getYearColor = (year: number): string => {
+export const getYearColor = (year: number): string => {
   return YEAR_COLORS[year] || `hsl(${(year * 47) % 360}, 70%, 50%)`;
 };
 
-// Define type locally if not imported
-type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
+// Types
+export type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
+
+interface YearlyMonthlyData {
+  year: number;
+  months: number[];
+}
+
+interface CumulativeChartData {
+  month: number;
+  monthName: string;
+  [key: string]: number | string;
+}
 
 interface CumulativeYearChartProps {
   type: "cylinders" | "dryIce";
@@ -63,6 +63,7 @@ interface CumulativeYearChartProps {
 
 export const CumulativeYearChart = React.memo(function CumulativeYearChart({ type, location = "all" }: CumulativeYearChartProps) {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [yearlyData, setYearlyData] = useState<YearlyMonthlyData[]>([]);
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
@@ -71,66 +72,81 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
   const [animatingClear, setAnimatingClear] = useState(false);
 
   useEffect(() => {
-    fetchAllYearsData();
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const currentYear = new Date().getFullYear();
+        const startYear = 2017;
+        const years: number[] = [];
+
+        for (let y = currentYear; y >= startYear; y--) {
+          years.push(y);
+        }
+
+        const orderType = type === "cylinders" ? "cylinder" : "dry_ice";
+        const locationParam = location === "all" ? null : location;
+
+        // Fetch all years in parallel using RPC
+        const results = await Promise.all(
+          years.map(year =>
+            supabase.rpc("get_monthly_order_totals", {
+              p_year: year,
+              p_order_type: orderType,
+              p_location: locationParam
+            })
+          )
+        );
+
+        console.log(`[CumulativeYearChart] Fetched ${results.length} years for ${type}`);
+
+        const allYearData: YearlyMonthlyData[] = [];
+
+        results.forEach((result, index) => {
+          const year = years[index];
+          
+          if (result.error) {
+            console.error(`[CumulativeYearChart] RPC error for ${year}:`, result.error);
+            return;
+          }
+
+          const monthlyTotals = new Array(12).fill(0);
+
+          if (result.data) {
+            result.data.forEach((item: { month: number; total_value: number }) => {
+              monthlyTotals[item.month - 1] = Number(item.total_value) || 0;
+            });
+          }
+
+          // Only include years with data
+          const hasData = monthlyTotals.some(v => v > 0);
+          if (hasData) {
+            allYearData.push({ year, months: monthlyTotals });
+          }
+        });
+
+        // Sort by year descending
+        allYearData.sort((a, b) => b.year - a.year);
+
+        setYearlyData(allYearData);
+        setAvailableYears(allYearData.map(d => d.year));
+
+        // Default: select first 4 years with data
+        const defaultYears = allYearData.slice(0, 4).map(d => d.year);
+        setSelectedYears(defaultYears);
+
+        console.log(`[CumulativeYearChart] Loaded ${allYearData.length} years with data`);
+      } catch (err) {
+        console.error("[CumulativeYearChart] Fetch error:", err);
+        setError("Fout bij ophalen data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [type, location]);
-
-  const fetchAllYearsData = async () => {
-    setLoading(true);
-
-    const currentYear = new Date().getFullYear();
-    const startYear = 2017;
-    const years: number[] = [];
-
-    for (let y = currentYear; y >= startYear; y--) {
-      years.push(y);
-    }
-
-    // Fetch data for all years in parallel
-    const orderType = type === "cylinders" ? "cylinder" : "dry_ice";
-    const promises = years.map(year =>
-      supabase.rpc("get_monthly_order_totals", {
-        p_year: year,
-        p_order_type: orderType,
-        p_location: location === "all" ? null : location
-      })
-    );
-
-    const results = await Promise.all(promises);
-
-    const allYearData: YearlyMonthlyData[] = [];
-
-    results.forEach((result, index) => {
-      const year = years[index];
-      const monthlyTotals = new Array(12).fill(0);
-
-      if (result.data) {
-        result.data.forEach((item: { month: number; total_value: number }) => {
-          monthlyTotals[item.month - 1] = Number(item.total_value) || 0;
-        });
-      }
-
-      // Only include years that have data
-      const hasData = monthlyTotals.some(v => v > 0);
-      if (hasData) {
-        allYearData.push({
-          year,
-          months: monthlyTotals
-        });
-      }
-    });
-
-    // Sort by year descending
-    allYearData.sort((a, b) => b.year - a.year);
-
-    setYearlyData(allYearData);
-    setAvailableYears(allYearData.map(d => d.year));
-
-    // Default: select current year and previous 2 years that have data
-    const defaultYears = allYearData.slice(0, 4).map(d => d.year);
-    setSelectedYears(defaultYears);
-
-    setLoading(false);
-  };
 
   const cumulativeChartData = useMemo(() => {
     const chartData: CumulativeChartData[] = [];
@@ -216,10 +232,14 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
   }, [topFiveYears]);
 
   if (loading) {
+    return <ChartSkeleton height={400} showLegend />;
+  }
+
+  if (error) {
     return (
       <Card className="glass-card">
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <CardContent className="flex items-center justify-center py-12 text-destructive">
+          {error}
         </CardContent>
       </Card>
     );
