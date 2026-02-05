@@ -29,7 +29,7 @@ const ReportLoadingFallback = () => (
   <ChartSkeleton height={350} />
 );
 import { supabase } from "@/integrations/supabase/client";
-import { format, subWeeks } from "date-fns";
+import { format, subWeeks, startOfMonth, endOfMonth, differenceInDays, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -39,6 +39,11 @@ import type { RolePermissions } from "@/hooks/useUserPermissions";
 
 type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 type UserProductionLocation = Database["public"]["Enums"]["production_location"] | null;
+
+type DateRange = {
+  from: Date;
+  to: Date;
+};
 
 interface ProductionPlanningProps {
   userProductionLocation?: UserProductionLocation;
@@ -61,6 +66,12 @@ export function ProductionPlanning({
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Date range state for dashboard sync with reports
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date())
+  });
+
   // Determine initial and allowed location based on user's assigned location
   const getInitialLocation = (): ProductionLocation => {
     if (canViewAllLocations) return "all";
@@ -81,7 +92,7 @@ export function ProductionPlanning({
   // Fetch stats when location or refreshKey changes
   useEffect(() => {
     fetchStats();
-  }, [refreshKey, selectedLocation]);
+  }, [refreshKey, selectedLocation, dateRange]);
 
   // Trigger refresh animation when refreshKey changes (but not on initial load)
   useEffect(() => {
@@ -102,15 +113,27 @@ export function ProductionPlanning({
     return Math.round(((current - previous) / previous) * 100);
   };
 
-  const fetchStats = async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
-    const lastWeekSameDay = format(subWeeks(new Date(), 1), "yyyy-MM-dd");
+  const handleDateRangeChange = useCallback((newRange: DateRange) => {
+    setDateRange(newRange);
+  }, []);
 
-    // Fetch dry ice orders for today
+  const fetchStats = async () => {
+    const fromDate = format(dateRange.from, "yyyy-MM-dd");
+    const toDate = format(dateRange.to, "yyyy-MM-dd");
+    
+    // Calculate previous period (same length, immediately before)
+    const periodLength = differenceInDays(dateRange.to, dateRange.from);
+    const prevTo = subDays(dateRange.from, 1);
+    const prevFrom = subDays(prevTo, periodLength);
+    const prevFromDate = format(prevFrom, "yyyy-MM-dd");
+    const prevToDate = format(prevTo, "yyyy-MM-dd");
+
+    // Fetch dry ice orders for date range
     let dryIceQuery = supabase
       .from("dry_ice_orders")
       .select("quantity_kg")
-      .eq("scheduled_date", today)
+      .gte("scheduled_date", fromDate)
+      .lte("scheduled_date", toDate)
       .neq("status", "cancelled");
 
     const { data: dryIceData } = await dryIceQuery;
@@ -119,22 +142,24 @@ export function ProductionPlanning({
       setDryIceToday(dryIceData.reduce((sum, o) => sum + Number(o.quantity_kg), 0));
     }
 
-    // Fetch dry ice orders for last week same day (for trend)
+    // Fetch dry ice orders for previous period (for trend)
     const { data: prevDryIceData } = await supabase
       .from("dry_ice_orders")
       .select("quantity_kg")
-      .eq("scheduled_date", lastWeekSameDay)
+      .gte("scheduled_date", prevFromDate)
+      .lte("scheduled_date", prevToDate)
       .neq("status", "cancelled");
 
     if (prevDryIceData) {
       setPreviousDryIceToday(prevDryIceData.reduce((sum, o) => sum + Number(o.quantity_kg), 0));
     }
 
-    // Fetch cylinder orders for today (filtered by location)
+    // Fetch cylinder orders for date range (filtered by location)
     let cylinderQuery = supabase
       .from("gas_cylinder_orders")
       .select("cylinder_count")
-      .eq("scheduled_date", today)
+      .gte("scheduled_date", fromDate)
+      .lte("scheduled_date", toDate)
       .neq("status", "cancelled");
 
     if (selectedLocation !== "all") {
@@ -147,11 +172,12 @@ export function ProductionPlanning({
       setCylindersToday(cylinderData.reduce((sum, o) => sum + o.cylinder_count, 0));
     }
 
-    // Fetch cylinder orders for last week same day (for trend)
+    // Fetch cylinder orders for previous period (for trend)
     let prevCylinderQuery = supabase
       .from("gas_cylinder_orders")
       .select("cylinder_count")
-      .eq("scheduled_date", lastWeekSameDay)
+      .gte("scheduled_date", prevFromDate)
+      .lte("scheduled_date", prevToDate)
       .neq("status", "cancelled");
 
     if (selectedLocation !== "all") {
@@ -164,55 +190,46 @@ export function ProductionPlanning({
       setPreviousCylindersToday(prevCylinderData.reduce((sum, o) => sum + o.cylinder_count, 0));
     }
 
-    // Fetch week orders count
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-
-    // Previous week dates
-    const prevWeekStart = subWeeks(weekStart, 1);
-    const prevWeekEnd = subWeeks(weekEnd, 1);
-
+    // Fetch total orders count for date range
     const { count: dryIceCount } = await supabase
       .from("dry_ice_orders")
       .select("*", { count: "exact", head: true })
-      .gte("scheduled_date", format(weekStart, "yyyy-MM-dd"))
-      .lte("scheduled_date", format(weekEnd, "yyyy-MM-dd"));
+      .gte("scheduled_date", fromDate)
+      .lte("scheduled_date", toDate);
 
-    // Week cylinder count with location filter
-    let weekCylinderQuery = supabase
+    // Cylinder count with location filter
+    let periodCylinderQuery = supabase
       .from("gas_cylinder_orders")
       .select("*", { count: "exact", head: true })
-      .gte("scheduled_date", format(weekStart, "yyyy-MM-dd"))
-      .lte("scheduled_date", format(weekEnd, "yyyy-MM-dd"));
+      .gte("scheduled_date", fromDate)
+      .lte("scheduled_date", toDate);
 
     if (selectedLocation !== "all") {
-      weekCylinderQuery = weekCylinderQuery.eq("location", selectedLocation);
+      periodCylinderQuery = periodCylinderQuery.eq("location", selectedLocation);
     }
 
-    const { count: cylinderCount } = await weekCylinderQuery;
+    const { count: cylinderCount } = await periodCylinderQuery;
 
     setWeekOrders((dryIceCount || 0) + (cylinderCount || 0));
 
-    // Fetch previous week orders count (for trend)
+    // Fetch previous period orders count (for trend)
     const { count: prevDryIceCount } = await supabase
       .from("dry_ice_orders")
       .select("*", { count: "exact", head: true })
-      .gte("scheduled_date", format(prevWeekStart, "yyyy-MM-dd"))
-      .lte("scheduled_date", format(prevWeekEnd, "yyyy-MM-dd"));
+      .gte("scheduled_date", prevFromDate)
+      .lte("scheduled_date", prevToDate);
 
-    let prevWeekCylinderQuery = supabase
+    let prevPeriodCylinderQuery = supabase
       .from("gas_cylinder_orders")
       .select("*", { count: "exact", head: true })
-      .gte("scheduled_date", format(prevWeekStart, "yyyy-MM-dd"))
-      .lte("scheduled_date", format(prevWeekEnd, "yyyy-MM-dd"));
+      .gte("scheduled_date", prevFromDate)
+      .lte("scheduled_date", prevToDate);
 
     if (selectedLocation !== "all") {
-      prevWeekCylinderQuery = prevWeekCylinderQuery.eq("location", selectedLocation);
+      prevPeriodCylinderQuery = prevPeriodCylinderQuery.eq("location", selectedLocation);
     }
 
-    const { count: prevCylinderCount } = await prevWeekCylinderQuery;
+    const { count: prevCylinderCount } = await prevPeriodCylinderQuery;
 
     setPreviousWeekOrders((prevDryIceCount || 0) + (prevCylinderCount || 0));
   };
@@ -220,7 +237,7 @@ export function ProductionPlanning({
   return (
     <div className="space-y-6">
       {/* KPI Dashboard */}
-      <KPIDashboard location={selectedLocation} refreshKey={refreshKey} />
+      <KPIDashboard location={selectedLocation} refreshKey={refreshKey} dateRange={dateRange} />
 
       {/* Location Filter */}
       <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 border border-border/50">
@@ -331,12 +348,12 @@ export function ProductionPlanning({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           value={`${dryIceToday} kg`}
-          label="Gepland voor productie"
+          label="Droogijs gepland"
           icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
           iconBgColor="bg-cyan-500/10"
           trend={{
             value: calculateTrend(dryIceToday, previousDryIceToday),
-            label: "vs. vorige week"
+            label: "vs. vorige periode"
           }}
           className={cn(
             "glass-card transition-all duration-300",
@@ -347,12 +364,12 @@ export function ProductionPlanning({
         <div className="relative">
           <StatCard
             value={cylindersToday}
-            label="Gepland voor vulling"
+            label="Cilinders gepland"
             icon={<Cylinder className="h-5 w-5 text-orange-500" />}
             iconBgColor="bg-orange-500/10"
             trend={{
               value: calculateTrend(cylindersToday, previousCylindersToday),
-              label: "vs. vorige week"
+              label: "vs. vorige periode"
             }}
             className={cn(
               "glass-card transition-all duration-300",
@@ -369,12 +386,12 @@ export function ProductionPlanning({
         <div className="relative">
           <StatCard
             value={weekOrders}
-            label="Totaal te verwerken"
+            label="Totaal orders"
             icon={<Package className="h-5 w-5 text-green-500" />}
             iconBgColor="bg-green-500/10"
             trend={{
               value: calculateTrend(weekOrders, previousWeekOrders),
-              label: "vs. vorige week"
+              label: "vs. vorige periode"
             }}
             className={cn(
               "glass-card transition-all duration-300",
@@ -398,6 +415,7 @@ export function ProductionPlanning({
           refreshKey={refreshKey}
           isRefreshing={isRefreshing}
           location={selectedLocation}
+          dateRange={dateRange}
         />
       </div>
 
@@ -474,7 +492,13 @@ export function ProductionPlanning({
 
         <TabsContent value="rapportage" className="mt-6">
           <Suspense fallback={<ReportLoadingFallback />}>
-            <ProductionReports refreshKey={refreshKey} onDataChanged={handleDataChanged} location={selectedLocation} />
+            <ProductionReports 
+              refreshKey={refreshKey} 
+              onDataChanged={handleDataChanged} 
+              location={selectedLocation}
+              dateRange={dateRange}
+              onDateRangeChange={handleDateRangeChange}
+            />
           </Suspense>
         </TabsContent>
 
