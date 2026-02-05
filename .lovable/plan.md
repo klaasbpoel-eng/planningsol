@@ -1,74 +1,139 @@
 
-# Fix Plan: Loading Icon Stuck on Internal Orders Page
 
-## Problem Analysis
+# Plan: Live Dashboard Refresh gebaseerd op Rapportageperiode
 
-The loading spinner runs indefinitely for admin users because of a logic flaw in `useInternalOrders.ts`:
+## Overzicht
+De KPI Dashboard, statistiek kaarten en Top 5 Klanten widget zullen dynamisch worden bijgewerkt wanneer de datumperiode in de Rapportage tab wordt gewijzigd.
 
-1. The `fetchOrders` function exits early when `productionLocation` is `null` (line 81)
-2. Admin users often have no assigned production location (as confirmed in network requests: `production_location: null`)
-3. Even though `getIncomingOrders()` and `getOutgoingOrders()` handle the admin case correctly, the underlying `orders` array is never populated because `fetchOrders` never runs
+## Huidige Situatie
 
-## Solution
+De productieplanning componenten werken momenteel als volgt:
+- **KPI Dashboard**: Toont data voor het huidige jaar vs vorig jaar
+- **Statistiek kaarten**: Tonen data voor vandaag en deze week
+- **Top 5 Klanten widget**: Toont data voor het huidige kalenderjaar
 
-Modify the hook to account for admin users who should see all orders regardless of production location:
+Deze widgets negeren de datumperiode selectie in Rapportage en gebruiken hun eigen vaste datumlogica.
 
-### Changes to `src/hooks/useInternalOrders.ts`
+## Oplossing
 
-1. **Update `fetchOrders` condition** - Allow fetching if user is admin OR has a production location
-2. **Wait for role loading** - Don't attempt fetch until we know the user's role
-3. **Update realtime subscription** - Same logic for setting up subscription
+### Architectuur Wijziging
 
 ```text
-Current flow:
-  productionLocation = null → fetchOrders exits → loading = true forever
-
-Fixed flow:
-  Wait for roleLoading → isAdmin = true → fetchOrders runs → loading = false
+ProductionPlanning (parent)
+    │
+    ├── dateRange state (nieuw - lift up from ProductionReports)
+    │
+    ├── KPIDashboard
+    │   └── Props: location, refreshKey, dateRange (nieuw)
+    │
+    ├── Stat Cards (inline)
+    │   └── Nu gebaseerd op dateRange
+    │
+    ├── TopCustomersWidget
+    │   └── Props: refreshKey, location, dateRange (nieuw)
+    │
+    └── ProductionReports
+        └── Props: dateRange, onDateRangeChange (nieuw callback)
 ```
 
-### Specific Code Changes
+### Bestandswijzigingen
 
-**fetchOrders function (around line 80-81)**
-- Change: `if (!productionLocation) return;`
-- To: `if (!productionLocation && !isAdmin) return;`
+#### 1. ProductionPlanning.tsx
+- Voeg `dateRange` state toe op parent niveau
+- Maak `handleDateRangeChange` callback functie
+- Pas `fetchStats()` aan om dateRange te gebruiken i.p.v. "vandaag"
+- Geef `dateRange` door aan KPIDashboard en TopCustomersWidget
+- Geef `dateRange` en `onDateRangeChange` door aan ProductionReports
 
-**useEffect for fetchOrders (around line 126-128)**
-- Add `isAdmin` and `roleLoading` to dependencies
-- Add guard: Don't run while `roleLoading` is true
+#### 2. ProductionReports.tsx
+- Verwijder interne `dateRange` state
+- Ontvang `dateRange` en `onDateRangeChange` via props
+- Roep `onDateRangeChange` aan bij preset knoppen en kalender selectie
 
-**useEffect for realtime subscription (around line 131-152)**
-- Update condition to also check for admin status
-- Add `isAdmin` to dependencies
+#### 3. KPIDashboard.tsx
+- Voeg optionele `dateRange` prop toe
+- Wanneer dateRange aanwezig is: gebruik deze periode voor berekeningen
+- Wanneer dateRange afwezig is: behoud huidige gedrag (jaar-totalen)
+- Pas sparkline data op om alleen de geselecteerde periode te tonen
 
-### Technical Details
+#### 4. TopCustomersWidget.tsx
+- Voeg optionele `dateRange` prop toe
+- Wanneer dateRange aanwezig is: filter klanten op deze periode
+- Maak nieuwe RPC functie of pas client-side filtering toe
 
-File: `src/hooks/useInternalOrders.ts`
+### Technische Details
 
+**ProductionPlanning.tsx:**
 ```typescript
-// Line 80-82: Update fetchOrders guard
-const fetchOrders = useCallback(async () => {
-    // Allow admins to fetch all orders, others need a location
-    if (!productionLocation && !isAdmin) return;
-    // ... rest of function
-}, [productionLocation, isAdmin]);
+// Nieuwe state
+const [dateRange, setDateRange] = useState<DateRange>({
+  from: startOfMonth(new Date()),
+  to: endOfMonth(new Date())
+});
 
-// Line 126-129: Update fetchOrders useEffect
-useEffect(() => {
-    if (roleLoading) return; // Wait for role check
-    fetchOrders();
-}, [fetchOrders, roleLoading]);
+// Aangepaste fetchStats die dateRange gebruikt
+const fetchStats = async () => {
+  const fromStr = format(dateRange.from, "yyyy-MM-dd");
+  const toStr = format(dateRange.to, "yyyy-MM-dd");
+  
+  // Query dry ice en cylinder orders binnen dateRange
+  // ...
+};
 
-// Line 131-152: Update realtime subscription
-useEffect(() => {
-    if (!productionLocation && !isAdmin) return;
-    // ... subscription setup
-}, [productionLocation, isAdmin, fetchOrders]);
+// In render:
+<KPIDashboard 
+  location={selectedLocation} 
+  refreshKey={refreshKey}
+  dateRange={dateRange}
+/>
+
+<TopCustomersWidget
+  refreshKey={refreshKey}
+  location={selectedLocation}
+  dateRange={dateRange}
+/>
+
+<ProductionReports 
+  refreshKey={refreshKey} 
+  onDataChanged={handleDataChanged} 
+  location={selectedLocation}
+  dateRange={dateRange}
+  onDateRangeChange={setDateRange}
+/>
 ```
 
-## Expected Result
+**KPIDashboard.tsx:**
+```typescript
+interface KPIDashboardProps {
+  location: ProductionLocation;
+  refreshKey?: number;
+  dateRange?: DateRange; // Nieuw
+}
 
-After these changes:
-- Admin users will see all orders load immediately
-- Non-admin users will continue to see only orders for their location
-- Loading spinner will properly disappear once data is fetched
+// In fetchKPIData:
+if (dateRange) {
+  // Gebruik dateRange voor queries
+  const fromStr = format(dateRange.from, "yyyy-MM-dd");
+  const toStr = format(dateRange.to, "yyyy-MM-dd");
+  // ... filter op deze periode
+} else {
+  // Bestaand gedrag (jaar-totalen)
+}
+```
+
+### UX Verbeteringen
+
+1. **Visuele feedback**: Toon een badge bij elk widget met de actieve periode
+2. **Loading states**: Toon skeleton tijdens het herladen
+3. **Smooth transitions**: Gebruik bestaande FadeIn en refresh animaties
+
+### Trend Berekeningen
+
+Bij gebruik van een custom dateRange worden trends berekend als:
+- **Vorige periode**: Dezelfde duur, direct voorafgaand aan de geselecteerde periode
+- Voorbeeld: Als je "Vorig jaar" selecteert, wordt de trend vergeleken met het jaar daarvoor
+
+### Fallback Gedrag
+
+Als geen dateRange prop wordt meegegeven, behouden alle widgets hun huidige standaard gedrag. Dit zorgt voor backwards compatibility.
+
