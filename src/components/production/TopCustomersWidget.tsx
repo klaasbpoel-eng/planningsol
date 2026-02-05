@@ -82,7 +82,14 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
       })
     ]);
 
-    if (currentRes.error) throw currentRes.error;
+   // Log errors for debugging
+   if (currentRes.error) {
+     console.error("[TopCustomersWidget] Error fetching current year data:", currentRes.error);
+     return;
+   }
+   if (previousRes.error) {
+     console.error("[TopCustomersWidget] Error fetching previous year data:", previousRes.error);
+   }
 
     const previousMap = new Map<string, { cylinders: number; dryIce: number }>();
     if (previousRes.data) {
@@ -148,6 +155,15 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
       })
     ]);
     
+   // Log errors for debugging
+   if (currentRes.error) {
+     console.error("[TopCustomersWidget] Error fetching current period data:", currentRes.error);
+     return;
+   }
+   if (previousRes.error) {
+     console.error("[TopCustomersWidget] Error fetching previous period data:", previousRes.error);
+   }
+
     // Build previous period map for trend calculation
     const prevMap = new Map<string, { cylinders: number; dryIce: number }>();
     if (previousRes.data) {

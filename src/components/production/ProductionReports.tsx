@@ -165,11 +165,16 @@ export function ProductionReports({
   }, [dateRange, refreshKey, location]);
 
   const fetchGasTypes = async () => {
-    const { data } = await supabase
+   const { data, error } = await supabase
       .from("gas_types")
       .select("id, name, color")
       .eq("is_active", true)
       .order("name");
+
+   if (error) {
+     console.error("[ProductionReports] Error fetching gas types:", error);
+     return;
+   }
 
     if (data) {
       setGasTypes(data);
@@ -279,78 +284,101 @@ export function ProductionReports({
 
   const fetchReportData = async () => {
     setLoading(true);
-    const fromDate = format(dateRange.from, "yyyy-MM-dd");
-    const toDate = format(dateRange.to, "yyyy-MM-dd");
+   
+   try {
+     const fromDate = format(dateRange.from, "yyyy-MM-dd");
+     const toDate = format(dateRange.to, "yyyy-MM-dd");
 
-    // Calculate previous period (same length, immediately before)
-    const periodLength = differenceInDays(dateRange.to, dateRange.from);
-    const prevTo = subDays(dateRange.from, 1);
-    const prevFrom = subDays(prevTo, periodLength);
-    const prevFromDate = format(prevFrom, "yyyy-MM-dd");
-    const prevToDate = format(prevTo, "yyyy-MM-dd");
+     // Calculate previous period (same length, immediately before)
+     const periodLength = differenceInDays(dateRange.to, dateRange.from);
+     const prevTo = subDays(dateRange.from, 1);
+     const prevFrom = subDays(prevTo, periodLength);
+     const prevFromDate = format(prevFrom, "yyyy-MM-dd");
+     const prevToDate = format(prevTo, "yyyy-MM-dd");
 
-    // Get all months in the range
-    const months = getMonthsInRange(dateRange.from, dateRange.to);
-    const prevMonths = getMonthsInRange(prevFrom, prevTo);
+     console.log("[ProductionReports] Fetching data for period:", { fromDate, toDate, location });
 
-    // Fetch data for each month in parallel
-    const cylinderPromises = months.map(({ year, month }) =>
-      fetchCylinderMonthData(year, month, fromDate, toDate)
-    );
-    const dryIcePromises = months.map(({ year, month }) =>
-      fetchDryIceMonthData(year, month, fromDate, toDate)
-    );
+     // Get all months in the range
+     const months = getMonthsInRange(dateRange.from, dateRange.to);
+     const prevMonths = getMonthsInRange(prevFrom, prevTo);
 
-    // Fetch previous period data
-    const prevCylinderPromises = prevMonths.map(({ year, month }) =>
-      fetchCylinderMonthData(year, month, prevFromDate, prevToDate)
-    );
-    const prevDryIcePromises = prevMonths.map(({ year, month }) =>
-      fetchDryIceMonthData(year, month, prevFromDate, prevToDate)
-    );
+     // Fetch data for each month in parallel
+     const cylinderPromises = months.map(({ year, month }) =>
+       fetchCylinderMonthData(year, month, fromDate, toDate)
+     );
+     const dryIcePromises = months.map(({ year, month }) =>
+       fetchDryIceMonthData(year, month, fromDate, toDate)
+     );
 
-    const [cylinderResults, dryIceResults, prevCylinderResults, prevDryIceResults] = await Promise.all([
-      Promise.all(cylinderPromises),
-      Promise.all(dryIcePromises),
-      Promise.all(prevCylinderPromises),
-      Promise.all(prevDryIcePromises)
-    ]);
+     // Fetch previous period data
+     const prevCylinderPromises = prevMonths.map(({ year, month }) =>
+       fetchCylinderMonthData(year, month, prevFromDate, prevToDate)
+     );
+     const prevDryIcePromises = prevMonths.map(({ year, month }) =>
+       fetchDryIceMonthData(year, month, prevFromDate, prevToDate)
+     );
 
-    // Combine results from all months
-    const allCylinderOrders = cylinderResults.flatMap(res => res.data || []);
-    const allDryIceOrders = dryIceResults.flatMap(res => res.data || []);
-    const allPrevCylinderOrders = prevCylinderResults.flatMap(res => res.data || []);
-    const allPrevDryIceOrders = prevDryIceResults.flatMap(res => res.data || []);
+     const [cylinderResults, dryIceResults, prevCylinderResults, prevDryIceResults] = await Promise.all([
+       Promise.all(cylinderPromises),
+       Promise.all(dryIcePromises),
+       Promise.all(prevCylinderPromises),
+       Promise.all(prevDryIcePromises)
+     ]);
 
-    // Remove duplicates (in case of overlapping date boundaries)
-    const uniqueCylinderOrders = Array.from(
-      new Map(allCylinderOrders.map(o => [o.id, o])).values()
-    ).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
+     // Log any errors from the fetches
+     cylinderResults.forEach((res, i) => {
+       if (res.error) console.error(`[ProductionReports] Cylinder fetch error month ${i}:`, res.error);
+     });
+     dryIceResults.forEach((res, i) => {
+       if (res.error) console.error(`[ProductionReports] Dry ice fetch error month ${i}:`, res.error);
+     });
 
-    const uniqueDryIceOrders = Array.from(
-      new Map(allDryIceOrders.map(o => [o.id, o])).values()
-    ).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
+     // Combine results from all months
+     const allCylinderOrders = cylinderResults.flatMap(res => res.data || []);
+     const allDryIceOrders = dryIceResults.flatMap(res => res.data || []);
+     const allPrevCylinderOrders = prevCylinderResults.flatMap(res => res.data || []);
+     const allPrevDryIceOrders = prevDryIceResults.flatMap(res => res.data || []);
 
-    const uniquePrevCylinderOrders = Array.from(
-      new Map(allPrevCylinderOrders.map(o => [o.id, o])).values()
-    );
-    const uniquePrevDryIceOrders = Array.from(
-      new Map(allPrevDryIceOrders.map(o => [o.id, o])).values()
-    );
+     console.log("[ProductionReports] Fetched orders:", { 
+       cylinders: allCylinderOrders.length, 
+       dryIce: allDryIceOrders.length,
+       prevCylinders: allPrevCylinderOrders.length,
+       prevDryIce: allPrevDryIceOrders.length
+     });
 
-    // Calculate previous period stats
-    setPreviousPeriodStats({
-      cylinderOrders: uniquePrevCylinderOrders.length,
-      totalCylinders: uniquePrevCylinderOrders.filter(o => o.status !== "cancelled").reduce((sum, o) => sum + o.cylinder_count, 0),
-      dryIceOrders: uniquePrevDryIceOrders.length,
-      totalDryIce: uniquePrevDryIceOrders.filter(o => o.status !== "cancelled").reduce((sum, o) => sum + Number(o.quantity_kg), 0),
-      completed: uniquePrevCylinderOrders.filter(o => o.status === "completed").length + uniquePrevDryIceOrders.filter(o => o.status === "completed").length,
-      pending: uniquePrevCylinderOrders.filter(o => o.status === "pending").length + uniquePrevDryIceOrders.filter(o => o.status === "pending").length
-    });
+     // Remove duplicates (in case of overlapping date boundaries)
+     const uniqueCylinderOrders = Array.from(
+       new Map(allCylinderOrders.map(o => [o.id, o])).values()
+     ).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
 
-    setCylinderOrders(uniqueCylinderOrders);
-    setDryIceOrders(uniqueDryIceOrders);
-    setLoading(false);
+     const uniqueDryIceOrders = Array.from(
+       new Map(allDryIceOrders.map(o => [o.id, o])).values()
+     ).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
+
+     const uniquePrevCylinderOrders = Array.from(
+       new Map(allPrevCylinderOrders.map(o => [o.id, o])).values()
+     );
+     const uniquePrevDryIceOrders = Array.from(
+       new Map(allPrevDryIceOrders.map(o => [o.id, o])).values()
+     );
+
+     // Calculate previous period stats
+     setPreviousPeriodStats({
+       cylinderOrders: uniquePrevCylinderOrders.length,
+       totalCylinders: uniquePrevCylinderOrders.filter(o => o.status !== "cancelled").reduce((sum, o) => sum + o.cylinder_count, 0),
+       dryIceOrders: uniquePrevDryIceOrders.length,
+       totalDryIce: uniquePrevDryIceOrders.filter(o => o.status !== "cancelled").reduce((sum, o) => sum + Number(o.quantity_kg), 0),
+       completed: uniquePrevCylinderOrders.filter(o => o.status === "completed").length + uniquePrevDryIceOrders.filter(o => o.status === "completed").length,
+       pending: uniquePrevCylinderOrders.filter(o => o.status === "pending").length + uniquePrevDryIceOrders.filter(o => o.status === "pending").length
+     });
+
+     setCylinderOrders(uniqueCylinderOrders);
+     setDryIceOrders(uniqueDryIceOrders);
+   } catch (error) {
+     console.error("[ProductionReports] Error fetching report data:", error);
+   } finally {
+     setLoading(false);
+   }
   };
 
   // Helper function to calculate trend percentage
