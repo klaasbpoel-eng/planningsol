@@ -1259,6 +1259,14 @@ export type Database = {
           total_dry_ice_kg: number
         }[]
       }
+      get_daily_production_by_period: {
+        Args: { p_from_date: string; p_location?: string; p_to_date: string }
+        Returns: {
+          cylinder_count: number
+          dry_ice_kg: number
+          production_date: string
+        }[]
+      }
       get_daily_production_totals: {
         Args: { p_location?: string; p_month?: number; p_year: number }
         Returns: {
@@ -1277,6 +1285,15 @@ export type Database = {
           pending_orders: number
           total_kg: number
           total_orders: number
+        }[]
+      }
+      get_gas_type_distribution_by_period: {
+        Args: { p_from_date: string; p_location?: string; p_to_date: string }
+        Returns: {
+          gas_type_color: string
+          gas_type_id: string
+          gas_type_name: string
+          total_cylinders: number
         }[]
       }
       get_monthly_cylinder_totals_by_customer: {
