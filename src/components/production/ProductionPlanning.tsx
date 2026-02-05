@@ -29,7 +29,8 @@ const ReportLoadingFallback = () => (
   <ChartSkeleton height={350} />
 );
 import { supabase } from "@/integrations/supabase/client";
-import { format, subWeeks, startOfMonth, endOfMonth, differenceInDays, subDays } from "date-fns";
+import { format, subWeeks, startOfMonth, endOfMonth, differenceInDays, subDays, startOfYear, endOfYear, startOfWeek, endOfWeek, isSameDay, isSameMonth, isSameYear, subMonths, subYears } from "date-fns";
+import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -71,6 +72,63 @@ export function ProductionPlanning({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
   });
+
+  // Helper function to format date range as human-readable label
+  const getDateRangeLabel = useCallback((range: DateRange): string => {
+    const now = new Date();
+    const { from, to } = range;
+    
+    // Check for common presets
+    // This year
+    if (isSameDay(from, startOfYear(now)) && isSameDay(to, endOfYear(now))) {
+      return "Dit jaar";
+    }
+    
+    // Last year
+    const lastYear = subYears(now, 1);
+    if (isSameDay(from, startOfYear(lastYear)) && isSameDay(to, endOfYear(lastYear))) {
+      return "Vorig jaar";
+    }
+    
+    // This month
+    if (isSameDay(from, startOfMonth(now)) && isSameDay(to, endOfMonth(now))) {
+      return "Deze maand";
+    }
+    
+    // Last month
+    const lastMonth = subMonths(now, 1);
+    if (isSameDay(from, startOfMonth(lastMonth)) && isSameDay(to, endOfMonth(lastMonth))) {
+      return "Vorige maand";
+    }
+    
+    // This week
+    if (isSameDay(from, startOfWeek(now, { weekStartsOn: 1 })) && 
+        isSameDay(to, endOfWeek(now, { weekStartsOn: 1 }))) {
+      return "Deze week";
+    }
+    
+    // Check for quarter (3 months ending this month)
+    const threeMonthsAgo = subMonths(startOfMonth(now), 2);
+    if (isSameDay(from, threeMonthsAgo) && isSameDay(to, endOfMonth(now))) {
+      return "Laatste 3 maanden";
+    }
+    
+    // Check if it's a full month
+    if (isSameDay(from, startOfMonth(from)) && isSameDay(to, endOfMonth(from)) && isSameMonth(from, to)) {
+      return format(from, "MMMM yyyy", { locale: nl });
+    }
+    
+    // Check if it's a full year
+    if (isSameDay(from, startOfYear(from)) && isSameDay(to, endOfYear(from)) && isSameYear(from, to)) {
+      return format(from, "yyyy");
+    }
+    
+    // Default: show date range
+    if (isSameYear(from, to)) {
+      return `${format(from, "d MMM", { locale: nl })} - ${format(to, "d MMM yyyy", { locale: nl })}`;
+    }
+    return `${format(from, "d MMM yyyy", { locale: nl })} - ${format(to, "d MMM yyyy", { locale: nl })}`;
+  }, []);
 
   // Determine initial and allowed location based on user's assigned location
   const getInitialLocation = (): ProductionLocation => {
@@ -345,7 +403,18 @@ export function ProductionPlanning({
       </div>
 
       {/* Quick stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="space-y-2">
+        {/* Period indicator */}
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="text-xs font-medium">
+            📅 {getDateRangeLabel(dateRange)}
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            Wijzig periode in Rapportage tab
+          </span>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           value={`${dryIceToday} kg`}
           label="Droogijs gepland"
@@ -417,6 +486,7 @@ export function ProductionPlanning({
           location={selectedLocation}
           dateRange={dateRange}
         />
+        </div>
       </div>
 
       {/* Main content tabs */}
