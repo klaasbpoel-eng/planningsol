@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Upload } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import { getStockStatus, type StockStatus } from "./StockStatusBadge";
 import { StockExcelImportDialog, type StockItem } from "./StockExcelImportDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -127,22 +127,22 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
   const overallStatus = statusConfigs.find((s) => s.status === "critical" && s.count > 0)
     ? "critical"
     : statusConfigs.find((s) => s.status === "low" && s.count > 0)
-    ? "low"
-    : "ok";
+      ? "low"
+      : "ok";
 
   const overallColor =
     overallStatus === "critical"
       ? "text-red-500"
       : overallStatus === "low"
-      ? "text-orange-500"
-      : "text-green-500";
+        ? "text-orange-500"
+        : "text-green-500";
 
   const overallLabel =
     overallStatus === "critical"
       ? "Actie vereist"
       : overallStatus === "low"
-      ? "Aandacht"
-      : "Op voorraad";
+        ? "Aandacht"
+        : "Op voorraad";
 
   return (
     <Card
@@ -171,7 +171,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
           )}
         </CardDescription>
       </CardHeader>
-      
+
       <StockExcelImportDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
@@ -192,7 +192,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
                     )}
                   >
                     <Icon className={cn("h-3 w-3", config.color)} />
-                    <span className={cn("text-sm font-bold", config.color)}>{config.count}</span>
+                    <span className={cn("text-sm font-bold", config.color)}>{formatNumber(config.count, 0)}</span>
                     <span className="text-[9px] text-muted-foreground">{config.label}</span>
                   </div>
                 </DialogTrigger>
@@ -202,7 +202,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
                       <Icon className={cn("h-5 w-5", config.color)} />
                       <span className={config.color}>{config.fullLabel}</span>
                       <span className="ml-auto text-sm font-normal text-muted-foreground">
-                        {config.count} items
+                        {formatNumber(config.count, 0)} items
                       </span>
                     </DialogTitle>
                   </DialogHeader>
@@ -225,18 +225,18 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
                             <div className="text-right ml-3 flex-shrink-0 space-y-1">
                               <div className="flex items-center justify-end gap-2 text-xs">
                                 <span className="text-muted-foreground">Voorraad:</span>
-                                <span className="font-semibold w-8 text-right">{item.numberOnStock}</span>
+                                <span className="font-semibold w-8 text-right">{formatNumber(item.numberOnStock, 0)}</span>
                               </div>
                               <div className="flex items-center justify-end gap-2 text-xs">
                                 <span className="text-muted-foreground">Gem. verbr:</span>
-                                <span className="font-semibold w-8 text-right">{item.averageConsumption}</span>
+                                <span className="font-semibold w-8 text-right">{formatNumber(item.averageConsumption, 0)}</span>
                               </div>
                               <div className={cn(
                                 "flex items-center justify-end gap-2 text-xs font-semibold",
                                 item.difference < 0 ? "text-red-500" : item.difference > 0 ? "text-green-500" : "text-muted-foreground"
                               )}>
                                 <span>Verschil:</span>
-                                <span className="w-8 text-right">{item.difference > 0 ? "+" : ""}{item.difference}</span>
+                                <span className="w-8 text-right">{item.difference > 0 ? "+" : ""}{formatNumber(item.difference, 0)}</span>
                               </div>
                             </div>
                           </div>

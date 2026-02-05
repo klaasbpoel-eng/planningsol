@@ -31,7 +31,7 @@ const ReportLoadingFallback = () => (
 import { supabase } from "@/integrations/supabase/client";
 import { format, subWeeks, startOfMonth, endOfMonth, differenceInDays, subDays, startOfYear, endOfYear, startOfWeek, endOfWeek, isSameDay, isSameMonth, isSameYear, subMonths, subYears } from "date-fns";
 import { nl } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
@@ -77,52 +77,52 @@ export function ProductionPlanning({
   const getDateRangeLabel = useCallback((range: DateRange): string => {
     const now = new Date();
     const { from, to } = range;
-    
+
     // Check for common presets
     // This year
     if (isSameDay(from, startOfYear(now)) && isSameDay(to, endOfYear(now))) {
       return "Dit jaar";
     }
-    
+
     // Last year
     const lastYear = subYears(now, 1);
     if (isSameDay(from, startOfYear(lastYear)) && isSameDay(to, endOfYear(lastYear))) {
       return "Vorig jaar";
     }
-    
+
     // This month
     if (isSameDay(from, startOfMonth(now)) && isSameDay(to, endOfMonth(now))) {
       return "Deze maand";
     }
-    
+
     // Last month
     const lastMonth = subMonths(now, 1);
     if (isSameDay(from, startOfMonth(lastMonth)) && isSameDay(to, endOfMonth(lastMonth))) {
       return "Vorige maand";
     }
-    
+
     // This week
-    if (isSameDay(from, startOfWeek(now, { weekStartsOn: 1 })) && 
-        isSameDay(to, endOfWeek(now, { weekStartsOn: 1 }))) {
+    if (isSameDay(from, startOfWeek(now, { weekStartsOn: 1 })) &&
+      isSameDay(to, endOfWeek(now, { weekStartsOn: 1 }))) {
       return "Deze week";
     }
-    
+
     // Check for quarter (3 months ending this month)
     const threeMonthsAgo = subMonths(startOfMonth(now), 2);
     if (isSameDay(from, threeMonthsAgo) && isSameDay(to, endOfMonth(now))) {
       return "Laatste 3 maanden";
     }
-    
+
     // Check if it's a full month
     if (isSameDay(from, startOfMonth(from)) && isSameDay(to, endOfMonth(from)) && isSameMonth(from, to)) {
       return format(from, "MMMM yyyy", { locale: nl });
     }
-    
+
     // Check if it's a full year
     if (isSameDay(from, startOfYear(from)) && isSameDay(to, endOfYear(from)) && isSameYear(from, to)) {
       return format(from, "yyyy");
     }
-    
+
     // Default: show date range
     if (isSameYear(from, to)) {
       return `${format(from, "d MMM", { locale: nl })} - ${format(to, "d MMM yyyy", { locale: nl })}`;
@@ -178,7 +178,7 @@ export function ProductionPlanning({
   const fetchStats = async () => {
     const fromDate = format(dateRange.from, "yyyy-MM-dd");
     const toDate = format(dateRange.to, "yyyy-MM-dd");
-    
+
     // Calculate previous period (same length, immediately before)
     const periodLength = differenceInDays(dateRange.to, dateRange.from);
     const prevTo = subDays(dateRange.from, 1);
@@ -413,31 +413,15 @@ export function ProductionPlanning({
             Wijzig periode in Rapportage tab
           </span>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard
-          value={`${dryIceToday} kg`}
-          label="Droogijs gepland"
-          icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
-          iconBgColor="bg-cyan-500/10"
-          trend={{
-            value: calculateTrend(dryIceToday, previousDryIceToday),
-            label: "vs. vorige periode"
-          }}
-          className={cn(
-            "glass-card transition-all duration-300",
-            isRefreshing && "animate-pulse ring-2 ring-primary/30"
-          )}
-        />
-
-        <div className="relative">
           <StatCard
-            value={cylindersToday}
-            label="Cilinders gepland"
-            icon={<Cylinder className="h-5 w-5 text-orange-500" />}
-            iconBgColor="bg-orange-500/10"
+            value={`${formatNumber(dryIceToday, 0)} kg`}
+            label="Droogijs gepland"
+            icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
+            iconBgColor="bg-cyan-500/10"
             trend={{
-              value: calculateTrend(cylindersToday, previousCylindersToday),
+              value: calculateTrend(dryIceToday, previousDryIceToday),
               label: "vs. vorige periode"
             }}
             className={cn(
@@ -445,47 +429,63 @@ export function ProductionPlanning({
               isRefreshing && "animate-pulse ring-2 ring-primary/30"
             )}
           />
-          {selectedLocation !== "all" && (
-            <Badge variant="outline" className="absolute top-2 right-2 text-[10px] py-0">
-              {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
-            </Badge>
-          )}
-        </div>
 
-        <div className="relative">
-          <StatCard
-            value={weekOrders}
-            label="Totaal orders"
-            icon={<Package className="h-5 w-5 text-green-500" />}
-            iconBgColor="bg-green-500/10"
-            trend={{
-              value: calculateTrend(weekOrders, previousWeekOrders),
-              label: "vs. vorige periode"
-            }}
-            className={cn(
-              "glass-card transition-all duration-300",
-              isRefreshing && "animate-pulse ring-2 ring-primary/30"
+          <div className="relative">
+            <StatCard
+              value={formatNumber(cylindersToday, 0)}
+              label="Cilinders gepland"
+              icon={<Cylinder className="h-5 w-5 text-orange-500" />}
+              iconBgColor="bg-orange-500/10"
+              trend={{
+                value: calculateTrend(cylindersToday, previousCylindersToday),
+                label: "vs. vorige periode"
+              }}
+              className={cn(
+                "glass-card transition-all duration-300",
+                isRefreshing && "animate-pulse ring-2 ring-primary/30"
+              )}
+            />
+            {selectedLocation !== "all" && (
+              <Badge variant="outline" className="absolute top-2 right-2 text-[10px] py-0">
+                {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
+              </Badge>
             )}
+          </div>
+
+          <div className="relative">
+            <StatCard
+              value={formatNumber(weekOrders, 0)}
+              label="Totaal orders"
+              icon={<Package className="h-5 w-5 text-green-500" />}
+              iconBgColor="bg-green-500/10"
+              trend={{
+                value: calculateTrend(weekOrders, previousWeekOrders),
+                label: "vs. vorige periode"
+              }}
+              className={cn(
+                "glass-card transition-all duration-300",
+                isRefreshing && "animate-pulse ring-2 ring-primary/30"
+              )}
+            />
+            {selectedLocation !== "all" && (
+              <Badge variant="outline" className="absolute top-2 right-2 text-[10px] py-0">
+                {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
+              </Badge>
+            )}
+          </div>
+
+          <StockSummaryWidget
+            refreshKey={refreshKey}
+            isRefreshing={isRefreshing}
           />
-          {selectedLocation !== "all" && (
-            <Badge variant="outline" className="absolute top-2 right-2 text-[10px] py-0">
-              {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
-            </Badge>
-          )}
-        </div>
 
-        <StockSummaryWidget
-          refreshKey={refreshKey}
-          isRefreshing={isRefreshing}
-        />
-
-        {/* Top 5 Customers Widget */}
-        <TopCustomersWidget
-          refreshKey={refreshKey}
-          isRefreshing={isRefreshing}
-          location={selectedLocation}
-          dateRange={dateRange}
-        />
+          {/* Top 5 Customers Widget */}
+          <TopCustomersWidget
+            refreshKey={refreshKey}
+            isRefreshing={isRefreshing}
+            location={selectedLocation}
+            dateRange={dateRange}
+          />
         </div>
       </div>
 
@@ -562,9 +562,9 @@ export function ProductionPlanning({
 
         <TabsContent value="rapportage" className="mt-6">
           <Suspense fallback={<ReportLoadingFallback />}>
-            <ProductionReports 
-              refreshKey={refreshKey} 
-              onDataChanged={handleDataChanged} 
+            <ProductionReports
+              refreshKey={refreshKey}
+              onDataChanged={handleDataChanged}
               location={selectedLocation}
               dateRange={dateRange}
               onDateRangeChange={handleDateRangeChange}
