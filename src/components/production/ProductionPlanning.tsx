@@ -256,10 +256,17 @@ export function ProductionPlanning({
    }
   };
 
+  // Determine which tabs to show based on permissions
+  const showAdvancedTabs = permissions?.canViewReports ?? true;
+  const showKPIDashboard = permissions?.canViewKPIDashboard ?? true;
+  const showAdvancedWidgets = permissions?.canViewAdvancedWidgets ?? true;
+
   return (
     <div className="space-y-6">
-      {/* KPI Dashboard */}
-      <KPIDashboard location={selectedLocation} refreshKey={refreshKey} dateRange={dateRange} />
+      {/* KPI Dashboard - only for non-operators */}
+      {showKPIDashboard && (
+        <KPIDashboard location={selectedLocation} refreshKey={refreshKey} dateRange={dateRange} />
+      )}
 
       {/* Location Filter */}
       <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 border border-border/50">
@@ -368,17 +375,24 @@ export function ProductionPlanning({
 
       {/* Quick stats */}
       <div className="space-y-2">
-        {/* Period indicator */}
+        {/* Period indicator - only show report tab hint for users who can see reports */}
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-xs font-medium">
             📅 {getDateRangeLabel(dateRange)}
           </Badge>
-          <span className="text-xs text-muted-foreground">
-            Wijzig periode in Rapportage tab
-          </span>
+          {showAdvancedTabs && (
+            <span className="text-xs text-muted-foreground">
+              Wijzig periode in Rapportage tab
+            </span>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className={cn(
+          "grid gap-4",
+          showAdvancedWidgets 
+            ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-5" 
+            : "grid-cols-1 md:grid-cols-3"
+        )}>
           <StatCard
             value={`${formatNumber(dryIceToday, 0)} kg`}
             label="Droogijs gepland"
@@ -438,24 +452,33 @@ export function ProductionPlanning({
             )}
           </div>
 
-          <StockSummaryWidget
-            refreshKey={refreshKey}
-            isRefreshing={isRefreshing}
-          />
+          {/* Advanced widgets - only for non-operators */}
+          {showAdvancedWidgets && (
+            <>
+              <StockSummaryWidget
+                refreshKey={refreshKey}
+                isRefreshing={isRefreshing}
+              />
 
-          {/* Top 5 Customers Widget */}
-          <TopCustomersWidget
-            refreshKey={refreshKey}
-            isRefreshing={isRefreshing}
-            location={selectedLocation}
-            dateRange={dateRange}
-          />
+              <TopCustomersWidget
+                refreshKey={refreshKey}
+                isRefreshing={isRefreshing}
+                location={selectedLocation}
+                dateRange={dateRange}
+              />
+            </>
+          )}
         </div>
       </div>
 
       {/* Main content tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full max-w-5xl grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 bg-muted/50 backdrop-blur-sm overflow-x-auto">
+        <TabsList className={cn(
+          "w-full max-w-5xl grid bg-muted/50 backdrop-blur-sm overflow-x-auto",
+          showAdvancedTabs 
+            ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-6" 
+            : "grid-cols-2"
+        )}>
           <TabsTrigger
             value="droogijs"
             className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
@@ -472,38 +495,42 @@ export function ProductionPlanning({
             <span className="hidden sm:inline">Gascilinders</span>
             <span className="sm:hidden">Gas</span>
           </TabsTrigger>
-          <TabsTrigger
-            value="rapportage"
-            className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
-          >
-            <BarChart3 className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden sm:inline">Rapportage</span>
-            <span className="sm:hidden">Stats</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="veiligheid"
-            className="data-[state=active]:bg-red-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
-          >
-            <ShieldAlert className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden sm:inline">Veiligheid</span>
-            <span className="sm:hidden">Veilig</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="sitemap"
-            className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
-          >
-            <MapPin className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden sm:inline">Site Map</span>
-            <span className="sm:hidden">Map</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="trailer"
-            className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
-          >
-            <Truck className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden sm:inline">Trailer</span>
-            <span className="sm:hidden">Truck</span>
-          </TabsTrigger>
+          {showAdvancedTabs && (
+            <>
+              <TabsTrigger
+                value="rapportage"
+                className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+              >
+                <BarChart3 className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Rapportage</span>
+                <span className="sm:hidden">Stats</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="veiligheid"
+                className="data-[state=active]:bg-red-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+              >
+                <ShieldAlert className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Veiligheid</span>
+                <span className="sm:hidden">Veilig</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="sitemap"
+                className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+              >
+                <MapPin className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Site Map</span>
+                <span className="sm:hidden">Map</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="trailer"
+                className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+              >
+                <Truck className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Trailer</span>
+                <span className="sm:hidden">Truck</span>
+              </TabsTrigger>
+            </>
+          )}
         </TabsList>
 
         <TabsContent value="droogijs" className="mt-6">
@@ -524,35 +551,39 @@ export function ProductionPlanning({
           </Suspense>
         </TabsContent>
 
-        <TabsContent value="rapportage" className="mt-6">
-          <Suspense fallback={<ReportLoadingFallback />}>
-            <ProductionReports
-              refreshKey={refreshKey}
-              onDataChanged={handleDataChanged}
-              location={selectedLocation}
-              dateRange={dateRange}
-              onDateRangeChange={handleDateRangeChange}
-            />
-          </Suspense>
-        </TabsContent>
+        {showAdvancedTabs && (
+          <>
+            <TabsContent value="rapportage" className="mt-6">
+              <Suspense fallback={<ReportLoadingFallback />}>
+                <ProductionReports
+                  refreshKey={refreshKey}
+                  onDataChanged={handleDataChanged}
+                  location={selectedLocation}
+                  dateRange={dateRange}
+                  onDateRangeChange={handleDateRangeChange}
+                />
+              </Suspense>
+            </TabsContent>
 
-        <TabsContent value="veiligheid" className="mt-6">
-          <Suspense fallback={<TabLoadingFallback />}>
-            <SafetyInstructions />
-          </Suspense>
-        </TabsContent>
+            <TabsContent value="veiligheid" className="mt-6">
+              <Suspense fallback={<TabLoadingFallback />}>
+                <SafetyInstructions />
+              </Suspense>
+            </TabsContent>
 
-        <TabsContent value="sitemap" className="mt-6">
-          <Suspense fallback={<TabLoadingFallback />}>
-            <SiteMap location={selectedLocation} />
-          </Suspense>
-        </TabsContent>
+            <TabsContent value="sitemap" className="mt-6">
+              <Suspense fallback={<TabLoadingFallback />}>
+                <SiteMap location={selectedLocation} />
+              </Suspense>
+            </TabsContent>
 
-        <TabsContent value="trailer" className="mt-6">
-          <Suspense fallback={<TabLoadingFallback />}>
-            <TrailerPlanning location={selectedLocation} />
-          </Suspense>
-        </TabsContent>
+            <TabsContent value="trailer" className="mt-6">
+              <Suspense fallback={<TabLoadingFallback />}>
+                <TrailerPlanning location={selectedLocation} />
+              </Suspense>
+            </TabsContent>
+          </>
+        )}
       </Tabs>
     </div>
   );

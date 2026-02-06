@@ -1,5 +1,6 @@
-
 # Plan: Beperken van Operator Interface tot Order Creatie
+
+## Status: ✅ Geïmplementeerd
 
 ## Overzicht
 
@@ -21,67 +22,26 @@ Dit plan past de productieplanning-interface aan zodat operators alleen de essen
 - Top Klanten widget
 - Voorraad overzicht widget
 - Rapportage tab
-- Veiligheid tab (optioneel, bespreken)
+- Veiligheid tab
 - Site Map tab
 - Trailer tab
 
-## Technische Aanpak
+## Geïmplementeerde Wijzigingen
 
-### Stap 1: Uitbreiden van Permissions Hook
+### useUserPermissions.ts
+Nieuwe permissie-vlaggen toegevoegd:
+- `canViewKPIDashboard: boolean` - Voor KPI Dashboard toegang
+- `canViewAdvancedWidgets: boolean` - Voor Top Customers & Stock Summary widgets
 
-Toevoegen van nieuwe permissie-vlaggen aan `useUserPermissions.ts`:
+Operators krijgen beide op `false`, Admin en Supervisor op `true`.
 
-```text
-canViewKPIDashboard: boolean
-canViewAdvancedWidgets: boolean  // Top Customers, Stock Summary
-```
-
-Operator krijgt beide op `false`, Admin en Supervisor op `true`.
-
-### Stap 2: Aanpassen ProductionPlanning.tsx
-
-Conditoneel renderen van componenten op basis van permissions:
-
-```text
-ProductionPlanning Component
-├── {permissions.canViewKPIDashboard && <KPIDashboard />}
-├── Locatie Filter (altijd zichtbaar)
-├── Quick Stats Grid
-│   ├── Droogijs StatCard (altijd)
-│   ├── Cilinders StatCard (altijd)
-│   ├── Totaal Orders StatCard (altijd)
-│   ├── {permissions.canViewAdvancedWidgets && <StockSummaryWidget />}
-│   └── {permissions.canViewAdvancedWidgets && <TopCustomersWidget />}
-└── Tabs
-    ├── Droogijs (altijd)
-    ├── Gascilinders (altijd)
-    ├── {permissions.canViewReports && Rapportage}
-    ├── {permissions.canViewReports && Veiligheid}
-    ├── {permissions.canViewReports && Site Map}
-    └── {permissions.canViewReports && Trailer}
-```
-
-### Stap 3: Dynamische Tab Rendering
-
-Implementeren van een tabs-array die gefilterd wordt op basis van permissions:
-
-```text
-const availableTabs = [
-  { id: "droogijs", show: true },
-  { id: "gascilinders", show: true },
-  { id: "rapportage", show: permissions.canViewReports },
-  { id: "veiligheid", show: permissions.canViewReports },
-  { id: "sitemap", show: permissions.canViewReports },
-  { id: "trailer", show: permissions.canViewReports },
-].filter(tab => tab.show)
-```
-
-## Bestanden die Gewijzigd Worden
-
-| Bestand | Wijziging |
-|---------|-----------|
-| `src/hooks/useUserPermissions.ts` | Nieuwe permissie-vlaggen toevoegen |
-| `src/components/production/ProductionPlanning.tsx` | Conditonele rendering van componenten en tabs |
+### ProductionPlanning.tsx
+Conditonele rendering geïmplementeerd:
+- KPIDashboard alleen zichtbaar als `canViewKPIDashboard = true`
+- StockSummaryWidget en TopCustomersWidget alleen als `canViewAdvancedWidgets = true`
+- Rapportage, Veiligheid, Site Map, en Trailer tabs alleen als `canViewReports = true`
+- Dynamische grid layout aanpassing (5 kolommen vs 3 kolommen)
+- Dynamische TabsList kolommen (6 vs 2)
 
 ## Visuele Vergelijking
 
@@ -98,7 +58,7 @@ const availableTabs = [
 └─────────────────────────────────────────────────┘
 ```
 
-### Operator View (na wijziging)
+### Operator View (geïmplementeerd)
 ```text
 ┌─────────────────────────────────────────────────┐
 │ Locatie: [Emmen] (beperkt)                      │
