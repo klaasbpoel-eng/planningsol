@@ -1,80 +1,68 @@
 
 
-# Plan: RLS Policies voor Gascilinder Orders voor Operators Toevoegen
+# Plan: Bewerk- en Verwijderknoppen Zichtbaar Maken voor Operators
 
 ## Probleem
 
-De vulwachtrij voor SOL Emmen toont geen data voor operators. Dit komt doordat de `gas_cylinder_orders` tabel **geen RLS policies** heeft voor operators om orders te bekijken op basis van hun productielocatie.
+De bewerk- en verwijderknoppen worden niet getoond voor operators. Dit komt doordat de **frontend permissie-configuratie** operators geen toegang geeft tot deze functies, terwijl de database RLS policies dit wel toestaan.
 
-**Bewijs uit database:**
-- Er zijn 20+ gascilinder orders voor SOL Emmen in februari 2026
-- Er zijn 14 droogijs orders voor SOL Emmen in februari 2026
-- De operator `kbpoel@home.nl` heeft `production_location: sol_emmen`
-- Maar de RLS policies blokkeren toegang
+| Onderdeel | Huidige waarde |
+|-----------|----------------|
+| `operator.canEditOrders` | `false` |
+| `operator.canDeleteOrders` | `false` |
 
-**Huidige RLS policies op `gas_cylinder_orders`:**
-| Policy | Regel |
-|--------|-------|
-| "Admins can view all" | `is_admin()` |
-| "Users can view assigned or created" | Alleen eigen orders |
+De knoppen worden alleen getoond als deze permissies `true` zijn:
+```text
+{permissions?.canEditOrders && <EditButton />}
+{permissions?.canDeleteOrders && <DeleteButton />}
+```
 
-**RLS policies op `dry_ice_orders` (correct):**
-| Policy | Regel |
-|--------|-------|
-| "Admins can view all" | `is_admin()` |
-| "Operators can view at their location" | Locatie-gebaseerd |
-| "Supervisors can view at their location" | Locatie-gebaseerd |
+## Oorzaak
+
+De permissie-mapping in `useUserPermissions.ts` definieert dat operators geen orders kunnen bewerken of verwijderen. Dit was correct voordat de RLS policies werden toegevoegd, maar nu de database-laag dit toestaat, moet de frontend dit ook toestaan.
 
 ## Oplossing
 
-Voeg dezelfde locatie-gebaseerde RLS policies toe aan `gas_cylinder_orders` die al bestaan op `dry_ice_orders`.
+Wijzig de `ROLE_PERMISSIONS` constante in `useUserPermissions.ts` om operators toe te staan orders te bewerken en verwijderen.
 
-## Database Migratie
-
-Twee nieuwe RLS policies toevoegen aan `gas_cylinder_orders`:
-
-```text
-1. "Operators can view gas cylinder orders at their location"
-   - Operator role check
-   - Locatie moet overeenkomen met operator's productielocatie
-   - Fallback: toegang tot alle locaties als geen locatie toegewezen
-
-2. "Supervisors can view gas cylinder orders at their location"  
-   - Supervisor role check
-   - Zelfde locatie-logica als operators
-```
-
-De SQL syntax volgt exact het patroon van de bestaande `dry_ice_orders` policies:
-
-```text
-Policy voor Operators:
-  has_role(auth.uid(), 'operator') 
-  AND (
-    (get_user_production_location(auth.uid()) IS NOT NULL 
-     AND location = get_user_production_location(auth.uid()))
-    OR get_user_production_location(auth.uid()) IS NULL
-  )
-
-Policy voor Supervisors:
-  has_role(auth.uid(), 'supervisor')
-  AND (dezelfde locatie-logica)
-```
-
-## Verwacht Resultaat
-
-Na de migratie:
-- Operators zien alle gascilinder orders voor hun locatie (SOL Emmen of SOL Tilburg)
-- Supervisors zien alle orders voor hun locatie
-- Admins blijven alle orders zien
-- De vulwachtrij toont de correcte data
-
-## Bestand dat Gewijzigd Wordt
+## Wijzigingen
 
 | Bestand | Wijziging |
 |---------|-----------|
-| Nieuwe SQL migratie | RLS policies toevoegen aan `gas_cylinder_orders` |
+| `src/hooks/useUserPermissions.ts` | Zet `canEditOrders: true` en `canDeleteOrders: true` voor de `operator` rol |
 
-## Geen Frontend Wijzigingen Nodig
+## Code Wijziging
 
-De frontend queries zijn correct. Het probleem zit puur in de database beveiliging.
+In het `ROLE_PERMISSIONS` object, de `operator` sectie aanpassen:
+
+```text
+Van:
+  operator: {
+    ...
+    canEditOrders: false,
+    canDeleteOrders: false,
+    ...
+  }
+
+Naar:
+  operator: {
+    ...
+    canEditOrders: true,
+    canDeleteOrders: true,
+    ...
+  }
+```
+
+## Technische Details
+
+De wijziging is eenvoudig: twee boolean waarden van `false` naar `true` veranderen. Dit zorgt ervoor dat:
+
+1. De bewerk-knop (potlood icoon) zichtbaar wordt voor operators
+2. De verwijder-knop (prullenbak icoon) zichtbaar wordt voor operators
+3. De status-dropdown werkt al correct (geen permissie-check)
+4. De mobiele weergave (MobileOrderCard) toont ook de knoppen (gebruikt dezelfde permissies)
+
+## Geen Database Wijzigingen Nodig
+
+De RLS policies zijn al correct geconfigureerd. Dit is puur een frontend permissie-aanpassing.
 
