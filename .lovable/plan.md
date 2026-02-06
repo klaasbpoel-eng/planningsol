@@ -1,119 +1,80 @@
 
-# Plan: Operator Toegang tot Productiestatistieken Repareren
+
+# Plan: RLS Policies voor Gascilinder Orders voor Operators Toevoegen
 
 ## Probleem
 
-Wanneer een operator inlogt en naar de productiepagina gaat, worden alle statistieken als "0" weergegeven. Dit komt doordat de database RPC functies (`get_production_efficiency_by_period`, `get_dry_ice_efficiency_by_period`) een autorisatiecontrole hebben die **alleen admins en supervisors** toestaat:
+De vulwachtrij voor SOL Emmen toont geen data voor operators. Dit komt doordat de `gas_cylinder_orders` tabel **geen RLS policies** heeft voor operators om orders te bekijken op basis van hun productielocatie.
 
-```sql
-IF NOT (public.is_admin() OR public.has_role(auth.uid(), 'supervisor')) THEN
-  RAISE EXCEPTION 'Unauthorized';
-END IF;
-```
+**Bewijs uit database:**
+- Er zijn 20+ gascilinder orders voor SOL Emmen in februari 2026
+- Er zijn 14 droogijs orders voor SOL Emmen in februari 2026
+- De operator `kbpoel@home.nl` heeft `production_location: sol_emmen`
+- Maar de RLS policies blokkeren toegang
 
-De netwerkverzoeken retourneren `"Unauthorized"` (HTTP 400).
+**Huidige RLS policies op `gas_cylinder_orders`:**
+| Policy | Regel |
+|--------|-------|
+| "Admins can view all" | `is_admin()` |
+| "Users can view assigned or created" | Alleen eigen orders |
+
+**RLS policies op `dry_ice_orders` (correct):**
+| Policy | Regel |
+|--------|-------|
+| "Admins can view all" | `is_admin()` |
+| "Operators can view at their location" | Locatie-gebaseerd |
+| "Supervisors can view at their location" | Locatie-gebaseerd |
 
 ## Oplossing
 
-De RPC functies moeten worden bijgewerkt om **ook operators toe te staan**, met de volgende beperkingen:
-- Operators kunnen alleen statistieken zien voor hun toegewezen locatie
-- Als een operator geen locatie heeft toegewezen, hebben ze geen toegang
-- De locatieparameter wordt afgedwongen voor operators (ze kunnen geen `NULL` of andere locatie opgeven)
+Voeg dezelfde locatie-gebaseerde RLS policies toe aan `gas_cylinder_orders` die al bestaan op `dry_ice_orders`.
 
-## Technische Aanpak
+## Database Migratie
 
-### Database Migratie
-
-Er zijn twee RPC functies die moeten worden aangepast:
-
-1. `get_production_efficiency_by_period` - voor gascilinder statistieken
-2. `get_dry_ice_efficiency_by_period` - voor droogijs statistieken
-
-De nieuwe autorisatielogica wordt:
+Twee nieuwe RLS policies toevoegen aan `gas_cylinder_orders`:
 
 ```text
-Toegangscontrole:
-├── Admin/Supervisor: Volledige toegang, alle locaties
-└── Operator:
-    ├── Moet een toegewezen locatie hebben
-    ├── Locatieparameter wordt geforceerd naar eigen locatie
-    └── Kan geen andere locaties opvragen
+1. "Operators can view gas cylinder orders at their location"
+   - Operator role check
+   - Locatie moet overeenkomen met operator's productielocatie
+   - Fallback: toegang tot alle locaties als geen locatie toegewezen
+
+2. "Supervisors can view gas cylinder orders at their location"  
+   - Supervisor role check
+   - Zelfde locatie-logica als operators
 ```
 
-### Wijzigingen per Functie
+De SQL syntax volgt exact het patroon van de bestaande `dry_ice_orders` policies:
 
-**get_production_efficiency_by_period:**
-```sql
--- Oude check:
-IF NOT (public.is_admin() OR public.has_role(auth.uid(), 'supervisor')) THEN
-  RAISE EXCEPTION 'Unauthorized';
-END IF;
+```text
+Policy voor Operators:
+  has_role(auth.uid(), 'operator') 
+  AND (
+    (get_user_production_location(auth.uid()) IS NOT NULL 
+     AND location = get_user_production_location(auth.uid()))
+    OR get_user_production_location(auth.uid()) IS NULL
+  )
 
--- Nieuwe check:
-DECLARE
-  v_user_location text;
-  v_effective_location text;
-BEGIN
-  -- Admins en supervisors hebben volledige toegang
-  IF public.is_admin() OR public.has_role(auth.uid(), 'supervisor') THEN
-    v_effective_location := p_location;
-  -- Operators zijn beperkt tot hun eigen locatie  
-  ELSIF public.has_role(auth.uid(), 'operator') THEN
-    v_user_location := public.get_user_production_location(auth.uid())::text;
-    IF v_user_location IS NULL THEN
-      RAISE EXCEPTION 'Unauthorized: No location assigned';
-    END IF;
-    -- Forceer de locatie naar de operator's eigen locatie
-    v_effective_location := v_user_location;
-  ELSE
-    RAISE EXCEPTION 'Unauthorized';
-  END IF;
-  
-  -- Gebruik v_effective_location in plaats van p_location in de query
+Policy voor Supervisors:
+  has_role(auth.uid(), 'supervisor')
+  AND (dezelfde locatie-logica)
 ```
 
-**get_dry_ice_efficiency_by_period:**
-Dezelfde logica, aangepast voor droogijs orders.
+## Verwacht Resultaat
+
+Na de migratie:
+- Operators zien alle gascilinder orders voor hun locatie (SOL Emmen of SOL Tilburg)
+- Supervisors zien alle orders voor hun locatie
+- Admins blijven alle orders zien
+- De vulwachtrij toont de correcte data
 
 ## Bestand dat Gewijzigd Wordt
 
 | Bestand | Wijziging |
 |---------|-----------|
-| Nieuwe SQL migratie | Update beide RPC functies met operator-toegang |
-
-## Visuele Flowchart
-
-```text
-Operator logt in
-       │
-       ▼
-ProductionPlanning laadt
-       │
-       ▼
-Roept RPC functies aan met p_location = operator's locatie
-       │
-       ▼
-RPC functie controleert:
-├── Is admin? → Ja → Gebruik p_location (of NULL voor alle)
-├── Is supervisor? → Ja → Gebruik p_location (of NULL voor alle)  
-├── Is operator? → Ja → 
-│   ├── Heeft locatie? → Ja → Forceer eigen locatie
-│   └── Geen locatie? → UNAUTHORIZED
-└── Anders → UNAUTHORIZED
-       │
-       ▼
-Resultaat met statistieken voor operator's locatie
-```
-
-## Verwacht Resultaat na Fix
-
-- Operators zien de statistieken voor hun toegewezen locatie
-- De 3 basis statistiek-kaarten tonen actuele data:
-  - Droogijs gepland (kg)
-  - Cilinders gepland
-  - Totaal orders
-- De vulwachtrij toont orders voor hun locatie
+| Nieuwe SQL migratie | RLS policies toevoegen aan `gas_cylinder_orders` |
 
 ## Geen Frontend Wijzigingen Nodig
 
-De frontend stuurt al de juiste locatieparameter mee (gebaseerd op `userProductionLocation`). Het probleem zit puur in de database functie-autorisatie.
+De frontend queries zijn correct. Het probleem zit puur in de database beveiliging.
+
