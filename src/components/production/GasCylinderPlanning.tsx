@@ -617,7 +617,7 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
                       customerName={order.customer_name}
                       scheduledDate={order.scheduled_date}
                       status={order.status}
-                      onStatusChange={permissions?.canEditOrders ? handleStatusChange : undefined}
+                      onStatusChange={handleStatusChange}
                       onEdit={() => handleEditOrder(order)}
                       onDelete={() => handleDeleteClick(order)}
                       canEdit={permissions?.canEditOrders}
@@ -740,24 +740,20 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
                           <TableCell>{order.pressure} bar</TableCell>
                           <TableCell>{format(new Date(order.scheduled_date), "dd-MM-yyyy")}</TableCell>
                           <TableCell>
-                            {permissions?.canEditOrders ? (
-                              <Select 
-                                value={order.status} 
-                                onValueChange={(v) => handleStatusChange(order.id, v)}
-                              >
-                                <SelectTrigger className="h-8 w-[110px]">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="bg-background border shadow-lg z-50">
-                                  <SelectItem value="pending">Gepland</SelectItem>
-                                  <SelectItem value="in_progress">Bezig</SelectItem>
-                                  <SelectItem value="completed">Voltooid</SelectItem>
-                                  <SelectItem value="cancelled">Geannuleerd</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              getStatusBadge(order.status)
-                            )}
+                            <Select 
+                              value={order.status} 
+                              onValueChange={(v) => handleStatusChange(order.id, v)}
+                            >
+                              <SelectTrigger className="h-8 w-[110px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="bg-background border shadow-lg z-50">
+                                <SelectItem value="pending">Gepland</SelectItem>
+                                <SelectItem value="in_progress">Bezig</SelectItem>
+                                <SelectItem value="completed">Voltooid</SelectItem>
+                                <SelectItem value="cancelled">Geannuleerd</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">

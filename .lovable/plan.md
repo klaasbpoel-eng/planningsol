@@ -1,110 +1,78 @@
+# Plan: Beperken van Operator Interface tot Order Creatie
 
-# Plan: Operator Interface Restricties Corrigeren
+## Status: ✅ Geïmplementeerd
 
-## Probleem Analyse
+## Overzicht
 
-Na analyse van de code zijn er verschillende bugs ontdekt waardoor operators onterecht edit/delete functionaliteit zien:
+Dit plan past de productieplanning-interface aan zodat operators alleen de essentiële functies zien voor hun dagelijkse werkzaamheden: het aanmaken van droogijs- en gascilinder-orders, plus de basale maandstatistieken.
 
-### Bug 1: DryIcePlanning.tsx - Desktop Tabel Acties
-**Locatie:** Lines 592-612
-**Probleem:** De actie-buttons (Edit/Delete) binnen de tabelcel worden NIET individueel gecontroleerd op permissions. Ze worden altijd beide getoond als de actie-kolom zichtbaar is.
+## Wat Operators Zullen Zien
 
+**Behouden:**
+- Droogijs tab (order creatie)
+- Gascilinders tab (order creatie)
+- 3 basis statistiek-kaarten:
+  - Droogijs gepland (kg)
+  - Cilinders gepland
+  - Totaal orders
+- Locatiefilter (beperkt tot eigen locatie)
+
+**Verborgen voor Operators:**
+- KPI Dashboard (geavanceerde efficiëntiegrafieken)
+- Top Klanten widget
+- Voorraad overzicht widget
+- Rapportage tab
+- Veiligheid tab
+- Site Map tab
+- Trailer tab
+
+## Geïmplementeerde Wijzigingen
+
+### useUserPermissions.ts
+Nieuwe permissie-vlaggen toegevoegd:
+- `canViewKPIDashboard: boolean` - Voor KPI Dashboard toegang
+- `canViewAdvancedWidgets: boolean` - Voor Top Customers & Stock Summary widgets
+
+Operators krijgen beide op `false`, Admin en Supervisor op `true`.
+
+### ProductionPlanning.tsx
+Conditonele rendering geïmplementeerd:
+- KPIDashboard alleen zichtbaar als `canViewKPIDashboard = true`
+- StockSummaryWidget en TopCustomersWidget alleen als `canViewAdvancedWidgets = true`
+- Rapportage, Veiligheid, Site Map, en Trailer tabs alleen als `canViewReports = true`
+- Dynamische grid layout aanpassing (5 kolommen vs 3 kolommen)
+- Dynamische TabsList kolommen (6 vs 2)
+
+## Visuele Vergelijking
+
+### Admin/Supervisor View
 ```text
-Huidige code:
-{(permissions?.canEditOrders || permissions?.canDeleteOrders) && (
-  <TableCell>
-    <Button onClick={handleEditOrder}>Edit</Button>  // NIET GECHECKT!
-    <Button onClick={handleDeleteClick}>Delete</Button> // NIET GECHECKT!
-  </TableCell>
-)}
+┌─────────────────────────────────────────────────┐
+│ KPI Dashboard (grafieken, efficiëntie)          │
+├─────────────────────────────────────────────────┤
+│ Locatie: [Alle] [Emmen] [Tilburg]               │
+├─────────────────────────────────────────────────┤
+│ [Droogijs] [Cilinders] [Orders] [Stock] [Top5] │
+├─────────────────────────────────────────────────┤
+│ [Droogijs][Cilinders][Rapportage][Veilig][Map] │
+└─────────────────────────────────────────────────┘
 ```
 
-### Bug 2: GasCylinderPlanning.tsx - Mobile Status Change
-**Locatie:** Line 620
-**Probleem:** `onStatusChange={handleStatusChange}` wordt ALTIJD doorgegeven aan MobileOrderCard, ongeacht permissions.
-
-### Bug 3: GasCylinderPlanning.tsx - Desktop Status Dropdown
-**Locatie:** Lines 742-756
-**Probleem:** De status-dropdown is ALTIJD zichtbaar en actief - geen permission check. Dit is inconsistent met DryIcePlanning waar dit wel correct is.
-
-## Technische Oplossing
-
-### Stap 1: DryIcePlanning.tsx - Individual Button Checks
-
-Aanpassen van lines 592-612 om individuele permission checks toe te voegen:
-
+### Operator View (geïmplementeerd)
 ```text
-{(permissions?.canEditOrders || permissions?.canDeleteOrders) && (
-  <TableCell>
-    <div className="flex items-center gap-1">
-      {permissions?.canEditOrders && (
-        <Button onClick={handleEditOrder}>
-          <Edit2 />
-        </Button>
-      )}
-      {permissions?.canDeleteOrders && (
-        <Button onClick={handleDeleteClick}>
-          <Trash2 />
-        </Button>
-      )}
-    </div>
-  </TableCell>
-)}
+┌─────────────────────────────────────────────────┐
+│ Locatie: [Emmen] (beperkt)                      │
+├─────────────────────────────────────────────────┤
+│ [Droogijs kg]  [Cilinders]  [Orders]            │
+├─────────────────────────────────────────────────┤
+│ [Droogijs]  [Gascilinders]                      │
+└─────────────────────────────────────────────────┘
 ```
 
-### Stap 2: GasCylinderPlanning.tsx - Mobile Card Fix
+## Voordelen
 
-Aanpassen van line 620:
-
-```text
-// Van:
-onStatusChange={handleStatusChange}
-
-// Naar:
-onStatusChange={permissions?.canEditOrders ? handleStatusChange : undefined}
-```
-
-### Stap 3: GasCylinderPlanning.tsx - Desktop Status Dropdown
-
-Aanpassen van lines 742-756 om consistent te zijn met DryIcePlanning:
-
-```text
-<TableCell>
-  {permissions?.canEditOrders ? (
-    <Select value={order.status} onValueChange={(v) => handleStatusChange(order.id, v)}>
-      ...
-    </Select>
-  ) : (
-    <StatusBadge status={order.status} />
-  )}
-</TableCell>
-```
-
-### Stap 4: GasCylinderPlanning.tsx - Desktop Action Buttons Check
-
-Toevoegen van individuele permission checks voor de edit/delete buttons (lines 758-778).
-
-## Bestanden die Gewijzigd Worden
-
-| Bestand | Wijziging |
-|---------|-----------|
-| `src/components/production/DryIcePlanning.tsx` | Individuele permission checks voor Edit/Delete buttons |
-| `src/components/production/GasCylinderPlanning.tsx` | Mobile status change check, Desktop status dropdown + action buttons |
-
-## Verwacht Resultaat
-
-Na implementatie:
-
-| Actie | Admin | Supervisor | Operator |
-|-------|-------|------------|----------|
-| View orders | Ja | Ja | Ja |
-| Create orders | Ja | Ja | Ja |
-| Edit orders | Ja | Ja | Nee |
-| Delete orders | Ja | Ja | Nee |
-| Change status | Ja | Ja | Nee |
-
-Operators zien alleen:
-- De order lijst (read-only)
-- Status als badge (niet als dropdown)
-- Geen edit/delete knoppen
-- De "Nieuwe productieorder" button
+1. **Eenvoudigere Interface** - Operators zien alleen wat relevant is
+2. **Betere Focus** - Minder afleiding, snellere workflows
+3. **Consistente Permissies** - Sluit aan bij bestaande `canViewReports` logica
+4. **Geen Database Wijzigingen** - Puur frontend aanpassing
+5. **Backward Compatible** - Geen impact op Admin/Supervisor workflows
