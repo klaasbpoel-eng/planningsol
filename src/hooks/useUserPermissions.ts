@@ -28,8 +28,10 @@ export interface RolePermissions {
   canManageCustomers: boolean;
   canViewCustomers: boolean;
   
-  // Reports
+  // Reports & Dashboards
   canViewReports: boolean;
+  canViewKPIDashboard: boolean;
+  canViewAdvancedWidgets: boolean;
   
   // Calendar
   canViewCalendar: boolean;
@@ -51,6 +53,8 @@ const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
     canManageCustomers: true,
     canViewCustomers: true,
     canViewReports: true,
+    canViewKPIDashboard: true,
+    canViewAdvancedWidgets: true,
     canViewCalendar: true,
     canViewTeamCalendar: true,
   },
@@ -68,6 +72,8 @@ const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
     canManageCustomers: true,
     canViewCustomers: true,
     canViewReports: true,
+    canViewKPIDashboard: true,
+    canViewAdvancedWidgets: true,
     canViewCalendar: true,
     canViewTeamCalendar: true,
   },
@@ -85,6 +91,8 @@ const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
     canManageCustomers: false,
     canViewCustomers: true,
     canViewReports: false,
+    canViewKPIDashboard: false,
+    canViewAdvancedWidgets: false,
     canViewCalendar: true,
     canViewTeamCalendar: false,
   },
@@ -102,6 +110,8 @@ const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
     canManageCustomers: false,
     canViewCustomers: false,
     canViewReports: false,
+    canViewKPIDashboard: false,
+    canViewAdvancedWidgets: false,
     canViewCalendar: true,
     canViewTeamCalendar: false,
   },
