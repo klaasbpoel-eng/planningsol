@@ -10,6 +10,7 @@ import { Cylinder, Map as MapIcon, Save, RotateCcw, Plus, Info, Pencil, Trash2, 
 import { cn } from "@/lib/utils";
 
 import { getGasColor } from "@/constants/gasColors";
+import { LocationMap } from "./LocationMap";
 
 interface StorageZone {
     id: string;
@@ -313,6 +314,8 @@ export function SiteMap({ location }: SiteMapProps) {
     };
 
     return (
+        <div className="space-y-6">
+        <LocationMap location={location} />
         <Card className={cn(
             "glass-card w-full overflow-hidden transition-all duration-300",
             isFullscreen ? "fixed inset-0 z-50 rounded-none h-screen w-screen bg-background/95 backdrop-blur-md" : ""
@@ -691,5 +694,6 @@ export function SiteMap({ location }: SiteMapProps) {
                 </motion.div>
             </CardContent>
         </Card>
+        </div>
     );
 }
