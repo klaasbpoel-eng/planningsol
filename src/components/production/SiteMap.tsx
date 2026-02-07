@@ -413,16 +413,16 @@ export function SiteMap({ location }: SiteMapProps) {
                 >
                     {/* SVG Map Layer */}
                     <svg viewBox="0 0 1024 1024" className="w-full h-full absolute inset-0 pointer-events-none">
-                        {/* Background Image - Rotated 90deg CW */}
+                        {/* Background Image */}
                         <image
-                            href="/site-map-background.png"
+                            href={location === "sol_tilburg" ? "/site-map-background.png" : "/site-map-emmen.png"}
                             x="0"
                             y="0"
                             width="1024"
                             height="1024"
                             preserveAspectRatio="xMidYMid slice"
                             opacity="0.9"
-                            transform="rotate(90, 512, 512)"
+                            transform={location === "sol_tilburg" ? "rotate(90, 512, 512)" : undefined}
                         />
                         <defs>
                             <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
