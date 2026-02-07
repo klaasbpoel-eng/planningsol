@@ -484,7 +484,7 @@ export function ProductionPlanning({
           >
             <Cylinder className="h-4 w-4 flex-shrink-0" />
             <span className="hidden sm:inline">Gascilinders</span>
-            <span className="sm:hidden">Gas</span>
+            <span className="sm:hidden">Cilinders</span>
           </TabsTrigger>
           {showAdvancedTabs && (
             <>
