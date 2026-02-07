@@ -902,7 +902,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   const getDateRangeLabel = () => {
     switch (viewType) {
       case "day":
-        return format(currentDate, "EEEE d MMMM yyyy", {
+        return format(currentDate, "EEEE d MMMM", {
           locale: nl
         });
       case "week":
