@@ -22,13 +22,14 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { 
-  Snowflake, 
-  CalendarDays, 
-  Package, 
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Snowflake,
+  CalendarDays,
+  Package,
   Scale,
-  Edit2, 
-  Save, 
+  Edit2,
+  Save,
   X,
   Trash2,
   Building2,
@@ -75,10 +76,10 @@ interface DryIceOrderDialogProps {
   packagingOptions?: DryIcePackaging[];
 }
 
-export function DryIceOrderDialog({ 
-  order, 
-  open, 
-  onOpenChange, 
+export function DryIceOrderDialog({
+  order,
+  open,
+  onOpenChange,
   onUpdate,
   isAdmin = false,
   canEdit,
@@ -91,7 +92,8 @@ export function DryIceOrderDialog({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  
+  const [deleteScope, setDeleteScope] = useState<'single' | 'series'>('single');
+
   // Edit state
   const [status, setStatus] = useState<string>("");
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>();
@@ -162,8 +164,8 @@ export function DryIceOrderDialog({
           container_has_wheels: containerHasWheels,
           notes: notes || null,
           is_recurring: isRecurring,
-          recurrence_end_date: isRecurring && !isInfiniteRecurrence && recurrenceEndDate 
-            ? format(recurrenceEndDate, "yyyy-MM-dd") 
+          recurrence_end_date: isRecurring && !isInfiniteRecurrence && recurrenceEndDate
+            ? format(recurrenceEndDate, "yyyy-MM-dd")
             : null,
         })
         .eq("id", order.id);
@@ -183,19 +185,33 @@ export function DryIceOrderDialog({
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (scope: 'single' | 'series' = 'single') => {
     if (!order) return;
     setDeleting(true);
 
     try {
-      const { error } = await supabase
-        .from("dry_ice_orders")
-        .delete()
-        .eq("id", order.id);
+      let query = supabase.from("dry_ice_orders").delete();
+
+      if (scope === 'series' && (order.is_recurring || order.parent_order_id)) {
+        // Delete all orders in the series
+        // The series ID is either the parent_order_id (if this is a child)
+        // or the order.id (if this is the parent)
+        const seriesId = order.parent_order_id || order.id;
+
+        // We want to delete:
+        // 1. The parent order (id = seriesId)
+        // 2. All child orders (parent_order_id = seriesId)
+        query = query.or(`id.eq.${seriesId},parent_order_id.eq.${seriesId}`);
+      } else {
+        // Delete only this specific order
+        query = query.eq("id", order.id);
+      }
+
+      const { error } = await query;
 
       if (error) throw error;
-      
-      toast.success("Droogijs order verwijderd");
+
+      toast.success(scope === 'series' ? "Volledige reeks verwijderd" : "Droogijs order verwijderd");
 
       setShowDeleteConfirm(false);
       onOpenChange(false);
@@ -213,6 +229,7 @@ export function DryIceOrderDialog({
   const handleClose = () => {
     setIsEditing(false);
     setShowDeleteConfirm(false);
+    setDeleteScope('single');
     onOpenChange(false);
   };
 
@@ -538,8 +555,8 @@ export function DryIceOrderDialog({
               <>
                 {hasEditPermission && (
                   <>
-                    <Button 
-                      variant="destructive" 
+                    <Button
+                      variant="destructive"
                       onClick={() => setShowDeleteConfirm(true)}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
@@ -567,14 +584,28 @@ export function DryIceOrderDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>Order verwijderen?</AlertDialogTitle>
             <AlertDialogDescription>
-              Weet je zeker dat je order {order.order_number} wilt verwijderen? 
+              Weet je zeker dat je order {order.order_number} wilt verwijderen?
               Deze actie kan niet ongedaan worden gemaakt.
             </AlertDialogDescription>
+            {(order.is_recurring || order.parent_order_id) && (
+              <div className="py-2">
+                <RadioGroup value={deleteScope} onValueChange={(v) => setDeleteScope(v as 'single' | 'series')}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="single" id="single" />
+                    <Label htmlFor="single">Alleen deze order verwijderen</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="series" id="series" />
+                    <Label htmlFor="series">Alle orders in de reeks verwijderen</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            )}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDelete} 
+            <AlertDialogAction
+              onClick={() => handleDelete(deleteScope)}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
