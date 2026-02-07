@@ -91,7 +91,7 @@ const InternalOrdersPage = () => {
 
     return (
         <PageTransition>
-            <div className="min-h-screen gradient-mesh">
+            <div className="min-h-screen gradient-mesh overflow-x-hidden">
                 <Header userEmail={user?.email} role={role} />
 
                 <main className="w-full px-4 md:px-[10%] py-8">

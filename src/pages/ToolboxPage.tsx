@@ -270,7 +270,7 @@ const ToolboxPage = () => {
 
     return (
         <PageTransition>
-            <div className="min-h-screen gradient-mesh">
+            <div className="min-h-screen gradient-mesh overflow-x-hidden">
                 <Header userEmail={session?.user?.email} />
 
                 <main className="container mx-auto px-4 py-8">

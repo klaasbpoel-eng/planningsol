@@ -61,7 +61,7 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
     ];
 
     return (
-        <div className="min-h-screen bg-background flex flex-col">
+        <div className="min-h-screen bg-background flex flex-col overflow-x-hidden">
             <Header userEmail={userEmail} role={role} />
 
             <main className="flex-1 container mx-auto px-4 py-8">

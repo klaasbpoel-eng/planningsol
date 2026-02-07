@@ -135,7 +135,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <Header userEmail={userEmail} role={role} />
 
       <FadeIn show={!loading}>
