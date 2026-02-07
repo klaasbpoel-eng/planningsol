@@ -22,11 +22,11 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { 
-  Cylinder, 
-  CalendarDays, 
-  Edit2, 
-  Save, 
+import {
+  Cylinder,
+  CalendarDays,
+  Edit2,
+  Save,
   X,
   Trash2,
   Building2,
@@ -85,10 +85,10 @@ interface GasCylinderOrderDialogProps {
   canEdit?: boolean;
 }
 
-export function GasCylinderOrderDialog({ 
-  order, 
-  open, 
-  onOpenChange, 
+export function GasCylinderOrderDialog({
+  order,
+  open,
+  onOpenChange,
   onUpdate,
   isAdmin = false,
   canEdit,
@@ -99,7 +99,7 @@ export function GasCylinderOrderDialog({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  
+
   // Edit state
   const [status, setStatus] = useState<string>("");
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>();
@@ -121,7 +121,7 @@ export function GasCylinderOrderDialog({
         .order("name");
       if (data) setGasTypes(data);
     };
-    
+
     const fetchCylinderSizes = async () => {
       const { data } = await supabase
         .from("cylinder_sizes")
@@ -130,7 +130,7 @@ export function GasCylinderOrderDialog({
         .order("capacity_liters", { ascending: true });
       if (data) setCylinderSizes(data);
     };
-    
+
     if (open) {
       fetchGasTypes();
       fetchCylinderSizes();
@@ -211,7 +211,7 @@ export function GasCylinderOrderDialog({
       // Get the selected gas type to map to enum
       const selectedGasType = gasTypes.find(t => t.id === gasTypeId);
       const mappedGasType = selectedGasType ? mapGasTypeToEnum(selectedGasType.name) : order.gas_type;
-      
+
       const { error } = await supabase
         .from("gas_cylinder_orders")
         .update({
@@ -253,7 +253,7 @@ export function GasCylinderOrderDialog({
         .eq("id", order.id);
 
       if (error) throw error;
-      
+
       toast.success("Gascilinder order verwijderd");
 
       setShowDeleteConfirm(false);
@@ -312,7 +312,7 @@ export function GasCylinderOrderDialog({
     if (orderData.gas_type_ref?.name) {
       return orderData.gas_type_ref.name;
     }
-    
+
     // Fallback: find matching gas type from loaded types
     if (orderData.gas_type_id) {
       const matchingType = gasTypes.find(gt => gt.id === orderData.gas_type_id);
@@ -320,7 +320,7 @@ export function GasCylinderOrderDialog({
         return matchingType.name;
       }
     }
-    
+
     // Legacy fallback: check notes for "Gastype: Name" format
     if (orderData.notes) {
       const gasTypeMatch = orderData.notes.match(/^Gastype:\s*(.+?)(?:\n|$)/i);
@@ -328,7 +328,7 @@ export function GasCylinderOrderDialog({
         return gasTypeMatch[1].trim();
       }
     }
-    
+
     // Final fallback to enum labels
     return gasTypeLabels[orderData.gas_type] || orderData.gas_type;
   };
@@ -374,7 +374,7 @@ export function GasCylinderOrderDialog({
           <div className="space-y-4 py-4">
             {isEditing ? (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Status</Label>
                     <Select value={status} onValueChange={setStatus}>
@@ -418,7 +418,7 @@ export function GasCylinderOrderDialog({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Gastype</Label>
                     <Select value={gasTypeId} onValueChange={setGasTypeId}>
@@ -429,9 +429,9 @@ export function GasCylinderOrderDialog({
                         {gasTypes.map((type) => (
                           <SelectItem key={type.id} value={type.id}>
                             <div className="flex items-center gap-2">
-                              <div 
-                                className="w-2 h-2 rounded-full flex-shrink-0" 
-                                style={{ backgroundColor: type.color }} 
+                              <div
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: type.color }}
                               />
                               {type.name}
                             </div>
@@ -455,7 +455,7 @@ export function GasCylinderOrderDialog({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Aantal</Label>
                     <Input
@@ -521,7 +521,7 @@ export function GasCylinderOrderDialog({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
                       <CalendarDays className="h-5 w-5 text-muted-foreground" />
                       <div>
@@ -541,11 +541,11 @@ export function GasCylinderOrderDialog({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                      <div 
-                        className="w-3 h-3 rounded-full flex-shrink-0" 
-                        style={{ backgroundColor: getGasTypeColor(order) }} 
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: getGasTypeColor(order) }}
                       />
                       <div>
                         <p className="text-xs text-muted-foreground">Gastype</p>
@@ -592,8 +592,8 @@ export function GasCylinderOrderDialog({
               <>
                 {hasEditPermission && (
                   <>
-                    <Button 
-                      variant="destructive" 
+                    <Button
+                      variant="destructive"
                       onClick={() => setShowDeleteConfirm(true)}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
@@ -621,14 +621,14 @@ export function GasCylinderOrderDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>Order verwijderen?</AlertDialogTitle>
             <AlertDialogDescription>
-              Weet je zeker dat je order {order.order_number} wilt verwijderen? 
+              Weet je zeker dat je order {order.order_number} wilt verwijderen?
               Deze actie kan niet ongedaan worden gemaakt.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDelete} 
+            <AlertDialogAction
+              onClick={handleDelete}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

@@ -278,7 +278,7 @@ export function DryIceOrderDialog({
           <div className="space-y-4 py-4">
             {isEditing ? (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Status</Label>
                     <Select value={status} onValueChange={setStatus}>
@@ -322,7 +322,7 @@ export function DryIceOrderDialog({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Gewicht (kg)</Label>
                     <Input
@@ -481,7 +481,7 @@ export function DryIceOrderDialog({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
                       <CalendarDays className="h-5 w-5 text-muted-foreground" />
                       <div>
@@ -501,7 +501,7 @@ export function DryIceOrderDialog({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
                       <Snowflake className="h-5 w-5 text-cyan-500" />
                       <div>
