@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { formatNumber } from "@/lib/utils";
 import {
-  ResponsiveDialog,
-  ResponsiveDialogContent,
-  ResponsiveDialogDescription,
-  ResponsiveDialogFooter,
-  ResponsiveDialogHeader,
-  ResponsiveDialogTitle,
-} from "@/components/ui/responsive-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -353,25 +353,25 @@ export function GasCylinderOrderDialog({
 
   return (
     <>
-      <ResponsiveDialog open={open} onOpenChange={handleClose}>
-        <ResponsiveDialogContent>
-          <ResponsiveDialogHeader>
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-[500px] w-[95%] rounded-lg">
+          <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-orange-500/10">
                 <Cylinder className="h-5 w-5 text-orange-500" />
               </div>
               <div className="flex-1">
-                <ResponsiveDialogTitle className="text-lg">
+                <DialogTitle className="text-lg">
                   {isEditing ? "Order bewerken" : "Gascilinder order"}
-                </ResponsiveDialogTitle>
-                <ResponsiveDialogDescription>
+                </DialogTitle>
+                <DialogDescription>
                   {isEditing ? "Bewerk de ordergegevens hieronder" : order.order_number}
-                </ResponsiveDialogDescription>
+                </DialogDescription>
               </div>
             </div>
-          </ResponsiveDialogHeader>
+          </DialogHeader>
 
-          <div className="space-y-4 py-4 px-4 sm:px-0">
+          <div className="space-y-4 py-4">
             {isEditing ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -576,14 +576,14 @@ export function GasCylinderOrderDialog({
             )}
           </div>
 
-          <ResponsiveDialogFooter>
+          <DialogFooter className="gap-2">
             {isEditing ? (
               <>
-                <Button variant="outline" onClick={cancelEditing} disabled={saving} className="h-11 sm:h-10 w-full sm:w-auto">
+                <Button variant="outline" onClick={cancelEditing} disabled={saving} className="w-full sm:w-auto">
                   <X className="mr-2 h-4 w-4" />
                   Annuleren
                 </Button>
-                <Button onClick={handleSave} disabled={saving} className="h-11 sm:h-10 w-full sm:w-auto">
+                <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
                   <Save className="mr-2 h-4 w-4" />
                   {saving ? "Opslaan..." : "Opslaan"}
                 </Button>
@@ -595,27 +595,27 @@ export function GasCylinderOrderDialog({
                     <Button
                       variant="destructive"
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="h-11 sm:h-10 w-full sm:w-auto"
+                      className="w-full sm:w-auto"
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Verwijderen
                     </Button>
-                    <Button onClick={startEditing} className="h-11 sm:h-10 w-full sm:w-auto">
+                    <Button onClick={startEditing} className="w-full sm:w-auto">
                       <Edit2 className="mr-2 h-4 w-4" />
                       Bewerken
                     </Button>
                   </>
                 )}
                 {!hasEditPermission && (
-                  <Button variant="outline" onClick={handleClose} className="h-11 sm:h-auto w-full sm:w-auto">
+                  <Button variant="outline" onClick={handleClose} className="w-full sm:w-auto">
                     Sluiten
                   </Button>
                 )}
               </>
             )}
-          </ResponsiveDialogFooter>
-        </ResponsiveDialogContent>
-      </ResponsiveDialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
