@@ -114,7 +114,7 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground antialiased font-sans;
+    @apply bg-background text-foreground antialiased font-sans overflow-x-hidden;
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
   }

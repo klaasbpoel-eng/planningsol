@@ -50,7 +50,7 @@ const ProductionPlanningPage = () => {
 
   return (
     <PageTransition>
-      <div className="min-h-screen gradient-mesh">
+      <div className="min-h-screen gradient-mesh overflow-x-hidden">
         <Header userEmail={user.email} role={role} />
 
         <main className="px-[1%] md:px-[10%] py-8 w-full">
