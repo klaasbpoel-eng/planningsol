@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -257,25 +257,25 @@ export function DryIceOrderDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+      <ResponsiveDialog open={open} onOpenChange={handleClose}>
+        <ResponsiveDialogContent>
+          <ResponsiveDialogHeader>
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-cyan-500/10">
                 <Snowflake className="h-5 w-5 text-cyan-500" />
               </div>
               <div className="flex-1">
-                <DialogTitle className="text-lg">
+                <ResponsiveDialogTitle className="text-lg">
                   {isEditing ? "Order bewerken" : "Droogijs order"}
-                </DialogTitle>
-                <DialogDescription>
+                </ResponsiveDialogTitle>
+                <ResponsiveDialogDescription>
                   {isEditing ? "Bewerk de ordergegevens hieronder" : order.order_number}
-                </DialogDescription>
+                </ResponsiveDialogDescription>
               </div>
             </div>
-          </DialogHeader>
+          </ResponsiveDialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 px-4 sm:px-0">
             {isEditing ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -539,14 +539,14 @@ export function DryIceOrderDialog({
             )}
           </div>
 
-          <DialogFooter className="gap-2">
+          <ResponsiveDialogFooter>
             {isEditing ? (
               <>
-                <Button variant="outline" onClick={cancelEditing} disabled={saving}>
+                <Button variant="outline" onClick={cancelEditing} disabled={saving} className="h-11 sm:h-10 w-full sm:w-auto">
                   <X className="mr-2 h-4 w-4" />
                   Annuleren
                 </Button>
-                <Button onClick={handleSave} disabled={saving}>
+                <Button onClick={handleSave} disabled={saving} className="h-11 sm:h-10 w-full sm:w-auto">
                   <Save className="mr-2 h-4 w-4" />
                   {saving ? "Opslaan..." : "Opslaan"}
                 </Button>
@@ -558,26 +558,27 @@ export function DryIceOrderDialog({
                     <Button
                       variant="destructive"
                       onClick={() => setShowDeleteConfirm(true)}
+                      className="h-11 sm:h-10 w-full sm:w-auto"
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Verwijderen
                     </Button>
-                    <Button onClick={startEditing}>
+                    <Button onClick={startEditing} className="h-11 sm:h-10 w-full sm:w-auto">
                       <Edit2 className="mr-2 h-4 w-4" />
                       Bewerken
                     </Button>
                   </>
                 )}
                 {!hasEditPermission && (
-                  <Button variant="outline" onClick={handleClose}>
+                  <Button variant="outline" onClick={handleClose} className="h-11 sm:h-auto w-full sm:w-auto">
                     Sluiten
                   </Button>
                 )}
               </>
             )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
