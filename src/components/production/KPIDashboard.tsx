@@ -322,7 +322,7 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
         <CollapsibleTrigger asChild>
           <CardHeader className="pb-2 cursor-pointer hover:bg-muted/30 transition-colors">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
+              <CardTitle className="text-lg flex items-center gap-2 flex-wrap">
                 <Activity className="h-5 w-5 text-primary" />
                 KPI Dashboard
                 <Badge variant="outline" className="ml-2 text-xs">
@@ -473,7 +473,7 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
               </div>
 
               {/* Additional Stats Row */}
-              <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-border/50">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 pt-4 border-t border-border/50">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-yellow-500/10">
                     <Clock className="h-4 w-4 text-yellow-500" />
