@@ -1073,6 +1073,10 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       </div>;
     }
     return <div className="space-y-4">
+      {/* Debug Info */}
+      <div className="p-2 bg-muted rounded text-xs text-muted-foreground mb-4">
+        Debug: R:{requests.length} T:{tasks.length} D:{dryIceOrders.length} U:{currentUserId ? 'Yes' : 'No'} L:{loading ? 'Yes' : 'No'}
+      </div>
       {sortedGroups.map(({
         date,
         items
