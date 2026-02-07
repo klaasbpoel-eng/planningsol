@@ -9,7 +9,7 @@ import { FadeIn } from "@/components/ui/fade-in";
 import { TableSkeleton, ChartSkeleton } from "@/components/ui/skeletons";
 
 // Lazy load heavy tab components
-const DryIcePlanning = lazy(() => import("./DryIcePlanning").then(m => ({ default: m.DryIcePlanning })));
+
 const GasCylinderPlanning = lazy(() => import("./GasCylinderPlanning").then(m => ({ default: m.GasCylinderPlanning })));
 const ProductionReports = lazy(() => import("./ProductionReports").then(m => ({ default: m.ProductionReports })));
 const SafetyInstructions = lazy(() => import("./SafetyInstructions").then(m => ({ default: m.SafetyInstructions })));
@@ -57,7 +57,7 @@ export function ProductionPlanning({
   canViewAllLocations = true,
   permissions
 }: ProductionPlanningProps) {
-  const [activeTab, setActiveTab] = useState("droogijs");
+  const [activeTab, setActiveTab] = useState("gascilinders");
   const [dryIceToday, setDryIceToday] = useState(0);
   const [cylindersToday, setCylindersToday] = useState(0);
   const [weekOrders, setWeekOrders] = useState(0);
@@ -479,13 +479,7 @@ export function ProductionPlanning({
             ? "grid-cols-3 sm:grid-cols-6"
             : "grid-cols-2"
         )}>
-          <TabsTrigger
-            value="droogijs"
-            className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
-          >
-            <Snowflake className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden sm:inline">Droogijs</span>
-          </TabsTrigger>
+
           <TabsTrigger
             value="gascilinders"
             className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
@@ -532,14 +526,7 @@ export function ProductionPlanning({
           )}
         </TabsList>
 
-        <TabsContent value="droogijs" className="mt-6">
-          <Suspense fallback={<TabLoadingFallback />}>
-            <DryIcePlanning
-              onDataChanged={handleDataChanged}
-              location={selectedLocation}
-            />
-          </Suspense>
-        </TabsContent>
+
 
         <TabsContent value="gascilinders" className="mt-6">
           <Suspense fallback={<TabLoadingFallback />}>
