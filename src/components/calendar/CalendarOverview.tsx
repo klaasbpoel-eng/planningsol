@@ -70,7 +70,13 @@ type CalendarItem = {
 };
 export function CalendarOverview() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewType, setViewType] = useState<ViewType>("week");
+  const [viewType, setViewType] = useState<ViewType>(() => {
+    // Check for mobile on initial render to set correct default view
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return "list";
+    }
+    return "week";
+  });
   const [requests, setRequests] = useState<RequestWithProfile[]>([]);
   const [tasks, setTasks] = useState<TaskWithProfile[]>([]);
   const [dryIceOrders, setDryIceOrders] = useState<DryIceOrderWithDetails[]>([]);
@@ -1741,7 +1747,7 @@ export function CalendarOverview() {
               </div>
             </div>
 
-            {!isMobile && (
+            <div className="hidden md:block">
               <ToggleGroup type="single" value={viewType} onValueChange={value => value && setViewType(value as ViewType)} className="bg-muted/50 p-1 rounded-xl border border-border/50">
                 <ToggleGroupItem value="list" aria-label="Lijstweergave" className="text-xs px-3 rounded-lg transition-all data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-md data-[state=on]:shadow-primary/25">
                   <List className="h-4 w-4 mr-1.5" />
@@ -1764,7 +1770,7 @@ export function CalendarOverview() {
                   Jaar
                 </ToggleGroupItem>
               </ToggleGroup>
-            )}
+            </div>
           </div>
 
         </div>
