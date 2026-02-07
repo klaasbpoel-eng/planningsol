@@ -1749,9 +1749,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
             <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg hover:bg-background" onClick={() => navigate("prev")}>
               <ChevronLeft className="h-5 w-5" />
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())} className="text-xs font-medium border-primary/30 text-primary hover:bg-primary/10">
+            {viewType !== 'day' && <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())} className="text-xs font-medium border-primary/30 text-primary hover:bg-primary/10">
               Vandaag
-            </Button>
+            </Button>}
           </div>
           <span className="text-base font-semibold capitalize text-foreground">
             {getDateRangeLabel()}
