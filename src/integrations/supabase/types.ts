@@ -1164,6 +1164,39 @@ export type Database = {
         }
         Relationships: []
       }
+      toolboxes: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          file_url: string | null
+          id: string
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          file_url?: string | null
+          id?: string
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          file_url?: string | null
+          id?: string
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1285,6 +1318,14 @@ export type Database = {
           pending_orders: number
           total_kg: number
           total_orders: number
+        }[]
+      }
+      get_gas_category_distribution_by_period: {
+        Args: { p_from_date: string; p_location?: string; p_to_date: string }
+        Returns: {
+          category_id: string
+          category_name: string
+          total_cylinders: number
         }[]
       }
       get_gas_type_distribution_by_period: {
