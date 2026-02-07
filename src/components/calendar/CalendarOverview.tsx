@@ -124,6 +124,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     previousDate: string;
     newDate: string;
   } | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   // Drag and drop state for dry ice
   const [draggedDryIceOrder, setDraggedDryIceOrder] = useState<DryIceOrderWithDetails | null>(null);
   const [moveSeriesDialogOpen, setMoveSeriesDialogOpen] = useState(false);
@@ -200,143 +201,83 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   }, [currentUser]);
   const fetchData = async () => {
     try {
+      setFetchError(null);
       let user = currentUser;
       if (!user) {
-        const {
-          data: {
-            user: fetchedUser
-          }
-        } = await supabase.auth.getUser();
+        const { data: { user: fetchedUser } } = await supabase.auth.getUser();
         user = fetchedUser;
       }
       if (!user) return;
 
-      // Fetch all profiles first
-      const {
-        data: profilesData,
-        error: profilesError
-      } = await supabase.from("profiles").select("*");
-      if (profilesError) throw profilesError;
+      console.log("Fetching data for user:", user.id);
 
-      // Fetch all requests (RLS allows all authenticated users to view)
-      const {
-        data: requestsData,
-        error: requestsError
-      } = await supabase.from("time_off_requests").select("*").order("start_date", {
-        ascending: true
-      });
-      if (requestsError) throw requestsError;
+      // Helper for independent fetches
+      const safeFetch = async <T,>(request: any, name: string): Promise<T | null> => {
+        const { data, error } = await request;
+        if (error) {
+          console.error(`Error fetching ${name}:`, error);
+          setFetchError(prev => `${prev ? prev + '; ' : ''}${name}: ${error.message || error.code}`);
+          return null;
+        }
+        return data as T;
+      };
 
-      // Fetch all tasks
-      const {
-        data: tasksData,
-        error: tasksError
-      } = await supabase.from("tasks").select("*").order("due_date", {
-        ascending: true
-      });
-      if (tasksError) throw tasksError;
+      // Parallel fetching
+      const [
+        profilesData,
+        requestsData,
+        tasksData,
+        taskTypesData,
+        dryIceOrdersData,
+        dryIceProductTypesData,
+        dryIcePackagingData,
+        gasCylinderOrdersData,
+        gasTypesData,
+        timeOffTypesData
+      ] = await Promise.all([
+        safeFetch<Profile[]>(supabase.from("profiles").select("*"), "profiles"),
+        safeFetch<TimeOffRequest[]>(supabase.from("time_off_requests").select("*").order("start_date", { ascending: true }), "requests"),
+        safeFetch<Task[]>(supabase.from("tasks").select("*").order("due_date", { ascending: true }), "tasks"),
+        safeFetch<TaskType[]>(supabase.from("task_types").select("*").eq("is_active", true), "taskTypes"),
+        safeFetch<DryIceOrder[]>(supabase.from("dry_ice_orders").select("*").eq("status", "pending").order("scheduled_date", { ascending: true }), "dryIce"),
+        safeFetch<DryIceProductType[]>(supabase.from("dry_ice_product_types").select("*").eq("is_active", true), "dryIceTypes"),
+        safeFetch<DryIcePackaging[]>(supabase.from("dry_ice_packaging").select("*").eq("is_active", true), "dryIcePkg"),
+        safeFetch<GasCylinderOrder[]>(supabase.from("gas_cylinder_orders").select("*").eq("status", "pending").order("scheduled_date", { ascending: true }), "gasCylinders"),
+        safeFetch<GasType[]>(supabase.from("gas_types").select("*").eq("is_active", true), "gasTypes"),
+        safeFetch<TimeOffType[]>(supabase.from("time_off_types").select("*").eq("is_active", true), "timeOffTypes")
+      ]);
 
-      // Fetch task types
-      const {
-        data: taskTypesData,
-        error: taskTypesError
-      } = await supabase.from("task_types").select("*").eq("is_active", true);
-      if (taskTypesError) throw taskTypesError;
-
-      // Fetch dry ice orders
-      const {
-        data: dryIceOrdersData,
-        error: dryIceOrdersError
-      } = await supabase.from("dry_ice_orders").select("*").eq("status", "pending").order("scheduled_date", {
-        ascending: true
-      });
-      if (dryIceOrdersError) throw dryIceOrdersError;
-
-      // Fetch dry ice product types
-      const {
-        data: dryIceProductTypesData,
-        error: dryIceProductTypesError
-      } = await supabase.from("dry_ice_product_types").select("*").eq("is_active", true);
-      if (dryIceProductTypesError) throw dryIceProductTypesError;
-
-      // Fetch dry ice packaging
-      const {
-        data: dryIcePackagingData,
-        error: dryIcePackagingError
-      } = await supabase.from("dry_ice_packaging").select("*").eq("is_active", true);
-      if (dryIcePackagingError) throw dryIcePackagingError;
-
-      // Fetch gas cylinder orders
-      const {
-        data: gasCylinderOrdersData,
-        error: gasCylinderOrdersError
-      } = await supabase.from("gas_cylinder_orders").select("*").eq("status", "pending").order("scheduled_date", {
-        ascending: true
-      });
-      if (gasCylinderOrdersError) throw gasCylinderOrdersError;
-
-      // Fetch gas types
-      const {
-        data: gasTypesData,
-        error: gasTypesError
-      } = await supabase.from("gas_types").select("*").eq("is_active", true);
-      if (gasTypesError) throw gasTypesError;
-
-      // Fetch time off types
-      const {
-        data: timeOffTypesData,
-        error: timeOffTypesError
-      } = await supabase.from("time_off_types").select("*").eq("is_active", true);
-      if (timeOffTypesError) throw timeOffTypesError;
-
-      // Map profiles and leave types to requests using profile_id (new) or user_id (legacy)
-      const requestsWithProfiles: RequestWithProfile[] = (requestsData || []).map(request => {
-        // Use profile_id if available, otherwise fall back to user_id
-        const requestAny = request as any;
-        const profile = requestAny.profile_id ? profilesData?.find(p => p.id === requestAny.profile_id) : profilesData?.find(p => p.user_id === request.user_id) || null;
-        const leave_type = request.type_id ? timeOffTypesData?.find(t => t.id === request.type_id) || null : null;
-        return {
-          ...request,
-          profile,
-          leave_type
-        };
+      // Map profiles and leave types to requests
+      const requestsWithProfiles: RequestWithProfile[] = (requestsData || []).map((request: any) => {
+        const profile = request.profile_id ? profilesData?.find((p: any) => p.id === request.profile_id) : profilesData?.find((p: any) => p.user_id === request.user_id) || null;
+        const leave_type = request.type_id ? timeOffTypesData?.find((t: any) => t.id === request.type_id) || null : null;
+        return { ...request, profile, leave_type };
       });
 
       // Find current user's profile
-      const currentProfile = profilesData?.find(p => p.user_id === user.id);
+      const currentProfile = profilesData?.find((p: any) => p.user_id === user?.id);
       if (currentProfile) {
         setCurrentProfileId(currentProfile.id);
       }
 
       // Map profiles and task types to tasks
-      const tasksWithProfiles: TaskWithProfile[] = (tasksData || []).map(task => {
-        const profile = profilesData?.find(p => p.user_id === task.assigned_to) || null;
-        const task_type = taskTypesData?.find(t => t.id === task.type_id) || null;
-        return {
-          ...task,
-          profile,
-          task_type
-        };
+      const tasksWithProfiles: TaskWithProfile[] = (tasksData || []).map((task: any) => {
+        const profile = profilesData?.find((p: any) => p.user_id === task.assigned_to) || null;
+        const task_type = taskTypesData?.find((t: any) => t.id === task.type_id) || null;
+        return { ...task, profile, task_type };
       });
 
       // Map product types and packaging to dry ice orders
-      const dryIceOrdersWithDetails: DryIceOrderWithDetails[] = (dryIceOrdersData || []).map(order => {
-        const product_type_info = dryIceProductTypesData?.find(t => t.id === order.product_type_id) || null;
-        const packaging_info = dryIcePackagingData?.find(p => p.id === order.packaging_id) || null;
-        return {
-          ...order,
-          product_type_info,
-          packaging_info
-        };
+      const dryIceOrdersWithDetails: DryIceOrderWithDetails[] = (dryIceOrdersData || []).map((order: any) => {
+        const product_type_info = dryIceProductTypesData?.find((t: any) => t.id === order.product_type_id) || null;
+        const packaging_info = dryIcePackagingData?.find((p: any) => p.id === order.packaging_id) || null;
+        return { ...order, product_type_info, packaging_info };
       });
 
       // Map gas types to gas cylinder orders
-      const gasCylinderOrdersWithDetails: GasCylinderOrderWithDetails[] = (gasCylinderOrdersData || []).map(order => {
-        const gas_type_info = gasTypesData?.find(t => t.id === order.gas_type_id) || null;
-        return {
-          ...order,
-          gas_type_info
-        };
+      const gasCylinderOrdersWithDetails: GasCylinderOrderWithDetails[] = (gasCylinderOrdersData || []).map((order: any) => {
+        const gas_type_info = gasTypesData?.find((t: any) => t.id === order.gas_type_id) || null;
+        return { ...order, gas_type_info };
       });
       setRequests(requestsWithProfiles);
       setTasks(tasksWithProfiles);
@@ -1074,8 +1015,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     }
     return <div className="space-y-4">
       {/* Debug Info */}
-      <div className="p-2 bg-muted rounded text-xs text-muted-foreground mb-4">
+      <div className="p-2 bg-muted rounded text-xs text-muted-foreground mb-4 break-words">
         Debug: R:{requests.length} T:{tasks.length} D:{dryIceOrders.length} U:{currentUserId ? 'Yes' : 'No'} L:{loading ? 'Yes' : 'No'}
+        {fetchError && <div className="text-destructive mt-1">Err: {fetchError}</div>}
       </div>
       {sortedGroups.map(({
         date,
