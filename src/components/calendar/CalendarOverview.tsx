@@ -239,10 +239,10 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         safeFetch<TimeOffRequest[]>(supabase.from("time_off_requests").select("*").order("start_date", { ascending: true }), "requests"),
         safeFetch<Task[]>(supabase.from("tasks").select("*").order("due_date", { ascending: true }), "tasks"),
         safeFetch<TaskType[]>(supabase.from("task_types").select("*").eq("is_active", true), "taskTypes"),
-        safeFetch<DryIceOrder[]>(supabase.from("dry_ice_orders").select("*").eq("status", "pending").order("scheduled_date", { ascending: true }), "dryIce"),
+        safeFetch<DryIceOrder[]>(supabase.from("dry_ice_orders").select("*").eq("status", "pending").gte("scheduled_date", "2025-01-01").order("scheduled_date", { ascending: true }), "dryIce"),
         safeFetch<DryIceProductType[]>(supabase.from("dry_ice_product_types").select("*").eq("is_active", true), "dryIceTypes"),
         safeFetch<DryIcePackaging[]>(supabase.from("dry_ice_packaging").select("*").eq("is_active", true), "dryIcePkg"),
-        safeFetch<GasCylinderOrder[]>(supabase.from("gas_cylinder_orders").select("*").eq("status", "pending").order("scheduled_date", { ascending: true }), "gasCylinders"),
+        safeFetch<GasCylinderOrder[]>(supabase.from("gas_cylinder_orders").select("*").eq("status", "pending").gte("scheduled_date", "2025-01-01").order("scheduled_date", { ascending: true }), "gasCylinders"),
         safeFetch<GasType[]>(supabase.from("gas_types").select("*").eq("is_active", true), "gasTypes"),
         safeFetch<TimeOffType[]>(supabase.from("time_off_types").select("*").eq("is_active", true), "timeOffTypes")
       ]);
@@ -1014,11 +1014,6 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       </div>;
     }
     return <div className="space-y-4">
-      {/* Debug Info */}
-      <div className="p-2 bg-muted rounded text-xs text-muted-foreground mb-4 break-words">
-        Debug: R:{requests.length} T:{tasks.length} D:{dryIceOrders.length} U:{currentUserId ? 'Yes' : 'No'} L:{loading ? 'Yes' : 'No'}
-        {fetchError && <div className="text-destructive mt-1">Err: {fetchError}</div>}
-      </div>
       {sortedGroups.map(({
         date,
         items
