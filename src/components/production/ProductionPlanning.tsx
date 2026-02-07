@@ -485,7 +485,6 @@ export function ProductionPlanning({
           >
             <Snowflake className="h-4 w-4 flex-shrink-0" />
             <span className="hidden sm:inline">Droogijs</span>
-            <span className="sm:hidden">IJs</span>
           </TabsTrigger>
           <TabsTrigger
             value="gascilinders"
