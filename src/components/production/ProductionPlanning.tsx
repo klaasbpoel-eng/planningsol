@@ -12,9 +12,7 @@ import { TableSkeleton, ChartSkeleton } from "@/components/ui/skeletons";
 
 const GasCylinderPlanning = lazy(() => import("./GasCylinderPlanning").then(m => ({ default: m.GasCylinderPlanning })));
 const ProductionReports = lazy(() => import("./ProductionReports").then(m => ({ default: m.ProductionReports })));
-const SafetyInstructions = lazy(() => import("./SafetyInstructions").then(m => ({ default: m.SafetyInstructions })));
-const SiteMap = lazy(() => import("./SiteMap").then(m => ({ default: m.SiteMap })));
-const TrailerPlanning = lazy(() => import("./TrailerPlanning").then(m => ({ default: m.TrailerPlanning })));
+
 
 // ... (existing code)
 
@@ -498,30 +496,7 @@ export function ProductionPlanning({
                 <span className="hidden sm:inline">Rapportage</span>
                 <span className="sm:hidden">Stats</span>
               </TabsTrigger>
-              <TabsTrigger
-                value="veiligheid"
-                className="data-[state=active]:bg-red-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
-              >
-                <ShieldAlert className="h-4 w-4 flex-shrink-0" />
-                <span className="hidden sm:inline">Veiligheid</span>
-                <span className="sm:hidden">Veilig</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="sitemap"
-                className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
-              >
-                <MapPin className="h-4 w-4 flex-shrink-0" />
-                <span className="hidden sm:inline">Site Map</span>
-                <span className="sm:hidden">Map</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="trailer"
-                className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
-              >
-                <Truck className="h-4 w-4 flex-shrink-0" />
-                <span className="hidden sm:inline">Trailer</span>
-                <span className="sm:hidden">Truck</span>
-              </TabsTrigger>
+
             </>
           )}
         </TabsList>
@@ -551,23 +526,7 @@ export function ProductionPlanning({
               </Suspense>
             </TabsContent>
 
-            <TabsContent value="veiligheid" className="mt-6">
-              <Suspense fallback={<TabLoadingFallback />}>
-                <SafetyInstructions />
-              </Suspense>
-            </TabsContent>
 
-            <TabsContent value="sitemap" className="mt-6">
-              <Suspense fallback={<TabLoadingFallback />}>
-                <SiteMap location={selectedLocation} />
-              </Suspense>
-            </TabsContent>
-
-            <TabsContent value="trailer" className="mt-6">
-              <Suspense fallback={<TabLoadingFallback />}>
-                <TrailerPlanning location={selectedLocation} />
-              </Suspense>
-            </TabsContent>
           </>
         )}
       </Tabs>
