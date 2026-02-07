@@ -79,7 +79,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   const [viewType, setViewType] = useState<ViewType>(() => {
     // Check for mobile on initial render to set correct default view
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      return "list";
+      return "day";
     }
     return "week";
   });
@@ -136,12 +136,12 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   } = useUserRole(currentUserId);
   const isMobile = useIsMobile();
 
-  // Force list view on mobile
+  // Force valid view on mobile
   useEffect(() => {
-    if (isMobile) {
-      setViewType("list");
+    if (isMobile && viewType !== "list" && viewType !== "day") {
+      setViewType("day");
     }
-  }, [isMobile]);
+  }, [isMobile, viewType]);
   const leaveTypes = [{
     value: "vacation",
     label: "Vakantie",
@@ -1199,9 +1199,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     const dayGasCylinderOrders = getGasCylinderOrdersForDay(currentDate);
     const hasItems = dayRequests.length > 0 || dayTasks.length > 0 || dayDryIceOrders.length > 0 || dayGasCylinderOrders.length > 0;
     return <div className="space-y-4 animate-fade-in">
-      <div className={cn("p-8 rounded-2xl border backdrop-blur-sm transition-all duration-300", isToday(currentDate) ? "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-primary/10 shadow-lg shadow-primary/10" : "bg-card/80 hover:bg-card")}>
+      <div className={cn("p-4 md:p-8 rounded-2xl border backdrop-blur-sm transition-all duration-300", isToday(currentDate) ? "ring-2 ring-primary/50 bg-gradient-to-br from-primary/5 to-primary/10 shadow-lg shadow-primary/10" : "bg-card/80 hover:bg-card")}>
         <div className="text-center mb-6">
-          <div className="text-6xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
+          <div className="text-4xl md:text-6xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
             {format(currentDate, "d")}
           </div>
           <div className="text-lg text-muted-foreground mt-1 capitalize">
@@ -1699,6 +1699,20 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                   Gascilinders
                 </label>
               </div>
+            </div>
+
+            {/* Mobile View Toggle */}
+            <div className="md:hidden">
+              <ToggleGroup type="single" value={viewType} onValueChange={value => value && setViewType(value as ViewType)} className="bg-muted/50 p-1 rounded-xl border border-border/50">
+                <ToggleGroupItem value="day" aria-label="Dagweergave" className="text-xs px-3 rounded-lg transition-all data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-md data-[state=on]:shadow-primary/25">
+                  <CalendarDays className="h-4 w-4 mr-1.5" />
+                  Dag
+                </ToggleGroupItem>
+                <ToggleGroupItem value="list" aria-label="Lijstweergave" className="text-xs px-3 rounded-lg transition-all data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-md data-[state=on]:shadow-primary/25">
+                  <List className="h-4 w-4 mr-1.5" />
+                  Lijst
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
 
             <div className="hidden md:block">
