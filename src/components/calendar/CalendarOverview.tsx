@@ -68,7 +68,13 @@ type CalendarItem = {
   type: "gascylinder";
   data: GasCylinderOrderWithDetails;
 };
-export function CalendarOverview() {
+import type { User } from "@supabase/supabase-js";
+
+interface CalendarOverviewProps {
+  currentUser?: User | null;
+}
+
+export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<ViewType>(() => {
     // Check for mobile on initial render to set correct default view
@@ -118,7 +124,6 @@ export function CalendarOverview() {
     previousDate: string;
     newDate: string;
   } | null>(null);
-
   // Drag and drop state for dry ice
   const [draggedDryIceOrder, setDraggedDryIceOrder] = useState<DryIceOrderWithDetails | null>(null);
   const [moveSeriesDialogOpen, setMoveSeriesDialogOpen] = useState(false);
@@ -177,25 +182,33 @@ export function CalendarOverview() {
   }];
   useEffect(() => {
     const getUser = async () => {
-      const {
-        data: {
-          user
+      if (currentUser) {
+        setCurrentUserId(currentUser.id);
+      } else {
+        const {
+          data: {
+            user
+          }
+        } = await supabase.auth.getUser();
+        if (user) {
+          setCurrentUserId(user.id);
         }
-      } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUserId(user.id);
       }
     };
     getUser();
     fetchData();
-  }, []);
+  }, [currentUser]);
   const fetchData = async () => {
     try {
-      const {
-        data: {
-          user
-        }
-      } = await supabase.auth.getUser();
+      let user = currentUser;
+      if (!user) {
+        const {
+          data: {
+            user: fetchedUser
+          }
+        } = await supabase.auth.getUser();
+        user = fetchedUser;
+      }
       if (!user) return;
 
       // Fetch all profiles first

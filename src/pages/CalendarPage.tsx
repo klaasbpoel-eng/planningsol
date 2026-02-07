@@ -52,7 +52,7 @@ const CalendarPage = () => {
         <Header userEmail={user.email} />
 
         <main className="flex-1 flex flex-col w-full px-[1%] md:px-[10%]">
-          <CalendarOverview />
+          <CalendarOverview currentUser={user} />
         </main>
       </div>
     </PageTransition>
