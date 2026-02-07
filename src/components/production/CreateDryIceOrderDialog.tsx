@@ -62,10 +62,10 @@ export function CreateDryIceOrderDialog({
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   const [userProductionLocation, setUserProductionLocation] = useState<"sol_emmen" | "sol_tilburg" | null>(null);
   const [canSelectLocation, setCanSelectLocation] = useState(true);
-  
+
   const [productTypes, setProductTypes] = useState<{ id: string; name: string }[]>([]);
   const [packagingOptions, setPackagingOptions] = useState<{ id: string; name: string }[]>([]);
-  
+
   // Check if selected packaging is EPS type or Kunststof container
   const selectedPackaging = packagingOptions.find(p => p.id === packagingId);
   const isEpsPackaging = selectedPackaging?.name.toLowerCase().includes("eps");
@@ -81,20 +81,20 @@ export function CreateDryIceOrderDialog({
           .select("id, production_location")
           .eq("user_id", user.id)
           .maybeSingle();
-        
+
         if (profile) {
           setCurrentProfileId(profile.id);
-          
+
           // Check user role
           const { data: roleData } = await supabase
             .from("user_roles")
             .select("role")
             .eq("user_id", user.id)
             .maybeSingle();
-          
+
           const userRole = roleData?.role || "user";
           const isAdmin = userRole === "admin";
-          
+
           // If user has assigned location and is not admin, restrict to that location
           if (profile.production_location && !isAdmin) {
             setUserProductionLocation(profile.production_location);
@@ -121,14 +121,14 @@ export function CreateDryIceOrderDialog({
       .select("id, name")
       .eq("is_active", true)
       .order("sort_order");
-    
+
     // Fetch default product type setting
     const { data: defaultSetting } = await supabase
       .from("app_settings")
       .select("value")
       .eq("key", "dry_ice_default_product_type_id")
       .maybeSingle();
-    
+
     if (data && data.length > 0) {
       setProductTypes(data);
       // Use configured default, or fallback to "9mm", or first item
@@ -156,14 +156,14 @@ export function CreateDryIceOrderDialog({
     setCustomerId("");
     setCustomerName("");
     setQuantityKg("");
-    
+
     // Fetch default product type setting for reset
     const { data: defaultSetting } = await supabase
       .from("app_settings")
       .select("value")
       .eq("key", "dry_ice_default_product_type_id")
       .maybeSingle();
-    
+
     if (productTypes.length > 0) {
       if (defaultSetting?.value && productTypes.find(pt => pt.id === defaultSetting.value)) {
         setProductTypeId(defaultSetting.value);
@@ -204,22 +204,22 @@ export function CreateDryIceOrderDialog({
       toast.error("Kon je gebruikersprofiel niet vinden. Probeer opnieuw in te loggen.");
       return;
     }
-    
+
     if (!customerName.trim()) {
       toast.error("Selecteer een klant");
       return;
     }
-    
+
     if (!quantityKg) {
       toast.error("Vul de hoeveelheid in");
       return;
     }
-    
+
     if (!scheduledDate) {
       toast.error("Selecteer een datum");
       return;
     }
-    
+
     if (!productTypeId) {
       toast.error("Selecteer een producttype");
       return;
@@ -241,13 +241,13 @@ export function CreateDryIceOrderDialog({
     try {
       // Generate dates for recurring orders
       const orderDates: Date[] = [scheduledDate];
-      
+
       if (isRecurring) {
         // For infinite recurrence, create orders for 1 year ahead
-        const endDate = isInfiniteRecurrence 
+        const endDate = isInfiniteRecurrence
           ? addYears(scheduledDate, 1)
           : recurrenceEndDate;
-        
+
         if (endDate) {
           let nextDate = addWeeks(scheduledDate, recurrenceInterval);
           while (nextDate <= endDate) {
@@ -270,28 +270,57 @@ export function CreateDryIceOrderDialog({
         notes: notes.trim() || null,
         created_by: currentProfileId,
         is_recurring: isRecurring,
-        recurrence_end_date: isRecurring && !isInfiniteRecurrence && recurrenceEndDate 
-          ? format(recurrenceEndDate, "yyyy-MM-dd") 
+        recurrence_end_date: isRecurring && !isInfiniteRecurrence && recurrenceEndDate
+          ? format(recurrenceEndDate, "yyyy-MM-dd")
           : null,
         status: alreadyCompleted ? "completed" as const : "pending" as const,
         location: location,
       };
 
-      // Insert all orders
-      const ordersToInsert = orderDates.map((date, index) => ({
+      // Insert the parent order (first date)
+      const parentDate = orderDates[0];
+      const parentOrderNumber = generateOrderNumber();
+
+      const parentOrderData = {
         ...baseOrderData,
-        order_number: generateOrderNumber() + (index > 0 ? `-${index}` : ""),
-        scheduled_date: format(date, "yyyy-MM-dd"),
-      }));
+        order_number: parentOrderNumber,
+        scheduled_date: format(parentDate, "yyyy-MM-dd"),
+        // Parent has no parent_order_id
+        parent_order_id: null
+      };
 
-      const { error } = await supabase.from("dry_ice_orders").insert(ordersToInsert);
+      const { data: parentOrder, error: parentError } = await supabase
+        .from("dry_ice_orders")
+        .insert(parentOrderData)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (parentError) throw parentError;
+      if (!parentOrder) throw new Error("Failed to create parent order");
+
+      // Insert child orders if any
+      if (orderDates.length > 1) {
+        const childOrders = orderDates.slice(1).map((date, index) => ({
+          ...baseOrderData,
+          order_number: `${parentOrderNumber}-${index + 1}`,
+          scheduled_date: format(date, "yyyy-MM-dd"),
+          parent_order_id: parentOrder.id
+        }));
+
+        const { error: childrenError } = await supabase
+          .from("dry_ice_orders")
+          .insert(childOrders);
+
+        if (childrenError) throw childrenError;
+      }
+
+      // We don't need 'ordersToInsert', we know the count
+      const ordersToInsert = orderDates; // mapping for count usage below
 
       const orderCount = ordersToInsert.length;
       toast.success(
-        orderCount > 1 
-          ? `${orderCount} productieorders aangemaakt` 
+        orderCount > 1
+          ? `${orderCount} productieorders aangemaakt`
           : "Productieorder aangemaakt"
       );
       resetForm();
@@ -467,8 +496,8 @@ export function CreateDryIceOrderDialog({
 
             <div className="space-y-2">
               <Label>Productielocatie</Label>
-              <Select 
-                value={location} 
+              <Select
+                value={location}
                 onValueChange={(v) => setLocation(v as "sol_emmen" | "sol_tilburg")}
                 disabled={!canSelectLocation}
               >
@@ -491,8 +520,8 @@ export function CreateDryIceOrderDialog({
           {/* Recurrence option */}
           <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
             <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="isRecurring" 
+              <Checkbox
+                id="isRecurring"
                 checked={isRecurring}
                 onCheckedChange={(checked) => {
                   setIsRecurring(checked === true);
@@ -507,7 +536,7 @@ export function CreateDryIceOrderDialog({
                 Herhalen op dezelfde dag
               </Label>
             </div>
-            
+
             {isRecurring && (
               <div className="space-y-3 pl-6">
                 <div className="space-y-2">
@@ -528,8 +557,8 @@ export function CreateDryIceOrderDialog({
                   </RadioGroup>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="isInfinite" 
+                  <Checkbox
+                    id="isInfinite"
                     checked={isInfiniteRecurrence}
                     onCheckedChange={(checked) => {
                       setIsInfiniteRecurrence(checked === true);
@@ -542,7 +571,7 @@ export function CreateDryIceOrderDialog({
                     Oneindig herhalen (1 jaar vooruit aanmaken)
                   </Label>
                 </div>
-                
+
                 {!isInfiniteRecurrence && (
                   <div className="space-y-2">
                     <Label>
@@ -580,11 +609,11 @@ export function CreateDryIceOrderDialog({
                     </Popover>
                   </div>
                 )}
-                
+
                 {scheduledDate && (isInfiniteRecurrence || recurrenceEndDate) && (
                   <p className="text-xs text-muted-foreground">
-                    Dit maakt {isInfiniteRecurrence 
-                      ? "52" 
+                    Dit maakt {isInfiniteRecurrence
+                      ? "52"
                       : Math.floor((recurrenceEndDate!.getTime() - scheduledDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1} orders aan
                   </p>
                 )}

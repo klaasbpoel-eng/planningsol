@@ -52,10 +52,10 @@ export function CreateDryIceOrderCalendarDialog({
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>(undefined);
   const [notes, setNotes] = useState("");
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
-  
+
   const [productTypes, setProductTypes] = useState<{ id: string; name: string }[]>([]);
   const [packagingOptions, setPackagingOptions] = useState<{ id: string; name: string }[]>([]);
-  
+
   // Check if selected packaging is EPS type or Kunststof container
   const selectedPackaging = packagingOptions.find(p => p.id === packagingId);
   const isEpsPackaging = selectedPackaging?.name.toLowerCase().includes("eps");
@@ -84,7 +84,7 @@ export function CreateDryIceOrderCalendarDialog({
         .select("id")
         .eq("user_id", user.id)
         .maybeSingle();
-      
+
       if (profile) {
         setCurrentProfileId(profile.id);
       }
@@ -97,14 +97,14 @@ export function CreateDryIceOrderCalendarDialog({
       .select("id, name")
       .eq("is_active", true)
       .order("sort_order");
-    
+
     // Fetch default product type setting
     const { data: defaultSetting } = await supabase
       .from("app_settings")
       .select("value")
       .eq("key", "dry_ice_default_product_type_id")
       .maybeSingle();
-    
+
     if (data && data.length > 0) {
       setProductTypes(data);
       if (!productTypeId) {
@@ -134,14 +134,14 @@ export function CreateDryIceOrderCalendarDialog({
     setCustomerId("");
     setCustomerName("");
     setQuantityKg("");
-    
+
     // Fetch default product type setting for reset
     const { data: defaultSetting } = await supabase
       .from("app_settings")
       .select("value")
       .eq("key", "dry_ice_default_product_type_id")
       .maybeSingle();
-    
+
     if (productTypes.length > 0) {
       if (defaultSetting?.value && productTypes.find(pt => pt.id === defaultSetting.value)) {
         setProductTypeId(defaultSetting.value);
@@ -177,22 +177,22 @@ export function CreateDryIceOrderCalendarDialog({
       toast.error("Kon je gebruikersprofiel niet vinden. Probeer opnieuw in te loggen.");
       return;
     }
-    
+
     if (!customerName.trim()) {
       toast.error("Selecteer een klant");
       return;
     }
-    
+
     if (!quantityKg) {
       toast.error("Vul de hoeveelheid in");
       return;
     }
-    
+
     if (!scheduledDate) {
       toast.error("Selecteer een datum");
       return;
     }
-    
+
     if (!productTypeId) {
       toast.error("Selecteer een producttype");
       return;
@@ -214,13 +214,13 @@ export function CreateDryIceOrderCalendarDialog({
     try {
       // Generate dates for recurring orders
       const orderDates: Date[] = [scheduledDate];
-      
+
       if (isRecurring) {
         // For infinite recurrence, create orders for 1 year ahead
-        const endDate = isInfiniteRecurrence 
+        const endDate = isInfiniteRecurrence
           ? addYears(scheduledDate, 1)
           : recurrenceEndDate;
-        
+
         if (endDate) {
           let nextDate = addWeeks(scheduledDate, recurrenceInterval);
           while (nextDate <= endDate) {
@@ -243,26 +243,55 @@ export function CreateDryIceOrderCalendarDialog({
         notes: notes.trim() || null,
         created_by: currentProfileId,
         is_recurring: isRecurring,
-        recurrence_end_date: isRecurring && !isInfiniteRecurrence && recurrenceEndDate 
-          ? format(recurrenceEndDate, "yyyy-MM-dd") 
+        recurrence_end_date: isRecurring && !isInfiniteRecurrence && recurrenceEndDate
+          ? format(recurrenceEndDate, "yyyy-MM-dd")
           : null,
       };
 
-      // Insert all orders
-      const ordersToInsert = orderDates.map((date, index) => ({
+      // Insert the parent order (first date)
+      const parentDate = orderDates[0];
+      const parentOrderNumber = generateOrderNumber();
+
+      const parentOrderData = {
         ...baseOrderData,
-        order_number: generateOrderNumber() + (index > 0 ? `-${index}` : ""),
-        scheduled_date: format(date, "yyyy-MM-dd"),
-      }));
+        order_number: parentOrderNumber,
+        scheduled_date: format(parentDate, "yyyy-MM-dd"),
+        // Parent has no parent_order_id
+        parent_order_id: null
+      };
 
-      const { error } = await supabase.from("dry_ice_orders").insert(ordersToInsert);
+      const { data: parentOrder, error: parentError } = await supabase
+        .from("dry_ice_orders")
+        .insert(parentOrderData)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (parentError) throw parentError;
+      if (!parentOrder) throw new Error("Failed to create parent order");
+
+      // Insert child orders if any
+      if (orderDates.length > 1) {
+        const childOrders = orderDates.slice(1).map((date, index) => ({
+          ...baseOrderData,
+          order_number: `${parentOrderNumber}-${index + 1}`,
+          scheduled_date: format(date, "yyyy-MM-dd"),
+          parent_order_id: parentOrder.id
+        }));
+
+        const { error: childrenError } = await supabase
+          .from("dry_ice_orders")
+          .insert(childOrders);
+
+        if (childrenError) throw childrenError;
+      }
+
+      // We don't need 'ordersToInsert', we know the count
+      const ordersToInsert = orderDates; // mapping for count usage below
 
       const orderCount = ordersToInsert.length;
       toast.success(
-        orderCount > 1 
-          ? `${orderCount} droogijs orders aangemaakt` 
+        orderCount > 1
+          ? `${orderCount} droogijs orders aangemaakt`
           : "Droogijs order aangemaakt"
       );
       resetForm();
@@ -438,8 +467,8 @@ export function CreateDryIceOrderCalendarDialog({
           {/* Recurrence option */}
           <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
             <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="isRecurringCal" 
+              <Checkbox
+                id="isRecurringCal"
                 checked={isRecurring}
                 onCheckedChange={(checked) => {
                   setIsRecurring(checked === true);
@@ -454,7 +483,7 @@ export function CreateDryIceOrderCalendarDialog({
                 Herhalen op dezelfde dag
               </Label>
             </div>
-            
+
             {isRecurring && (
               <div className="space-y-3 pl-6">
                 <div className="space-y-2">
@@ -475,8 +504,8 @@ export function CreateDryIceOrderCalendarDialog({
                   </RadioGroup>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="isInfiniteCal" 
+                  <Checkbox
+                    id="isInfiniteCal"
                     checked={isInfiniteRecurrence}
                     onCheckedChange={(checked) => {
                       setIsInfiniteRecurrence(checked === true);
@@ -489,7 +518,7 @@ export function CreateDryIceOrderCalendarDialog({
                     Oneindig herhalen (1 jaar vooruit aanmaken)
                   </Label>
                 </div>
-                
+
                 {!isInfiniteRecurrence && (
                   <div className="space-y-2">
                     <Label>
