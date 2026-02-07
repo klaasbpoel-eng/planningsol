@@ -1,68 +1,21 @@
 
 
-# Plan: Bewerk- en Verwijderknoppen Zichtbaar Maken voor Operators
+# Plan: Luchtfoto als Site Map Achtergrond
 
-## Probleem
+## Wat gaan we doen
 
-De bewerk- en verwijderknoppen worden niet getoond voor operators. Dit komt doordat de **frontend permissie-configuratie** operators geen toegang geeft tot deze functies, terwijl de database RLS policies dit wel toestaan.
-
-| Onderdeel | Huidige waarde |
-|-----------|----------------|
-| `operator.canEditOrders` | `false` |
-| `operator.canDeleteOrders` | `false` |
-
-De knoppen worden alleen getoond als deze permissies `true` zijn:
-```text
-{permissions?.canEditOrders && <EditButton />}
-{permissions?.canDeleteOrders && <DeleteButton />}
-```
-
-## Oorzaak
-
-De permissie-mapping in `useUserPermissions.ts` definieert dat operators geen orders kunnen bewerken of verwijderen. Dit was correct voordat de RLS policies werden toegevoegd, maar nu de database-laag dit toestaat, moet de frontend dit ook toestaan.
-
-## Oplossing
-
-Wijzig de `ROLE_PERMISSIONS` constante in `useUserPermissions.ts` om operators toe te staan orders te bewerken en verwijderen.
+De geüploade satellietfoto van het SOL Emmen terrein wordt ingesteld als achtergrondafbeelding voor de Site Map component. Dit vervangt (of vult aan naast) de huidige `site-map-background.png`.
 
 ## Wijzigingen
 
-| Bestand | Wijziging |
-|---------|-----------|
-| `src/hooks/useUserPermissions.ts` | Zet `canEditOrders: true` en `canDeleteOrders: true` voor de `operator` rol |
-
-## Code Wijziging
-
-In het `ROLE_PERMISSIONS` object, de `operator` sectie aanpassen:
-
-```text
-Van:
-  operator: {
-    ...
-    canEditOrders: false,
-    canDeleteOrders: false,
-    ...
-  }
-
-Naar:
-  operator: {
-    ...
-    canEditOrders: true,
-    canDeleteOrders: true,
-    ...
-  }
-```
+| Stap | Actie |
+|------|-------|
+| 1 | Kopieer de geüploade afbeelding naar `public/site-map-emmen.png` |
+| 2 | Pas `SiteMap.tsx` aan om de nieuwe afbeelding als achtergrond te gebruiken |
 
 ## Technische Details
 
-De wijziging is eenvoudig: twee boolean waarden van `false` naar `true` veranderen. Dit zorgt ervoor dat:
-
-1. De bewerk-knop (potlood icoon) zichtbaar wordt voor operators
-2. De verwijder-knop (prullenbak icoon) zichtbaar wordt voor operators
-3. De status-dropdown werkt al correct (geen permissie-check)
-4. De mobiele weergave (MobileOrderCard) toont ook de knoppen (gebruikt dezelfde permissies)
-
-## Geen Database Wijzigingen Nodig
-
-De RLS policies zijn al correct geconfigureerd. Dit is puur een frontend permissie-aanpassing.
-
+- De afbeelding wordt opgeslagen in de `public/` map zodat deze direct als CSS background-image gebruikt kan worden
+- In het SiteMap component wordt de achtergrondafbeelding ingesteld op de nieuwe luchtfoto, met `background-size: cover` en `background-position: center`
+- De bestaande functionaliteit (tanks, opslagzones, drag-and-drop, zoom, rotatie) blijft volledig intact
+- Indien het component per locatie (`sol_emmen` / `sol_tilburg`) kan schakelen, wordt de luchtfoto gekoppeld aan de Emmen-locatie
