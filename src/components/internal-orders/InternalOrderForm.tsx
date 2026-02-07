@@ -59,23 +59,22 @@ export const InternalOrderForm = ({
 
     const articleGroups = useMemo(() => {
         const sorted = [...ARTICLES].sort((a, b) => a.name.localeCompare(b.name));
-        const groups = [
-            { heading: "2-Serie (Eigendom)", items: [] as typeof sorted },
-            { heading: "7-Serie (Statiegeld/Huur)", items: [] as typeof sorted },
-            { heading: "Overig", items: [] as typeof sorted }
-        ];
+
+        // Group by category
+        const groups: Record<string, typeof sorted> = {};
 
         sorted.forEach(article => {
-            if (article.id.startsWith("2")) {
-                groups[0].items.push(article);
-            } else if (article.id.startsWith("7")) {
-                groups[1].items.push(article);
-            } else {
-                groups[2].items.push(article);
+            const category = article.category || "Overig";
+            if (!groups[category]) {
+                groups[category] = [];
             }
+            groups[category].push(article);
         });
 
-        return groups.filter(g => g.items.length > 0);
+        // Convert to array and sort by category name
+        return Object.entries(groups)
+            .map(([heading, items]) => ({ heading, items }))
+            .sort((a, b) => a.heading.localeCompare(b.heading));
     }, []);
 
     const LocationLabel = ({ value }: { value: string }) => {
