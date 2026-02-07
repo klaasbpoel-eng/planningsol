@@ -27,7 +27,7 @@ import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { toast } from "sonner";
 import { formatNumber } from "@/lib/utils";
-import { CreateDryIceOrderDialog } from "./CreateDryIceOrderDialog";
+
 import { DryIceOrderDialog } from "@/components/calendar/DryIceOrderDialog";
 import { DryIceExcelImportDialog } from "./DryIceExcelImportDialog";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
@@ -94,7 +94,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [packagingOptions, setPackagingOptions] = useState<Packaging[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
+
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<DryIceOrder | null>(null);
   const [userId, setUserId] = useState<string | undefined>();
@@ -102,7 +102,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
   const [orderToDelete, setOrderToDelete] = useState<DryIceOrder | null>(null);
   const [dailyCapacity, setDailyCapacity] = useState<number>(500);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  
+
   // Filter states
   const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
   const [customerFilter, setCustomerFilter] = useState<string>("all");
@@ -110,12 +110,12 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortColumn, setSortColumn] = useState<SortColumn>("scheduled_date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  
+
   const { permissions, isAdmin } = useUserPermissions(userId);
 
   // Unique customers from orders for filtering
   const uniqueCustomers = [...new Set(orders.map(o => o.customer_name))].sort();
-  
+
   // Generate available years (2022 to current year + 1)
   const availableYears = Array.from(
     { length: new Date().getFullYear() - 2021 + 1 },
@@ -135,7 +135,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
     if (sortColumn !== column) {
       return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
     }
-    return sortDirection === "asc" 
+    return sortDirection === "asc"
       ? <ArrowUp className="h-4 w-4 ml-1" />
       : <ArrowDown className="h-4 w-4 ml-1" />;
   };
@@ -159,11 +159,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
     onDataChanged?.();
   };
 
-  const handleOrderCreated = () => {
-    fetchOrders();
-    setDialogOpen(false);
-    onDataChanged?.();
-  };
+
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -194,7 +190,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
     setLoading(true);
     const startDate = `${yearFilter}-01-01`;
     const endDate = `${yearFilter}-12-31`;
-    
+
     const { data, error } = await supabase
       .from("dry_ice_orders")
       .select("*")
@@ -242,7 +238,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
 
   const handleConfirmDelete = async () => {
     if (!orderToDelete) return;
-    
+
     const { error } = await supabase
       .from("dry_ice_orders")
       .delete()
@@ -261,7 +257,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     // Optimistic update
-    setOrders(prev => prev.map(order => 
+    setOrders(prev => prev.map(order =>
       order.id === id ? { ...order, status: newStatus } : order
     ));
 
@@ -379,12 +375,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
               Excel import
             </Button>
           )}
-          {permissions?.canCreateOrders && (
-            <Button variant="dryice" onClick={() => setDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nieuwe productieorder
-            </Button>
-          )}
+
         </div>
       </div>
 
@@ -451,172 +442,172 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
                 <EmptyState
                   variant={hasActiveFilters ? "search" : "dryice"}
                   title={hasActiveFilters ? "Geen orders gevonden" : "Geen productieorders gepland"}
-                  description={hasActiveFilters 
-                    ? "Pas de filters aan of voeg een nieuwe order toe." 
+                  description={hasActiveFilters
+                    ? "Pas de filters aan of voeg een nieuwe order toe."
                     : "Voeg een nieuwe productieorder toe om te beginnen."}
                   size="md"
                 />
               ) : (
-              <>
-                {/* Mobile Card Layout */}
-                <div className="md:hidden space-y-3">
-                  {sortedOrders.map((order) => (
-                    <MobileOrderCard
-                      key={order.id}
-                      id={order.id}
-                      customerName={order.customer_name}
-                      scheduledDate={order.scheduled_date}
-                      status={order.status}
-                      onStatusChange={permissions?.canEditOrders ? handleStatusChange : undefined}
-                      onEdit={() => handleEditOrder(order)}
-                      onDelete={() => handleDeleteClick(order)}
-                      canEdit={permissions?.canEditOrders}
-                      canDelete={permissions?.canDeleteOrders}
-                      isRecurring={order.is_recurring ?? false}
-                    >
-                      <OrderDetail label="Type" value={getProductTypeLabel(order)} />
-                      <OrderDetail label="Hoeveelheid" value={`${formatNumber(order.quantity_kg, 0)} kg`} />
-                      <OrderDetail label="Verpakking" value={getPackagingLabel(order)} />
-                      {order.box_count && (
-                        <OrderDetail label="Dozen" value={order.box_count} />
-                      )}
-                    </MobileOrderCard>
-                  ))}
-                </div>
+                <>
+                  {/* Mobile Card Layout */}
+                  <div className="md:hidden space-y-3">
+                    {sortedOrders.map((order) => (
+                      <MobileOrderCard
+                        key={order.id}
+                        id={order.id}
+                        customerName={order.customer_name}
+                        scheduledDate={order.scheduled_date}
+                        status={order.status}
+                        onStatusChange={permissions?.canEditOrders ? handleStatusChange : undefined}
+                        onEdit={() => handleEditOrder(order)}
+                        onDelete={() => handleDeleteClick(order)}
+                        canEdit={permissions?.canEditOrders}
+                        canDelete={permissions?.canDeleteOrders}
+                        isRecurring={order.is_recurring ?? false}
+                      >
+                        <OrderDetail label="Type" value={getProductTypeLabel(order)} />
+                        <OrderDetail label="Hoeveelheid" value={`${formatNumber(order.quantity_kg, 0)} kg`} />
+                        <OrderDetail label="Verpakking" value={getPackagingLabel(order)} />
+                        {order.box_count && (
+                          <OrderDetail label="Dozen" value={order.box_count} />
+                        )}
+                      </MobileOrderCard>
+                    ))}
+                  </div>
 
-                {/* Desktop Table Layout */}
-                <div className="hidden md:block">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>
-                          <div className="space-y-1">
-                            <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("customer_name")}>
-                              Klant<SortIcon column="customer_name" />
+                  {/* Desktop Table Layout */}
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>
+                            <div className="space-y-1">
+                              <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("customer_name")}>
+                                Klant<SortIcon column="customer_name" />
+                              </div>
+                              <Select value={customerFilter} onValueChange={(v) => setCustomerFilter(v)}>
+                                <SelectTrigger className="h-7 text-xs bg-background w-full">
+                                  <SelectValue placeholder="Alle" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-background border shadow-lg z-50 max-h-[300px]">
+                                  <SelectItem value="all">Alle klanten</SelectItem>
+                                  {uniqueCustomers.map((customer) => (
+                                    <SelectItem key={customer} value={customer}>{customer}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
-                            <Select value={customerFilter} onValueChange={(v) => setCustomerFilter(v)}>
-                              <SelectTrigger className="h-7 text-xs bg-background w-full">
-                                <SelectValue placeholder="Alle" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-background border shadow-lg z-50 max-h-[300px]">
-                                <SelectItem value="all">Alle klanten</SelectItem>
-                                {uniqueCustomers.map((customer) => (
-                                  <SelectItem key={customer} value={customer}>{customer}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </TableHead>
-                        <TableHead>
-                          <div className="space-y-1">
-                            <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("product_type")}>
-                              Type<SortIcon column="product_type" />
-                            </div>
-                            <Select value={productTypeFilter} onValueChange={(v) => setProductTypeFilter(v)}>
-                              <SelectTrigger className="h-7 text-xs bg-background w-full">
-                                <SelectValue placeholder="Alle" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-background border shadow-lg z-50">
-                                <SelectItem value="all">Alle types</SelectItem>
-                                {productTypes.map((pt) => (
-                                  <SelectItem key={pt.id} value={pt.id}>{pt.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </TableHead>
-                        <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("quantity_kg")}>
-                          <div className="flex items-center">Hoeveelheid<SortIcon column="quantity_kg" /></div>
-                        </TableHead>
-                        <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("scheduled_date")}>
-                          <div className="flex items-center">Datum<SortIcon column="scheduled_date" /></div>
-                        </TableHead>
-                        <TableHead>
-                          <div className="space-y-1">
-                            <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("status")}>
-                              Status<SortIcon column="status" />
-                            </div>
-                            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-                              <SelectTrigger className="h-7 text-xs bg-background w-full">
-                                <SelectValue placeholder="Alle" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-background border shadow-lg z-50">
-                                <SelectItem value="all">Alle</SelectItem>
-                                {Object.entries(statusLabels).map(([value, label]) => (
-                                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </TableHead>
-                        {(permissions?.canEditOrders || permissions?.canDeleteOrders) && <TableHead className="w-[80px]"></TableHead>}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sortedOrders.map((order) => (
-                        <TableRow key={order.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              {order.customer_name}
-                              {order.is_recurring && (
-                                <span title="Onderdeel van herhalende reeks" className="text-cyan-500">
-                                  <Repeat className="h-3.5 w-3.5" />
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>{getProductTypeLabel(order)}</TableCell>
-                          <TableCell>{formatNumber(order.quantity_kg, 0)} kg</TableCell>
-                          <TableCell>
-                            {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
-                          </TableCell>
-                          <TableCell>
-                            {permissions?.canEditOrders ? (
-                              <Select 
-                                value={order.status} 
-                                onValueChange={(newStatus) => handleStatusChange(order.id, newStatus)}
-                              >
-                                <SelectTrigger className="h-8 w-[130px] bg-background">
-                                  <SelectValue />
+                          </TableHead>
+                          <TableHead>
+                            <div className="space-y-1">
+                              <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("product_type")}>
+                                Type<SortIcon column="product_type" />
+                              </div>
+                              <Select value={productTypeFilter} onValueChange={(v) => setProductTypeFilter(v)}>
+                                <SelectTrigger className="h-7 text-xs bg-background w-full">
+                                  <SelectValue placeholder="Alle" />
                                 </SelectTrigger>
                                 <SelectContent className="bg-background border shadow-lg z-50">
+                                  <SelectItem value="all">Alle types</SelectItem>
+                                  {productTypes.map((pt) => (
+                                    <SelectItem key={pt.id} value={pt.id}>{pt.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </TableHead>
+                          <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("quantity_kg")}>
+                            <div className="flex items-center">Hoeveelheid<SortIcon column="quantity_kg" /></div>
+                          </TableHead>
+                          <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("scheduled_date")}>
+                            <div className="flex items-center">Datum<SortIcon column="scheduled_date" /></div>
+                          </TableHead>
+                          <TableHead>
+                            <div className="space-y-1">
+                              <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("status")}>
+                                Status<SortIcon column="status" />
+                              </div>
+                              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                                <SelectTrigger className="h-7 text-xs bg-background w-full">
+                                  <SelectValue placeholder="Alle" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-background border shadow-lg z-50">
+                                  <SelectItem value="all">Alle</SelectItem>
                                   {Object.entries(statusLabels).map(([value, label]) => (
                                     <SelectItem key={value} value={value}>{label}</SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
-                            ) : (
-                              getStatusBadge(order.status)
-                            )}
-                          </TableCell>
-                          {(permissions?.canEditOrders || permissions?.canDeleteOrders) && (
+                            </div>
+                          </TableHead>
+                          {(permissions?.canEditOrders || permissions?.canDeleteOrders) && <TableHead className="w-[80px]"></TableHead>}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sortedOrders.map((order) => (
+                          <TableRow key={order.id}>
                             <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => handleEditOrder(order)}
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-destructive hover:text-destructive"
-                                  onClick={() => handleDeleteClick(order)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                              <div className="flex items-center gap-2">
+                                {order.customer_name}
+                                {order.is_recurring && (
+                                  <span title="Onderdeel van herhalende reeks" className="text-cyan-500">
+                                    <Repeat className="h-3.5 w-3.5" />
+                                  </span>
+                                )}
                               </div>
                             </TableCell>
-                          )}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </>
+                            <TableCell>{getProductTypeLabel(order)}</TableCell>
+                            <TableCell>{formatNumber(order.quantity_kg, 0)} kg</TableCell>
+                            <TableCell>
+                              {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
+                            </TableCell>
+                            <TableCell>
+                              {permissions?.canEditOrders ? (
+                                <Select
+                                  value={order.status}
+                                  onValueChange={(newStatus) => handleStatusChange(order.id, newStatus)}
+                                >
+                                  <SelectTrigger className="h-8 w-[130px] bg-background">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-background border shadow-lg z-50">
+                                    {Object.entries(statusLabels).map(([value, label]) => (
+                                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                getStatusBadge(order.status)
+                              )}
+                            </TableCell>
+                            {(permissions?.canEditOrders || permissions?.canDeleteOrders) && (
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => handleEditOrder(order)}
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteClick(order)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -651,11 +642,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
         </div>
       </div>
 
-      <CreateDryIceOrderDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onCreated={handleOrderCreated}
-      />
+
 
       <DryIceOrderDialog
         order={selectedOrder ? {
@@ -694,13 +681,13 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
           <AlertDialogHeader>
             <AlertDialogTitle>Order verwijderen</AlertDialogTitle>
             <AlertDialogDescription>
-              Weet je zeker dat je order {orderToDelete?.order_number} wilt verwijderen? 
+              Weet je zeker dat je order {orderToDelete?.order_number} wilt verwijderen?
               Deze actie kan niet ongedaan worden gemaakt.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuleren</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleConfirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
@@ -719,14 +706,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
         }}
       />
 
-      {/* Floating Action Button for mobile */}
-      {permissions.canCreateOrders && (
-        <FloatingActionButton
-          onClick={() => setDialogOpen(true)}
-          label="Nieuwe droogijs order"
-          variant="dryice"
-        />
-      )}
+
     </div>
   );
 }
