@@ -8,12 +8,13 @@ import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
 import { PageTransition } from "@/components/ui/page-transition";
 import { Loader2 } from "lucide-react";
+import { UserLaunchpad } from "@/components/dashboard/UserLaunchpad";
 import type { User } from "@supabase/supabase-js";
 
 const Index = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showAdminView, setShowAdminView] = useState(true);
+  const [showAdminView, setShowAdminView] = useState(false);
   const { role, permissions, loading: permissionsLoading, isAdmin } = useUserPermissions(user?.id);
   const { isApproved, loading: approvalLoading } = useApprovalStatus(user?.id);
 
@@ -62,9 +63,9 @@ const Index = () => {
   if (isAdmin && showAdminView) {
     return (
       <PageTransition>
-        <AdminDashboard 
-          userEmail={user.email} 
-          onSwitchView={() => setShowAdminView(false)} 
+        <AdminDashboard
+          userEmail={user.email}
+          onSwitchView={() => setShowAdminView(false)}
           permissions={permissions}
           role={role}
         />
@@ -72,10 +73,11 @@ const Index = () => {
     );
   }
 
+  // Show User Launchpad for all authenticated users
   return (
     <PageTransition>
-      <Dashboard 
-        userEmail={user.email} 
+      <UserLaunchpad
+        userEmail={user.email}
         isAdmin={isAdmin}
         onSwitchToAdmin={() => setShowAdminView(true)}
         permissions={permissions}

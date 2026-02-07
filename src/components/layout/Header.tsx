@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck } from "lucide-react";
+import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck, BookOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -97,6 +97,20 @@ export function Header({
         >
           <Truck className="h-4 w-4 mr-2" />
           Interne Bestellingen
+        </Button>
+      </Link>
+      <Link to="/toolbox" onClick={mobile ? closeMobileMenu : undefined}>
+        <Button
+          variant={mobile ? "ghost" : "ghost"}
+          size={mobile ? "lg" : "sm"}
+          className={`${mobile ? "w-full justify-start text-base h-12" : ""
+            } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/toolbox"
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
+              : ""
+            }`}
+        >
+          <BookOpen className="h-4 w-4 mr-2" />
+          Toolbox
         </Button>
       </Link>
       {isAdmin && onSwitchView && (

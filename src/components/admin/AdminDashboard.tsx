@@ -152,67 +152,78 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
   }
 
   return (
+
     <div className="min-h-screen bg-background">
       <Header userEmail={userEmail} isAdmin onSwitchView={onSwitchView} role={role} />
 
       <main className="w-full px-[1%] md:px-[10%] py-8">
-        {/* Filters */}
-        <AdminFilters
-          employees={employees}
-          filters={filters}
-          onFiltersChange={setFilters}
-        />
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card className="shadow-md border-0 bg-primary/5">
-            <CardContent className="pt-6 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-primary/10">
-                <Users className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{stats.total}</p>
-                <p className="text-sm text-muted-foreground">Totaal</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-md border-0 bg-warning/5">
-            <CardContent className="pt-6 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-warning/10">
-                <Clock className="h-6 w-6 text-warning" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{stats.pending}</p>
-                <p className="text-sm text-muted-foreground">In behandeling</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-md border-0 bg-success/5">
-            <CardContent className="pt-6 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-success/10">
-                <CalendarCheck className="h-6 w-6 text-success" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{stats.approved}</p>
-                <p className="text-sm text-muted-foreground">Goedgekeurd</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-md border-0 bg-destructive/5">
-            <CardContent className="pt-6 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-destructive/10">
-                <XCircle className="h-6 w-6 text-destructive" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{stats.rejected}</p>
-                <p className="text-sm text-muted-foreground">Afgewezen</p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-foreground">Beheerpaneel</h1>
+          <p className="text-muted-foreground">Beheer goedkeuringen, personeel en instellingen.</p>
         </div>
+
+        {/* Filters and Stats - Hide when in Settings */}
+        {activeTab !== 'settings' && (
+          <>
+            {/* Filters */}
+            <AdminFilters
+              employees={employees}
+              filters={filters}
+              onFiltersChange={setFilters}
+            />
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <Card className="shadow-md border-0 bg-primary/5">
+                <CardContent className="pt-6 flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-primary/10">
+                    <Users className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{stats.total}</p>
+                    <p className="text-sm text-muted-foreground">Totaal</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-md border-0 bg-warning/5">
+                <CardContent className="pt-6 flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-warning/10">
+                    <Clock className="h-6 w-6 text-warning" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{stats.pending}</p>
+                    <p className="text-sm text-muted-foreground">In behandeling</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-md border-0 bg-success/5">
+                <CardContent className="pt-6 flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-success/10">
+                    <CalendarCheck className="h-6 w-6 text-success" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{stats.approved}</p>
+                    <p className="text-sm text-muted-foreground">Goedgekeurd</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-md border-0 bg-destructive/5">
+                <CardContent className="pt-6 flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-destructive/10">
+                    <XCircle className="h-6 w-6 text-destructive" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{stats.rejected}</p>
+                    <p className="text-sm text-muted-foreground">Afgewezen</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
 
         {/* Tabs for Requests and Calendar */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">

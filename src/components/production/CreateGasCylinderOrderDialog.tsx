@@ -22,7 +22,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays, Cylinder, Plus } from "lucide-react";
-import { format } from "date-fns";
+import { format, subYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,11 +60,16 @@ export function CreateGasCylinderOrderDialog({
     name: string;
     color: string;
   }>>([]);
+  const [showAllGases, setShowAllGases] = useState(false);
   const [cylinderSizes, setCylinderSizes] = useState<Array<{
     id: string;
     name: string;
     capacity_liters: number | null;
   }>>([]);
+  const [commonGasIds, setCommonGasIds] = useState<Set<string>>(new Set());
+
+  // REMOVE HARDCODED KEYWORDS
+  // const commonGasKeywords = [...];
 
   useEffect(() => {
     const fetchProfileAndPermissions = async () => {
@@ -76,20 +81,20 @@ export function CreateGasCylinderOrderDialog({
           .select("id, production_location")
           .eq("user_id", user.id)
           .single();
-        
+
         if (profile) {
           setCurrentProfileId(profile.id);
-          
+
           // Check user role
           const { data: roleData } = await supabase
             .from("user_roles")
             .select("role")
             .eq("user_id", user.id)
             .maybeSingle();
-          
+
           const userRole = roleData?.role || "user";
           const isAdmin = userRole === "admin";
-          
+
           // If user has assigned location and is not admin, restrict to that location
           if (profile.production_location && !isAdmin) {
             setUserProductionLocation(profile.production_location);
@@ -109,28 +114,13 @@ export function CreateGasCylinderOrderDialog({
   }, []);
 
   useEffect(() => {
-    const fetchGasTypes = async () => {
-      const { data } = await supabase
-        .from("gas_types")
-        .select("id, name, color")
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
-      
-      if (data) {
-        setGasTypes(data);
-        if (data.length > 0 && !gasTypeId) {
-          setGasTypeId(data[0].id);
-        }
-      }
-    };
-
     const fetchCylinderSizes = async () => {
       const { data } = await supabase
         .from("cylinder_sizes")
         .select("id, name, capacity_liters")
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
-      
+
       if (data) {
         setCylinderSizes(data);
         if (data.length > 0) {
@@ -138,12 +128,93 @@ export function CreateGasCylinderOrderDialog({
         }
       }
     };
-    
+
     if (open) {
-      fetchGasTypes();
+      // Fetch gas types and stats in parallel
+      const loadData = async () => {
+        const { data: gasTypesData } = await supabase
+          .from("gas_types")
+          .select("id, name, color")
+          .eq("is_active", true);
+
+        if (gasTypesData) {
+          // Fetch stats for the last year to determine popularity
+          const fromDate = format(subYears(new Date(), 1), "yyyy-MM-dd");
+          const toDate = format(new Date(), "yyyy-MM-dd");
+
+          const { data: statsData, error } = await supabase.rpc("get_gas_type_distribution_by_period", {
+            p_from_date: fromDate,
+            p_to_date: toDate,
+            p_location: null // Global stats
+          });
+
+          let sortedTypes = [...gasTypesData];
+          let topIds = new Set<string>();
+
+          if (statsData && !error) {
+            const usageMap = new Map<string, number>();
+            statsData.forEach((stat: any) => {
+              if (stat.gas_type_name) {
+                usageMap.set(stat.gas_type_name, Number(stat.total_cylinders) || 0);
+              }
+            });
+
+            // Sort gas types by usage count (descending)
+            sortedTypes.sort((a, b) => {
+              const countA = usageMap.get(a.name) || 0;
+              const countB = usageMap.get(b.name) || 0;
+              return countB - countA;
+            });
+
+            // Take top 35 as common (or all if less than 35)
+            const topCommon = sortedTypes.slice(0, 35);
+            topIds = new Set(topCommon.map(t => t.id));
+          } else {
+            // Fallback
+            const fallbackKeywords = ["zuurstof", "stikstof", "acetyleen", "argon", "co2", "menggas", "weldmix"];
+            const top = sortedTypes.filter(t =>
+              fallbackKeywords.some(k => t.name.toLowerCase().includes(k))
+            );
+            topIds = new Set(top.map(t => t.id));
+          }
+
+          // Finally, sort all types alphabetically for the dropdown display
+          sortedTypes.sort((a, b) => a.name.localeCompare(b.name));
+
+          setGasTypes(sortedTypes);
+          setCommonGasIds(topIds);
+
+          if (sortedTypes.length > 0 && !gasTypeId) {
+            setGasTypeId(sortedTypes[0].id);
+          }
+        }
+      };
+
+      loadData();
       fetchCylinderSizes();
     }
   }, [open]);
+
+  // Auto-select medical quality when "Zuurstof Medicinaal" is selected
+  // Auto-select 300 bar pressure when "300 bar" is in the name
+  useEffect(() => {
+    const selectedGas = gasTypes.find(t => t.id === gasTypeId);
+    if (selectedGas) {
+      const name = selectedGas.name.toLowerCase();
+
+      if (name.includes("zuurstof medicinaal") || name.includes("medisch")) {
+        setGasGrade("medical");
+      } else {
+        setGasGrade("technical");
+      }
+
+      if (name.includes("300bar")) {
+        setPressure(300);
+      } else {
+        setPressure(200);
+      }
+    }
+  }, [gasTypeId, gasTypes]);
 
   const resetForm = () => {
     setCustomerId("");
@@ -219,7 +290,7 @@ export function CreateGasCylinderOrderDialog({
     try {
       const selectedGasType = getSelectedGasType();
       const mappedGasType = selectedGasType ? mapGasTypeToEnum(selectedGasType.name) : "other";
-      
+
       const insertData = {
         order_number: generateOrderNumber(),
         customer_name: customerName.trim(),
@@ -236,7 +307,7 @@ export function CreateGasCylinderOrderDialog({
         status: isCompleted ? "completed" as const : "pending" as const,
         location: location,
       };
-      
+
       const { error } = await supabase.from("gas_cylinder_orders").insert(insertData);
 
       if (error) {
@@ -291,23 +362,37 @@ export function CreateGasCylinderOrderDialog({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Gastype</Label>
+              <div className="flex justify-between items-center">
+                <Label>Gastype</Label>
+                <button
+                  onClick={() => setShowAllGases(!showAllGases)}
+                  className="text-xs text-primary hover:underline focus:outline-none"
+                  type="button"
+                >
+                  {showAllGases ? "Toon alleen veelgebruikt" : "Toon alles"}
+                </button>
+              </div>
               <Select value={gasTypeId} onValueChange={setGasTypeId}>
                 <SelectTrigger className="bg-background h-11 sm:h-10">
                   <SelectValue placeholder="Selecteer gastype" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
-                  {gasTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id}>
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-2 h-2 rounded-full flex-shrink-0" 
-                          style={{ backgroundColor: type.color }} 
-                        />
-                        {type.name}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {gasTypes
+                    .filter(type => {
+                      if (showAllGases) return true;
+                      return commonGasIds.has(type.id);
+                    })
+                    .map((type) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: type.color }}
+                          />
+                          {type.name}
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -375,8 +460,8 @@ export function CreateGasCylinderOrderDialog({
 
             <div className="space-y-2">
               <Label>Productielocatie</Label>
-              <Select 
-                value={location} 
+              <Select
+                value={location}
                 onValueChange={(v) => setLocation(v as "sol_emmen" | "sol_tilburg")}
                 disabled={!canSelectLocation}
               >

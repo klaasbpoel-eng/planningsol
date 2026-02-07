@@ -283,7 +283,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent 
-          className="sm:max-w-[600px]"
+          className="sm:max-w-[1000px]"
           onInteractOutside={(e) => {
             if (bulkDeleteDialogOpen || deleteDialogOpen || editDialogOpen) {
               e.preventDefault();

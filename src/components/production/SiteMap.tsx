@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Cylinder, Map as MapIcon, Save, RotateCcw, Plus, Info, Pencil, Trash2, RotateCw, ZoomIn, ZoomOut, Move, Maximize2, Minimize2, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { getGasColor } from "@/constants/gasColors";
+
 interface StorageZone {
     id: string;
     x: number;
@@ -20,16 +22,30 @@ interface StorageZone {
     variant?: 'default' | 'text'; // 'default' for cylinder group, 'text' for just label
 }
 
+// Custom Icon for 16-cylinder Pallet
+const PalletIcon = ({ className, color }: { className?: string; color?: string }) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className={className} style={{ color }}>
+        {/* Pallet Base Frame */}
+        <rect x="1" y="1" width="22" height="22" rx="2" strokeWidth="1" strokeOpacity="0.5" />
+
+        {/* 4x4 Grid of Cylinders - Adjusted for fit */}
+        <g fill={color || "currentColor"} stroke="none">
+            {[0, 1, 2, 3].map(row =>
+                [0, 1, 2, 3].map(col => (
+                    <circle key={`${row}-${col}`} cx={4.5 + col * 5} cy={4.5 + row * 5} r="2" opacity="0.9" />
+                ))
+            )}
+        </g>
+    </svg>
+);
+
 interface SiteMapProps {
     location?: "sol_emmen" | "sol_tilburg" | "all";
 }
 
 export function SiteMap({ location }: SiteMapProps) {
     const [mode, setMode] = useState<"view" | "edit">("view");
-    const [zones, setZones] = useState<StorageZone[]>([
-        { id: "z1", x: 300, y: 770, type: "oxygen", label: "Zuurstof", rotation: -90, scale: 1, variant: 'default' },
-        { id: "z2", x: 300, y: 740, type: "nitrogen", label: "Stikstof", rotation: -90, scale: 1, variant: 'default' },
-    ]);
+    const [zones, setZones] = useState<StorageZone[]>([]);
     const [rotatingZoneId, setRotatingZoneId] = useState<string | null>(null);
     const [scalingZoneId, setScalingZoneId] = useState<string | null>(null);
     const [isRotatingMap, setIsRotatingMap] = useState(false);
@@ -61,6 +77,14 @@ export function SiteMap({ location }: SiteMapProps) {
                     // Handle Rotation
                     if (rotatingZoneId) {
                         let angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI) + 90;
+
+                        // Shift to snap behavior
+                        if (e.shiftKey) {
+                            const snapIncrement = 15;
+                            const normalizedAngle = (angle % 360 + 360) % 360;
+                            angle = Math.round(normalizedAngle / snapIncrement) * snapIncrement;
+                        }
+
                         setZones(prev => prev.map(z => z.id === activeId ? { ...z, rotation: angle } : z));
                     }
 
@@ -68,7 +92,13 @@ export function SiteMap({ location }: SiteMapProps) {
                     if (scalingZoneId) {
                         const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
                         const baseRadius = 30; // pixels
-                        const newScale = Math.max(0.5, Math.min(5, distance / (baseRadius * zoom))); // Allow slightly larger max scale for text
+                        let newScale = Math.max(0.2, Math.min(5, distance / (baseRadius * zoom)));
+
+                        // Shift to snap behavior for scaling
+                        if (e.shiftKey) {
+                            const snapIncrement = 0.25;
+                            newScale = Math.round(newScale / snapIncrement) * snapIncrement;
+                        }
 
                         setZones(prev => prev.map(z => z.id === activeId ? { ...z, scale: newScale } : z));
                     }
@@ -201,6 +231,87 @@ export function SiteMap({ location }: SiteMapProps) {
         setZones(zones.map(z => z.id === id ? { ...z, label: newName } : z));
     };
 
+    const handleDragStart = (e: React.DragEvent, type: "cylinder" | "text") => {
+        e.dataTransfer.setData("application/json", JSON.stringify({ type }));
+        e.dataTransfer.effectAllowed = "copy";
+
+        // Visual feedback
+        const dragIcon = document.createElement('div');
+        dragIcon.style.opacity = '0';
+        document.body.appendChild(dragIcon);
+        e.dataTransfer.setDragImage(dragIcon, 0, 0);
+        setTimeout(() => document.body.removeChild(dragIcon), 0);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+
+        try {
+            const dataData = e.dataTransfer.getData("application/json");
+            if (!dataData) return;
+            const { type } = JSON.parse(dataData);
+
+            if (!containerRef.current) return;
+
+            // 1. Calculate Mouse Position relative to Container Center (adjusted for Pan)
+            const rect = containerRef.current.getBoundingClientRect();
+            const containerCenterX = rect.width / 2;
+            const containerCenterY = rect.height / 2;
+
+            // The visual center of the map on screen includes the pan offset
+            const visualMapCenterX = rect.left + containerCenterX + pan.x;
+            const visualMapCenterY = rect.top + containerCenterY + pan.y;
+
+            // Vector from Map Center to Mouse
+            const vectorX = e.clientX - visualMapCenterX;
+            const vectorY = e.clientY - visualMapCenterY;
+
+            // 2. Un-Rotate this vector
+            // We need to rotate opposite to the map rotation
+            const rads = -mapRotation * (Math.PI / 180);
+            const unrotatedX = vectorX * Math.cos(rads) - vectorY * Math.sin(rads);
+            const unrotatedY = vectorX * Math.sin(rads) + vectorY * Math.cos(rads);
+
+            // 3. Un-Scale
+            const finalOffsetX = unrotatedX / zoom;
+            const finalOffsetY = unrotatedY / zoom;
+
+            // 4. Calculate Final Coordinates relative to the original map origin (top-left)
+            // The map's origin (0,0) is at (containerCenterX - width/2, containerCenterY - height/2) relative to center?
+            // Actually, in our CSS, top/left are relative to the container.
+            // When Zoom=1, Pan=0, Rotate=0: Center of container is (Width/2, Height/2).
+            // A point at (Width/2, Height/2) should be x=Width/2, y=Height/2.
+
+            const dropX = containerCenterX + finalOffsetX;
+            const dropY = containerCenterY + finalOffsetY;
+
+            // Add the new zone
+            const newZone: StorageZone = {
+                id: `z${Date.now()}`,
+                x: dropX - (type === 'text' ? 40 : 20), // Center the item (approx)
+                y: dropY - 20,
+                type: type === 'text' ? "text" : "new",
+                label: type === 'text' ? "Nieuw Label" : "Nieuwe Opslag",
+                rotation: 0,
+                scale: 1,
+                variant: type === 'text' ? 'text' : 'default'
+            };
+
+            setZones(prev => [...prev, newZone]);
+
+            // Switch to edit mode automatically to allow immediate adjustment
+            setMode("edit");
+
+        } catch (err) {
+            console.error("Drop failed", err);
+        }
+    };
+
     return (
         <Card className={cn(
             "glass-card w-full overflow-hidden transition-all duration-300",
@@ -215,7 +326,7 @@ export function SiteMap({ location }: SiteMapProps) {
                     <CardDescription>
                         {mode === "view"
                             ? "Overzicht van tankniveaus en opslaglocaties"
-                            : "Sleep, draai en schaal elementen. Dubbelklik voor Fullscreen."}
+                            : "Sleep elementen van de balk hieronder op de kaart."}
                     </CardDescription>
                 </div>
                 <div className="flex gap-2">
@@ -243,21 +354,36 @@ export function SiteMap({ location }: SiteMapProps) {
                         </Button>
                     </div>
 
-                    {mode === "edit" ? (
-                        <>
-                            <Button variant="outline" size="sm" onClick={addTextZone} title="Tekst Toevoegen">
+
+                    {/* Always allow adding items via Drag and Drop, even in view mode (it switches to edit) */}
+                    <div className="flex gap-2">
+                        <div
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, 'text')}
+                            className="cursor-move"
+                        >
+                            <Button variant="outline" size="sm" title="Sleep naar kaart">
                                 <Type className="h-4 w-4 mr-2" />
                                 Tekst
                             </Button>
-                            <Button variant="outline" size="sm" onClick={addZone} title="Cilinders Toevoegen">
+                        </div>
+                        <div
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, 'cylinder')}
+                            className="cursor-move"
+                        >
+                            <Button variant="outline" size="sm" title="Sleep naar kaart">
                                 <Plus className="h-4 w-4 mr-2" />
                                 Opslag
                             </Button>
-                            <Button size="sm" onClick={() => setMode("view")}>
-                                <Save className="h-4 w-4 mr-2" />
-                                Opslaan
-                            </Button>
-                        </>
+                        </div>
+                    </div>
+
+                    {mode === "edit" ? (
+                        <Button size="sm" onClick={() => setMode("view")}>
+                            <Save className="h-4 w-4 mr-2" />
+                            Opslaan
+                        </Button>
                     ) : (
                         <Button variant="outline" size="sm" onClick={() => setMode("edit")}>
                             Layout Wijzigen
@@ -275,6 +401,8 @@ export function SiteMap({ location }: SiteMapProps) {
                 onWheel={handleWheel}
                 onMouseDown={handleMouseDown}
                 onDoubleClick={handleDoubleClick}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
             >
                 <motion.div
                     ref={mapRef}
@@ -379,15 +507,15 @@ export function SiteMap({ location }: SiteMapProps) {
                                             // Default Cylinder Group Variant
                                             <div className="flex flex-col items-center">
                                                 <div className={cn(
-                                                    "p-1.5 rounded-lg shadow-md border backdrop-blur-sm transition-all",
-                                                    mode === "edit" ? "bg-orange-500/20 border-orange-500 animate-pulse" : "bg-white/70 dark:bg-black/40 border-border"
+                                                    "p-1 rounded-lg shadow-sm border backdrop-blur-sm transition-all",
+                                                    mode === "edit" ? "bg-orange-500/20 border-orange-500 animate-pulse" : "bg-white/80 dark:bg-black/50 border-border/50"
                                                 )}>
-                                                    <Cylinder className={cn(
-                                                        "h-4 w-4",
-                                                        mode === "edit" ? "text-orange-600 dark:text-orange-400" : "text-primary"
-                                                    )} />
+                                                    <PalletIcon
+                                                        className="h-10 w-10" // Make it slightly larger to see details
+                                                        color={mode === "edit" ? "#ea580c" : getGasColor(zone.label)}
+                                                    />
                                                 </div>
-                                                <Badge variant="outline" className="mt-0.5 text-[10px] px-1.5 py-0 bg-background/80 backdrop-blur-xs whitespace-nowrap shadow-sm">
+                                                <Badge variant="outline" className="mt-0.5 text-[10px] px-1.5 py-0 bg-background/90 backdrop-blur-xs whitespace-nowrap shadow-sm border-0 ring-1 ring-border/50">
                                                     {zone.label}
                                                 </Badge>
                                             </div>
@@ -403,7 +531,7 @@ export function SiteMap({ location }: SiteMapProps) {
                                                 {/* Free Rotation Handle (Top) */}
                                                 <div
                                                     className="absolute -top-6 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-orange-500 cursor-grab active:cursor-grabbing shadow-sm border border-white z-50 flex items-center justify-center hover:scale-110 transition-transform"
-                                                    title="Draaien"
+                                                    title="Draaien (Shift om te snappen)"
                                                     onMouseDown={(e) => {
                                                         e.stopPropagation();
                                                         setRotatingZoneId(zone.id);
@@ -411,12 +539,18 @@ export function SiteMap({ location }: SiteMapProps) {
                                                 >
                                                     <RotateCw className="h-2 w-2 text-white" />
                                                 </div>
+                                                {/* Rotation Angle Indicator */}
+                                                {rotatingZoneId === zone.id && (
+                                                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap z-50 pointer-events-none">
+                                                        {Math.round(zone.rotation)}°
+                                                    </div>
+                                                )}
                                                 <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0.5 h-2 bg-orange-500"></div>
 
                                                 {/* Free Scale Handle (Bottom Right) */}
                                                 <div
                                                     className="absolute -bottom-3 -right-3 w-4 h-4 rounded-full bg-blue-500 cursor-nwse-resize active:cursor-grabbing shadow-sm border border-white z-50 flex items-center justify-center hover:scale-110 transition-transform"
-                                                    title="Schalen"
+                                                    title="Schalen (Shift om te snappen)"
                                                     onMouseDown={(e) => {
                                                         e.stopPropagation();
                                                         setScalingZoneId(zone.id);
@@ -424,6 +558,12 @@ export function SiteMap({ location }: SiteMapProps) {
                                                 >
                                                     <Maximize2 className="h-2 w-2 text-white" />
                                                 </div>
+                                                {/* Scale Indicator */}
+                                                {scalingZoneId === zone.id && (
+                                                    <div className="absolute -bottom-9 -right-6 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap z-50 pointer-events-none">
+                                                        {Math.round((zone.scale || 1) * 100)}%
+                                                    </div>
+                                                )}
 
 
                                                 {/* Edit Menu - Counter-rotated & Scaled Inverse */}
@@ -464,6 +604,64 @@ export function SiteMap({ location }: SiteMapProps) {
                                                     <Button
                                                         size="icon"
                                                         variant="ghost"
+                                                        className="h-4 w-4 rounded-full hover:bg-muted"
+                                                        title="-90° Draaien"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setZones(prev => prev.map(z => z.id === zone.id ? { ...z, rotation: (z.rotation || 0) - 90 } : z));
+                                                        }}
+                                                        onMouseDown={(e) => e.stopPropagation()}
+                                                    >
+                                                        <RotateCcw className="h-2.5 w-2.5" />
+                                                    </Button>
+
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="h-4 w-4 rounded-full hover:bg-muted"
+                                                        title="+90° Draaien"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setZones(prev => prev.map(z => z.id === zone.id ? { ...z, rotation: (z.rotation || 0) + 90 } : z));
+                                                        }}
+                                                        onMouseDown={(e) => e.stopPropagation()}
+                                                    >
+                                                        <RotateCw className="h-2.5 w-2.5" />
+                                                    </Button>
+
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="h-4 w-4 rounded-full hover:bg-muted"
+                                                        title="-10% Schalen"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setZones(prev => prev.map(z => z.id === zone.id ? { ...z, scale: Math.max(0.2, (z.scale || 1) - 0.1) } : z));
+                                                        }}
+                                                        onMouseDown={(e) => e.stopPropagation()}
+                                                    >
+                                                        <ZoomOut className="h-2.5 w-2.5" />
+                                                    </Button>
+
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="h-4 w-4 rounded-full hover:bg-muted"
+                                                        title="+10% Schalen"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setZones(prev => prev.map(z => z.id === zone.id ? { ...z, scale: Math.min(5, (z.scale || 1) + 0.1) } : z));
+                                                        }}
+                                                        onMouseDown={(e) => e.stopPropagation()}
+                                                    >
+                                                        <ZoomIn className="h-2.5 w-2.5" />
+                                                    </Button>
+
+                                                    <div className="w-px h-3 bg-border my-auto"></div>
+
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
                                                         className="h-4 w-4 rounded-full hover:bg-red-100 text-red-600"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -486,7 +684,7 @@ export function SiteMap({ location }: SiteMapProps) {
                         {mode === "edit" && !isFullscreen && (
                             <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-orange-500/90 text-white px-4 py-1.5 rounded-full text-sm font-medium shadow-lg animate-in fade-in slide-in-from-top-4 flex items-center gap-2 z-50 pointer-events-none">
                                 <Info className="h-4 w-4" />
-                                Sleep, Draai (rood) en Schaal (blauw) iconen
+                                Sleep=Verplaats | Rood=Draai (Shift=Snap) | Blauw=Schaal (Shift=Snap)
                             </div>
                         )}
                     </div>

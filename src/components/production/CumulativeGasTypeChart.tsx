@@ -7,6 +7,7 @@ import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger }
 import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown, Minus, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
+import { getGasColor } from "@/constants/gasColors";
 import {
   LineChart,
   Line,
@@ -58,7 +59,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
   const [animatingTopFive, setAnimatingTopFive] = useState(false);
   const [animatingAll, setAnimatingAll] = useState(false);
   const [animatingClear, setAnimatingClear] = useState(false);
-  
+
 
   useEffect(() => {
     const currentYear = new Date().getFullYear();
@@ -93,7 +94,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
           gasTypeMap.set(item.gas_type_id, {
             id: item.gas_type_id,
             name: item.gas_type_name || "Onbekend",
-            color: item.gas_type_color || "#94a3b8",
+            color: getGasColor(item.gas_type_name || "", item.gas_type_color || "#94a3b8"),
             months: new Array(12).fill(0)
           });
         }
@@ -139,20 +140,20 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
       const info = allGasTypes.find(gt => gt.id === gasTypeId);
       const year1DataItem = yearData.find(yd => yd.year === selectedYear1);
       const year2DataItem = yearData.find(yd => yd.year === selectedYear2);
-      
+
       const gasType1 = year1DataItem?.gasTypes.find(gt => gt.id === gasTypeId);
       const gasType2 = year2DataItem?.gasTypes.find(gt => gt.id === gasTypeId);
-      
+
       const total1 = gasType1?.months.reduce((a, b) => a + b, 0) || 0;
       const total2 = gasType2?.months.reduce((a, b) => a + b, 0) || 0;
-      
+
       let percentChange = 0;
       if (total2 > 0) {
         percentChange = ((total1 - total2) / total2) * 100;
       } else if (total1 > 0) {
         percentChange = 100;
       }
-      
+
       return {
         id: gasTypeId,
         name: info?.name || gasTypeId,
@@ -316,21 +317,21 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
           <div className="flex items-center justify-between">
             <Label className="text-sm text-muted-foreground">Selecteer gastypes</Label>
             <div className="flex gap-2">
-              <button 
+              <button
                 onClick={selectTopFive}
                 className="text-xs text-primary font-medium px-2 py-1 rounded-md transition-all duration-200 hover:bg-primary/10 hover:scale-105 active:scale-95"
               >
                 Top 5
               </button>
               <span className="text-muted-foreground">|</span>
-              <button 
+              <button
                 onClick={selectAllGasTypes}
                 className="text-xs text-primary font-medium px-2 py-1 rounded-md transition-all duration-200 hover:bg-primary/10 hover:scale-105 active:scale-95"
               >
                 Alles
               </button>
               <span className="text-muted-foreground">|</span>
-              <button 
+              <button
                 onClick={clearGasTypes}
                 className="text-xs text-primary font-medium px-2 py-1 rounded-md transition-all duration-200 hover:bg-primary/10 hover:scale-105 active:scale-95"
               >
@@ -343,23 +344,22 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
               const isSelected = selectedGasTypes.includes(gasType.id);
               const isTopFive = topFiveGasTypes.includes(gasType.id);
               const topRank = topFiveGasTypes.indexOf(gasType.id);
-              const shouldAnimate = 
-                (animatingTopFive && isTopFive) || 
-                animatingAll || 
+              const shouldAnimate =
+                (animatingTopFive && isTopFive) ||
+                animatingAll ||
                 (animatingClear && isSelected);
               const gasTypeVolume = getGasTypeVolume(gasType.id);
-              
+
               return (
                 <TooltipProvider key={gasType.id} delayDuration={0}>
                   <UITooltip>
                     <TooltipTrigger asChild>
                       <Badge
                         variant={isSelected ? "default" : "outline"}
-                        className={`cursor-pointer transition-all duration-200 flex items-center gap-1 hover:scale-105 hover:shadow-md active:scale-95 ${
-                          shouldAnimate 
-                            ? "animate-[pulse_0.3s_ease-in-out_2] scale-110" 
+                        className={`cursor-pointer transition-all duration-200 flex items-center gap-1 hover:scale-105 hover:shadow-md active:scale-95 ${shouldAnimate
+                            ? "animate-[pulse_0.3s_ease-in-out_2] scale-110"
                             : ""
-                        }`}
+                          }`}
                         style={{
                           backgroundColor: isSelected ? gasType.color : undefined,
                           borderColor: gasType.color,
@@ -368,13 +368,12 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
                         onClick={() => toggleGasType(gasType.id)}
                       >
                         {isTopFive && (
-                          <Trophy 
-                            className={`h-3 w-3 ${
-                              topRank === 0 ? "text-yellow-400" : 
-                              topRank === 1 ? "text-gray-300" : 
-                              topRank === 2 ? "text-amber-600" : 
-                              isSelected ? "text-white/70" : "opacity-50"
-                            }`} 
+                          <Trophy
+                            className={`h-3 w-3 ${topRank === 0 ? "text-yellow-400" :
+                                topRank === 1 ? "text-gray-300" :
+                                  topRank === 2 ? "text-amber-600" :
+                                    isSelected ? "text-white/70" : "opacity-50"
+                              }`}
                           />
                         )}
                         {gasType.name}
@@ -407,12 +406,12 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
         {selectedGasTypes.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {growthData.map(item => (
-              <div 
+              <div
                 key={item.id}
                 className="flex items-center justify-between p-3 rounded-lg border bg-card"
               >
                 <div className="flex items-center gap-2">
-                  <span 
+                  <span
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: item.color }}
                   />
@@ -423,13 +422,12 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
                     <div>{formatNumber(item.total1, 0)} ({selectedYear1})</div>
                     <div>{formatNumber(item.total2, 0)} ({selectedYear2})</div>
                   </div>
-                  <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                    item.percentChange > 0 
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
-                      : item.percentChange < 0 
+                  <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${item.percentChange > 0
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                      : item.percentChange < 0
                         ? 'bg-red-500/10 text-red-600 dark:text-red-400'
                         : 'bg-muted text-muted-foreground'
-                  }`}>
+                    }`}>
                     {item.percentChange > 0 ? (
                       <TrendingUp className="h-3 w-3" />
                     ) : item.percentChange < 0 ? (
@@ -465,11 +463,11 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
           <ResponsiveContainer width="100%" height={400}>
             <LineChart data={cumulativeChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey="monthName" 
+              <XAxis
+                dataKey="monthName"
                 className="text-xs"
               />
-              <YAxis 
+              <YAxis
                 className="text-xs"
                 tickFormatter={(value) => formatNumber(value, 0)}
               />
@@ -486,7 +484,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
                 }}
                 labelFormatter={(label) => `Maand: ${label}`}
               />
-              <Legend 
+              <Legend
                 formatter={(value) => {
                   const [gasTypeId, year] = value.split('_');
                   const info = getGasTypeInfo(gasTypeId);
@@ -545,7 +543,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
               <tbody>
                 {selectedGasTypes.flatMap(gasTypeId => {
                   const info = getGasTypeInfo(gasTypeId);
-                  
+
                   return yearData.map((yd, yIdx) => {
                     const gasType = yd.gasTypes.find(gt => gt.id === gasTypeId);
                     let cumulative = 0;
@@ -558,7 +556,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
                       <tr key={`${gasTypeId}_${yd.year}`} className="border-b hover:bg-muted/50">
                         {yIdx === 0 && (
                           <td className="py-2 px-2 font-medium" rowSpan={2}>
-                            <span 
+                            <span
                               className="inline-block w-3 h-3 rounded-full mr-2"
                               style={{ backgroundColor: info?.color }}
                             />

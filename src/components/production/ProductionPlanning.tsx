@@ -186,74 +186,74 @@ export function ProductionPlanning({
     const prevFromDate = format(prevFrom, "yyyy-MM-dd");
     const prevToDate = format(prevTo, "yyyy-MM-dd");
 
-   // Use RPC functions for server-side aggregation (avoids 1000 row limit)
-   const locationParam = selectedLocation === "all" ? null : selectedLocation;
+    // Use RPC functions for server-side aggregation (avoids 1000 row limit)
+    const locationParam = selectedLocation === "all" ? null : selectedLocation;
 
-   try {
-     // Fetch current period stats using RPC functions (parallel calls)
-     const [dryIceRes, cylinderRes, prevDryIceRes, prevCylinderRes] = await Promise.all([
-       supabase.rpc("get_dry_ice_efficiency_by_period", {
-         p_from_date: fromDate,
-         p_to_date: toDate,
-         p_location: null // Dry ice is only in Emmen, no location filter needed
-       }),
-       supabase.rpc("get_production_efficiency_by_period", {
-         p_from_date: fromDate,
-         p_to_date: toDate,
-         p_location: locationParam
-       }),
-       supabase.rpc("get_dry_ice_efficiency_by_period", {
-         p_from_date: prevFromDate,
-         p_to_date: prevToDate,
-         p_location: null
-       }),
-       supabase.rpc("get_production_efficiency_by_period", {
-         p_from_date: prevFromDate,
-         p_to_date: prevToDate,
-         p_location: locationParam
-       })
-     ]);
+    try {
+      // Fetch current period stats using RPC functions (parallel calls)
+      const [dryIceRes, cylinderRes, prevDryIceRes, prevCylinderRes] = await Promise.all([
+        supabase.rpc("get_dry_ice_efficiency_by_period", {
+          p_from_date: fromDate,
+          p_to_date: toDate,
+          p_location: null // Dry ice is only in Emmen, no location filter needed
+        }),
+        supabase.rpc("get_production_efficiency_by_period", {
+          p_from_date: fromDate,
+          p_to_date: toDate,
+          p_location: locationParam
+        }),
+        supabase.rpc("get_dry_ice_efficiency_by_period", {
+          p_from_date: prevFromDate,
+          p_to_date: prevToDate,
+          p_location: null
+        }),
+        supabase.rpc("get_production_efficiency_by_period", {
+          p_from_date: prevFromDate,
+          p_to_date: prevToDate,
+          p_location: locationParam
+        })
+      ]);
 
-     // Handle dry ice current period
-     if (dryIceRes.error) {
-       console.error("[ProductionPlanning] Dry ice RPC error:", dryIceRes.error);
-     } else if (dryIceRes.data?.[0]) {
-       setDryIceToday(Number(dryIceRes.data[0].total_kg) || 0);
-     }
+      // Handle dry ice current period
+      if (dryIceRes.error) {
+        console.error("[ProductionPlanning] Dry ice RPC error:", dryIceRes.error);
+      } else if (dryIceRes.data?.[0]) {
+        setDryIceToday(Number(dryIceRes.data[0].total_kg) || 0);
+      }
 
-     // Handle cylinder current period
-     if (cylinderRes.error) {
-       console.error("[ProductionPlanning] Cylinder RPC error:", cylinderRes.error);
-     } else if (cylinderRes.data?.[0]) {
-       setCylindersToday(Number(cylinderRes.data[0].total_cylinders) || 0);
-     }
+      // Handle cylinder current period
+      if (cylinderRes.error) {
+        console.error("[ProductionPlanning] Cylinder RPC error:", cylinderRes.error);
+      } else if (cylinderRes.data?.[0]) {
+        setCylindersToday(Number(cylinderRes.data[0].total_cylinders) || 0);
+      }
 
-     // Handle dry ice previous period
-     if (prevDryIceRes.error) {
-       console.error("[ProductionPlanning] Prev dry ice RPC error:", prevDryIceRes.error);
-     } else if (prevDryIceRes.data?.[0]) {
-       setPreviousDryIceToday(Number(prevDryIceRes.data[0].total_kg) || 0);
-     }
+      // Handle dry ice previous period
+      if (prevDryIceRes.error) {
+        console.error("[ProductionPlanning] Prev dry ice RPC error:", prevDryIceRes.error);
+      } else if (prevDryIceRes.data?.[0]) {
+        setPreviousDryIceToday(Number(prevDryIceRes.data[0].total_kg) || 0);
+      }
 
-     // Handle cylinder previous period
-     if (prevCylinderRes.error) {
-       console.error("[ProductionPlanning] Prev cylinder RPC error:", prevCylinderRes.error);
-     } else if (prevCylinderRes.data?.[0]) {
-       setPreviousCylindersToday(Number(prevCylinderRes.data[0].total_cylinders) || 0);
-     }
+      // Handle cylinder previous period
+      if (prevCylinderRes.error) {
+        console.error("[ProductionPlanning] Prev cylinder RPC error:", prevCylinderRes.error);
+      } else if (prevCylinderRes.data?.[0]) {
+        setPreviousCylindersToday(Number(prevCylinderRes.data[0].total_cylinders) || 0);
+      }
 
-     // Calculate total orders from RPC responses
-     const currentDryIceOrders = dryIceRes.data?.[0]?.total_orders || 0;
-     const currentCylinderOrders = cylinderRes.data?.[0]?.total_orders || 0;
-     setWeekOrders(Number(currentDryIceOrders) + Number(currentCylinderOrders));
+      // Calculate total orders from RPC responses
+      const currentDryIceOrders = dryIceRes.data?.[0]?.total_orders || 0;
+      const currentCylinderOrders = cylinderRes.data?.[0]?.total_orders || 0;
+      setWeekOrders(Number(currentDryIceOrders) + Number(currentCylinderOrders));
 
-     const prevDryIceOrders = prevDryIceRes.data?.[0]?.total_orders || 0;
-     const prevCylinderOrders = prevCylinderRes.data?.[0]?.total_orders || 0;
-     setPreviousWeekOrders(Number(prevDryIceOrders) + Number(prevCylinderOrders));
+      const prevDryIceOrders = prevDryIceRes.data?.[0]?.total_orders || 0;
+      const prevCylinderOrders = prevCylinderRes.data?.[0]?.total_orders || 0;
+      setPreviousWeekOrders(Number(prevDryIceOrders) + Number(prevCylinderOrders));
 
-   } catch (error) {
-     console.error("[ProductionPlanning] Error fetching stats:", error);
-   }
+    } catch (error) {
+      console.error("[ProductionPlanning] Error fetching stats:", error);
+    }
   };
 
   // Determine which tabs to show based on permissions
@@ -389,9 +389,9 @@ export function ProductionPlanning({
 
         <div className={cn(
           "grid gap-4",
-          showAdvancedWidgets 
-            ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-5" 
-            : "grid-cols-1 md:grid-cols-3"
+          showAdvancedWidgets
+            ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-5"
+            : "grid-cols-1 sm:grid-cols-3"
         )}>
           <StatCard
             value={`${formatNumber(dryIceToday, 0)} kg`}
@@ -474,9 +474,9 @@ export function ProductionPlanning({
       {/* Main content tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className={cn(
-          "w-full max-w-5xl grid bg-muted/50 backdrop-blur-sm overflow-x-auto",
-          showAdvancedTabs 
-            ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-6" 
+          "w-full max-w-5xl grid bg-muted/50 backdrop-blur-sm overflow-x-auto h-auto p-1",
+          showAdvancedTabs
+            ? "grid-cols-3 sm:grid-cols-6"
             : "grid-cols-2"
         )}>
           <TabsTrigger
@@ -585,6 +585,6 @@ export function ProductionPlanning({
           </>
         )}
       </Tabs>
-    </div>
+    </div >
   );
 }

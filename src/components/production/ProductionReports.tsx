@@ -14,6 +14,12 @@ interface GasTypeDistributionData {
   total_cylinders: number;
 }
 
+interface GasCategoryDistributionData {
+  category_id: string | null;
+  category_name: string;
+  total_cylinders: number;
+}
+
 interface EfficiencyData {
   total_orders: number;
   completed_orders: number;
@@ -61,7 +67,8 @@ import {
   AreaChartIcon,
   Map as MapIcon
 } from "lucide-react";
-import { GlowLineChart } from "@/components/ui/glow-line-chart";
+// import { GlowLineChart } from "@/components/ui/glow-line-chart";
+// import { RoundedBarChart } from "@/components/ui/rounded-bar-chart";
 import { ChartSkeleton, StatCardSkeleton } from "@/components/ui/skeletons";
 import { StatCard } from "@/components/ui/stat-card";
 
@@ -86,13 +93,13 @@ import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ReportExportButtons } from "./ReportExportButtons";
 import {
-  AreaChart,
-  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  LineChart,
+  Line,
   BarChart,
   Bar,
   Cell,
@@ -138,6 +145,8 @@ interface ProductionReportsProps {
   onDateRangeChange?: (range: DateRange) => void;
 }
 
+import { GAS_COLOR_MAPPING, getGasColor } from "@/constants/gasColors";
+
 export function ProductionReports({
   refreshKey = 0,
   onDataChanged,
@@ -150,6 +159,7 @@ export function ProductionReports({
   // Server-side aggregated data
   const [dailyProduction, setDailyProduction] = useState<DailyProductionData[]>([]);
   const [gasTypeDistributionData, setGasTypeDistributionData] = useState<GasTypeDistributionData[]>([]);
+  const [gasCategoryDistributionData, setGasCategoryDistributionData] = useState<GasCategoryDistributionData[]>([]);
   const [cylinderEfficiency, setCylinderEfficiency] = useState<EfficiencyData | null>(null);
   const [dryIceEfficiency, setDryIceEfficiency] = useState<DryIceEfficiencyData | null>(null);
   const [prevCylinderEfficiency, setPrevCylinderEfficiency] = useState<EfficiencyData | null>(null);
@@ -175,7 +185,8 @@ export function ProductionReports({
   const [dryIceOrders, setDryIceOrders] = useState<DryIceOrder[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [productionChartView, setProductionChartView] = useState<"both" | "cylinders" | "dryIce">("both");
-  const [chartStyle, setChartStyle] = useState<"area" | "glow">("area");
+  const [distributionView, setDistributionView] = useState<"type" | "category">("type");
+
 
   // Previous period stats for trend calculations
   const [previousPeriodStats, setPreviousPeriodStats] = useState({
@@ -220,7 +231,8 @@ export function ProductionReports({
         dryIceEffRes,
         prevCylinderEffRes,
         prevDryIceEffRes,
-        customerTotalsRes
+        customerTotalsRes,
+        gasCategoryRes
       ] = await Promise.all([
         // Daily production data for charts
         supabase.rpc("get_daily_production_by_period", {
@@ -263,6 +275,12 @@ export function ProductionReports({
           p_from_date: fromDate,
           p_to_date: toDate,
           p_location: locationParam
+        }),
+        // Gas category distribution (NEW)
+        supabase.rpc("get_gas_category_distribution_by_period" as any, {
+          p_from_date: fromDate,
+          p_to_date: toDate,
+          p_location: locationParam
         })
       ]);
 
@@ -279,12 +297,16 @@ export function ProductionReports({
       if (cylinderEffRes.error) console.error("[ProductionReports] Cylinder efficiency RPC error:", cylinderEffRes.error);
       if (dryIceEffRes.error) console.error("[ProductionReports] Dry ice efficiency RPC error:", dryIceEffRes.error);
       if (customerTotalsRes.error) console.error("[ProductionReports] Customer totals RPC error:", customerTotalsRes.error);
+      if (gasCategoryRes.error) console.error("[ProductionReports] Gas category distribution RPC error:", gasCategoryRes.error);
 
       // Set daily production data
       setDailyProduction(dailyRes.data || []);
 
       // Set gas type distribution
       setGasTypeDistributionData(gasTypeRes.data || []);
+
+      // Set gas category distribution
+      setGasCategoryDistributionData((gasCategoryRes.data as any) || []);
 
       // Set customer totals
       setCustomerTotals(customerTotalsRes.data || []);
@@ -384,12 +406,30 @@ export function ProductionReports({
 
   // Gas type distribution from RPC (already aggregated)
   const gasTypeDistribution = useMemo(() => {
-    return gasTypeDistributionData.map(item => ({
-      name: item.gas_type_name,
-      value: Number(item.total_cylinders) || 0,
-      color: item.gas_type_color
-    }));
+    return gasTypeDistributionData.map(item => {
+      // Robust lookup: fast exact match, then case-insensitive
+      const name = item.gas_type_name || "";
+      const color = getGasColor(name, item.gas_type_color || "#8b5cf6");
+
+      return {
+        name: item.gas_type_name,
+        value: Number(item.total_cylinders) || 0,
+        color
+      };
+    });
   }, [gasTypeDistributionData]);
+
+  // Gas category distribution from RPC (already aggregated)
+  const gasCategoryDistribution = useMemo(() => {
+    return gasCategoryDistributionData.map(item => ({
+      name: item.category_name,
+      value: Number(item.total_cylinders) || 0,
+      color: "#8b5cf6" // Default color for categories (purple)
+    }));
+  }, [gasCategoryDistributionData]);
+
+  // Determine which distribution data to show
+  const currentDistributionData = distributionView === "type" ? gasTypeDistribution : gasCategoryDistribution;
 
   // Customer ranking from RPC data
   const cylinderCustomerRanking = useMemo(() => {
@@ -670,20 +710,7 @@ export function ProductionReports({
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                {/* Chart Style Toggle */}
-                <ToggleGroup
-                  type="single"
-                  value={chartStyle}
-                  onValueChange={(value) => value && setChartStyle(value as "area" | "glow")}
-                  className="bg-muted/50 rounded-md p-1"
-                >
-                  <ToggleGroupItem value="area" aria-label="Area Chart" className="text-xs px-2 data-[state=on]:bg-background">
-                    <AreaChartIcon className="h-3.5 w-3.5" />
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="glow" aria-label="Glow Chart" className="text-xs px-2 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                    <Sparkles className="h-3.5 w-3.5" />
-                  </ToggleGroupItem>
-                </ToggleGroup>
+
 
                 {/* Data View Toggle */}
                 <ToggleGroup
@@ -712,58 +739,47 @@ export function ProductionReports({
             </CardHeader>
             <CardContent>
               {ordersPerDay.length > 0 ? (
-                chartStyle === "glow" ? (
-                  <GlowLineChart
-                    data={ordersPerDay}
-                    xAxisKey="displayDate"
-                    height={300}
-                    series={[
-                      ...(productionChartView === "both" || productionChartView === "cylinders"
-                        ? [{ dataKey: "cylinders", name: "Cilinders", color: "#f97316", glowColor: "#f97316" }]
-                        : []),
-                      ...(productionChartView === "both" || productionChartView === "dryIce"
-                        ? [{ dataKey: "dryIce", name: "Droogijs (kg)", color: "#06b6d4", glowColor: "#06b6d4" }]
-                        : []),
-                    ]}
-                  />
-                ) : (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={ordersPerDay}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="displayDate" className="text-xs" />
-                      <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--background))',
-                          border: '1px solid hsl(var(--border))'
-                        }}
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={ordersPerDay}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted/40" />
+                    <XAxis dataKey="displayDate" className="text-xs" tickLine={false} axisLine={false} />
+                    <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(200, 200, 200, 0.3)',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                        backdropFilter: 'blur(10px)'
+                      }}
+                      itemStyle={{ color: '#333' }}
+                      labelStyle={{ fontWeight: 'bold', color: '#666', marginBottom: '0.5rem' }}
+                    />
+                    <Legend />
+                    {(productionChartView === "both" || productionChartView === "cylinders") && (
+                      <Line
+                        type="monotone"
+                        dataKey="cylinders"
+                        name="Cilinders"
+                        stroke="#f97316"
+                        strokeWidth={2}
+                        dot={{ r: 4, fill: "#f97316" }}
+                        activeDot={{ r: 6 }}
                       />
-                      <Legend />
-                      {(productionChartView === "both" || productionChartView === "cylinders") && (
-                        <Area
-                          type="monotone"
-                          dataKey="cylinders"
-                          name="Cilinders"
-                          stackId="1"
-                          stroke="#f97316"
-                          fill="#f97316"
-                          fillOpacity={0.6}
-                        />
-                      )}
-                      {(productionChartView === "both" || productionChartView === "dryIce") && (
-                        <Area
-                          type="monotone"
-                          dataKey="dryIce"
-                          name="Droogijs (kg)"
-                          stackId="2"
-                          stroke="#06b6d4"
-                          fill="#06b6d4"
-                          fillOpacity={0.6}
-                        />
-                      )}
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )
+                    )}
+                    {(productionChartView === "both" || productionChartView === "dryIce") && (
+                      <Line
+                        type="monotone"
+                        dataKey="dryIce"
+                        name="Droogijs (kg)"
+                        stroke="#06b6d4"
+                        strokeWidth={2}
+                        dot={{ r: 4, fill: "#06b6d4" }}
+                        activeDot={{ r: 6 }}
+                      />
+                    )}
+                  </LineChart>
+                </ResponsiveContainer>
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
                   Geen data voor deze periode
@@ -775,50 +791,42 @@ export function ProductionReports({
           {/* Gas Type Distribution */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="text-lg">Gastype verdeling</CardTitle>
-                <CardDescription>Aantal cilinders per gastype</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <div>
+                  <CardTitle className="text-lg">
+                    {distributionView === "type" ? "Gastype verdeling" : "Categorie verdeling"}
+                  </CardTitle>
+                  <CardDescription>Aantal cilinders per {distributionView === "type" ? "gastype" : "categorie"}</CardDescription>
+                </div>
+                <ToggleGroup
+                  type="single"
+                  value={distributionView}
+                  onValueChange={(val) => val && setDistributionView(val as "type" | "category")}
+                  className="bg-muted/50 rounded-md p-1"
+                >
+                  <ToggleGroupItem value="type" className="text-xs px-2 h-7" aria-label="Gastype">Type</ToggleGroupItem>
+                  <ToggleGroupItem value="category" className="text-xs px-2 h-7" aria-label="Categorie">Cat</ToggleGroupItem>
+                </ToggleGroup>
               </CardHeader>
               <CardContent>
-                {gasTypeDistribution.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={Math.max(250, gasTypeDistribution.length * 40)}>
-                    <BarChart
-                      data={gasTypeDistribution}
-                      layout="vertical"
-                      margin={{ left: 10, right: 60 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
-                      <XAxis
-                        type="number"
-                        className="text-xs"
-                        tickFormatter={(value) => formatNumber(value, 0)}
-                      />
-                      <YAxis
-                        dataKey="name"
-                        type="category"
-                        width={140}
-                        className="text-xs"
-                        tick={{ fontSize: 11 }}
-                      />
+                {currentDistributionData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={Math.max(300, currentDistributionData.length * 40)}>
+                    <BarChart data={currentDistributionData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} className="stroke-muted/40" />
+                      <XAxis type="number" className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} tickLine={false} axisLine={false} />
+                      <YAxis dataKey="name" type="category" width={100} className="text-xs font-medium" tickLine={false} axisLine={false} />
                       <Tooltip
+                        cursor={{ fill: 'transparent' }}
                         contentStyle={{
-                          backgroundColor: 'hsl(var(--background))',
-                          border: '1px solid hsl(var(--border))'
+                          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                          borderRadius: '8px',
+                          border: 'none',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                         }}
                         formatter={(value: number) => [formatNumber(value, 0), "Cilinders"]}
                       />
-                      <Bar
-                        dataKey="value"
-                        name="Cilinders"
-                        radius={[0, 4, 4, 0]}
-                        label={{
-                          position: 'right',
-                          formatter: (value: number) => formatNumber(value, 0),
-                          fontSize: 11,
-                          fill: 'hsl(var(--foreground))'
-                        }}
-                      >
-                        {gasTypeDistribution.map((entry, index) => (
+                      <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
+                        {currentDistributionData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Bar>

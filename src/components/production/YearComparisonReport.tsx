@@ -14,6 +14,7 @@ import { CustomerMultiSelect } from "./CustomerMultiSelect";
 import { CylinderSizeMultiSelect } from "./CylinderSizeMultiSelect";
 import { CumulativeYearChart } from "./CumulativeYearChart";
 import { CumulativeGasTypeChart } from "./CumulativeGasTypeChart";
+import { getGasColor } from "@/constants/gasColors";
 import {
   BarChart,
   Bar,
@@ -566,7 +567,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       if (!typeInfo.has(item.gas_type_id)) {
         typeInfo.set(item.gas_type_id, {
           name: item.gas_type_name || "Onbekend",
-          color: item.gas_type_color || "#94a3b8"
+          color: getGasColor(item.gas_type_name || "", item.gas_type_color || "#94a3b8")
         });
       }
 
@@ -577,7 +578,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       } else {
         currentYearMap.set(item.gas_type_id, {
           name: item.gas_type_name || "Onbekend",
-          color: item.gas_type_color || "#94a3b8",
+          color: getGasColor(item.gas_type_name || "", item.gas_type_color || "#94a3b8"),
           total: Number(item.total_cylinders) || 0
         });
       }
@@ -596,7 +597,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       if (!typeInfo.has(item.gas_type_id)) {
         typeInfo.set(item.gas_type_id, {
           name: item.gas_type_name || "Onbekend",
-          color: item.gas_type_color || "#94a3b8"
+          color: getGasColor(item.gas_type_name || "", item.gas_type_color || "#94a3b8")
         });
       }
 
@@ -607,7 +608,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       } else {
         previousYearMap.set(item.gas_type_id, {
           name: item.gas_type_name || "Onbekend",
-          color: item.gas_type_color || "#94a3b8",
+          color: getGasColor(item.gas_type_name || "", item.gas_type_color || "#94a3b8"),
           total: Number(item.total_cylinders) || 0
         });
       }
