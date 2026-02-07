@@ -75,21 +75,22 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
   const [editingType, setEditingType] = useState<GasType | null>(null);
   const [typeToDelete, setTypeToDelete] = useState<GasType | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  
+
   // Sort state
   const [sortColumn, setSortColumn] = useState<SortColumn>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  
+
   // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#3b82f6");
   const [isActive, setIsActive] = useState(true);
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [saving, setSaving] = useState(false);
 
   const fetchCategories = async () => {
@@ -131,9 +132,15 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
     if (sortColumn !== column) {
       return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
     }
-    return sortDirection === "asc" 
+    return sortDirection === "asc"
       ? <ArrowUp className="h-4 w-4 ml-1" />
       : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
+
+  const getCategoryName = (id: string | null) => {
+    if (!id) return "-";
+    const cat = categories.find(c => c.id === id);
+    return cat ? cat.name : "-";
   };
 
   useEffect(() => {
@@ -144,11 +151,18 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
     }
   }, [open, sortColumn, sortDirection]);
 
+  // Filtering calculations
+  const filteredGasTypes = gasTypes.filter(type => {
+    if (categoryFilter === "all") return true;
+    if (categoryFilter === "none") return type.category_id === null;
+    return type.category_id === categoryFilter;
+  });
+
   // Pagination calculations
-  const totalPages = Math.ceil(gasTypes.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredGasTypes.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedGasTypes = gasTypes.slice(startIndex, endIndex);
+  const paginatedGasTypes = filteredGasTypes.slice(startIndex, endIndex);
 
   const openEditDialog = (type: GasType | null) => {
     if (type) {
@@ -263,7 +277,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
         .neq("id", "00000000-0000-0000-0000-000000000000");
 
       if (error) throw error;
-      
+
       toast.success(`${gasTypes.length} gastypes verwijderd`);
       fetchGasTypes();
       setBulkDeleteDialogOpen(false);
@@ -282,7 +296,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent 
+        <DialogContent
           className="sm:max-w-[1000px]"
           onInteractOutside={(e) => {
             if (bulkDeleteDialogOpen || deleteDialogOpen || editDialogOpen) {
@@ -305,22 +319,39 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
           </DialogHeader>
 
           <div className="py-4">
-            <div className="flex justify-between mb-4">
-              <Button
-                variant="destructive"
-                size="sm"
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onOpenChange(false); // Close main dialog first
-                  setTimeout(() => setBulkDeleteDialogOpen(true), 100); // Then open confirm dialog
-                }}
-                disabled={gasTypes.length === 0}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Alles verwijderen ({gasTypes.length})
-              </Button>
+            <div className="flex flex-col sm:flex-row justify-between mb-4 gap-4">
+              <div className="flex items-center gap-2">
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter op categorie" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle categorieën</SelectItem>
+                    <SelectItem value="none">Geen categorie</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onOpenChange(false); // Close main dialog first
+                    setTimeout(() => setBulkDeleteDialogOpen(true), 100); // Then open confirm dialog
+                  }}
+                  disabled={gasTypes.length === 0}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Alles verwijderen
+                </Button>
+              </div>
+
               <Button size="sm" onClick={() => openEditDialog(null)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nieuw gastype
@@ -340,7 +371,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-16">Kleur</TableHead>
-                    <TableHead 
+                    <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("name")}
                     >
@@ -349,7 +380,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                         <SortIcon column="name" />
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("description")}
                     >
@@ -358,7 +389,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                         <SortIcon column="description" />
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("is_active")}
                     >
@@ -367,6 +398,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                         <SortIcon column="is_active" />
                       </div>
                     </TableHead>
+                    <TableHead>Categorie</TableHead>
                     <TableHead className="text-right">Acties</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -391,6 +423,9 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                         >
                           {type.is_active ? "Actief" : "Inactief"}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {getCategoryName(type.category_id)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -511,8 +546,8 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="typeCategory">Categorie</Label>
-              <Select 
-                value={categoryId || "none"} 
+              <Select
+                value={categoryId || "none"}
                 onValueChange={(v) => setCategoryId(v === "none" ? null : v)}
               >
                 <SelectTrigger>
@@ -568,8 +603,8 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
       </AlertDialog>
 
       {/* Bulk Delete Confirmation */}
-      <AlertDialog 
-        open={bulkDeleteDialogOpen} 
+      <AlertDialog
+        open={bulkDeleteDialogOpen}
         onOpenChange={(isOpen) => {
           setBulkDeleteDialogOpen(isOpen);
           if (!isOpen) {
