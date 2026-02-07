@@ -10,6 +10,7 @@ import { Cylinder, Map as MapIcon, Save, RotateCcw, Plus, Info, Pencil, Trash2, 
 import { cn } from "@/lib/utils";
 
 import { getGasColor } from "@/constants/gasColors";
+import { LocationMap } from "./LocationMap";
 
 interface StorageZone {
     id: string;
@@ -313,6 +314,8 @@ export function SiteMap({ location }: SiteMapProps) {
     };
 
     return (
+        <div className="space-y-6">
+        <LocationMap location={location} />
         <Card className={cn(
             "glass-card w-full overflow-hidden transition-all duration-300",
             isFullscreen ? "fixed inset-0 z-50 rounded-none h-screen w-screen bg-background/95 backdrop-blur-md" : ""
@@ -413,16 +416,16 @@ export function SiteMap({ location }: SiteMapProps) {
                 >
                     {/* SVG Map Layer */}
                     <svg viewBox="0 0 1024 1024" className="w-full h-full absolute inset-0 pointer-events-none">
-                        {/* Background Image - Rotated 90deg CW */}
+                        {/* Background Image */}
                         <image
-                            href="/site-map-background.png"
+                            href={location === "sol_tilburg" ? "/site-map-background.png" : "/site-map-emmen.png"}
                             x="0"
                             y="0"
                             width="1024"
                             height="1024"
                             preserveAspectRatio="xMidYMid slice"
                             opacity="0.9"
-                            transform="rotate(90, 512, 512)"
+                            transform={location === "sol_tilburg" ? "rotate(90, 512, 512)" : undefined}
                         />
                         <defs>
                             <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
@@ -691,5 +694,6 @@ export function SiteMap({ location }: SiteMapProps) {
                 </motion.div>
             </CardContent>
         </Card>
+        </div>
     );
 }
