@@ -195,18 +195,29 @@ export function ExcelImportDialog({
     
     const str = locationStr.toLowerCase().trim();
     
-    // Match Tilburg variations
+    // Match Tilburg variations (including "SOL Tilburg" from export)
     if (str.includes("tilburg")) {
       return "sol_tilburg";
     }
     
-    // Match Emmen variations (including "depot emmen")
+    // Match Emmen variations (including "SOL Emmen" from export, "depot emmen")
     if (str.includes("emmen")) {
       return "sol_emmen";
     }
     
+    // Match internal enum values directly
+    if (str === "sol_tilburg") return "sol_tilburg";
+    if (str === "sol_emmen") return "sol_emmen";
+    
     // Default to Emmen for unknown locations
     return "sol_emmen";
+  };
+
+  // Parse grade from various formats
+  const parseGrade = (gradeStr: string): "medical" | "technical" => {
+    const str = gradeStr.toLowerCase().trim();
+    if (str === "m" || str.includes("medic")) return "medical";
+    return "technical";
   };
 
   // Parse Excel date
@@ -222,8 +233,22 @@ export function ExcelImportDialog({
     
     // String date formats
     if (typeof value === "string") {
+      const trimmed = value.trim();
+      
+      // ISO format yyyy-MM-dd (from export CSV)
+      const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (isoMatch) {
+        return new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
+      }
+      
+      // European format dd-MM-yyyy
+      const euMatch = trimmed.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+      if (euMatch) {
+        return new Date(parseInt(euMatch[3]), parseInt(euMatch[2]) - 1, parseInt(euMatch[1]));
+      }
+      
       // Try parsing M/D/YY format (e.g., "1/2/25")
-      const parts = value.split("/");
+      const parts = trimmed.split("/");
       if (parts.length === 3) {
         const month = parseInt(parts[0]) - 1;
         const day = parseInt(parts[1]);
@@ -233,7 +258,7 @@ export function ExcelImportDialog({
       }
       
       // Try standard date parsing
-      const parsed = new Date(value);
+      const parsed = new Date(trimmed);
       if (!isNaN(parsed.getTime())) return parsed;
     }
     
@@ -263,19 +288,49 @@ export function ExcelImportDialog({
       }
     }
     
-    // Parse Excel file
+    // Parse file (Excel or CSV)
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
+        const workbook = XLSX.read(data, { type: "array", codepage: 65001 });
         
-        // Get first sheet (Cilinder Vullingen)
+        // Get first sheet
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         
-        // Convert to JSON
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+        // For CSV files with semicolons, XLSX may not split correctly - handle manually
+        const isCSV = selectedFile.name.toLowerCase().endsWith('.csv');
+        let jsonData: unknown[][];
+        
+        if (isCSV) {
+          // Re-read as text for proper semicolon parsing
+          const textDecoder = new TextDecoder('utf-8');
+          let csvText = textDecoder.decode(data);
+          // Remove BOM if present
+          if (csvText.charCodeAt(0) === 0xFEFF) csvText = csvText.slice(1);
+          
+          jsonData = csvText.split(/\r?\n/).filter(line => line.trim()).map(line => {
+            // Split by semicolon, handle quoted values
+            const cells: string[] = [];
+            let current = '';
+            let inQuotes = false;
+            for (const char of line) {
+              if (char === '"') {
+                inQuotes = !inQuotes;
+              } else if (char === ';' && !inQuotes) {
+                cells.push(current.trim());
+                current = '';
+              } else {
+                current += char;
+              }
+            }
+            cells.push(current.trim());
+            return cells;
+          });
+        } else {
+          jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+        }
         
         // Find header row to get column indices
         let headerRowIndex = -1;
@@ -285,16 +340,35 @@ export function ExcelImportDialog({
           const row = jsonData[i];
           if (!row) continue;
           
-          // Look for header row with "Datum", "Gassoort", etc.
           const rowStr = row.map(cell => String(cell || "").toLowerCase()).join("|");
+          
+          // Detect export CSV format: "ordernummer;klant;gastype;kwaliteit;..."
+          if (rowStr.includes("ordernummer") && rowStr.includes("klant") && rowStr.includes("gastype")) {
+            headerRowIndex = i;
+            row.forEach((cell, idx) => {
+              const cellStr = String(cell || "").toLowerCase().trim();
+              if (cellStr === "datum") columnMap.date = idx;
+              if (cellStr === "gastype") columnMap.gasType = idx;
+              if (cellStr === "cilindergrootte") columnMap.size = idx;
+              if (cellStr === "aantal") columnMap.count = idx;
+              if (cellStr === "kwaliteit") columnMap.grade = idx;
+              if (cellStr === "klant") columnMap.customer = idx;
+              if (cellStr === "locatie") columnMap.location = idx;
+              if (cellStr === "opmerkingen") columnMap.notes = idx;
+              if (cellStr === "druk (bar)" || cellStr === "druk") columnMap.pressure = idx;
+              if (cellStr === "status") columnMap.status = idx;
+              if (cellStr === "ordernummer") columnMap.orderNumber = idx;
+            });
+            break;
+          }
+          
+          // Detect original Excel format: "datum" + "gassoort"/"gastype"
           if (rowStr.includes("datum") && (rowStr.includes("gassoort") || rowStr.includes("gastype"))) {
             headerRowIndex = i;
-            // Map column names to indices
             row.forEach((cell, idx) => {
               const cellStr = String(cell || "").toLowerCase().trim();
               if (cellStr.includes("datum")) columnMap.date = idx;
               if (cellStr.includes("gassoort") || cellStr.includes("gastype")) columnMap.gasType = idx;
-              // Detect size column - expanded patterns including "omschrijving" and "inhoud"
               if (columnMap.size === undefined) {
                 if (cellStr.includes("type vulling") || cellStr.includes("vulling type") || 
                     cellStr.includes("cilinderinhoud") || cellStr.includes("cilinder inhoud") ||
@@ -305,23 +379,19 @@ export function ExcelImportDialog({
               }
               if (cellStr === "aantal") columnMap.count = idx;
               if (cellStr === "m/t") columnMap.grade = idx;
-              // Detect location column
               if (cellStr.includes("locatie") || cellStr.includes("location") || 
                   cellStr.includes("productielocatie") || cellStr.includes("site") || 
                   cellStr.includes("vestiging")) {
                 columnMap.location = idx;
               }
-              // Detect customer column - "klant" or "vulling tbv"
               if (cellStr.includes("vulling tbv") || cellStr.includes("tbv") || 
                   cellStr === "klant" || cellStr.includes("customer")) {
                 columnMap.customer = idx;
               }
-              // Detect notes column - "opmerkingen" or "omschrijving"
               if (cellStr.includes("opmerkingen") || cellStr.includes("opmerking") ||
                   cellStr.includes("omschrijving") || cellStr === "notes") {
                 columnMap.notes = idx;
               }
-              // Detect pressure column
               if (cellStr.includes("pressure") || cellStr.includes("druk") || 
                   cellStr === "bar") {
                 columnMap.pressure = idx;
@@ -331,12 +401,12 @@ export function ExcelImportDialog({
           }
         }
         
-        // Fallback to fixed indices if header not found (matching Excel structure: Datum, Gastype, Cilinderinhoud, Aantal, M/T, Locatie, Klant, Omschrijving)
+        // Fallback to fixed indices if header not found
         if (headerRowIndex === -1) {
           columnMap = { date: 0, gasType: 1, size: 2, count: 3, grade: 4, location: 5, customer: 6, notes: 7, pressure: 8 };
         }
         
-        console.log("Column mapping:", columnMap, "Header row:", headerRowIndex);
+        console.log("Column mapping:", columnMap, "Header row:", headerRowIndex, "CSV:", isCSV);
         
         // Find data start (skip header rows)
         const orders: ParsedCylinderOrder[] = [];
@@ -344,16 +414,17 @@ export function ExcelImportDialog({
         
         for (let i = startRow; i < jsonData.length; i++) {
           const row = jsonData[i];
-          if (!row || row.length < 5) continue;
+          if (!row || row.length < 3) continue;
           
-          // Check if first column is a date
-          const dateValue = parseExcelDate(row[columnMap.date ?? 0]);
+          // Parse date from the mapped column
+          const dateCol = columnMap.date ?? 0;
+          const dateValue = parseExcelDate(row[dateCol]);
           if (!dateValue || dateValue.getFullYear() < 2020) continue;
           
           const gasType = String(row[columnMap.gasType ?? 1] || "").trim();
           let sizeStr = String(row[columnMap.size ?? 2] || "").trim();
           const count = parseInt(String(row[columnMap.count ?? 3] || "0"));
-          const gradeCode = String(row[columnMap.grade ?? 4] || "T").toUpperCase();
+          const gradeStr = String(row[columnMap.grade ?? 4] || "T").trim();
           const customer = String(row[columnMap.customer ?? 5] || "").trim();
           const notes = String(row[columnMap.notes ?? 6] || "").trim();
           const locationStr = columnMap.location !== undefined 
@@ -375,7 +446,6 @@ export function ExcelImportDialog({
               pressure = pressureVal;
             }
           } else {
-            // Try to extract pressure from sizeStr or notes
             const pressureSource = sizeStr || notes;
             const { pressure: descPressure } = parseCylinderSize(pressureSource, cylinderSizes);
             pressure = descPressure;
@@ -389,7 +459,7 @@ export function ExcelImportDialog({
             gasType,
             cylinderSize: size,
             count,
-            grade: gradeCode === "M" ? "medical" : "technical",
+            grade: parseGrade(gradeStr),
             customer: customer || "Onbekend",
             notes,
             pressure,
@@ -568,11 +638,11 @@ export function ExcelImportDialog({
             <div className="border-2 border-dashed rounded-lg p-8 text-center">
               <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
               <p className="text-sm text-muted-foreground mb-4">
-                Sleep een Excel bestand hierheen of klik om te selecteren
+                Sleep een Excel of CSV bestand hierheen of klik om te selecteren
               </p>
               <input
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
                 onChange={handleFileSelect}
                 className="hidden"
                 id="excel-upload"
@@ -582,6 +652,9 @@ export function ExcelImportDialog({
                   <span>Bestand selecteren</span>
                 </Button>
               </label>
+              <p className="text-xs text-muted-foreground mt-3">
+                Ondersteunt .xlsx, .xls en .csv (puntkomma-gescheiden)
+              </p>
             </div>
           )}
 
