@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Upload } from "lucide-react";
+import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Upload, Maximize2, Minimize2 } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
 import { getStockStatus, type StockStatus } from "./StockStatusBadge";
 import { StockExcelImportDialog, type StockItem } from "./StockExcelImportDialog";
@@ -57,6 +57,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     sol_tilburg: [],
   });
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [fullscreenStatus, setFullscreenStatus] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | undefined>();
   const { isAdmin } = useUserRole(userId);
 
@@ -254,7 +255,12 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
                       <span className="text-[9px] text-muted-foreground">{config.label}</span>
                     </div>
                   </DialogTrigger>
-                  <DialogContent className="max-w-lg">
+                  <DialogContent className={cn(
+                    "transition-all duration-200",
+                    fullscreenStatus === config.status
+                      ? "max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh]"
+                      : "max-w-lg"
+                  )}>
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2">
                         <Icon className={cn("h-5 w-5", config.color)} />
@@ -264,13 +270,26 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
                             {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
                           </Badge>
                         )}
-                        <span className="ml-auto text-sm font-normal text-muted-foreground">
+                        <span className="ml-auto flex items-center gap-2 text-sm font-normal text-muted-foreground">
                           {formatNumber(config.count, 0)} items
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => setFullscreenStatus(
+                              fullscreenStatus === config.status ? null : config.status
+                            )}
+                          >
+                            {fullscreenStatus === config.status
+                              ? <Minimize2 className="h-3.5 w-3.5" />
+                              : <Maximize2 className="h-3.5 w-3.5" />
+                            }
+                          </Button>
                         </span>
                       </DialogTitle>
                     </DialogHeader>
                     {config.items.length > 0 ? (
-                      <ScrollArea className="max-h-[60vh]">
+                      <ScrollArea className={fullscreenStatus === config.status ? "h-[calc(95vh-80px)]" : "max-h-[60vh]"}>
                         <div className="space-y-2">
                           {config.items.map((item) => (
                             <div
