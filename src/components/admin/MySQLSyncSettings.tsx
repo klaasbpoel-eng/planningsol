@@ -26,6 +26,8 @@ import {
   Eye,
   EyeOff,
   TableProperties,
+  Plug,
+  Loader2,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -73,6 +75,14 @@ export function MySQLSyncSettings({ selectedTables }: MySQLSyncSettingsProps) {
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<{ current: number; total: number; table: string; rowsProcessed?: number } | null>(null);
   const [creatingSchema, setCreatingSchema] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionResult, setConnectionResult] = useState<{
+    success: boolean;
+    version?: string;
+    latency_ms?: number;
+    existing_tables?: string[];
+    error?: string;
+  } | null>(null);
 
   const [confirmPush, setConfirmPush] = useState(false);
   const [confirmSchema, setConfirmSchema] = useState(false);
@@ -95,6 +105,40 @@ export function MySQLSyncSettings({ selectedTables }: MySQLSyncSettingsProps) {
     setter(val);
     // Save on next tick after state update
     setTimeout(saveConfig, 0);
+  };
+  const handleTestConnection = async () => {
+    setTestingConnection(true);
+    setConnectionResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Niet ingelogd");
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-mysql-connection`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(mysqlCredentials),
+        }
+      );
+
+      const data = await response.json();
+      setConnectionResult(data);
+      if (data.success) {
+        toast.success(`Verbinding succesvol! MySQL ${data.version} (${data.latency_ms}ms)`);
+      } else {
+        toast.error(`Verbinding mislukt: ${data.error}`);
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Verbinding mislukt";
+      setConnectionResult({ success: false, error: msg });
+      toast.error(msg);
+    } finally {
+      setTestingConnection(false);
+    }
   };
 
   const handleCreateSchema = async () => {
@@ -297,6 +341,37 @@ export function MySQLSyncSettings({ selectedTables }: MySQLSyncSettingsProps) {
                 Zorg dat je MySQL server bereikbaar is vanaf het internet.
               </AlertDescription>
             </Alert>
+
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={handleTestConnection}
+                disabled={testingConnection || !isConfigured}
+                className="gap-2"
+              >
+                {testingConnection ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plug className="h-4 w-4" />
+                )}
+                {testingConnection ? "Testen..." : "Test verbinding"}
+              </Button>
+              {connectionResult && (
+                <div className="flex items-center gap-2 text-sm">
+                  {connectionResult.success ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span>MySQL {connectionResult.version} — {connectionResult.latency_ms}ms — {connectionResult.existing_tables?.length || 0} tabellen gevonden</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4 text-destructive" />
+                      <span className="text-destructive">{connectionResult.error}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
