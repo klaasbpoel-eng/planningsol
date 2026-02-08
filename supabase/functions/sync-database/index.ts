@@ -6,18 +6,19 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Tables ordered by dependency (parents first, children last)
 const SYNC_TABLES = [
+  "app_settings",
   "gas_type_categories",
-  "gas_types",
   "cylinder_sizes",
   "dry_ice_packaging",
   "dry_ice_product_types",
   "task_types",
   "time_off_types",
-  "app_settings",
+  "gas_types",        // depends on gas_type_categories
   "customers",
-  "gas_cylinder_orders",
-  "dry_ice_orders",
+  "gas_cylinder_orders", // depends on customers, gas_types
+  "dry_ice_orders",      // depends on customers, dry_ice_product_types, dry_ice_packaging
 ];
 
 async function fetchAllRows(client: any, table: string) {
@@ -42,18 +43,38 @@ async function fetchAllRows(client: any, table: string) {
   return allRows;
 }
 
+// Columns to strip before upserting to avoid FK / generated-column conflicts
+const STRIP_COLUMNS: Record<string, string[]> = {
+  gas_types: ["category_id"],
+  gas_cylinder_orders: ["customer_id", "gas_type_id", "assigned_to", "created_by"],
+  dry_ice_orders: ["customer_id", "product_type_id", "packaging_id", "parent_order_id", "assigned_to", "created_by"],
+};
+
+function cleanRows(table: string, rows: any[]) {
+  const cols = STRIP_COLUMNS[table];
+  if (!cols) return rows;
+  return rows.map((row) => {
+    const clean = { ...row };
+    for (const col of cols) {
+      delete clean[col];
+    }
+    return clean;
+  });
+}
+
 async function upsertBatch(client: any, table: string, rows: any[]) {
   if (rows.length === 0) return { inserted: 0, errors: [] };
 
+  const cleaned = cleanRows(table, rows);
   const batchSize = 500;
   let inserted = 0;
   const errors: string[] = [];
 
-  for (let i = 0; i < rows.length; i += batchSize) {
-    const batch = rows.slice(i, i + batchSize);
-    const { error } = await client.from(table).upsert(batch, { onConflict: "id" });
+  for (let i = 0; i < cleaned.length; i += batchSize) {
+    const batch = cleaned.slice(i, i + batchSize);
+    const { error } = await client.from(table).upsert(batch, { onConflict: "id", ignoreDuplicates: false });
     if (error) {
-      errors.push(`${table} batch ${i}: ${error.message}`);
+      errors.push(`batch ${Math.floor(i / batchSize) + 1}: ${error.message}`);
     } else {
       inserted += batch.length;
     }
