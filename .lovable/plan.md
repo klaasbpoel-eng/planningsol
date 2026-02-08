@@ -1,52 +1,45 @@
 
 
-## Voorraad Import Aanpassen aan Excel Formaat
-
-De huidige importfunctie herkent de kolomnamen uit het Excel-bestand niet correct. Het bestand gebruikt specifieke headers die niet overeenkomen met de huidige detectielogica.
+## Fix: KPI Dashboard toont data van verkeerde datum door tijdzone-conversie
 
 ### Het probleem
 
-De Excel headers zijn:
-- `SubCode` -- artikelcode
-- `SubCodeDescription` -- omschrijving
-- `GemVanQty` -- gemiddeld verbruik
-- `AantalVanBarcode` -- voorraad (aantal op voorraad)
-- `Verscil` -- verschil (let op: typfout in origineel, geen "h")
+De KPI Dashboard toont 52 cilinders en 5 voltooide orders voor Tilburg, maar die horen eigenlijk bij 31 januari (niet februari). Dit komt door een tijdzone-bug:
 
-De huidige code zoekt naar woorden als "omschrijving", "voorraad", "gem verbr" -- die niet in deze headers voorkomen.
+- De datum `1 februari 2026 00:00 CET` wordt via `.toISOString()` omgezet naar `2026-01-31T23:00:00Z` (UTC)
+- `.split('T')[0]` pakt dan `2026-01-31` in plaats van `2026-02-01`
+- Hierdoor worden 5 orders van 31 januari (52 cilinders) onterecht meegeteld
 
-### Wat wordt er aangepast
+Dit probleem zit op meerdere plekken in de code waar `.toISOString().split('T')[0]` wordt gebruikt voor datumconversie.
 
-**Bestand: `src/components/production/StockExcelImportDialog.tsx`**
+### Oplossing
 
-De header-detectielogica wordt uitgebreid zodat de exacte kolomnamen uit het Excel-bestand worden herkend:
+Vervang alle `.toISOString().split('T')[0]` conversies door een lokale datumformattering die de tijdzone respecteert. Gebruik de bestaande `format()` functie van `date-fns` (al geimporteerd in ProductionPlanning) of een handmatige lokale formatter.
 
-1. **Header-rij detectie** (regel 86-90): Voeg de nieuwe patronen toe zodat de rij herkend wordt:
-   - `subcodeDescription` of `gemvanqty` of `aantalvanbarcode`
+### Bestanden die worden aangepast
 
-2. **Kolom-mapping** (regel 92-109): Voeg per kolom de exacte headers toe:
-   - `subCode`: ook matchen op `subcode` (staat er al, werkt)
-   - `description`: ook matchen op `subcodedescription`
-   - `averageConsumption`: ook matchen op `gemvanqty`
-   - `numberOnStock`: ook matchen op `aantalvanbarcode`
-   - `difference`: ook matchen op `verscil` (zonder h)
+**1. `src/components/production/KPIDashboard.tsx`**
 
-### Technische details
-
-De wijzigingen zitten alleen in de `handleFileSelect` callback:
-
-**Header-rij herkenning** -- de conditie wordt verruimd:
+Voeg een helper-functie toe die lokaal formatteert:
 ```
-// Bestaand: zoekt "omschrijving" EN "voorraad"
-// Nieuw: ook matchen als "subcodedescription" EN "gemvanqty" aanwezig zijn
+const toLocalDateString = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
 ```
 
-**Kolom-mapping** -- per kolom extra patronen:
-```
-description: + "subcodedescription"
-averageConsumption: + "gemvanqty"  
-numberOnStock: + "aantalvanbarcode"
-difference: + "verscil"
-```
+Vervang alle voorkomens van `.toISOString().split('T')[0]` door `toLocalDateString()`:
+- Regel 87: `fromDate` berekening
+- Regel 88: `toDate` berekening  
+- Regel 98: `prevFromDate` berekening
+- Regel 99: `prevToDate` berekening
+- Regel 215: `startStr` in `fetchWeeklySparkline`
+- Regel 216: `endStr` in `fetchWeeklySparkline`
 
-Geen andere bestanden hoeven te worden aangepast.
+Dit zorgt ervoor dat `1 feb 2026 00:00 CET` correct wordt als `2026-02-01`, ongeacht de tijdzone van de gebruiker.
+
+### Impact
+
+Na deze fix zal het KPI Dashboard voor Tilburg correct 0 cilinders en 0 orders tonen in februari, omdat alle 5 orders op 31 januari vallen en buiten de geselecteerde periode vallen.
