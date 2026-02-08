@@ -350,22 +350,31 @@ export function SupabaseSyncSettings() {
               <ScrollArea className="h-[200px]">
                 <div className="space-y-2">
                   {Object.entries(result.details).map(([table, detail]) => (
-                    <div key={table} className="flex items-center justify-between border rounded p-2 text-sm">
-                      <span className="font-mono">{table}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">{detail.rows} →</span>
-                        {detail.errors.length > 0 ? (
-                          <Badge variant="destructive" className="gap-1">
-                            <XCircle className="h-3 w-3" />
-                            {detail.errors.length} fout(en)
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="gap-1">
-                            <CheckCircle2 className="h-3 w-3" />
-                            {detail.inserted}
-                          </Badge>
-                        )}
+                    <div key={table} className="border rounded p-2 text-sm space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono">{table}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">{detail.rows} →</span>
+                          {detail.errors.length > 0 ? (
+                            <Badge variant="destructive" className="gap-1">
+                              <XCircle className="h-3 w-3" />
+                              {detail.errors.length} fout(en)
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="gap-1">
+                              <CheckCircle2 className="h-3 w-3" />
+                              {detail.inserted}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
+                      {detail.errors.length > 0 && (
+                        <div className="text-xs text-destructive bg-destructive/10 rounded p-2 mt-1 space-y-0.5">
+                          {detail.errors.map((err, idx) => (
+                            <div key={idx} className="break-all">{err}</div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
