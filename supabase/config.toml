@@ -2,3 +2,9 @@ project_id = "lrgjeqsvgsxarneegzmd"
 
 [functions.complete-past-dry-ice-orders]
 verify_jwt = false
+
+[functions.backup-database]
+verify_jwt = false
+
+[functions.restore-database]
+verify_jwt = false
