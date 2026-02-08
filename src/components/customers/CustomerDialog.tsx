@@ -41,7 +41,34 @@ export function CustomerDialog({
   customer,
   onSaved,
 }: CustomerDialogProps) {
-  // ... (keep state and useEffect)
+  const [name, setName] = useState("");
+  const [contactPerson, setContactPerson] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [notes, setNotes] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (customer) {
+      setName(customer.name || "");
+      setContactPerson(customer.contact_person || "");
+      setEmail(customer.email || "");
+      setPhone(customer.phone || "");
+      setAddress(customer.address || "");
+      setNotes(customer.notes || "");
+      setIsActive(customer.is_active);
+    } else {
+      setName("");
+      setContactPerson("");
+      setEmail("");
+      setPhone("");
+      setAddress("");
+      setNotes("");
+      setIsActive(true);
+    }
+  }, [customer, open]);
 
   const handleSave = async () => {
     if (!name.trim()) {
