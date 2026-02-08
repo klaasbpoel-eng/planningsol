@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.test-mysql-connection]
 verify_jwt = false
+
+[functions.test-supabase-connection]
+verify_jwt = false

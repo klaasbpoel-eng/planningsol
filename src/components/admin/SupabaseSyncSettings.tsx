@@ -31,6 +31,8 @@ import {
   Eye,
   EyeOff,
   TableProperties,
+  Plug,
+  Loader2,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MySQLSyncSettings } from "./MySQLSyncSettings";
@@ -84,6 +86,14 @@ export function SupabaseSyncSettings() {
   const [confirmSchema, setConfirmSchema] = useState(false);
   const [schemaResult, setSchemaResult] = useState<any>(null);
   const [schemaResultOpen, setSchemaResultOpen] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionResult, setConnectionResult] = useState<{
+    success: boolean;
+    latency_ms?: number;
+    existing_tables?: string[];
+    tables_checked?: number;
+    error?: string;
+  } | null>(null);
 
   const saveConfig = (url: string, dbUrl?: string) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ url, dbUrl: dbUrl ?? externalDbUrl }));
@@ -97,6 +107,41 @@ export function SupabaseSyncSettings() {
   const handleDbUrlChange = (val: string) => {
     setExternalDbUrl(val);
     saveConfig(externalUrl, val);
+  };
+
+  const handleTestConnection = async () => {
+    setTestingConnection(true);
+    setConnectionResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Niet ingelogd");
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-supabase-connection`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ externalUrl, externalServiceKey: externalKey }),
+        }
+      );
+
+      const data = await response.json();
+      setConnectionResult(data);
+      if (data.success) {
+        toast.success(`Verbinding succesvol! ${data.existing_tables?.length || 0}/${data.tables_checked} tabellen gevonden (${data.latency_ms}ms)`);
+      } else {
+        toast.error(`Verbinding mislukt: ${data.error}`);
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Verbinding mislukt";
+      setConnectionResult({ success: false, error: msg });
+      toast.error(msg);
+    } finally {
+      setTestingConnection(false);
+    }
   };
 
   const handleCreateSchema = async () => {
@@ -371,6 +416,37 @@ export function SupabaseSyncSettings() {
                 schema aanmaken. De Database URL is te vinden onder Project Settings → Database in je externe project.
               </AlertDescription>
             </Alert>
+
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={handleTestConnection}
+                disabled={testingConnection || !externalUrl || !externalKey}
+                className="gap-2"
+              >
+                {testingConnection ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plug className="h-4 w-4" />
+                )}
+                {testingConnection ? "Testen..." : "Test verbinding"}
+              </Button>
+              {connectionResult && (
+                <div className="flex items-center gap-2 text-sm">
+                  {connectionResult.success ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span>{connectionResult.existing_tables?.length || 0}/{connectionResult.tables_checked} tabellen gevonden — {connectionResult.latency_ms}ms</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4 text-destructive" />
+                      <span className="text-destructive">{connectionResult.error}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
