@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const BATCH_SIZE = 10000;
+const BATCH_SIZE = 999;
 
 const statusLabels: Record<string, string> = {
   pending: "Gepland",
@@ -57,7 +57,10 @@ Deno.serve(async (req) => {
     }
 
     // Use service role to fetch all data
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+      db: { schema: 'public' },
+      global: { headers: { 'x-my-custom-header': 'export' } },
+    });
 
     // Parse optional filters from query params
     const url = new URL(req.url);
