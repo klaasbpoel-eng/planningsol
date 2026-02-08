@@ -1,95 +1,52 @@
 
 
-## Database Backup & Restore voor Admins
+## Voorraad Import Aanpassen aan Excel Formaat
 
-Een nieuwe functionaliteit waarmee admin-gebruikers een volledige backup van de database kunnen downloaden als JSON-bestand, en deze later kunnen herstellen.
+De huidige importfunctie herkent de kolomnamen uit het Excel-bestand niet correct. Het bestand gebruikt specifieke headers die niet overeenkomen met de huidige detectielogica.
 
-### Wat wordt er ge-backupt?
+### Het probleem
 
-De volgende tabellen worden opgenomen in de backup:
+De Excel headers zijn:
+- `SubCode` -- artikelcode
+- `SubCodeDescription` -- omschrijving
+- `GemVanQty` -- gemiddeld verbruik
+- `AantalVanBarcode` -- voorraad (aantal op voorraad)
+- `Verscil` -- verschil (let op: typfout in origineel, geen "h")
 
-- `gas_cylinder_orders` -- alle gascilinder orders
-- `dry_ice_orders` -- alle droogijs orders
-- `customers` -- klantgegevens
-- `gas_types` -- gastype definities
-- `gas_type_categories` -- gastype categorien
-- `cylinder_sizes` -- cilindergroottes
-- `dry_ice_packaging` -- droogijs verpakkingen
-- `dry_ice_product_types` -- droogijs producttypen
-- `app_settings` -- applicatie-instellingen
-- `task_types` -- taaktype definities
-- `time_off_types` -- verloftype definities
+De huidige code zoekt naar woorden als "omschrijving", "voorraad", "gem verbr" -- die niet in deze headers voorkomen.
 
-Tabellen zoals `profiles`, `user_roles`, `notifications`, en `employee_leave_balances` worden NIET meegenomen om beveiligings- en privacy-redenen.
+### Wat wordt er aangepast
 
-### Nieuwe bestanden
+**Bestand: `src/components/production/StockExcelImportDialog.tsx`**
 
-**1. Edge function: `supabase/functions/backup-database/index.ts`**
+De header-detectielogica wordt uitgebreid zodat de exacte kolomnamen uit het Excel-bestand worden herkend:
 
-- Admin-only (controleert `user_roles` op admin-rol)
-- Gebruikt service role client om alle data op te halen (batched per 999 rijen)
-- Retourneert een JSON-bestand met alle tabeldata + metadata (datum, versie)
-- Structuur van het JSON-bestand:
+1. **Header-rij detectie** (regel 86-90): Voeg de nieuwe patronen toe zodat de rij herkend wordt:
+   - `subcodeDescription` of `gemvanqty` of `aantalvanbarcode`
 
-```text
-{
-  "version": "1.0",
-  "created_at": "2026-02-08T...",
-  "tables": {
-    "gas_cylinder_orders": [...],
-    "dry_ice_orders": [...],
-    "customers": [...],
-    ...
-  }
-}
-```
-
-**2. Edge function: `supabase/functions/restore-database/index.ts`**
-
-- Admin-only
-- Accepteert het JSON backup-bestand via POST body
-- Valideert de structuur (controleert `version` en `tables` velden)
-- Per tabel: verwijdert bestaande data en voegt backup-data toe in batches
-- Volgorde van restore respecteert foreign key relaties (eerst referentietabellen, dan ordertabellen)
-- Gebruikt een transactie via direct SQL (postgresjs) zodat een fout alles terugdraait
-
-**3. Frontend component: `src/components/admin/DatabaseBackupRestore.tsx`**
-
-- Card-component met twee secties:
-  - **Backup**: knop om backup te downloaden als `.json` bestand
-  - **Restore**: file upload (accepteert `.json`) met bevestigingsdialoog
-- Beide acties tonen loading-status en success/error toasts
-- Restore toont een waarschuwingsdialoog ("Dit overschrijft alle huidige data")
-
-### Bestaand bestand wijzigen
-
-**`src/components/admin/AdminSettings.tsx`**
-
-- Importeer `DatabaseBackupRestore` component
-- Voeg het toe aan de "Algemeen" tab, onder `DefaultCustomerSetting`
+2. **Kolom-mapping** (regel 92-109): Voeg per kolom de exacte headers toe:
+   - `subCode`: ook matchen op `subcode` (staat er al, werkt)
+   - `description`: ook matchen op `subcodedescription`
+   - `averageConsumption`: ook matchen op `gemvanqty`
+   - `numberOnStock`: ook matchen op `aantalvanbarcode`
+   - `difference`: ook matchen op `verscil` (zonder h)
 
 ### Technische details
 
-**Backup edge function flow:**
-1. Verifieer admin-rol via auth header
-2. Maak service role client aan
-3. Haal per tabel alle rijen op in batches van 999
-4. Combineer tot een JSON-object met metadata
-5. Retourneer als `application/json` download
+De wijzigingen zitten alleen in de `handleFileSelect` callback:
 
-**Restore edge function flow:**
-1. Verifieer admin-rol
-2. Parse en valideer het JSON-bestand
-3. Open een database-transactie via `postgresjs`
-4. Verwijder data in omgekeerde volgorde (orders eerst, dan referentietabellen)
-5. Insert data in correcte volgorde (referentietabellen eerst)
-6. Bij succes: commit. Bij fout: rollback + foutmelding
+**Header-rij herkenning** -- de conditie wordt verruimd:
+```
+// Bestaand: zoekt "omschrijving" EN "voorraad"
+// Nieuw: ook matchen als "subcodedescription" EN "gemvanqty" aanwezig zijn
+```
 
-**Restore-volgorde (respecteert foreign keys):**
-1. Eerst: `gas_type_categories`, `gas_types`, `cylinder_sizes`, `dry_ice_packaging`, `dry_ice_product_types`, `task_types`, `time_off_types`, `app_settings`, `customers`
-2. Daarna: `gas_cylinder_orders`, `dry_ice_orders`
+**Kolom-mapping** -- per kolom extra patronen:
+```
+description: + "subcodedescription"
+averageConsumption: + "gemvanqty"  
+numberOnStock: + "aantalvanbarcode"
+difference: + "verscil"
+```
 
-**Delete-volgorde (omgekeerd):**
-1. Eerst: `gas_cylinder_orders`, `dry_ice_orders`
-2. Daarna: de rest
-
+Geen andere bestanden hoeven te worden aangepast.
