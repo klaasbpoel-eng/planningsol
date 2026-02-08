@@ -286,38 +286,85 @@ export function MySQLSyncSettings({ selectedTables }: MySQLSyncSettingsProps) {
   };
 
   const handleExportDump = async () => {
+    if (selectedTables.length === 0) {
+      toast.error("Selecteer minimaal één tabel");
+      return;
+    }
     setExporting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Niet ingelogd");
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-mysql-dump`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ tables: selectedTables }),
-        }
-      );
+      const sqlParts: string[] = [];
+      let totalRows = 0;
 
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || `Export mislukt (${response.status})`);
+      // Export table by table to avoid CPU timeout
+      for (let i = 0; i < selectedTables.length; i++) {
+        const table = selectedTables[i];
+        toast.info(`Exporteren: ${table} (${i + 1}/${selectedTables.length})...`);
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-mysql-dump`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              table,
+              includeHeader: i === 0,
+              includeFooter: i === selectedTables.length - 1,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || `Export mislukt voor ${table} (${response.status})`);
+        }
+
+        const data = await response.json();
+        sqlParts.push(data.sql);
+        totalRows += data.rows || 0;
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      // Combine and compress client-side
+      const fullSql = sqlParts.join("\n");
+      const blob = new Blob([fullSql], { type: "application/sql" });
+
+      // Try gzip compression via CompressionStream
+      let downloadBlob: Blob;
+      let filename: string;
+      try {
+        const cs = new CompressionStream("gzip");
+        const writer = cs.writable.getWriter();
+        writer.write(new TextEncoder().encode(fullSql));
+        writer.close();
+        const reader = cs.readable.getReader();
+        const chunks: BlobPart[] = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(new Blob([value]));
+        }
+        downloadBlob = new Blob(chunks, { type: "application/gzip" });
+        filename = `mysql_dump_${new Date().toISOString().slice(0, 10)}.sql.gz`;
+      } catch {
+        // Fallback: plain SQL
+        downloadBlob = blob;
+        filename = `mysql_dump_${new Date().toISOString().slice(0, 10)}.sql`;
+      }
+
+      const url = URL.createObjectURL(downloadBlob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `mysql_dump_${new Date().toISOString().slice(0, 10)}.sql.gz`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success("MySQL dump gedownload!");
+      toast.success(`MySQL dump gedownload! (${totalRows} rijen)`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Export mislukt");
     } finally {
