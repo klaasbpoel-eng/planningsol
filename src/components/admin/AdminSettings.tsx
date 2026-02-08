@@ -9,8 +9,9 @@ import { EmployeeList } from "./EmployeeList";
 import { DatabaseBackupRestore } from "./DatabaseBackupRestore";
 import { ExternalDatabaseSettings } from "./ExternalDatabaseSettings";
 import { MigrationSettings } from "./MigrationSettings";
+import { SupabaseSyncSettings } from "./SupabaseSyncSettings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Users, Factory, Calendar, Building2, UserCog, Database, ArrowRightLeft } from "lucide-react";
+import { Settings, Users, Factory, Calendar, Building2, UserCog, Database, ArrowRightLeft, RefreshCw } from "lucide-react";
 
 export function AdminSettings() {
   return (
@@ -51,6 +52,10 @@ export function AdminSettings() {
           <TabsTrigger value="migration" className="gap-2 data-[state=active]:bg-background">
             <ArrowRightLeft className="h-4 w-4" />
             Migratie
+          </TabsTrigger>
+          <TabsTrigger value="sync" className="gap-2 data-[state=active]:bg-background">
+            <RefreshCw className="h-4 w-4" />
+            Supabase Sync
           </TabsTrigger>
         </TabsList>
 
@@ -99,6 +104,10 @@ export function AdminSettings() {
 
         <TabsContent value="migration" className="space-y-4 animate-fade-in-up">
           <MigrationSettings />
+        </TabsContent>
+
+        <TabsContent value="sync" className="space-y-4 animate-fade-in-up">
+          <SupabaseSyncSettings />
         </TabsContent>
       </Tabs>
     </div>
