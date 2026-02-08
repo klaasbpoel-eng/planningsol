@@ -28,6 +28,7 @@ import {
   TableProperties,
   Plug,
   Loader2,
+  Download,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -73,6 +74,7 @@ export function MySQLSyncSettings({ selectedTables }: MySQLSyncSettingsProps) {
   const [showPassword, setShowPassword] = useState(false);
 
   const [syncing, setSyncing] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [syncProgress, setSyncProgress] = useState<{ current: number; total: number; table: string; rowsProcessed?: number } | null>(null);
   const [creatingSchema, setCreatingSchema] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
@@ -283,6 +285,46 @@ export function MySQLSyncSettings({ selectedTables }: MySQLSyncSettingsProps) {
     }
   };
 
+  const handleExportDump = async () => {
+    setExporting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Niet ingelogd");
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-mysql-dump`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ tables: selectedTables }),
+        }
+      );
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || `Export mislukt (${response.status})`);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mysql_dump_${new Date().toISOString().slice(0, 10)}.sql.gz`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("MySQL dump gedownload!");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Export mislukt");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <>
       <div className="space-y-6">
@@ -422,6 +464,19 @@ export function MySQLSyncSettings({ selectedTables }: MySQLSyncSettingsProps) {
               >
                 <TableProperties className="h-4 w-4" />
                 {creatingSchema ? "Schema aanmaken..." : "Schema aanmaken"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleExportDump}
+                disabled={exporting || selectedTables.length === 0}
+                className="gap-2"
+              >
+                {exporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {exporting ? "Exporteren..." : "Download .sql.gz"}
               </Button>
             </div>
 
