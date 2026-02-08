@@ -35,14 +35,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 const STORAGE_KEY = "supabase_sync_config";
 
 const ALL_TABLES = [
+  "app_settings",
   "gas_type_categories",
-  "gas_types",
   "cylinder_sizes",
   "dry_ice_packaging",
   "dry_ice_product_types",
   "task_types",
   "time_off_types",
-  "app_settings",
+  "gas_types",
   "customers",
   "gas_cylinder_orders",
   "dry_ice_orders",
@@ -66,6 +66,7 @@ export function SupabaseSyncSettings() {
   const [showKey, setShowKey] = useState(false);
   const [selectedTables, setSelectedTables] = useState<string[]>(ALL_TABLES);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<{ current: number; total: number; table: string } | null>(null);
   const [confirmDirection, setConfirmDirection] = useState<"push" | "pull" | null>(null);
   const [result, setResult] = useState<SyncResult | null>(null);
   const [resultOpen, setResultOpen] = useState(false);
@@ -102,50 +103,75 @@ export function SupabaseSyncSettings() {
 
     setSyncing(true);
     setResult(null);
+    setSyncProgress({ current: 0, total: selectedTables.length, table: selectedTables[0] });
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Niet ingelogd");
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-database`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            direction,
-            externalUrl,
-            externalServiceKey: externalKey,
-            tables: selectedTables,
-          }),
+      let tableIndex = 0;
+      let accumulatedResults: Record<string, any> = {};
+
+      // Chain requests — one table per call
+      while (true) {
+        setSyncProgress({
+          current: tableIndex,
+          total: selectedTables.length,
+          table: selectedTables[tableIndex] || "Afronden...",
+        });
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-database`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              direction,
+              externalUrl,
+              externalServiceKey: externalKey,
+              tables: selectedTables,
+              tableIndex,
+              accumulatedResults,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || `Sync mislukt (${response.status})`);
         }
-      );
 
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Sync mislukt");
-      }
+        const data = await response.json();
 
-      const data: SyncResult = await response.json();
-      setResult(data);
-      setResultOpen(true);
+        if (data.done) {
+          // Final response with summary
+          setResult(data as SyncResult);
+          setResultOpen(true);
 
-      if (data.summary.totalErrors === 0) {
-        toast.success(
-          `Sync voltooid: ${data.summary.totalInserted} rijen ${direction === "push" ? "verzonden" : "ontvangen"}`
-        );
-      } else {
-        toast.warning(
-          `Sync voltooid met ${data.summary.totalErrors} fouten`
-        );
+          if (data.summary.totalErrors === 0) {
+            toast.success(
+              `Sync voltooid: ${data.summary.totalInserted} rijen ${direction === "push" ? "verzonden" : "ontvangen"}`
+            );
+          } else {
+            toast.warning(
+              `Sync voltooid met ${data.summary.totalErrors} fouten`
+            );
+          }
+          break;
+        }
+
+        // Partial — move to next table
+        accumulatedResults = data.accumulatedResults;
+        tableIndex = data.nextIndex;
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Sync mislukt");
     } finally {
       setSyncing(false);
+      setSyncProgress(null);
     }
   };
 
@@ -269,13 +295,14 @@ export function SupabaseSyncSettings() {
               </Button>
             </div>
 
-            {syncing && (
+            {syncing && syncProgress && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <RefreshCw className="h-4 w-4 animate-spin" />
-                  Synchronisatie bezig...
+                  Synchronisatie bezig — <span className="font-mono">{syncProgress.table}</span>
+                  {" "}({syncProgress.current + 1}/{syncProgress.total})
                 </div>
-                <Progress value={undefined} className="h-2" />
+                <Progress value={(syncProgress.current / syncProgress.total) * 100} className="h-2" />
               </div>
             )}
           </CardContent>
