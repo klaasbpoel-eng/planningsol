@@ -458,11 +458,11 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
                         customerName={order.customer_name}
                         scheduledDate={order.scheduled_date}
                         status={order.status}
-                        onStatusChange={permissions?.canEditOrders ? handleStatusChange : undefined}
+                        onStatusChange={isAdmin ? handleStatusChange : undefined}
                         onEdit={() => handleEditOrder(order)}
                         onDelete={() => handleDeleteClick(order)}
-                        canEdit={permissions?.canEditOrders}
-                        canDelete={permissions?.canDeleteOrders}
+                        canEdit={isAdmin}
+                        canDelete={isAdmin}
                         isRecurring={order.is_recurring ?? false}
                       >
                         <OrderDetail label="Type" value={getProductTypeLabel(order)} />
@@ -540,7 +540,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
                               </Select>
                             </div>
                           </TableHead>
-                          {(permissions?.canEditOrders || permissions?.canDeleteOrders) && <TableHead className="w-[80px]"></TableHead>}
+                          {isAdmin && <TableHead className="w-[80px]"></TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -562,7 +562,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
                               {format(new Date(order.scheduled_date), "d MMM yyyy", { locale: nl })}
                             </TableCell>
                             <TableCell>
-                              {permissions?.canEditOrders ? (
+                              {isAdmin ? (
                                 <Select
                                   value={order.status}
                                   onValueChange={(newStatus) => handleStatusChange(order.id, newStatus)}
@@ -580,7 +580,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
                                 getStatusBadge(order.status)
                               )}
                             </TableCell>
-                            {(permissions?.canEditOrders || permissions?.canDeleteOrders) && (
+                            {isAdmin && (
                               <TableCell>
                                 <div className="flex items-center gap-1">
                                   <Button
@@ -671,7 +671,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
         open={editDialogOpen}
         onOpenChange={handleEditDialogClose}
         onUpdate={handleOrderUpdated}
-        canEdit={permissions?.canEditOrders}
+        canEdit={isAdmin}
         productTypes={productTypes.map(pt => ({ ...pt, description: null, is_active: true, sort_order: 0, created_at: "", updated_at: "" }))}
         packagingOptions={packagingOptions.map(pkg => ({ ...pkg, description: null, is_active: true, sort_order: 0, created_at: "", updated_at: "", capacity_kg: null }))}
       />
