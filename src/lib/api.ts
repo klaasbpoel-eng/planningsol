@@ -825,9 +825,9 @@ export const api = {
         getAll: async () => {
             const config = getConfig();
             if (config?.useMySQL) {
-                return executeMySQL("SELECT * FROM time_off_requests ORDER BY start_date ASC");
+                return executeMySQL("SELECT * FROM time_off_requests ORDER BY start_date DESC");
             } else {
-                const { data, error } = await supabase.from("time_off_requests").select("*").order("start_date", { ascending: true });
+                const { data, error } = await supabase.from("time_off_requests").select("*").order("start_date", { ascending: false });
                 if (error) throw error;
                 return data;
             }
@@ -892,6 +892,36 @@ export const api = {
                 return rows[0] || null;
             } else {
                 const { data, error } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
+                if (error) throw error;
+                return data;
+            }
+        },
+        create: async (item: any) => {
+            const config = getConfig();
+            if (config?.useMySQL) {
+                const id = item.id || crypto.randomUUID();
+                const keys = Object.keys(item).filter(k => k !== 'id');
+                const values = keys.map(k => item[k]);
+                keys.unshift('id');
+                values.unshift(id);
+                const placeholders = keys.map(() => '?').join(',');
+                return executeMySQL(`INSERT INTO profiles (${keys.join(',')}) VALUES (${placeholders})`, values);
+            } else {
+                const { data, error } = await supabase.from("profiles").insert(item).select().single();
+                if (error) throw error;
+                return data;
+            }
+        },
+        update: async (id: string, item: any) => {
+            const config = getConfig();
+            if (config?.useMySQL) {
+                const keys = Object.keys(item).filter(k => k !== 'id' && k !== 'created_at');
+                const values = keys.map(k => item[k]);
+                values.push(id);
+                const setClause = keys.map(k => `${k} = ?`).join(',');
+                return executeMySQL(`UPDATE profiles SET ${setClause} WHERE id = ?`, values);
+            } else {
+                const { data, error } = await supabase.from("profiles").update(item).eq("id", id).select().single();
                 if (error) throw error;
                 return data;
             }
@@ -1192,60 +1222,7 @@ export const api = {
             }
         }
     },
-    timeOffRequests: {
-        getAll: async () => {
-            const config = getConfig();
-            if (config?.useMySQL) {
-                // Use a join to get profile info if needed, or just select *
-                // Assuming we might need profile names, but start simple
-                return executeMySQL("SELECT * FROM time_off_requests ORDER BY start_date DESC");
-            } else {
-                const { data, error } = await supabase.from("time_off_requests").select("*").order("start_date", { ascending: false });
-                if (error) throw error;
-                return data;
-            }
-        },
-        create: async (item: any) => {
-            const config = getConfig();
-            if (config?.useMySQL) {
-                const id = item.id || crypto.randomUUID();
-                const keys = Object.keys(item).filter(k => k !== 'id');
-                const values = keys.map(k => item[k]);
-                keys.unshift('id');
-                values.unshift(id);
-                const placeholders = keys.map(() => '?').join(',');
-                return executeMySQL(`INSERT INTO time_off_requests (${keys.join(',')}) VALUES (${placeholders})`, values);
-            } else {
-                const { data, error } = await supabase.from("time_off_requests").insert(item).select().single();
-                if (error) throw error;
-                return data;
-            }
-        },
-        update: async (id: string, item: any) => {
-            const config = getConfig();
-            if (config?.useMySQL) {
-                const keys = Object.keys(item).filter(k => k !== 'id' && k !== 'created_at');
-                const values = keys.map(k => item[k]);
-                values.push(id);
-                const setClause = keys.map(k => `${k} = ?`).join(',');
-                return executeMySQL(`UPDATE time_off_requests SET ${setClause} WHERE id = ?`, values);
-            } else {
-                const { data, error } = await supabase.from("time_off_requests").update(item).eq("id", id).select().single();
-                if (error) throw error;
-                return data;
-            }
-        },
-        delete: async (id: string) => {
-            const config = getConfig();
-            if (config?.useMySQL) {
-                return executeMySQL("DELETE FROM time_off_requests WHERE id = ?", [id]);
-            } else {
-                const { error } = await supabase.from("time_off_requests").delete().eq("id", id);
-                if (error) throw error;
-                return true;
-            }
-        }
-    },
+
     admin: {
         repairDatabase: async () => {
             const config = getConfig();
@@ -1314,5 +1291,6 @@ export const api = {
                 return false;
             }
         }
-    }
+    },
+
 };
