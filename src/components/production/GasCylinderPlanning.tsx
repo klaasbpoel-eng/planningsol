@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Trash2, Filter, CalendarIcon, X, Edit2, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, MapPin } from "lucide-react";
+import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Trash2, Filter, CalendarIcon, X, Edit2, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, MapPin, Download, Loader2 } from "lucide-react";
 import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { FadeIn } from "@/components/ui/fade-in";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -125,6 +125,7 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
   const [monthFilter, setMonthFilter] = useState<number>(new Date().getMonth() + 1);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [locationTab, setLocationTab] = useState<LocationTab>(getInitialTab());
+  const [isExporting, setIsExporting] = useState(false);
 
   // Update location tab when location prop changes (for non-admin users)
   useEffect(() => {
@@ -500,6 +501,52 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
     setCustomerFilter("all");
     setYearFilter(new Date().getFullYear());
     setMonthFilter(new Date().getMonth() + 1);
+  };
+
+  const handleExportToExcel = async () => {
+    setIsExporting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Je bent niet ingelogd");
+        return;
+      }
+
+      const params = new URLSearchParams();
+      if (monthFilter === 0 && yearFilter) {
+        params.set("year", yearFilter.toString());
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const url = `${supabaseUrl}/functions/v1/export-cylinder-orders${params.toString() ? `?${params}` : ""}`;
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Export mislukt");
+      }
+
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = res.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1] || "gascilinder-orders.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      toast.success("Export gedownload");
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Fout bij exporteren");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Render the order content (table, filters, stats)
@@ -880,10 +927,20 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
         </div>
         <div className="flex gap-2">
           {isAdmin && (
-            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Excel import
-            </Button>
+            <>
+              <Button variant="outline" onClick={handleExportToExcel} disabled={isExporting}>
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                Excel export
+              </Button>
+              <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Excel import
+              </Button>
+            </>
           )}
           {permissions?.canCreateOrders && (
             <Button variant="accent" onClick={() => setDialogOpen(true)}>
