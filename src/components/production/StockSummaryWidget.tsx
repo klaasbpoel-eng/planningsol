@@ -254,7 +254,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
                       <span className="text-[9px] text-muted-foreground">{config.label}</span>
                     </div>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent className="max-w-lg">
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2">
                         <Icon className={cn("h-5 w-5", config.color)} />
