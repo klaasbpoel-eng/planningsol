@@ -82,10 +82,18 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
     try {
       const locationParam = location === "all" ? null : location;
 
+      // Helper to format date as local YYYY-MM-DD (avoids UTC timezone shift)
+      const toLocalDateString = (date: Date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
+
       if (dateRange) {
         // Calculate period-based data
-        const fromDate = dateRange.from.toISOString().split('T')[0];
-        const toDate = dateRange.to.toISOString().split('T')[0];
+        const fromDate = toLocalDateString(dateRange.from);
+        const toDate = toLocalDateString(dateRange.to);
 
         console.log("[KPIDashboard] Calling RPC with date range:", { fromDate, toDate, locationParam });
 
@@ -95,8 +103,8 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
         prevTo.setDate(prevTo.getDate() - 1);
         const prevFrom = new Date(prevTo);
         prevFrom.setDate(prevFrom.getDate() - periodLength);
-        const prevFromDate = prevFrom.toISOString().split('T')[0];
-        const prevToDate = prevTo.toISOString().split('T')[0];
+        const prevFromDate = toLocalDateString(prevFrom);
+        const prevToDate = toLocalDateString(prevTo);
 
         // Fetch current period data
         // Use RPC function for server-side aggregation (avoids 1000 row limit)
@@ -212,8 +220,9 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 6);
 
-      const startStr = weekStart.toISOString().split('T')[0];
-      const endStr = weekEnd.toISOString().split('T')[0];
+      const toLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const startStr = toLocal(weekStart);
+      const endStr = toLocal(weekEnd);
 
       let query = supabase
         .from("gas_cylinder_orders")
