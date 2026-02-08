@@ -1,37 +1,36 @@
 
 
-## Database Export Vereenvoudigen
+## Fix "Onbekend" in Kalender
 
-De huidige "Migratie" tab bevat nog veel oude functionaliteit (externe database connecties, Supabase credentials, migratiescript generatie) die niet meer nodig is. Dit plan vervangt dat door alleen de schone MySQL export download.
+### Oorzaak
+De `profiles` tabel heeft alleen een `full_name` kolom, maar de code probeert te sorteren op `last_name` en `first_name` -- kolommen die niet bestaan. Dit veroorzaakt een fout waardoor alle profielen niet geladen worden, en de kalender "Onbekend" toont bij elke medewerker.
 
-### Wat er verandert
+### Oplossing
 
-**1. MigrationSettings.tsx vervangen**
-- De 489 regels aan oude migratie-logica (connecties, scripts, etc.) worden vervangen door een simpele wrapper die:
-  - De tabelselectie toont (checkboxes voor alle beschikbare tabellen)
-  - De `DatabaseExportSettings` component rendert met de geselecteerde tabellen
+**Bestand: `src/lib/api.ts` (regel 846-848)**
 
-**2. Tab hernoemen in AdminSettings.tsx**
-- "Migratie" tab hernoemen naar "Database Export"
-- Icon aanpassen van `ArrowRightLeft` naar `Download`
+De `profiles.getAll()` functie aanpassen om te sorteren op `full_name` in plaats van `last_name` en `first_name`:
 
-**3. Opruimen**
-- Alle ongebruikte imports en code verwijderen uit MigrationSettings
-- De externe database connectie-logica (localStorage keys, ConnectionConfig types) verwijderen
-
-### Resultaat
-- De admin ziet een "Database Export" tab met tabelselectie en een download knop
-- Geen verwarrende connectie-instellingen of script-generatie meer
-- De bestaande `DatabaseExportSettings` component en `export-mysql-dump` edge function blijven ongewijzigd
+- MySQL query: `ORDER BY last_name ASC, first_name ASC` wordt `ORDER BY full_name ASC`
+- Supabase query: `.order("last_name").order("first_name")` wordt `.order("full_name")`
 
 ### Technische details
 
-**MigrationSettings.tsx** wordt ~60 regels:
-- State: `selectedTables` array
-- UI: Checkboxes voor tabelselectie + `DatabaseExportSettings` component
-- Tabellen lijst komt uit de `TABLE_SQLS` keys in de edge function (hardcoded lijst: `app_settings`, `gas_type_categories`, `cylinder_sizes`, `dry_ice_packaging`, `dry_ice_product_types`, `task_types`, `time_off_types`, `gas_types`, `customers`, `gas_cylinder_orders`, `dry_ice_orders`)
+Huidige code (fout):
+```typescript
+// MySQL pad
+return executeMySQL("SELECT * FROM profiles ORDER BY last_name ASC, first_name ASC");
+// Supabase pad
+const { data, error } = await supabase.from("profiles").select("*").order("last_name").order("first_name");
+```
 
-**AdminSettings.tsx** wijzigingen:
-- Import `Download` icon in plaats van `ArrowRightLeft`
-- Tab label: "Database Export" in plaats van "Migratie"
+Nieuwe code:
+```typescript
+// MySQL pad
+return executeMySQL("SELECT * FROM profiles ORDER BY full_name ASC");
+// Supabase pad
+const { data, error } = await supabase.from("profiles").select("*").order("full_name");
+```
+
+Dit is een eenvoudige fix van 2 regels die het probleem direct oplost.
 
