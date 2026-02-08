@@ -6,7 +6,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Tables ordered by dependency (parents first)
 const SYNC_TABLES = [
   "app_settings",
   "gas_type_categories",
@@ -21,7 +20,6 @@ const SYNC_TABLES = [
   "dry_ice_orders",
 ];
 
-// FK columns to strip to avoid constraint errors on target
 const STRIP_COLUMNS: Record<string, string[]> = {
   gas_types: ["category_id"],
   gas_cylinder_orders: ["customer_id", "gas_type_id", "assigned_to", "created_by"],
@@ -38,41 +36,26 @@ function cleanRows(table: string, rows: any[]) {
   });
 }
 
-async function fetchAllRows(client: any, table: string) {
-  const allRows: unknown[] = [];
-  const batchSize = 999;
-  let offset = 0;
-  while (true) {
-    const { data, error } = await client
-      .from(table)
-      .select("*")
-      .range(offset, offset + batchSize - 1);
-    if (error) throw new Error(`Fetch ${table}: ${error.message}`);
-    if (!data || data.length === 0) break;
-    allRows.push(...data);
-    if (data.length < batchSize) break;
-    offset += batchSize;
-  }
-  return allRows;
+// Fetch a single page of rows
+async function fetchPage(client: any, table: string, offset: number, limit: number) {
+  const { data, error } = await client
+    .from(table)
+    .select("*")
+    .range(offset, offset + limit - 1);
+  if (error) throw new Error(`Fetch ${table}: ${error.message}`);
+  return data || [];
 }
 
+// Upsert a single batch
 async function upsertBatch(client: any, table: string, rows: any[]) {
-  if (rows.length === 0) return { inserted: 0, errors: [] as string[] };
+  if (rows.length === 0) return { inserted: 0, error: null as string | null };
   const cleaned = cleanRows(table, rows);
-  const batchSize = 200;
-  let inserted = 0;
-  const errors: string[] = [];
-  for (let i = 0; i < cleaned.length; i += batchSize) {
-    const batch = cleaned.slice(i, i + batchSize);
-    const { error } = await client.from(table).upsert(batch, { onConflict: "id", ignoreDuplicates: false });
-    if (error) {
-      errors.push(`batch ${Math.floor(i / batchSize) + 1}: ${error.message}`);
-    } else {
-      inserted += batch.length;
-    }
-  }
-  return { inserted, errors };
+  const { error } = await client.from(table).upsert(cleaned, { onConflict: "id", ignoreDuplicates: false });
+  if (error) return { inserted: 0, error: error.message };
+  return { inserted: cleaned.length, error: null };
 }
+
+const BATCH_SIZE = 500; // rows per call
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -91,7 +74,6 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Verify admin
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -114,7 +96,21 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { direction, externalUrl, externalServiceKey, tables, tableIndex = 0, accumulatedResults = {} } = body;
+    const {
+      direction,
+      externalUrl,
+      externalServiceKey,
+      tables,
+      // Pagination state
+      tableIndex = 0,
+      batchOffset = 0,
+      // Accumulated results across all calls
+      accumulatedResults = {},
+      // Current table accumulator
+      currentTableRows = 0,
+      currentTableInserted = 0,
+      currentTableErrors = [] as string[],
+    } = body;
 
     if (!externalUrl || !externalServiceKey) {
       return new Response(JSON.stringify({ error: "Externe Supabase URL en Service Role Key zijn vereist" }), {
@@ -132,15 +128,11 @@ Deno.serve(async (req) => {
     const sourceClient = direction === "push" ? localServiceClient : externalClient;
     const targetClient = direction === "push" ? externalClient : localServiceClient;
 
-    // Process only ONE table per invocation to stay within CPU limits
-    const currentTable = selectedTables[tableIndex];
-
-    if (!currentTable) {
-      // All tables done — return accumulated results
+    // All tables done?
+    if (tableIndex >= selectedTables.length) {
       const totalRows = Object.values(accumulatedResults as Record<string, any>).reduce((s: number, r: any) => s + r.rows, 0);
       const totalInserted = Object.values(accumulatedResults as Record<string, any>).reduce((s: number, r: any) => s + r.inserted, 0);
       const totalErrors = Object.values(accumulatedResults as Record<string, any>).reduce((s: number, r: any) => s + r.errors.length, 0);
-
       return new Response(JSON.stringify({
         success: true, direction, done: true,
         summary: { totalRows, totalInserted, totalErrors },
@@ -148,40 +140,90 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Process current table
-    let tableResult: { rows: number; inserted: number; errors: string[] };
+    const currentTable = selectedTables[tableIndex];
+
+    // Fetch one batch from source
+    let rows: any[] = [];
+    let fetchError: string | null = null;
     try {
-      const rows = await fetchAllRows(sourceClient, currentTable);
-      const { inserted, errors } = await upsertBatch(targetClient, currentTable, rows);
-      tableResult = { rows: rows.length, inserted, errors };
-    } catch (error) {
-      tableResult = { rows: 0, inserted: 0, errors: [error instanceof Error ? error.message : "Onbekende fout"] };
+      rows = await fetchPage(sourceClient, currentTable, batchOffset, BATCH_SIZE);
+    } catch (e) {
+      fetchError = e instanceof Error ? e.message : "Fetch fout";
     }
 
-    const newResults = { ...accumulatedResults, [currentTable]: tableResult };
-    const nextIndex = tableIndex + 1;
+    let newTableRows = currentTableRows;
+    let newTableInserted = currentTableInserted;
+    let newTableErrors = [...currentTableErrors];
 
-    if (nextIndex < selectedTables.length) {
-      // Return partial progress — frontend will chain the next call
+    if (fetchError) {
+      newTableErrors.push(fetchError);
+    } else if (rows.length > 0) {
+      newTableRows += rows.length;
+      const result = await upsertBatch(targetClient, currentTable, rows);
+      newTableInserted += result.inserted;
+      if (result.error) newTableErrors.push(`offset ${batchOffset}: ${result.error}`);
+    }
+
+    // More rows to fetch for this table?
+    const hasMore = !fetchError && rows.length === BATCH_SIZE;
+
+    if (hasMore) {
+      // Continue with next batch of same table
       return new Response(JSON.stringify({
         success: true, direction, done: false,
-        currentTable, tableIndex, nextIndex,
+        tableIndex, batchOffset: batchOffset + BATCH_SIZE,
+        currentTable,
         totalTables: selectedTables.length,
-        tableResult,
-        accumulatedResults: newResults,
+        currentTableRows: newTableRows,
+        currentTableInserted: newTableInserted,
+        currentTableErrors: newTableErrors,
+        accumulatedResults,
+        progress: {
+          table: currentTable,
+          tableNum: tableIndex + 1,
+          totalTables: selectedTables.length,
+          rowsProcessed: newTableRows,
+        },
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Last table — return final results
-    const totalRows = Object.values(newResults as Record<string, any>).reduce((s: number, r: any) => s + r.rows, 0);
-    const totalInserted = Object.values(newResults as Record<string, any>).reduce((s: number, r: any) => s + r.inserted, 0);
-    const totalErrors = Object.values(newResults as Record<string, any>).reduce((s: number, r: any) => s + r.errors.length, 0);
+    // Table complete — save result and move to next
+    const newResults = {
+      ...accumulatedResults,
+      [currentTable]: { rows: newTableRows, inserted: newTableInserted, errors: newTableErrors },
+    };
+    const nextIndex = tableIndex + 1;
 
+    if (nextIndex >= selectedTables.length) {
+      // All done
+      const totalRows = Object.values(newResults as Record<string, any>).reduce((s: number, r: any) => s + r.rows, 0);
+      const totalInserted = Object.values(newResults as Record<string, any>).reduce((s: number, r: any) => s + r.inserted, 0);
+      const totalErrors = Object.values(newResults as Record<string, any>).reduce((s: number, r: any) => s + r.errors.length, 0);
+      return new Response(JSON.stringify({
+        success: true, direction, done: true,
+        summary: { totalRows, totalInserted, totalErrors },
+        details: newResults,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Next table
     return new Response(JSON.stringify({
-      success: true, direction, done: true,
-      summary: { totalRows, totalInserted, totalErrors },
-      details: newResults,
+      success: true, direction, done: false,
+      tableIndex: nextIndex, batchOffset: 0,
+      currentTable: selectedTables[nextIndex],
+      totalTables: selectedTables.length,
+      currentTableRows: 0,
+      currentTableInserted: 0,
+      currentTableErrors: [],
+      accumulatedResults: newResults,
+      progress: {
+        table: selectedTables[nextIndex],
+        tableNum: nextIndex + 1,
+        totalTables: selectedTables.length,
+        rowsProcessed: 0,
+      },
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
   } catch (error) {
     console.error("Sync error:", error);
     return new Response(

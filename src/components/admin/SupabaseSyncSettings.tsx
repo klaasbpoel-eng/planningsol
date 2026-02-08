@@ -66,7 +66,7 @@ export function SupabaseSyncSettings() {
   const [showKey, setShowKey] = useState(false);
   const [selectedTables, setSelectedTables] = useState<string[]>(ALL_TABLES);
   const [syncing, setSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState<{ current: number; total: number; table: string } | null>(null);
+  const [syncProgress, setSyncProgress] = useState<{ current: number; total: number; table: string; rowsProcessed?: number } | null>(null);
   const [confirmDirection, setConfirmDirection] = useState<"push" | "pull" | null>(null);
   const [result, setResult] = useState<SyncResult | null>(null);
   const [resultOpen, setResultOpen] = useState(false);
@@ -109,17 +109,15 @@ export function SupabaseSyncSettings() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Niet ingelogd");
 
+      // State for chaining
       let tableIndex = 0;
+      let batchOffset = 0;
       let accumulatedResults: Record<string, any> = {};
+      let currentTableRows = 0;
+      let currentTableInserted = 0;
+      let currentTableErrors: string[] = [];
 
-      // Chain requests — one table per call
       while (true) {
-        setSyncProgress({
-          current: tableIndex,
-          total: selectedTables.length,
-          table: selectedTables[tableIndex] || "Afronden...",
-        });
-
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-database`,
           {
@@ -134,38 +132,51 @@ export function SupabaseSyncSettings() {
               externalServiceKey: externalKey,
               tables: selectedTables,
               tableIndex,
+              batchOffset,
               accumulatedResults,
+              currentTableRows,
+              currentTableInserted,
+              currentTableErrors,
             }),
           }
         );
 
         if (!response.ok) {
           const err = await response.json();
-          throw new Error(err.error || `Sync mislukt (${response.status})`);
+          throw new Error(err.error || err.message || `Sync mislukt (${response.status})`);
         }
 
         const data = await response.json();
 
         if (data.done) {
-          // Final response with summary
           setResult(data as SyncResult);
           setResultOpen(true);
-
           if (data.summary.totalErrors === 0) {
-            toast.success(
-              `Sync voltooid: ${data.summary.totalInserted} rijen ${direction === "push" ? "verzonden" : "ontvangen"}`
-            );
+            toast.success(`Sync voltooid: ${data.summary.totalInserted} rijen ${direction === "push" ? "verzonden" : "ontvangen"}`);
           } else {
-            toast.warning(
-              `Sync voltooid met ${data.summary.totalErrors} fouten`
-            );
+            toast.warning(`Sync voltooid met ${data.summary.totalErrors} fouten`);
           }
           break;
         }
 
-        // Partial — move to next table
+        // Update progress
+        const progress = data.progress;
+        if (progress) {
+          setSyncProgress({
+            current: progress.tableNum - 1,
+            total: progress.totalTables,
+            table: progress.table,
+            rowsProcessed: progress.rowsProcessed,
+          });
+        }
+
+        // Carry forward state for next call
+        tableIndex = data.tableIndex;
+        batchOffset = data.batchOffset;
         accumulatedResults = data.accumulatedResults;
-        tableIndex = data.nextIndex;
+        currentTableRows = data.currentTableRows ?? 0;
+        currentTableInserted = data.currentTableInserted ?? 0;
+        currentTableErrors = data.currentTableErrors ?? [];
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Sync mislukt");
@@ -299,8 +310,9 @@ export function SupabaseSyncSettings() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <RefreshCw className="h-4 w-4 animate-spin" />
-                  Synchronisatie bezig — <span className="font-mono">{syncProgress.table}</span>
+                  <span className="font-mono">{syncProgress.table}</span>
                   {" "}({syncProgress.current + 1}/{syncProgress.total})
+                  {syncProgress.rowsProcessed ? ` — ${syncProgress.rowsProcessed} rijen` : ""}
                 </div>
                 <Progress value={(syncProgress.current / syncProgress.total) * 100} className="h-2" />
               </div>
