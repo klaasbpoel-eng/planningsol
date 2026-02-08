@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   Eye,
   EyeOff,
+  TableProperties,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -62,22 +63,85 @@ export function SupabaseSyncSettings() {
       return saved ? JSON.parse(saved).url || "" : "";
     } catch { return ""; }
   });
+  const [externalDbUrl, setExternalDbUrl] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved).dbUrl || "" : "";
+    } catch { return ""; }
+  });
   const [externalKey, setExternalKey] = useState("");
   const [showKey, setShowKey] = useState(false);
+  const [showDbUrl, setShowDbUrl] = useState(false);
   const [selectedTables, setSelectedTables] = useState<string[]>(ALL_TABLES);
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<{ current: number; total: number; table: string; rowsProcessed?: number } | null>(null);
   const [confirmDirection, setConfirmDirection] = useState<"push" | "pull" | null>(null);
   const [result, setResult] = useState<SyncResult | null>(null);
   const [resultOpen, setResultOpen] = useState(false);
+  const [creatingSchema, setCreatingSchema] = useState(false);
+  const [confirmSchema, setConfirmSchema] = useState(false);
+  const [schemaResult, setSchemaResult] = useState<any>(null);
+  const [schemaResultOpen, setSchemaResultOpen] = useState(false);
 
-  const saveConfig = (url: string) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ url }));
+  const saveConfig = (url: string, dbUrl?: string) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ url, dbUrl: dbUrl ?? externalDbUrl }));
   };
 
   const handleUrlChange = (val: string) => {
     setExternalUrl(val);
     saveConfig(val);
+  };
+
+  const handleDbUrlChange = (val: string) => {
+    setExternalDbUrl(val);
+    saveConfig(externalUrl, val);
+  };
+
+  const handleCreateSchema = async () => {
+    setConfirmSchema(false);
+    if (!externalDbUrl) {
+      toast.error("Vul de externe Database URL in");
+      return;
+    }
+    setCreatingSchema(true);
+    setSchemaResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Niet ingelogd");
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-schema`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            externalDbUrl,
+            tables: selectedTables,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || `Schema aanmaken mislukt (${response.status})`);
+      }
+
+      const data = await response.json();
+      setSchemaResult(data);
+      setSchemaResultOpen(true);
+      if (data.success) {
+        toast.success(`Schema succesvol aangemaakt (${data.summary.created} objecten)`);
+      } else {
+        toast.warning(`Schema aangemaakt met ${data.summary.errors} fouten`);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Schema aanmaken mislukt");
+    } finally {
+      setCreatingSchema(false);
+    }
   };
 
   const handleToggleTable = (table: string) => {
@@ -232,13 +296,35 @@ export function SupabaseSyncSettings() {
                   </Button>
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>Externe Database URL</Label>
+                <div className="relative">
+                  <Database className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={externalDbUrl}
+                    onChange={(e) => handleDbUrlChange(e.target.value)}
+                    className="pl-9 pr-10"
+                    type={showDbUrl ? "text" : "password"}
+                    placeholder="postgresql://postgres:[password]@db.xxxxx.supabase.co:5432/postgres"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-10 w-10"
+                    onClick={() => setShowDbUrl(!showDbUrl)}
+                  >
+                    {showDbUrl ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
             </div>
             <Alert>
               <ShieldAlert className="h-4 w-4" />
               <AlertTitle>Let op</AlertTitle>
               <AlertDescription>
-                Gebruik de <strong>Service Role Key</strong> van je externe project. Deze wordt niet opgeslagen en
-                alleen tijdens de sync verzonden via een beveiligde verbinding.
+                Gebruik de <strong>Service Role Key</strong> voor data sync en de <strong>Database URL</strong> voor
+                schema aanmaken. De Database URL is te vinden onder Project Settings → Database in je externe project.
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -303,6 +389,15 @@ export function SupabaseSyncSettings() {
               >
                 <ArrowDownToLine className="h-4 w-4" />
                 Pull van extern
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setConfirmSchema(true)}
+                disabled={syncing || creatingSchema || !externalDbUrl}
+                className="gap-2"
+              >
+                <TableProperties className="h-4 w-4" />
+                {creatingSchema ? "Schema aanmaken..." : "Schema aanmaken"}
               </Button>
             </div>
 
@@ -413,6 +508,80 @@ export function SupabaseSyncSettings() {
                             <div key={idx} className="break-all">{err}</div>
                           ))}
                         </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Schema Dialog */}
+      <Dialog open={confirmSchema} onOpenChange={setConfirmSchema}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TableProperties className="h-5 w-5 text-primary" />
+              Schema aanmaken op extern project
+            </DialogTitle>
+            <DialogDescription>
+              Dit maakt alle benodigde enum types en {selectedTables.length} tabel(len) aan op je externe
+              Supabase project. Bestaande tabellen worden <strong>niet</strong> overschreven (IF NOT EXISTS).
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmSchema(false)}>
+              Annuleren
+            </Button>
+            <Button onClick={handleCreateSchema}>
+              Ja, schema aanmaken
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schema Results Dialog */}
+      <Dialog open={schemaResultOpen} onOpenChange={setSchemaResultOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {schemaResult?.success ? (
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              )}
+              Schema Resultaat
+            </DialogTitle>
+          </DialogHeader>
+          {schemaResult && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-center">
+                <div className="border rounded-lg p-3">
+                  <div className="text-2xl font-bold text-green-600">{schemaResult.summary.created}</div>
+                  <div className="text-xs text-muted-foreground">Aangemaakt</div>
+                </div>
+                <div className="border rounded-lg p-3">
+                  <div className="text-2xl font-bold text-destructive">{schemaResult.summary.errors}</div>
+                  <div className="text-xs text-muted-foreground">Fouten</div>
+                </div>
+              </div>
+              <ScrollArea className="h-[200px]">
+                <div className="space-y-2">
+                  {schemaResult.results.map((item: any) => (
+                    <div key={item.name} className="border rounded p-2 text-sm flex items-center justify-between">
+                      <span className="font-mono">{item.name}</span>
+                      {item.status === "error" ? (
+                        <Badge variant="destructive" className="gap-1">
+                          <XCircle className="h-3 w-3" />
+                          {item.error?.substring(0, 60)}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          OK
+                        </Badge>
                       )}
                     </div>
                   ))}
