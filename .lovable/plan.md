@@ -1,76 +1,37 @@
 
 
-# Schema Aanmaken op Extern Supabase Project
+## Database Export Vereenvoudigen
 
-## Overzicht
-Een nieuwe knop "Schema aanmaken" toevoegen aan de Supabase Sync UI die automatisch alle benodigde enums en tabellen aanmaakt op het externe Supabase project. Dit zorgt ervoor dat de tabelstructuur klaarstaat voordat je data kunt synchroniseren.
+De huidige "Migratie" tab bevat nog veel oude functionaliteit (externe database connecties, Supabase credentials, migratiescript generatie) die niet meer nodig is. Dit plan vervangt dat door alleen de schone MySQL export download.
 
-## Wat wordt er gebouwd
+### Wat er verandert
 
-### 1. Nieuwe Edge Function: `sync-schema`
-Een backend functie die SQL uitvoert op het externe project via de `postgresjs` library (dezelfde aanpak als `reset-dry-ice-orders`). De functie:
-- Maakt eerst de benodigde enum types aan (indien ze nog niet bestaan): `dry_ice_product_type`, `production_order_status`, `production_location`, `gas_type`, `gas_grade`
-- Maakt daarna alle 11 sync-tabellen aan in de juiste volgorde (parent-tabellen eerst)
-- Gebruikt `CREATE TYPE IF NOT EXISTS` en `CREATE TABLE IF NOT EXISTS` zodat bestaande structuren niet overschreven worden
-- Vereist dat de gebruiker de **Database URL** (postgres connection string) van het externe project opgeeft, omdat schema-bewerkingen niet via de Supabase REST API kunnen
+**1. MigrationSettings.tsx vervangen**
+- De 489 regels aan oude migratie-logica (connecties, scripts, etc.) worden vervangen door een simpele wrapper die:
+  - De tabelselectie toont (checkboxes voor alle beschikbare tabellen)
+  - De `DatabaseExportSettings` component rendert met de geselecteerde tabellen
 
-### 2. UI Aanpassingen in SupabaseSyncSettings
-- Een extra invoerveld voor de **externe Database URL** (postgres connection string)
-- Een "Schema aanmaken" knop met een bevestigingsdialoog
-- Resultaatweergave met succes/foutmeldingen
+**2. Tab hernoemen in AdminSettings.tsx**
+- "Migratie" tab hernoemen naar "Database Export"
+- Icon aanpassen van `ArrowRightLeft` naar `Download`
 
-## Workflow voor de gebruiker
+**3. Opruimen**
+- Alle ongebruikte imports en code verwijderen uit MigrationSettings
+- De externe database connectie-logica (localStorage keys, ConnectionConfig types) verwijderen
 
-```text
-1. Vul externe Supabase URL + Service Role Key in (bestaand)
-2. Vul externe Database URL in (nieuw veld)  
-3. Klik "Schema aanmaken" --> maakt tabellen aan op extern project
-4. Klik "Push naar extern" --> synchroniseert de data
-```
+### Resultaat
+- De admin ziet een "Database Export" tab met tabelselectie en een download knop
+- Geen verwarrende connectie-instellingen of script-generatie meer
+- De bestaande `DatabaseExportSettings` component en `export-mysql-dump` edge function blijven ongewijzigd
 
-## Technische Details
+### Technische details
 
-### Edge Function `sync-schema/index.ts`
-- Authenticatie + admin-check (zelfde patroon als bestaande functies)
-- Ontvangt: `externalDbUrl` en optioneel `tables` (welke tabellen)
-- Gebruikt `postgresjs` (deno.land/x/postgresjs) om SQL uit te voeren op het externe project
-- SQL bevat `IF NOT EXISTS` clausules zodat het veilig meerdere keren uitgevoerd kan worden
-- Retourneert een lijst van aangemaakte/overgeslagen tabellen
+**MigrationSettings.tsx** wordt ~60 regels:
+- State: `selectedTables` array
+- UI: Checkboxes voor tabelselectie + `DatabaseExportSettings` component
+- Tabellen lijst komt uit de `TABLE_SQLS` keys in de edge function (hardcoded lijst: `app_settings`, `gas_type_categories`, `cylinder_sizes`, `dry_ice_packaging`, `dry_ice_product_types`, `task_types`, `time_off_types`, `gas_types`, `customers`, `gas_cylinder_orders`, `dry_ice_orders`)
 
-### SQL die wordt uitgevoerd
-De volgende objecten worden aangemaakt (in volgorde):
-
-**Enums:**
-- `dry_ice_product_type` (blocks, pellets, sticks)
-- `production_order_status` (pending, in_progress, completed, cancelled)
-- `production_location` (sol_emmen, sol_tilburg)
-- `gas_type` (co2, nitrogen, argon, acetylene, oxygen, helium, other)
-- `gas_grade` (medical, technical)
-
-**Tabellen (in dependency-volgorde):**
-1. `app_settings`
-2. `gas_type_categories`
-3. `cylinder_sizes`
-4. `dry_ice_packaging`
-5. `dry_ice_product_types`
-6. `task_types`
-7. `time_off_types`
-8. `gas_types` (FK naar gas_type_categories)
-9. `customers`
-10. `gas_cylinder_orders` (FKs naar customers, gas_types)
-11. `dry_ice_orders` (FKs naar customers, dry_ice_product_types, dry_ice_packaging)
-
-Tabellen worden aangemaakt **zonder RLS** en **zonder FK constraints naar `profiles`** (die bestaan alleen in het lokale project). De FK-kolommen (`created_by`, `assigned_to`, etc.) worden wel als `uuid` kolommen aangemaakt maar zonder foreign key constraint.
-
-### UI Component wijzigingen
-- Nieuw veld "Externe Database URL" met placeholder `postgresql://postgres:[password]@db.xxxxx.supabase.co:5432/postgres`
-- Opslaan in localStorage (alleen URL, niet het wachtwoord)
-- Knop "Schema aanmaken" naast de bestaande push/pull knoppen
-- Bevestigingsdialoog met uitleg
-- Laadstatus en resultaatweergave
-
-### Bestanden die worden aangemaakt/gewijzigd
-1. **Nieuw**: `supabase/functions/sync-schema/index.ts` - Edge function
-2. **Wijzigen**: `supabase/config.toml` - JWT verify instelling toevoegen
-3. **Wijzigen**: `src/components/admin/SupabaseSyncSettings.tsx` - UI uitbreiden
+**AdminSettings.tsx** wijzigingen:
+- Import `Download` icon in plaats van `ArrowRightLeft`
+- Tab label: "Database Export" in plaats van "Migratie"
 
