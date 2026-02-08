@@ -270,6 +270,20 @@ export function CreateGasCylinderOrderDialog({
       const selectedGasType = getSelectedGasType();
       const mappedGasType = selectedGasType ? mapGasTypeToEnum(selectedGasType.name) : "other";
 
+      let finalNotes = notes.trim();
+
+      // Auto-fill notes from cylinder size if empty
+      if (!finalNotes && cylinderSize) {
+        // Check for simple formatting like "2L", "10L", "50L"
+        const match = cylinderSize.match(/^(\d+)L$/i);
+        if (match) {
+          finalNotes = `${match[1]} liter cilinder`;
+        } else {
+          // For complex types like "PP 16 x 50L" or "Dewar", use the name as is
+          finalNotes = cylinderSize;
+        }
+      }
+
       const insertData = {
         order_number: generateOrderNumber(),
         customer_name: customerName.trim(),
@@ -281,7 +295,7 @@ export function CreateGasCylinderOrderDialog({
         cylinder_size: cylinderSize,
         pressure: pressure,
         scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
-        notes: notes.trim() || null,
+        notes: finalNotes || null,
         created_by: currentProfileId,
         status: isCompleted ? "completed" as const : "pending" as const,
         location: location,

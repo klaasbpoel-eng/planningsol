@@ -223,6 +223,25 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         }
       };
 
+      // Auto-repair check (optional, but let's make it manual first)
+      const repairDB = async () => {
+        try {
+          if (confirm("Dit probeert de database tabellen te repareren (profiles, requests, etc). Doorgaan?")) {
+            // @ts-ignore
+            await api.admin.repairDatabase();
+            alert("Database reparatie voltooid! Pagina wordt herladen.");
+            window.location.reload();
+          }
+        } catch (e: any) {
+          alert("Fout bij repareren: " + e.message);
+        }
+      };
+
+      if (fetchError) {
+        // If error text contains "Table" or generic 400, show repair suggestion
+        console.warn("Fetch error detected, offering repair...");
+      }
+
       // Parallel fetching
       const [
         profilesData,
@@ -1620,6 +1639,18 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
 
       <div className="px-4 py-4 border-b border-border/50">
         <div className="flex flex-col gap-5">
+          {fetchError && (
+            <Button variant="destructive" size="sm" onClick={() => {
+              // Trigger repair logic
+              // @ts-ignore
+              api.admin.repairDatabase().then(() => {
+                alert("Reparatie gereed. Herladen...");
+                window.location.reload();
+              }).catch((e: any) => alert("Fout: " + e.message));
+            }}>
+              Herstel Database
+            </Button>
+          )}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <CardTitle className="flex items-center gap-3 text-xl font-bold">

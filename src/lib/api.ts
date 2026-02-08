@@ -29,8 +29,14 @@ async function executeMySQL(query: string, params: any[] = []) {
         }
     });
 
-    if (error) throw error;
-    if (data.error) throw new Error(data.error);
+    if (error) {
+        console.error("Supabase Function Error:", error);
+        throw error;
+    }
+    if (data.error) {
+        console.error("MySQL Query Error:", data.error);
+        throw new Error(data.error);
+    }
     return data.data;
 }
 
@@ -528,12 +534,23 @@ export const api = {
             const config = getConfig();
             if (config?.useMySQL) {
                 const id = item.id || crypto.randomUUID();
-                const keys = Object.keys(item).filter(k => k !== 'id' && k !== 'gas_type_ref'); // Exclude virtual fields
-                const values = keys.map(k => item[k]);
-                keys.unshift('id');
-                values.unshift(id);
-                const placeholders = keys.map(() => '?').join(',');
-                return executeMySQL(`INSERT INTO gas_cylinder_orders (${keys.join(',')}) VALUES (${placeholders})`, values);
+
+                // Explicitly select columns to ensure correct order and presence
+                const columns = [
+                    'id', 'order_number', 'customer_name', 'customer_id',
+                    'gas_type', 'gas_type_id', 'gas_grade', 'cylinder_count',
+                    'cylinder_size', 'pressure', 'scheduled_date', 'notes',
+                    'created_by', 'status', 'location'
+                ];
+
+                const values = columns.map(col => {
+                    if (col === 'id') return id;
+                    const val = item[col];
+                    return val === undefined ? null : val;
+                });
+
+                const placeholders = columns.map(() => '?').join(',');
+                return executeMySQL(`INSERT INTO gas_cylinder_orders (${columns.join(',')}) VALUES (${placeholders})`, values);
             } else {
                 const { data, error } = await supabase.from("gas_cylinder_orders").insert(item).select().single();
                 if (error) throw error;
@@ -642,12 +659,30 @@ export const api = {
             const config = getConfig();
             if (config?.useMySQL) {
                 const id = item.id || crypto.randomUUID();
-                const keys = Object.keys(item).filter(k => k !== 'id' && k !== 'product_type_info' && k !== 'packaging_info');
-                const values = keys.map(k => item[k]);
-                keys.unshift('id');
-                values.unshift(id);
-                const placeholders = keys.map(() => '?').join(',');
-                return executeMySQL(`INSERT INTO dry_ice_orders (${keys.join(',')}) VALUES (${placeholders})`, values);
+
+                // Explicitly select columns to ensure correct order and presence
+                const columns = [
+                    'id', 'order_number', 'customer_name', 'customer_id', 'status', 'scheduled_date',
+                    'quantity_kg', 'product_type', 'product_type_id', 'packaging_id', 'box_count',
+                    'container_has_wheels', 'notes', 'is_recurring',
+                    'recurrence_end_date', 'created_by', 'parent_order_id'
+                ];
+
+                const values = columns.map(col => {
+                    if (col === 'id') return id;
+                    // Handle status default if missing
+                    if (col === 'status' && !item[col]) return 'pending';
+
+                    // Handle booleans for MySQL (1/0)
+                    if (col === 'container_has_wheels' || col === 'is_recurring') {
+                        return item[col] ? 1 : 0;
+                    }
+                    const val = item[col];
+                    return val === undefined ? null : val;
+                });
+
+                const placeholders = columns.map(() => '?').join(',');
+                return executeMySQL(`INSERT INTO dry_ice_orders (${columns.join(',')}) VALUES (${placeholders})`, values);
             } else {
                 const { data, error } = await supabase.from("dry_ice_orders").insert(item).select().single();
                 if (error) throw error;
@@ -1154,6 +1189,129 @@ export const api = {
                 const { error } = await supabase.from("time_off_types").delete().eq("id", id);
                 if (error) throw error;
                 return true;
+            }
+        }
+    },
+    timeOffRequests: {
+        getAll: async () => {
+            const config = getConfig();
+            if (config?.useMySQL) {
+                // Use a join to get profile info if needed, or just select *
+                // Assuming we might need profile names, but start simple
+                return executeMySQL("SELECT * FROM time_off_requests ORDER BY start_date DESC");
+            } else {
+                const { data, error } = await supabase.from("time_off_requests").select("*").order("start_date", { ascending: false });
+                if (error) throw error;
+                return data;
+            }
+        },
+        create: async (item: any) => {
+            const config = getConfig();
+            if (config?.useMySQL) {
+                const id = item.id || crypto.randomUUID();
+                const keys = Object.keys(item).filter(k => k !== 'id');
+                const values = keys.map(k => item[k]);
+                keys.unshift('id');
+                values.unshift(id);
+                const placeholders = keys.map(() => '?').join(',');
+                return executeMySQL(`INSERT INTO time_off_requests (${keys.join(',')}) VALUES (${placeholders})`, values);
+            } else {
+                const { data, error } = await supabase.from("time_off_requests").insert(item).select().single();
+                if (error) throw error;
+                return data;
+            }
+        },
+        update: async (id: string, item: any) => {
+            const config = getConfig();
+            if (config?.useMySQL) {
+                const keys = Object.keys(item).filter(k => k !== 'id' && k !== 'created_at');
+                const values = keys.map(k => item[k]);
+                values.push(id);
+                const setClause = keys.map(k => `${k} = ?`).join(',');
+                return executeMySQL(`UPDATE time_off_requests SET ${setClause} WHERE id = ?`, values);
+            } else {
+                const { data, error } = await supabase.from("time_off_requests").update(item).eq("id", id).select().single();
+                if (error) throw error;
+                return data;
+            }
+        },
+        delete: async (id: string) => {
+            const config = getConfig();
+            if (config?.useMySQL) {
+                return executeMySQL("DELETE FROM time_off_requests WHERE id = ?", [id]);
+            } else {
+                const { error } = await supabase.from("time_off_requests").delete().eq("id", id);
+                if (error) throw error;
+                return true;
+            }
+        }
+    },
+    admin: {
+        repairDatabase: async () => {
+            const config = getConfig();
+            if (config?.useMySQL) {
+                const queries = [
+                    // Profiles
+                    `CREATE TABLE IF NOT EXISTS profiles (
+                        id CHAR(36) PRIMARY KEY,
+                        user_id CHAR(36),
+                        full_name VARCHAR(255),
+                        job_title VARCHAR(255),
+                        department VARCHAR(255),
+                        email VARCHAR(255),
+                        phone VARCHAR(255),
+                        location VARCHAR(255),
+                        production_location VARCHAR(255),
+                        employment_type VARCHAR(255),
+                        hire_date DATE,
+                        date_of_birth DATE,
+                        emergency_contact_name VARCHAR(255),
+                        emergency_contact_phone VARCHAR(255),
+                        manager_id CHAR(36),
+                        is_approved BOOLEAN DEFAULT FALSE,
+                        approved_by CHAR(36),
+                        approved_at DATETIME,
+                        intended_role VARCHAR(255),
+                        address TEXT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    )`,
+                    // Time Off Requests
+                    `CREATE TABLE IF NOT EXISTS time_off_requests (
+                        id CHAR(36) PRIMARY KEY,
+                        user_id CHAR(36),
+                        profile_id CHAR(36) NOT NULL,
+                        start_date DATE NOT NULL,
+                        end_date DATE NOT NULL,
+                        day_part VARCHAR(50),
+                        type VARCHAR(50) NOT NULL,
+                        type_id CHAR(36),
+                        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+                        reason TEXT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    )`,
+                    // Task Types
+                    `CREATE TABLE IF NOT EXISTS task_types (
+                        id CHAR(36) PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        description TEXT,
+                        color VARCHAR(50),
+                        is_active BOOLEAN DEFAULT TRUE,
+                        sort_order INT DEFAULT 0,
+                        parent_id CHAR(36),
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    )`
+                ];
+
+                for (const query of queries) {
+                    await executeMySQL(query);
+                }
+                return true;
+            } else {
+                console.warn("Repair database not supported for Supabase direct mode");
+                return false;
             }
         }
     }
