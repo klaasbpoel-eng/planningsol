@@ -258,8 +258,8 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
                   <DialogContent className={cn(
                     "transition-all duration-200",
                     fullscreenStatus === config.status
-                      ? "max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh]"
-                      : "max-w-lg"
+                      ? "max-w-lg"
+                      : "max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh]"
                   )}>
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2">
@@ -270,26 +270,27 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
                             {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
                           </Badge>
                         )}
-                        <span className="ml-auto flex items-center gap-2 text-sm font-normal text-muted-foreground">
+                        <span className="ml-auto flex items-center gap-1 text-sm font-normal text-muted-foreground">
                           {formatNumber(config.count, 0)} items
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6"
+                            className="h-7 w-7 mr-6"
                             onClick={() => setFullscreenStatus(
                               fullscreenStatus === config.status ? null : config.status
                             )}
+                            title={fullscreenStatus === config.status ? "Volledig scherm" : "Compact weergave"}
                           >
                             {fullscreenStatus === config.status
-                              ? <Minimize2 className="h-3.5 w-3.5" />
-                              : <Maximize2 className="h-3.5 w-3.5" />
+                              ? <Maximize2 className="h-4 w-4" />
+                              : <Minimize2 className="h-4 w-4" />
                             }
                           </Button>
                         </span>
                       </DialogTitle>
                     </DialogHeader>
                     {config.items.length > 0 ? (
-                      <ScrollArea className={fullscreenStatus === config.status ? "h-[calc(95vh-80px)]" : "max-h-[60vh]"}>
+                      <ScrollArea className={fullscreenStatus === config.status ? "max-h-[60vh]" : "h-[calc(95vh-80px)]"}>
                         <div className="space-y-2">
                           {config.items.map((item) => (
                             <div
