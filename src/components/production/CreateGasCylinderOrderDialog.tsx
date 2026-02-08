@@ -176,16 +176,12 @@ export function CreateGasCylinderOrderDialog({
     const fetchLocationGasTypes = async () => {
       if (!location) return;
 
-      // Query for distinct gas types used at this location
-      const { data: locationOrders } = await supabase
-        .from("gas_cylinder_orders")
-        .select("gas_type_id")
-        .eq("location", location)
-        .not("gas_type_id", "is", null);
+      // Use RPC to efficiently get distinct gas type IDs for this location
+      const { data: locationGasTypes } = await supabase
+        .rpc("get_distinct_gas_type_ids_by_location", { p_location: location });
 
-      if (locationOrders && locationOrders.length > 0) {
-        // Extract unique gas type IDs
-        const uniqueIds = new Set(locationOrders.map(order => order.gas_type_id).filter(Boolean));
+      if (locationGasTypes && locationGasTypes.length > 0) {
+        const uniqueIds = new Set(locationGasTypes.map((row: { gas_type_id: string }) => row.gas_type_id).filter(Boolean));
         setLocationGasIds(uniqueIds);
       } else {
         // No history for this location - show all gas types
