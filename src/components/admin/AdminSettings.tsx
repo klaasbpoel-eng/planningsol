@@ -9,7 +9,7 @@ import { EmployeeList } from "./EmployeeList";
 import { DatabaseBackupRestore } from "./DatabaseBackupRestore";
 import { MigrationSettings } from "./MigrationSettings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Factory, Calendar, Building2, UserCog, ArrowRightLeft } from "lucide-react";
+import { Settings, Factory, Calendar, Building2, UserCog, Download } from "lucide-react";
 
 export function AdminSettings() {
   return (
@@ -44,8 +44,8 @@ export function AdminSettings() {
             Klanten
           </TabsTrigger>
           <TabsTrigger value="migration" className="gap-2 data-[state=active]:bg-background">
-            <ArrowRightLeft className="h-4 w-4" />
-            Migratie
+            <Download className="h-4 w-4" />
+            Database Export
           </TabsTrigger>
         </TabsList>
 
