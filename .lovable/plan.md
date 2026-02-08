@@ -1,35 +1,61 @@
 
-# Fix: Horizontaal scrollen op mobiel voorkomen
+
+# Fix: Alle gastypes tonen in het selectiemenu
 
 ## Probleem
 
-Op mobiele apparaten kan de hele pagina horizontaal verschoven worden, waardoor er witte ruimte zichtbaar wordt aan de rechterkant. Dit wordt veroorzaakt door elementen die breder zijn dan het scherm.
+Het gastype-selectiemenu in het "Nieuwe gascilinder order" dialoog toont niet alle gastypes. Dit komt doordat de app alle orders (48.000+) opvraagt om te bepalen welke gastypes bij een locatie horen, maar er maximaal 1.000 rijen per keer worden opgehaald. Hierdoor worden veel gastypes gemist.
 
-## Oorzaak
+## Oplossing
 
-Er zijn meerdere plekken waar content buiten het scherm kan uitsteken:
-
-1. **Geen overflow beveiliging** op de pagina-wrapper (`ProductionPlanningPage.tsx`) - het `gradient-mesh` div mist `overflow-x: hidden`
-2. **KPI Dashboard "Additional Stats Row"** - gebruikt `grid-cols-3` zonder responsive aanpassing, waardoor tekst en iconen op smalle schermen buiten beeld vallen
-3. **KPI Dashboard header** - de badges en tekst in de `CardHeader` kunnen op smalle schermen te breed worden
+Vervang de huidige query (die alle orders ophaalt) door een database-functie die efficient alleen de unieke gastype-IDs per locatie opvraagt.
 
 ## Wijzigingen
 
-| Bestand | Wijziging |
-|---------|-----------|
-| `src/pages/ProductionPlanningPage.tsx` | Voeg `overflow-x-hidden` toe aan de page wrapper |
-| `src/components/production/KPIDashboard.tsx` | Maak de "Additional Stats Row" responsive (`grid-cols-1 sm:grid-cols-3`) en voeg `overflow-hidden` toe aan de card |
-| `src/index.css` | Voeg globale `overflow-x: hidden` toe aan `body` om horizontaal scrollen app-breed te voorkomen |
+| Stap | Bestand | Wijziging |
+|------|---------|-----------|
+| 1 | Database | Nieuwe RPC-functie `get_distinct_gas_type_ids_by_location` aanmaken |
+| 2 | `CreateGasCylinderOrderDialog.tsx` | De inefficiente query vervangen door een aanroep naar de nieuwe functie |
 
 ## Technische Details
 
-### 1. Globale overflow fix (`src/index.css`)
-Voeg `overflow-x: hidden` toe aan de body styling om app-breed horizontaal scrollen te voorkomen. Dit is de veiligste aanpak zodat geen enkele pagina dit probleem kan veroorzaken.
+### 1. Database functie (SQL migratie)
 
-### 2. Page wrapper (`ProductionPlanningPage.tsx`)
-Voeg `overflow-x-hidden` toe aan de `min-h-screen gradient-mesh` div als extra beveiliging.
+Een nieuwe functie die `SELECT DISTINCT gas_type_id` uitvoert, gefilterd op locatie. Dit retourneert direct de unieke IDs (maximaal ~100 rijen) in plaats van alle 48.000+ orders.
 
-### 3. KPI Dashboard (`KPIDashboard.tsx`)
-- Verander de "Additional Stats Row" van `grid-cols-3` naar `grid-cols-1 sm:grid-cols-3` zodat de statistieken op mobiel onder elkaar staan
-- Voeg `overflow-hidden` toe aan de wrapper Card
-- Maak de header badges `flex-wrap` zodat ze op smalle schermen kunnen wrappen
+```sql
+CREATE OR REPLACE FUNCTION get_distinct_gas_type_ids_by_location(p_location TEXT)
+RETURNS TABLE(gas_type_id UUID)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT DISTINCT gco.gas_type_id
+  FROM public.gas_cylinder_orders gco
+  WHERE gco.location = p_location
+    AND gco.gas_type_id IS NOT NULL;
+$$;
+```
+
+### 2. Component aanpassing
+
+In `CreateGasCylinderOrderDialog.tsx` (rond regel 176-199) wordt de huidige query:
+
+```typescript
+// OUD - haalt tot 1000 orders op
+const { data: locationOrders } = await supabase
+  .from("gas_cylinder_orders")
+  .select("gas_type_id")
+  .eq("location", location)
+  .not("gas_type_id", "is", null);
+```
+
+Vervangen door:
+
+```typescript
+// NIEUW - haalt alleen unieke gas_type_ids op
+const { data: locationGasTypes } = await supabase
+  .rpc("get_distinct_gas_type_ids_by_location", { p_location: location });
+```
+
+Dit is sneller en retourneert altijd alle gastypes, ongeacht het aantal orders.
+
