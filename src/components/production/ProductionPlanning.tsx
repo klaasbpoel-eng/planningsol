@@ -190,22 +190,32 @@ export function ProductionPlanning({
 
     try {
       // Fetch current period stats using RPC functions (parallel calls)
+      const isTilburg = selectedLocation === "sol_tilburg";
+
+      // Skip dry ice RPC calls for Tilburg (dry ice is only produced in Emmen)
+      const dryIcePromise = isTilburg
+        ? Promise.resolve({ data: [{ total_kg: 0, total_orders: 0 }], error: null })
+        : supabase.rpc("get_dry_ice_efficiency_by_period", {
+            p_from_date: fromDate,
+            p_to_date: toDate,
+            p_location: null
+          });
+      const prevDryIcePromise = isTilburg
+        ? Promise.resolve({ data: [{ total_kg: 0, total_orders: 0 }], error: null })
+        : supabase.rpc("get_dry_ice_efficiency_by_period", {
+            p_from_date: prevFromDate,
+            p_to_date: prevToDate,
+            p_location: null
+          });
+
       const [dryIceRes, cylinderRes, prevDryIceRes, prevCylinderRes] = await Promise.all([
-        supabase.rpc("get_dry_ice_efficiency_by_period", {
-          p_from_date: fromDate,
-          p_to_date: toDate,
-          p_location: null // Dry ice is only in Emmen, no location filter needed
-        }),
+        dryIcePromise,
         supabase.rpc("get_production_efficiency_by_period", {
           p_from_date: fromDate,
           p_to_date: toDate,
           p_location: locationParam
         }),
-        supabase.rpc("get_dry_ice_efficiency_by_period", {
-          p_from_date: prevFromDate,
-          p_to_date: prevToDate,
-          p_location: null
-        }),
+        prevDryIcePromise,
         supabase.rpc("get_production_efficiency_by_period", {
           p_from_date: prevFromDate,
           p_to_date: prevToDate,
@@ -242,11 +252,11 @@ export function ProductionPlanning({
       }
 
       // Calculate total orders from RPC responses
-      const currentDryIceOrders = dryIceRes.data?.[0]?.total_orders || 0;
+      const currentDryIceOrders = isTilburg ? 0 : (dryIceRes.data?.[0]?.total_orders || 0);
       const currentCylinderOrders = cylinderRes.data?.[0]?.total_orders || 0;
       setWeekOrders(Number(currentDryIceOrders) + Number(currentCylinderOrders));
 
-      const prevDryIceOrders = prevDryIceRes.data?.[0]?.total_orders || 0;
+      const prevDryIceOrders = isTilburg ? 0 : (prevDryIceRes.data?.[0]?.total_orders || 0);
       const prevCylinderOrders = prevCylinderRes.data?.[0]?.total_orders || 0;
       setPreviousWeekOrders(Number(prevDryIceOrders) + Number(prevCylinderOrders));
 
@@ -389,23 +399,29 @@ export function ProductionPlanning({
         <div className={cn(
           "grid gap-4",
           showAdvancedWidgets
-            ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-5"
-            : "grid-cols-1 sm:grid-cols-3"
+            ? selectedLocation === "sol_tilburg"
+              ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+              : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-5"
+            : selectedLocation === "sol_tilburg"
+              ? "grid-cols-1 sm:grid-cols-2"
+              : "grid-cols-1 sm:grid-cols-3"
         )}>
-          <StatCard
-            value={`${formatNumber(dryIceToday, 0)} kg`}
-            label="Droogijs gepland"
-            icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
-            iconBgColor="bg-cyan-500/10"
-            trend={{
-              value: calculateTrend(dryIceToday, previousDryIceToday),
-              label: "vs. vorige periode"
-            }}
-            className={cn(
-              "glass-card transition-all duration-300",
-              isRefreshing && "animate-pulse ring-2 ring-primary/30"
-            )}
-          />
+          {selectedLocation !== "sol_tilburg" && (
+            <StatCard
+              value={`${formatNumber(dryIceToday, 0)} kg`}
+              label="Droogijs gepland"
+              icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
+              iconBgColor="bg-cyan-500/10"
+              trend={{
+                value: calculateTrend(dryIceToday, previousDryIceToday),
+                label: "vs. vorige periode"
+              }}
+              className={cn(
+                "glass-card transition-all duration-300",
+                isRefreshing && "animate-pulse ring-2 ring-primary/30"
+              )}
+            />
+          )}
 
           <div className="relative">
             <StatCard
