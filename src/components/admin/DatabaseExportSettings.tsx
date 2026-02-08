@@ -5,11 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Database, Loader2, Download } from "lucide-react";
 
-interface MySQLSyncSettingsProps {
+interface DatabaseExportSettingsProps {
   selectedTables: string[];
 }
 
-export function MySQLSyncSettings({ selectedTables }: MySQLSyncSettingsProps) {
+export function DatabaseExportSettings({ selectedTables }: DatabaseExportSettingsProps) {
   const [exporting, setExporting] = useState(false);
 
   const handleExportDump = async () => {
