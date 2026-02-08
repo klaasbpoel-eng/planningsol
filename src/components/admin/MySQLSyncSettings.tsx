@@ -106,6 +106,26 @@ export function MySQLSyncSettings({ selectedTables }: MySQLSyncSettingsProps) {
     // Save on next tick after state update
     setTimeout(saveConfig, 0);
   };
+
+  const sanitizeHost = (value: string): string => {
+    let host = value.trim();
+    // Remove protocol (http://, https://, etc.)
+    host = host.replace(/^[a-zA-Z]+:\/\//, "");
+    // Remove path, query string, and fragment
+    host = host.split("/")[0].split("?")[0].split("#")[0];
+    // Remove port if present (port is in a separate field)
+    host = host.replace(/:\d+$/, "");
+    return host;
+  };
+
+  const handleHostBlur = () => {
+    const cleaned = sanitizeHost(mysqlHost);
+    if (cleaned !== mysqlHost) {
+      setMysqlHost(cleaned);
+      toast.info(`Host automatisch aangepast naar: ${cleaned}`);
+      setTimeout(saveConfig, 0);
+    }
+  };
   const handleTestConnection = async () => {
     setTestingConnection(true);
     setConnectionResult(null);
@@ -284,7 +304,8 @@ export function MySQLSyncSettings({ selectedTables }: MySQLSyncSettingsProps) {
                 <Input
                   value={mysqlHost}
                   onChange={(e) => handleFieldChange(setMysqlHost)(e.target.value)}
-                  placeholder="localhost of 192.168.1.100"
+                  onBlur={handleHostBlur}
+                  placeholder="bijv. web0131.zxcs.nl"
                 />
               </div>
               <div className="space-y-2">
