@@ -109,6 +109,72 @@ Deno.serve(async (req) => {
           OR assigned_to IN (SELECT id FROM profiles WHERE user_id = auth.uid())
         );
 
+      -- Operator policies (location-scoped CRUD)
+      CREATE POLICY "Operators can view gas cylinder orders at their location"
+        ON public.gas_cylinder_orders FOR SELECT
+        USING (
+          has_role(auth.uid(), 'operator'::app_role)
+          AND ((get_user_production_location(auth.uid()) IS NOT NULL AND location = get_user_production_location(auth.uid()))
+               OR get_user_production_location(auth.uid()) IS NULL)
+        );
+
+      CREATE POLICY "Operators can create gas cylinder orders at their location"
+        ON public.gas_cylinder_orders FOR INSERT
+        WITH CHECK (
+          has_role(auth.uid(), 'operator'::app_role)
+          AND ((get_user_production_location(auth.uid()) IS NOT NULL AND location = get_user_production_location(auth.uid()))
+               OR get_user_production_location(auth.uid()) IS NULL)
+        );
+
+      CREATE POLICY "Operators can update gas cylinder orders at their location"
+        ON public.gas_cylinder_orders FOR UPDATE
+        USING (
+          has_role(auth.uid(), 'operator'::app_role)
+          AND ((get_user_production_location(auth.uid()) IS NOT NULL AND location = get_user_production_location(auth.uid()))
+               OR get_user_production_location(auth.uid()) IS NULL)
+        );
+
+      CREATE POLICY "Operators can delete gas cylinder orders at their location"
+        ON public.gas_cylinder_orders FOR DELETE
+        USING (
+          has_role(auth.uid(), 'operator'::app_role)
+          AND ((get_user_production_location(auth.uid()) IS NOT NULL AND location = get_user_production_location(auth.uid()))
+               OR get_user_production_location(auth.uid()) IS NULL)
+        );
+
+      -- Supervisor policies (location-scoped CRUD)
+      CREATE POLICY "Supervisors can view gas cylinder orders at their location"
+        ON public.gas_cylinder_orders FOR SELECT
+        USING (
+          has_role(auth.uid(), 'supervisor'::app_role)
+          AND ((get_user_production_location(auth.uid()) IS NOT NULL AND location = get_user_production_location(auth.uid()))
+               OR get_user_production_location(auth.uid()) IS NULL)
+        );
+
+      CREATE POLICY "Supervisors can create gas cylinder orders at their location"
+        ON public.gas_cylinder_orders FOR INSERT
+        WITH CHECK (
+          has_role(auth.uid(), 'supervisor'::app_role)
+          AND ((get_user_production_location(auth.uid()) IS NOT NULL AND location = get_user_production_location(auth.uid()))
+               OR get_user_production_location(auth.uid()) IS NULL)
+        );
+
+      CREATE POLICY "Supervisors can update gas cylinder orders at their location"
+        ON public.gas_cylinder_orders FOR UPDATE
+        USING (
+          has_role(auth.uid(), 'supervisor'::app_role)
+          AND ((get_user_production_location(auth.uid()) IS NOT NULL AND location = get_user_production_location(auth.uid()))
+               OR get_user_production_location(auth.uid()) IS NULL)
+        );
+
+      CREATE POLICY "Supervisors can delete gas cylinder orders at their location"
+        ON public.gas_cylinder_orders FOR DELETE
+        USING (
+          has_role(auth.uid(), 'supervisor'::app_role)
+          AND ((get_user_production_location(auth.uid()) IS NOT NULL AND location = get_user_production_location(auth.uid()))
+               OR get_user_production_location(auth.uid()) IS NULL)
+        );
+
       -- Create indexes for performance
       CREATE INDEX idx_gas_cylinder_orders_scheduled_date ON public.gas_cylinder_orders(scheduled_date);
       CREATE INDEX idx_gas_cylinder_orders_status ON public.gas_cylinder_orders(status);
