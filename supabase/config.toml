@@ -2,6 +2,3 @@ project_id = "lrgjeqsvgsxarneegzmd"
 
 [functions.complete-past-dry-ice-orders]
 verify_jwt = false
-
-[functions.export-gas-cylinder-orders]
-verify_jwt = false

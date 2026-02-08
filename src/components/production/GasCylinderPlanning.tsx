@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Trash2, Filter, CalendarIcon, X, Edit2, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, MapPin, Download, Loader2 } from "lucide-react";
+import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Trash2, Filter, CalendarIcon, X, Edit2, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, MapPin } from "lucide-react";
 import { FloatingActionButton } from "@/components/ui/floating-action-button";
 import { FadeIn } from "@/components/ui/fade-in";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -125,7 +125,6 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
   const [monthFilter, setMonthFilter] = useState<number>(new Date().getMonth() + 1);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [locationTab, setLocationTab] = useState<LocationTab>(getInitialTab());
-  const [isExporting, setIsExporting] = useState(false);
 
   // Update location tab when location prop changes (for non-admin users)
   useEffect(() => {
@@ -503,48 +502,6 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
     setMonthFilter(new Date().getMonth() + 1);
   };
 
-  const handleExportAll = async () => {
-    setIsExporting(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Je bent niet ingelogd");
-        return;
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-gas-cylinder-orders`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Export mislukt");
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      const today = new Date().toISOString().split("T")[0];
-      a.href = url;
-      a.download = `gascilinder-orders-export-${today}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast.success("Export gedownload");
-    } catch (error: any) {
-      console.error("Export error:", error);
-      toast.error(error.message || "Er ging iets mis bij het exporteren");
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   // Render the order content (table, filters, stats)
   const renderOrderContent = () => (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -619,20 +576,6 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
                     Wis filters
                   </Button>
                 )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9"
-                  onClick={handleExportAll}
-                  disabled={isExporting}
-                >
-                  {isExporting ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4 mr-1" />
-                  )}
-                  {isExporting ? "Exporteren..." : "Excel export"}
-                </Button>
               </div>
             </div>
           </CardHeader>

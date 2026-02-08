@@ -33,8 +33,6 @@ interface ParsedCylinderOrder {
   notes: string;
   pressure: number;
   location: "sol_emmen" | "sol_tilburg";
-  orderNumber?: string;
-  status?: "pending" | "in_progress" | "completed" | "cancelled";
 }
 
 interface ImportStats {
@@ -291,42 +289,34 @@ export function ExcelImportDialog({
           const rowStr = row.map(cell => String(cell || "").toLowerCase()).join("|");
           if (rowStr.includes("datum") && (rowStr.includes("gassoort") || rowStr.includes("gastype"))) {
             headerRowIndex = i;
+            // Map column names to indices
             row.forEach((cell, idx) => {
               const cellStr = String(cell || "").toLowerCase().trim();
               if (cellStr.includes("datum")) columnMap.date = idx;
               if (cellStr.includes("gassoort") || cellStr.includes("gastype")) columnMap.gasType = idx;
-              // Detect order number column
-              if (cellStr.includes("ordernummer") || cellStr.includes("order_number")) {
-                columnMap.orderNumber = idx;
-              }
-              // Detect size column - expanded patterns
+              // Detect size column - expanded patterns including "omschrijving" and "inhoud"
               if (columnMap.size === undefined) {
                 if (cellStr.includes("type vulling") || cellStr.includes("vulling type") || 
                     cellStr.includes("cilinderinhoud") || cellStr.includes("cilinder inhoud") ||
-                    cellStr.includes("cilindergrootte") || cellStr.includes("cilinder grootte") ||
                     cellStr.includes("formaat") || cellStr.includes("size") || 
                     cellStr.includes("grootte") || cellStr === "inhoud") {
                   columnMap.size = idx;
                 }
               }
-              // Detect count column - handle "aantal cilinders" and "aantal"
-              if (cellStr.includes("aantal")) columnMap.count = idx;
-              // Detect grade column - handle "m/t" and "kwaliteit"
-              if (cellStr === "m/t" || cellStr.includes("kwaliteit") || cellStr.includes("quality")) {
-                columnMap.grade = idx;
-              }
+              if (cellStr === "aantal") columnMap.count = idx;
+              if (cellStr === "m/t") columnMap.grade = idx;
               // Detect location column
               if (cellStr.includes("locatie") || cellStr.includes("location") || 
                   cellStr.includes("productielocatie") || cellStr.includes("site") || 
                   cellStr.includes("vestiging")) {
                 columnMap.location = idx;
               }
-              // Detect customer column
+              // Detect customer column - "klant" or "vulling tbv"
               if (cellStr.includes("vulling tbv") || cellStr.includes("tbv") || 
                   cellStr === "klant" || cellStr.includes("customer")) {
                 columnMap.customer = idx;
               }
-              // Detect notes column
+              // Detect notes column - "opmerkingen" or "omschrijving"
               if (cellStr.includes("opmerkingen") || cellStr.includes("opmerking") ||
                   cellStr.includes("omschrijving") || cellStr === "notes") {
                 columnMap.notes = idx;
@@ -336,10 +326,6 @@ export function ExcelImportDialog({
                   cellStr === "bar") {
                 columnMap.pressure = idx;
               }
-              // Detect status column
-              if (cellStr === "status") {
-                columnMap.status = idx;
-              }
             });
             break;
           }
@@ -347,7 +333,7 @@ export function ExcelImportDialog({
         
         // Fallback to fixed indices if header not found (matching Excel structure: Datum, Gastype, Cilinderinhoud, Aantal, M/T, Locatie, Klant, Omschrijving)
         if (headerRowIndex === -1) {
-          columnMap = { date: 0, gasType: 1, size: 2, count: 3, grade: 4, location: 5, customer: 6, notes: 7, pressure: 8, status: 9, orderNumber: -1 };
+          columnMap = { date: 0, gasType: 1, size: 2, count: 3, grade: 4, location: 5, customer: 6, notes: 7, pressure: 8 };
         }
         
         console.log("Column mapping:", columnMap, "Header row:", headerRowIndex);
@@ -367,17 +353,11 @@ export function ExcelImportDialog({
           const gasType = String(row[columnMap.gasType ?? 1] || "").trim();
           let sizeStr = String(row[columnMap.size ?? 2] || "").trim();
           const count = parseInt(String(row[columnMap.count ?? 3] || "0"));
-          const gradeRaw = String(row[columnMap.grade ?? 4] || "T").trim();
+          const gradeCode = String(row[columnMap.grade ?? 4] || "T").toUpperCase();
           const customer = String(row[columnMap.customer ?? 5] || "").trim();
           const notes = String(row[columnMap.notes ?? 6] || "").trim();
           const locationStr = columnMap.location !== undefined 
             ? String(row[columnMap.location] || "").trim() 
-            : undefined;
-          const orderNumberRaw = columnMap.orderNumber !== undefined && columnMap.orderNumber >= 0
-            ? String(row[columnMap.orderNumber] || "").trim()
-            : undefined;
-          const statusRaw = columnMap.status !== undefined
-            ? String(row[columnMap.status] || "").trim().toLowerCase()
             : undefined;
           
           // Fallback: als size leeg is, probeer notes/omschrijving kolom
@@ -387,19 +367,6 @@ export function ExcelImportDialog({
           
           if (!gasType || count <= 0) continue;
           
-          // Parse grade - handle both "M"/"T" and "Medicinaal"/"Technisch"
-          const gradeUpper = gradeRaw.toUpperCase();
-          const isMedical = gradeUpper === "M" || gradeRaw.toLowerCase().includes("medicinaal") || gradeRaw.toLowerCase().includes("medical");
-          
-          // Parse status from export format
-          let status: "pending" | "in_progress" | "completed" | "cancelled" | undefined;
-          if (statusRaw) {
-            if (statusRaw.includes("voltooid") || statusRaw.includes("completed")) status = "completed";
-            else if (statusRaw.includes("bezig") || statusRaw.includes("in_progress") || statusRaw.includes("in progress")) status = "in_progress";
-            else if (statusRaw.includes("geannuleerd") || statusRaw.includes("cancelled")) status = "cancelled";
-            else if (statusRaw.includes("gepland") || statusRaw.includes("pending")) status = "pending";
-          }
-          
           // Parse pressure from dedicated column, fallback to description parsing
           let pressure = 200;
           if (columnMap.pressure !== undefined) {
@@ -408,6 +375,7 @@ export function ExcelImportDialog({
               pressure = pressureVal;
             }
           } else {
+            // Try to extract pressure from sizeStr or notes
             const pressureSource = sizeStr || notes;
             const { pressure: descPressure } = parseCylinderSize(pressureSource, cylinderSizes);
             pressure = descPressure;
@@ -421,13 +389,11 @@ export function ExcelImportDialog({
             gasType,
             cylinderSize: size,
             count,
-            grade: isMedical ? "medical" : "technical",
+            grade: gradeCode === "M" ? "medical" : "technical",
             customer: customer || "Onbekend",
             notes,
             pressure,
             location,
-            orderNumber: orderNumberRaw || undefined,
-            status: status || "completed",
           });
         }
         
@@ -476,7 +442,7 @@ export function ExcelImportDialog({
       const batch = parsedData.slice(start, end);
       
       const createInsertData = () => batch.map((order, idx) => ({
-        order_number: order.orderNumber || generateOrderNumber(start + idx),
+        order_number: generateOrderNumber(start + idx),
         customer_name: order.customer,
         gas_type: mapGasTypeToEnum(order.gasType),
         gas_type_id: matchGasTypeId(order.gasType),
@@ -487,7 +453,7 @@ export function ExcelImportDialog({
         scheduled_date: format(order.date, "yyyy-MM-dd"),
         notes: order.notes || null,
         created_by: currentProfileId,
-        status: (order.status || "completed") as "pending" | "in_progress" | "completed" | "cancelled",
+        status: "completed" as const,
         location: order.location,
       }));
       
@@ -514,7 +480,7 @@ export function ExcelImportDialog({
           for (let i = 0; i < batch.length; i++) {
             const order = batch[i];
             const singleInsert = {
-              order_number: order.orderNumber || generateOrderNumber(start + i),
+              order_number: generateOrderNumber(start + i),
               customer_name: order.customer,
               gas_type: mapGasTypeToEnum(order.gasType),
               gas_type_id: matchGasTypeId(order.gasType),
@@ -525,7 +491,7 @@ export function ExcelImportDialog({
               scheduled_date: format(order.date, "yyyy-MM-dd"),
               notes: order.notes || null,
               created_by: currentProfileId,
-              status: (order.status || "completed") as "pending" | "in_progress" | "completed" | "cancelled",
+              status: "completed" as const,
               location: order.location,
             };
             
