@@ -878,9 +878,9 @@ export const api = {
         getAll: async () => {
             const config = getConfig();
             if (config?.useMySQL) {
-                return executeMySQL("SELECT * FROM profiles ORDER BY last_name ASC, first_name ASC");
+                return executeMySQL("SELECT * FROM profiles ORDER BY full_name ASC");
             } else {
-                const { data, error } = await supabase.from("profiles").select("*").order("last_name").order("first_name");
+                const { data, error } = await supabase.from("profiles").select("*").order("full_name");
                 if (error) throw error;
                 return data;
             }
