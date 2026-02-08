@@ -5,7 +5,8 @@ import { DryIceSettings } from "./DryIceSettings";
 import { DefaultCustomerSetting } from "./DefaultCustomerSetting";
 import { UserApprovalManagement } from "./UserApprovalManagement";
 import { CustomerManagement } from "../customers/CustomerManagement";
-import { EmployeeList } from "./EmployeeList"; // Assuming likely path or fix import below
+import { EmployeeList } from "./EmployeeList";
+import { DatabaseBackupRestore } from "./DatabaseBackupRestore";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Users, Factory, Calendar, Building2, UserCog } from "lucide-react";
 
@@ -46,6 +47,7 @@ export function AdminSettings() {
         <TabsContent value="general" className="space-y-4 animate-fade-in-up">
           <div className="grid gap-4">
             <DefaultCustomerSetting />
+            <DatabaseBackupRestore />
           </div>
         </TabsContent>
 
