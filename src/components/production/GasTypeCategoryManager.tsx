@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { FolderOpen, Plus, Pencil, Trash2, Save, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,7 +56,7 @@ export function GasTypeCategoryManager({ open, onOpenChange }: GasTypeCategoryMa
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<GasTypeCategory | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<GasTypeCategory | null>(null);
-  
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -67,17 +68,14 @@ export function GasTypeCategoryManager({ open, onOpenChange }: GasTypeCategoryMa
   const [saving, setSaving] = useState(false);
 
   const fetchCategories = async () => {
-    const { data, error } = await supabase
-      .from("gas_type_categories")
-      .select("*")
-      .order("sort_order", { ascending: true });
-
-    if (error) {
-      console.error("Error fetching categories:", error);
-    } else {
+    try {
+      const data = await api.gasTypeCategories.getAll();
       setCategories(data || []);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -123,17 +121,10 @@ export function GasTypeCategoryManager({ open, onOpenChange }: GasTypeCategoryMa
 
     try {
       if (editingCategory) {
-        const { error } = await supabase
-          .from("gas_type_categories")
-          .update(categoryData)
-          .eq("id", editingCategory.id);
-        if (error) throw error;
+        await api.gasTypeCategories.update(editingCategory.id, categoryData);
         toast.success("Categorie bijgewerkt");
       } else {
-        const { error } = await supabase
-          .from("gas_type_categories")
-          .insert(categoryData);
-        if (error) throw error;
+        await api.gasTypeCategories.create(categoryData);
         toast.success("Categorie toegevoegd");
       }
       fetchCategories();
@@ -149,32 +140,25 @@ export function GasTypeCategoryManager({ open, onOpenChange }: GasTypeCategoryMa
   const handleDelete = async () => {
     if (!categoryToDelete) return;
 
-    const { error } = await supabase
-      .from("gas_type_categories")
-      .delete()
-      .eq("id", categoryToDelete.id);
-
-    if (error) {
-      console.error("Error deleting category:", error);
-      toast.error("Fout bij verwijderen");
-    } else {
+    try {
+      await api.gasTypeCategories.delete(categoryToDelete.id);
       toast.success("Categorie verwijderd");
       fetchCategories();
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      toast.error("Fout bij verwijderen");
     }
     setDeleteDialogOpen(false);
     setCategoryToDelete(null);
   };
 
   const handleToggleActive = async (category: GasTypeCategory) => {
-    const { error } = await supabase
-      .from("gas_type_categories")
-      .update({ is_active: !category.is_active })
-      .eq("id", category.id);
-
-    if (error) {
-      toast.error("Fout bij bijwerken");
-    } else {
+    try {
+      await api.gasTypeCategories.update(category.id, { is_active: !category.is_active });
       fetchCategories();
+    } catch (error) {
+      console.error(error);
+      toast.error("Fout bij bijwerken");
     }
   };
 
@@ -191,13 +175,15 @@ export function GasTypeCategoryManager({ open, onOpenChange }: GasTypeCategoryMa
       sort_order: i,
     }));
 
-    for (const update of updates) {
-      await supabase
-        .from("gas_type_categories")
-        .update({ sort_order: update.sort_order })
-        .eq("id", update.id);
+    try {
+      await Promise.all(updates.map(update =>
+        api.gasTypeCategories.update(update.id, { sort_order: update.sort_order })
+      ));
+      fetchCategories();
+    } catch (error) {
+      console.error("Error updating sort order:", error);
+      toast.error("Fout bij verplaatsen");
     }
-    fetchCategories();
   };
 
   const handleMoveDown = async (index: number) => {
@@ -213,19 +199,21 @@ export function GasTypeCategoryManager({ open, onOpenChange }: GasTypeCategoryMa
       sort_order: i,
     }));
 
-    for (const update of updates) {
-      await supabase
-        .from("gas_type_categories")
-        .update({ sort_order: update.sort_order })
-        .eq("id", update.id);
+    try {
+      await Promise.all(updates.map(update =>
+        api.gasTypeCategories.update(update.id, { sort_order: update.sort_order })
+      ));
+      fetchCategories();
+    } catch (error) {
+      console.error("Error updating sort order:", error);
+      toast.error("Fout bij verplaatsen");
     }
-    fetchCategories();
   };
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent 
+        <DialogContent
           className="sm:max-w-[550px]"
           onInteractOutside={(e) => {
             if (deleteDialogOpen || editDialogOpen) {

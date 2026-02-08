@@ -31,6 +31,7 @@ import {
 import { Flame, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -94,29 +95,38 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
   const [saving, setSaving] = useState(false);
 
   const fetchCategories = async () => {
-    const { data, error } = await supabase
-      .from("gas_type_categories")
-      .select("id, name")
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true });
-
-    if (!error && data) {
-      setCategories(data);
+    try {
+      const data = await api.gasTypeCategories.getAll();
+      setCategories(data || []);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
     }
   };
 
   const fetchGasTypes = async () => {
-    const { data, error } = await supabase
-      .from("gas_types")
-      .select("*")
-      .order(sortColumn, { ascending: sortDirection === "asc", nullsFirst: false });
+    try {
+      const data = await api.gasTypes.getAll();
+      // Client-side sort because API doesn't support dynamic sort params yet
+      if (data) {
+        const sorted = [...data].sort((a: any, b: any) => {
+          const aVal = a[sortColumn];
+          const bVal = b[sortColumn];
+          if (aVal === bVal) return 0;
+          if (aVal === null) return 1;
+          if (bVal === null) return -1;
 
-    if (error) {
+          const comparison = aVal < bVal ? -1 : 1;
+          return sortDirection === "asc" ? comparison : -comparison;
+        });
+        setGasTypes(sorted);
+      } else {
+        setGasTypes([]);
+      }
+    } catch (error) {
       console.error("Error fetching gas types:", error);
-    } else {
-      setGasTypes(data || []);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSort = (column: SortColumn) => {
@@ -200,17 +210,10 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
 
     try {
       if (editingType) {
-        const { error } = await supabase
-          .from("gas_types")
-          .update(typeData)
-          .eq("id", editingType.id);
-        if (error) throw error;
+        await api.gasTypes.update(editingType.id, typeData);
         toast.success("Gastype bijgewerkt");
       } else {
-        const { error } = await supabase
-          .from("gas_types")
-          .insert(typeData);
-        if (error) throw error;
+        await api.gasTypes.create(typeData);
         toast.success("Gastype toegevoegd");
       }
       fetchGasTypes();
@@ -226,32 +229,25 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
   const handleDelete = async () => {
     if (!typeToDelete) return;
 
-    const { error } = await supabase
-      .from("gas_types")
-      .delete()
-      .eq("id", typeToDelete.id);
-
-    if (error) {
-      console.error("Error deleting gas type:", error);
-      toast.error("Fout bij verwijderen");
-    } else {
+    try {
+      await api.gasTypes.delete(typeToDelete.id);
       toast.success("Gastype verwijderd");
       fetchGasTypes();
+    } catch (error) {
+      console.error("Error deleting gas type:", error);
+      toast.error("Fout bij verwijderen");
     }
     setDeleteDialogOpen(false);
     setTypeToDelete(null);
   };
 
   const handleToggleActive = async (type: GasType) => {
-    const { error } = await supabase
-      .from("gas_types")
-      .update({ is_active: !type.is_active })
-      .eq("id", type.id);
-
-    if (error) {
-      toast.error("Fout bij bijwerken");
-    } else {
+    try {
+      await api.gasTypes.update(type.id, { is_active: !type.is_active });
       fetchGasTypes();
+    } catch (error) {
+      console.error(error);
+      toast.error("Fout bij bijwerken");
     }
   };
 
@@ -260,34 +256,22 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
 
     setBulkDeleting(true);
     try {
-      // First, clear references in gas_cylinder_orders
-      const { error: clearError } = await supabase
-        .from("gas_cylinder_orders")
-        .update({ gas_type_id: null })
-        .neq("id", "00000000-0000-0000-0000-000000000000");
+      // NOTE: Clearing references directly is not yet supported in API for MySQL.
+      // We rely on simple deletion for now. 
+      // Ideally we should add a method to API to clear references or handle CASCADE in DB.
 
-      if (clearError) {
-        console.error("Error clearing gas type references:", clearError);
-        // Continue anyway - some references may not exist
-      }
+      const promises = gasTypes
+        .filter(t => t.id !== "00000000-0000-0000-0000-000000000000") // Skip unassigned/sys types if any
+        .map(t => api.gasTypes.delete(t.id));
 
-      const { error } = await supabase
-        .from("gas_types")
-        .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000");
-
-      if (error) throw error;
+      await Promise.all(promises);
 
       toast.success(`${gasTypes.length} gastypes verwijderd`);
       fetchGasTypes();
       setBulkDeleteDialogOpen(false);
     } catch (error: any) {
       console.error("Error bulk deleting gas types:", error);
-      if (error?.code === "23503") {
-        toast.error("Kan niet verwijderen: gastypes worden nog gebruikt door orders");
-      } else {
-        toast.error("Fout bij verwijderen van gastypes");
-      }
+      toast.error("Fout bij verwijderen van gastypes. Mogelijk zijn ze in gebruik.");
     } finally {
       setBulkDeleting(false);
     }

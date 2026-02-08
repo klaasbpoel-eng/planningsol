@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Box, Plus, Pencil, Trash2, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,7 +57,7 @@ export function DryIcePackagingManager({ open, onOpenChange }: DryIcePackagingMa
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingPackaging, setEditingPackaging] = useState<Packaging | null>(null);
   const [packagingToDelete, setPackagingToDelete] = useState<Packaging | null>(null);
-  
+
   // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -65,17 +66,14 @@ export function DryIcePackagingManager({ open, onOpenChange }: DryIcePackagingMa
   const [saving, setSaving] = useState(false);
 
   const fetchPackaging = async () => {
-    const { data, error } = await supabase
-      .from("dry_ice_packaging")
-      .select("*")
-      .order("sort_order");
-
-    if (error) {
-      console.error("Error fetching packaging:", error);
-    } else {
+    try {
+      const data = await api.dryIcePackaging.getAll();
       setPackagingOptions(data || []);
+    } catch (error) {
+      console.error("Error fetching packaging:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -117,17 +115,10 @@ export function DryIcePackagingManager({ open, onOpenChange }: DryIcePackagingMa
 
     try {
       if (editingPackaging) {
-        const { error } = await supabase
-          .from("dry_ice_packaging")
-          .update(packagingData)
-          .eq("id", editingPackaging.id);
-        if (error) throw error;
+        await api.dryIcePackaging.update(editingPackaging.id, packagingData);
         toast.success("Verpakking bijgewerkt");
       } else {
-        const { error } = await supabase
-          .from("dry_ice_packaging")
-          .insert(packagingData);
-        if (error) throw error;
+        await api.dryIcePackaging.create(packagingData);
         toast.success("Verpakking toegevoegd");
       }
       fetchPackaging();
@@ -143,32 +134,25 @@ export function DryIcePackagingManager({ open, onOpenChange }: DryIcePackagingMa
   const handleDelete = async () => {
     if (!packagingToDelete) return;
 
-    const { error } = await supabase
-      .from("dry_ice_packaging")
-      .delete()
-      .eq("id", packagingToDelete.id);
-
-    if (error) {
-      console.error("Error deleting packaging:", error);
-      toast.error("Fout bij verwijderen");
-    } else {
+    try {
+      await api.dryIcePackaging.delete(packagingToDelete.id);
       toast.success("Verpakking verwijderd");
       fetchPackaging();
+    } catch (error) {
+      console.error("Error deleting packaging:", error);
+      toast.error("Fout bij verwijderen");
     }
     setDeleteDialogOpen(false);
     setPackagingToDelete(null);
   };
 
   const handleToggleActive = async (packaging: Packaging) => {
-    const { error } = await supabase
-      .from("dry_ice_packaging")
-      .update({ is_active: !packaging.is_active })
-      .eq("id", packaging.id);
-
-    if (error) {
-      toast.error("Fout bij bijwerken");
-    } else {
+    try {
+      await api.dryIcePackaging.update(packaging.id, { is_active: !packaging.is_active });
       fetchPackaging();
+    } catch (error) {
+      console.error(error);
+      toast.error("Fout bij bijwerken");
     }
   };
 

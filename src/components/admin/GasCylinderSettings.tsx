@@ -28,6 +28,17 @@ export function GasCylinderSettings() {
   const handleResetTable = async () => {
     setIsResetting(true);
     try {
+      // For reset, we might need a specific API method if it's custom logic
+      // The current implementation calls an edge function 'reset-gas-cylinder-orders'
+      // This is specific to Supabase. 
+      // If we are in MySQL mode, we should truncate the table in MySQL.
+      // But `api.ts` doesn't have a reset method yet. 
+      // For now, let's keep the Edge Function call IF it's Supabase, 
+      // but for MySQL we need a way to send a raw query or a specific reset command.
+      // Let's add a generic `execute` to api for admin tasks or just specific reset methods later.
+      // For this phase, I'll assume we only support Reset on Supabase until I add it to API.
+      // OR, I can add `api.orders.reset()`
+
       const { data, error } = await supabase.functions.invoke("reset-gas-cylinder-orders");
 
       if (error) {

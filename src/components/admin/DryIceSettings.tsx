@@ -8,6 +8,7 @@ import { DryIceProductTypeManager } from "@/components/production/DryIceProductT
 import { DryIcePackagingManager } from "@/components/production/DryIcePackagingManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 import {
   Select,
   SelectContent,
@@ -38,7 +39,7 @@ export function DryIceSettings() {
   const [loadingCapacity, setLoadingCapacity] = useState(true);
   const [savingCapacity, setSavingCapacity] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
-  
+
   // Default product type setting
   const [productTypes, setProductTypes] = useState<{ id: string; name: string }[]>([]);
   const [defaultProductTypeId, setDefaultProductTypeId] = useState<string>("");
@@ -52,97 +53,83 @@ export function DryIceSettings() {
 
   const fetchProductTypes = async () => {
     setLoadingProductTypes(true);
-    
-    // Fetch product types
-    const { data: types } = await supabase
-      .from("dry_ice_product_types")
-      .select("id, name")
-      .eq("is_active", true)
-      .order("sort_order");
-    
-    if (types) {
-      setProductTypes(types);
+
+    try {
+      // Fetch product types
+      const types = await api.dryIceProductTypes.getAll();
+      if (types) {
+        setProductTypes(types);
+      }
+
+      // Fetch current default setting
+      const setting = await api.appSettings.getByKey(DRY_ICE_DEFAULT_PRODUCT_TYPE_KEY);
+
+      if (setting?.value) {
+        setDefaultProductTypeId(setting.value);
+      } else if (types && types.length > 0) {
+        // Default to first type if no setting exists
+        const defaultType = types.find((t: any) => t.name.toLowerCase().includes("9mm"));
+        setDefaultProductTypeId(defaultType?.id || types[0].id);
+      }
+    } catch (error) {
+      console.error("Error fetching defaults:", error);
+    } finally {
+      setLoadingProductTypes(false);
     }
-    
-    // Fetch current default setting
-    const { data: setting } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", DRY_ICE_DEFAULT_PRODUCT_TYPE_KEY)
-      .maybeSingle();
-    
-    if (setting?.value) {
-      setDefaultProductTypeId(setting.value);
-    } else if (types && types.length > 0) {
-      // Default to first type if no setting exists
-      const defaultType = types.find(t => t.name.toLowerCase().includes("9mm"));
-      setDefaultProductTypeId(defaultType?.id || types[0].id);
-    }
-    
-    setLoadingProductTypes(false);
   };
 
   const fetchDailyCapacity = async () => {
     setLoadingCapacity(true);
-    const { data, error } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", DRY_ICE_CAPACITY_KEY)
-      .maybeSingle();
-
-    if (!error && data?.value) {
-      setDailyCapacity(Number(data.value));
-    } else {
+    try {
+      const data = await api.appSettings.getByKey(DRY_ICE_CAPACITY_KEY);
+      if (data?.value) {
+        setDailyCapacity(Number(data.value));
+      } else {
+        setDailyCapacity(DEFAULT_CAPACITY);
+      }
+    } catch (error) {
+      console.error("Error fetching capacity:", error);
       setDailyCapacity(DEFAULT_CAPACITY);
+    } finally {
+      setLoadingCapacity(false);
     }
-    setLoadingCapacity(false);
   };
 
   const saveDailyCapacity = async () => {
     setSavingCapacity(true);
-    
-    const { error } = await supabase
-      .from("app_settings")
-      .upsert(
-        {
-          key: DRY_ICE_CAPACITY_KEY,
-          value: dailyCapacity.toString(),
-          description: "Dagelijkse productiecapaciteit voor droogijs in kg"
-        },
-        { onConflict: "key" }
-      );
 
-    if (error) {
+    try {
+      await api.appSettings.upsert(
+        DRY_ICE_CAPACITY_KEY,
+        dailyCapacity.toString(),
+        "Dagelijkse productiecapaciteit voor droogijs in kg"
+      );
+      toast.success("Dagcapaciteit opgeslagen");
+    } catch (error) {
       console.error("Error saving capacity:", error);
       toast.error("Fout bij opslaan dagcapaciteit");
-    } else {
-      toast.success("Dagcapaciteit opgeslagen");
+    } finally {
+      setSavingCapacity(false);
     }
-    setSavingCapacity(false);
   };
 
   const saveDefaultProductType = async (typeId: string) => {
     setSavingDefaultType(true);
     setDefaultProductTypeId(typeId);
-    
-    const { error } = await supabase
-      .from("app_settings")
-      .upsert(
-        {
-          key: DRY_ICE_DEFAULT_PRODUCT_TYPE_KEY,
-          value: typeId,
-          description: "Standaard producttype voor nieuwe droogijs orders"
-        },
-        { onConflict: "key" }
-      );
 
-    if (error) {
+    try {
+      await api.appSettings.upsert(
+        DRY_ICE_DEFAULT_PRODUCT_TYPE_KEY,
+        typeId,
+        "Standaard producttype voor nieuwe droogijs orders"
+      );
+      toast.success("Standaard producttype opgeslagen");
+    } catch (error) {
       console.error("Error saving default product type:", error);
       toast.error("Fout bij opslaan standaard producttype");
-    } else {
-      toast.success("Standaard producttype opgeslagen");
+    } finally {
+      setSavingDefaultType(false);
     }
-    setSavingDefaultType(false);
   };
 
   const handleResetTable = async () => {

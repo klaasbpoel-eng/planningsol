@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Package, Plus, Pencil, Trash2, Save, GripVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,7 +56,7 @@ export function DryIceProductTypeManager({ open, onOpenChange }: DryIceProductTy
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState<ProductType | null>(null);
   const [typeToDelete, setTypeToDelete] = useState<ProductType | null>(null);
-  
+
   // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -63,17 +64,14 @@ export function DryIceProductTypeManager({ open, onOpenChange }: DryIceProductTy
   const [saving, setSaving] = useState(false);
 
   const fetchProductTypes = async () => {
-    const { data, error } = await supabase
-      .from("dry_ice_product_types")
-      .select("*")
-      .order("sort_order");
-
-    if (error) {
-      console.error("Error fetching product types:", error);
-    } else {
+    try {
+      const data = await api.dryIceProductTypes.getAll();
       setProductTypes(data || []);
+    } catch (error) {
+      console.error("Error fetching product types:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -112,17 +110,10 @@ export function DryIceProductTypeManager({ open, onOpenChange }: DryIceProductTy
 
     try {
       if (editingType) {
-        const { error } = await supabase
-          .from("dry_ice_product_types")
-          .update(typeData)
-          .eq("id", editingType.id);
-        if (error) throw error;
+        await api.dryIceProductTypes.update(editingType.id, typeData);
         toast.success("Producttype bijgewerkt");
       } else {
-        const { error } = await supabase
-          .from("dry_ice_product_types")
-          .insert(typeData);
-        if (error) throw error;
+        await api.dryIceProductTypes.create(typeData);
         toast.success("Producttype toegevoegd");
       }
       fetchProductTypes();
@@ -138,32 +129,25 @@ export function DryIceProductTypeManager({ open, onOpenChange }: DryIceProductTy
   const handleDelete = async () => {
     if (!typeToDelete) return;
 
-    const { error } = await supabase
-      .from("dry_ice_product_types")
-      .delete()
-      .eq("id", typeToDelete.id);
-
-    if (error) {
-      console.error("Error deleting product type:", error);
-      toast.error("Fout bij verwijderen");
-    } else {
+    try {
+      await api.dryIceProductTypes.delete(typeToDelete.id);
       toast.success("Producttype verwijderd");
       fetchProductTypes();
+    } catch (error) {
+      console.error("Error deleting product type:", error);
+      toast.error("Fout bij verwijderen");
     }
     setDeleteDialogOpen(false);
     setTypeToDelete(null);
   };
 
   const handleToggleActive = async (type: ProductType) => {
-    const { error } = await supabase
-      .from("dry_ice_product_types")
-      .update({ is_active: !type.is_active })
-      .eq("id", type.id);
-
-    if (error) {
-      toast.error("Fout bij bijwerken");
-    } else {
+    try {
+      await api.dryIceProductTypes.update(type.id, { is_active: !type.is_active });
       fetchProductTypes();
+    } catch (error) {
+      console.error(error);
+      toast.error("Fout bij bijwerken");
     }
   };
 

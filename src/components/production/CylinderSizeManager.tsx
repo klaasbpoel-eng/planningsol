@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Cylinder, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,15 +62,15 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
   const [editingSize, setEditingSize] = useState<CylinderSize | null>(null);
   const [sizeToDelete, setSizeToDelete] = useState<CylinderSize | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  
+
   // Sort state
   const [sortColumn, setSortColumn] = useState<SortColumn>("capacity_liters");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  
+
   // Form state
   const [name, setName] = useState("");
   const [capacityLiters, setCapacityLiters] = useState("");
@@ -78,17 +79,29 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
   const [saving, setSaving] = useState(false);
 
   const fetchCylinderSizes = async () => {
-    const { data, error } = await supabase
-      .from("cylinder_sizes")
-      .select("*")
-      .order(sortColumn, { ascending: sortDirection === "asc", nullsFirst: false });
+    try {
+      const data = await api.cylinderSizes.getAll();
+      if (data) {
+        // Client-side sort if needed, though API has default sort
+        const sorted = [...data].sort((a: any, b: any) => {
+          const aVal = a[sortColumn];
+          const bVal = b[sortColumn];
+          if (aVal === bVal) return 0;
+          if (aVal === null) return 1;
+          if (bVal === null) return -1;
 
-    if (error) {
+          const comparison = aVal < bVal ? -1 : 1;
+          return sortDirection === "asc" ? comparison : -comparison;
+        });
+        setCylinderSizes(sorted);
+      } else {
+        setCylinderSizes([]);
+      }
+    } catch (error) {
       console.error("Error fetching cylinder sizes:", error);
-    } else {
-      setCylinderSizes(data || []);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSort = (column: SortColumn) => {
@@ -104,7 +117,7 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
     if (sortColumn !== column) {
       return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
     }
-    return sortDirection === "asc" 
+    return sortDirection === "asc"
       ? <ArrowUp className="h-4 w-4 ml-1" />
       : <ArrowDown className="h-4 w-4 ml-1" />;
   };
@@ -155,17 +168,10 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
 
     try {
       if (editingSize) {
-        const { error } = await supabase
-          .from("cylinder_sizes")
-          .update(sizeData)
-          .eq("id", editingSize.id);
-        if (error) throw error;
+        await api.cylinderSizes.update(editingSize.id, sizeData);
         toast.success("Cilinderinhoud bijgewerkt");
       } else {
-        const { error } = await supabase
-          .from("cylinder_sizes")
-          .insert(sizeData);
-        if (error) throw error;
+        await api.cylinderSizes.create(sizeData);
         toast.success("Cilinderinhoud toegevoegd");
       }
       fetchCylinderSizes();
@@ -181,32 +187,25 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
   const handleDelete = async () => {
     if (!sizeToDelete) return;
 
-    const { error } = await supabase
-      .from("cylinder_sizes")
-      .delete()
-      .eq("id", sizeToDelete.id);
-
-    if (error) {
-      console.error("Error deleting cylinder size:", error);
-      toast.error("Fout bij verwijderen");
-    } else {
+    try {
+      await api.cylinderSizes.delete(sizeToDelete.id);
       toast.success("Cilinderinhoud verwijderd");
       fetchCylinderSizes();
+    } catch (error) {
+      console.error("Error deleting cylinder size:", error);
+      toast.error("Fout bij verwijderen");
     }
     setDeleteDialogOpen(false);
     setSizeToDelete(null);
   };
 
   const handleToggleActive = async (size: CylinderSize) => {
-    const { error } = await supabase
-      .from("cylinder_sizes")
-      .update({ is_active: !size.is_active })
-      .eq("id", size.id);
-
-    if (error) {
-      toast.error("Fout bij bijwerken");
-    } else {
+    try {
+      await api.cylinderSizes.update(size.id, { is_active: !size.is_active });
       fetchCylinderSizes();
+    } catch (error) {
+      console.error(error);
+      toast.error("Fout bij bijwerken");
     }
   };
 
@@ -215,23 +214,18 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
 
     setBulkDeleting(true);
     try {
-      const { error } = await supabase
-        .from("cylinder_sizes")
-        .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000");
+      const promises = cylinderSizes
+        .filter(s => s.id !== "00000000-0000-0000-0000-000000000000")
+        .map(s => api.cylinderSizes.delete(s.id));
 
-      if (error) throw error;
-      
+      await Promise.all(promises);
+
       toast.success(`${cylinderSizes.length} cilinderinhouden verwijderd`);
       fetchCylinderSizes();
       setBulkDeleteDialogOpen(false);
     } catch (error: any) {
       console.error("Error bulk deleting cylinder sizes:", error);
-      if (error?.code === "23503") {
-        toast.error("Kan niet verwijderen: cilinderinhouden worden nog gebruikt");
-      } else {
-        toast.error("Fout bij verwijderen van cilinderinhouden");
-      }
+      toast.error("Fout bij verwijderen van cilinderinhouden. Mogelijk zijn ze in gebruik.");
     } finally {
       setBulkDeleting(false);
     }
@@ -240,7 +234,7 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent 
+        <DialogContent
           className="sm:max-w-[600px]"
           onInteractOutside={(e) => {
             if (bulkDeleteDialogOpen || deleteDialogOpen || editDialogOpen) {
@@ -297,7 +291,7 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead 
+                    <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("name")}
                     >
@@ -306,7 +300,7 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
                         <SortIcon column="name" />
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("capacity_liters")}
                     >
@@ -315,7 +309,7 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
                         <SortIcon column="capacity_liters" />
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("description")}
                     >
@@ -324,7 +318,7 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
                         <SortIcon column="description" />
                       </div>
                     </TableHead>
-                    <TableHead 
+                    <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       onClick={() => handleSort("is_active")}
                     >
@@ -506,8 +500,8 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
       </AlertDialog>
 
       {/* Bulk Delete Confirmation */}
-      <AlertDialog 
-        open={bulkDeleteDialogOpen} 
+      <AlertDialog
+        open={bulkDeleteDialogOpen}
         onOpenChange={(isOpen) => {
           setBulkDeleteDialogOpen(isOpen);
           if (!isOpen) {

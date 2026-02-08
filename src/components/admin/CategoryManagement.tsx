@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 import { Plus, Pencil, Trash2, FolderTree, Loader2, GripVertical } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -57,12 +58,7 @@ export function CategoryManagement() {
 
   const fetchCategories = async () => {
     try {
-      const { data, error } = await supabase
-        .from("task_types")
-        .select("*")
-        .order("sort_order");
-
-      if (error) throw error;
+      const data = await api.taskTypes.getAll();
       setCategories(data || []);
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -79,7 +75,7 @@ export function CategoryManagement() {
   const mainCategories = categories
     .filter((c) => !c.parent_id)
     .sort((a, b) => a.sort_order - b.sort_order);
-  
+
   const getSubcategories = (parentId: string) =>
     categories
       .filter((c) => c.parent_id === parentId)
@@ -118,29 +114,25 @@ export function CategoryManagement() {
 
     try {
       if (editingCategory) {
-        const { error } = await supabase
-          .from("task_types")
-          .update({
-            name: formData.name.trim(),
-            description: formData.description.trim() || null,
-            color: formData.color,
-            parent_id: formData.parent_id,
-            is_active: formData.is_active,
-          })
-          .eq("id", editingCategory.id);
+        await api.taskTypes.update(editingCategory.id, {
+          name: formData.name.trim(),
+          description: formData.description.trim() || null,
+          color: formData.color,
+          parent_id: formData.parent_id,
+          is_active: formData.is_active,
+        });
 
-        if (error) throw error;
         toast.success("Categorie bijgewerkt");
       } else {
         // Get the max sort_order for the parent
         const siblings = formData.parent_id
           ? getSubcategories(formData.parent_id)
           : mainCategories;
-        const maxOrder = siblings.length > 0 
-          ? Math.max(...siblings.map(s => s.sort_order)) 
+        const maxOrder = siblings.length > 0
+          ? Math.max(...siblings.map(s => s.sort_order))
           : 0;
 
-        const { error } = await supabase.from("task_types").insert({
+        await api.taskTypes.create({
           name: formData.name.trim(),
           description: formData.description.trim() || null,
           color: formData.color,
@@ -149,7 +141,6 @@ export function CategoryManagement() {
           sort_order: maxOrder + 1,
         });
 
-        if (error) throw error;
         toast.success("Categorie aangemaakt");
       }
 
@@ -177,12 +168,8 @@ export function CategoryManagement() {
         return;
       }
 
-      const { error } = await supabase
-        .from("task_types")
-        .delete()
-        .eq("id", deletingCategory.id);
+      await api.taskTypes.delete(deletingCategory.id);
 
-      if (error) throw error;
       toast.success("Categorie verwijderd");
       setDeleteDialogOpen(false);
       fetchCategories();
@@ -218,7 +205,7 @@ export function CategoryManagement() {
 
   const handleDrop = async (e: React.DragEvent, targetCategory: TaskType) => {
     e.preventDefault();
-    
+
     if (!draggedItem || draggedItem.id === targetCategory.id) {
       handleDragEnd();
       return;
@@ -260,7 +247,7 @@ export function CategoryManagement() {
           .from("task_types")
           .update({ sort_order: update.sort_order })
           .eq("id", update.id);
-        
+
         if (error) throw error;
       }
 
@@ -311,16 +298,14 @@ export function CategoryManagement() {
         ) : (
           <div className="space-y-4">
             {mainCategories.map((mainCat) => (
-              <div 
-                key={mainCat.id} 
-                className={`border rounded-lg transition-colors ${
-                  dragOverItem === mainCat.id ? "border-primary bg-primary/5" : ""
-                }`}
-              >
-                <div 
-                  className={`flex items-center justify-between p-4 bg-muted/30 ${
-                    draggedItem?.id === mainCat.id ? "opacity-50" : ""
+              <div
+                key={mainCat.id}
+                className={`border rounded-lg transition-colors ${dragOverItem === mainCat.id ? "border-primary bg-primary/5" : ""
                   }`}
+              >
+                <div
+                  className={`flex items-center justify-between p-4 bg-muted/30 ${draggedItem?.id === mainCat.id ? "opacity-50" : ""
+                    }`}
                   draggable
                   onDragStart={(e) => handleDragStart(e, mainCat)}
                   onDragOver={(e) => handleDragOver(e, mainCat.id)}
@@ -370,9 +355,8 @@ export function CategoryManagement() {
                     {getSubcategories(mainCat.id).map((subCat) => (
                       <div
                         key={subCat.id}
-                        className={`flex items-center justify-between py-3 px-4 pl-8 transition-colors ${
-                          dragOverItem === subCat.id ? "bg-primary/5" : ""
-                        } ${draggedItem?.id === subCat.id ? "opacity-50" : ""}`}
+                        className={`flex items-center justify-between py-3 px-4 pl-8 transition-colors ${dragOverItem === subCat.id ? "bg-primary/5" : ""
+                          } ${draggedItem?.id === subCat.id ? "opacity-50" : ""}`}
                         draggable
                         onDragStart={(e) => handleDragStart(e, subCat)}
                         onDragOver={(e) => handleDragOver(e, subCat.id)}
