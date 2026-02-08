@@ -85,8 +85,8 @@ export function StockExcelImportDialog({
           // Look for header row with stock-related columns
           if (
             (rowStr.includes("subcode") || rowStr.includes("sub code") || rowStr.includes("artikelcode")) &&
-            (rowStr.includes("omschrijving") || rowStr.includes("description")) &&
-            (rowStr.includes("voorraad") || rowStr.includes("stock") || rowStr.includes("aantal"))
+            (rowStr.includes("omschrijving") || rowStr.includes("description") || rowStr.includes("subcodedescription")) &&
+            (rowStr.includes("voorraad") || rowStr.includes("stock") || rowStr.includes("aantal") || rowStr.includes("gemvanqty") || rowStr.includes("aantalvanbarcode"))
           ) {
             headerRowIndex = i;
             row.forEach((cell, idx) => {
@@ -94,16 +94,16 @@ export function StockExcelImportDialog({
               if (cellStr.includes("subcode") || cellStr.includes("sub code") || cellStr.includes("artikelcode") || cellStr === "code") {
                 columnMap.subCode = idx;
               }
-              if (cellStr.includes("omschrijving") || cellStr.includes("description") || cellStr === "naam" || cellStr === "product") {
+              if (cellStr.includes("omschrijving") || cellStr.includes("description") || cellStr.includes("subcodedescription") || cellStr === "naam" || cellStr === "product") {
                 columnMap.description = idx;
               }
-              if (cellStr.includes("gem") && (cellStr.includes("verbr") || cellStr.includes("cons"))) {
+              if ((cellStr.includes("gem") && (cellStr.includes("verbr") || cellStr.includes("cons"))) || cellStr.includes("gemvanqty")) {
                 columnMap.averageConsumption = idx;
               }
-              if (cellStr.includes("voorraad") || cellStr.includes("stock") || cellStr.includes("aantal op voorraad")) {
+              if (cellStr.includes("voorraad") || cellStr.includes("stock") || cellStr.includes("aantal op voorraad") || cellStr.includes("aantalvanbarcode")) {
                 columnMap.numberOnStock = idx;
               }
-              if (cellStr.includes("verschil") || cellStr.includes("difference") || cellStr.includes("diff")) {
+              if (cellStr.includes("verschil") || cellStr.includes("difference") || cellStr.includes("diff") || cellStr.includes("verscil")) {
                 columnMap.difference = idx;
               }
             });
