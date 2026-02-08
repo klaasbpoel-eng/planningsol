@@ -1,61 +1,50 @@
 
 
-# Fix: Alle gastypes tonen in het selectiemenu
+## Update Reset Function to Match Current Table Schema
 
-## Probleem
+The "Gascilinder orders tabel resetten" edge function currently recreates the table with an incomplete schema -- it's missing several RLS policies that operators and supervisors need to create/view/update/delete orders. This means after resetting, only admins can import data. Additionally, the CSV import flow relies on these policies being present.
 
-Het gastype-selectiemenu in het "Nieuwe gascilinder order" dialoog toont niet alle gastypes. Dit komt doordat de app alle orders (48.000+) opvraagt om te bepalen welke gastypes bij een locatie horen, maar er maximaal 1.000 rijen per keer worden opgehaald. Hierdoor worden veel gastypes gemist.
+### What will change
 
-## Oplossing
+**File: `supabase/functions/reset-gas-cylinder-orders/index.ts`**
 
-Vervang de huidige query (die alle orders ophaalt) door een database-functie die efficient alleen de unieke gastype-IDs per locatie opvraagt.
+Add the missing RLS policies to the `DROP TABLE ... CREATE TABLE` SQL block:
 
-## Wijzigingen
+1. **Operator policies** (4 policies):
+   - SELECT, INSERT, UPDATE, DELETE -- scoped to their `production_location`
 
-| Stap | Bestand | Wijziging |
-|------|---------|-----------|
-| 1 | Database | Nieuwe RPC-functie `get_distinct_gas_type_ids_by_location` aanmaken |
-| 2 | `CreateGasCylinderOrderDialog.tsx` | De inefficiente query vervangen door een aanroep naar de nieuwe functie |
+2. **Supervisor policies** (4 policies):
+   - SELECT, INSERT, UPDATE, DELETE -- scoped to their `production_location`
 
-## Technische Details
+These policies use the same pattern as the current live table: checking `has_role(auth.uid(), 'operator'/'supervisor')` combined with `get_user_production_location(auth.uid())` to restrict access by location.
 
-### 1. Database functie (SQL migratie)
+### Technical Details
 
-Een nieuwe functie die `SELECT DISTINCT gas_type_id` uitvoert, gefilterd op locatie. Dit retourneert direct de unieke IDs (maximaal ~100 rijen) in plaats van alle 48.000+ orders.
+The exact policies to add mirror what currently exists on the table:
 
+```text
+-- Operators: location-scoped CRUD
+"Operators can view gas cylinder orders at their location" (SELECT)
+"Operators can create gas cylinder orders at their location" (INSERT)
+"Operators can update gas cylinder orders at their location" (UPDATE)
+"Operators can delete gas cylinder orders at their location" (DELETE)
+
+-- Supervisors: location-scoped CRUD
+"Supervisors can view gas cylinder orders at their location" (SELECT)
+"Supervisors can create gas cylinder orders at their location" (INSERT)
+"Supervisors can update gas cylinder orders at their location" (UPDATE)
+"Supervisors can delete gas cylinder orders at their location" (DELETE)
+```
+
+Each uses the condition:
 ```sql
-CREATE OR REPLACE FUNCTION get_distinct_gas_type_ids_by_location(p_location TEXT)
-RETURNS TABLE(gas_type_id UUID)
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = ''
-AS $$
-  SELECT DISTINCT gco.gas_type_id
-  FROM public.gas_cylinder_orders gco
-  WHERE gco.location = p_location
-    AND gco.gas_type_id IS NOT NULL;
-$$;
+has_role(auth.uid(), 'operator'::app_role)
+AND (
+  (get_user_production_location(auth.uid()) IS NOT NULL
+   AND location = get_user_production_location(auth.uid()))
+  OR get_user_production_location(auth.uid()) IS NULL
+)
 ```
 
-### 2. Component aanpassing
-
-In `CreateGasCylinderOrderDialog.tsx` (rond regel 176-199) wordt de huidige query:
-
-```typescript
-// OUD - haalt tot 1000 orders op
-const { data: locationOrders } = await supabase
-  .from("gas_cylinder_orders")
-  .select("gas_type_id")
-  .eq("location", location)
-  .not("gas_type_id", "is", null);
-```
-
-Vervangen door:
-
-```typescript
-// NIEUW - haalt alleen unieke gas_type_ids op
-const { data: locationGasTypes } = await supabase
-  .rpc("get_distinct_gas_type_ids_by_location", { p_location: location });
-```
-
-Dit is sneller en retourneert altijd alle gastypes, ongeacht het aantal orders.
+No other files need changes -- the import logic in `ExcelImportDialog.tsx` already writes the correct columns and values.
 
