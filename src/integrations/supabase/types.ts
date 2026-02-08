@@ -1308,6 +1308,12 @@ export type Database = {
           production_date: string
         }[]
       }
+      get_distinct_gas_type_ids_by_location: {
+        Args: { p_location: string }
+        Returns: {
+          gas_type_id: string
+        }[]
+      }
       get_dry_ice_efficiency_by_period: {
         Args: { p_from_date: string; p_location?: string; p_to_date: string }
         Returns: {
