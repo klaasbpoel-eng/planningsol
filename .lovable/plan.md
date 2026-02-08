@@ -1,45 +1,34 @@
 
 
-## Fix: KPI Dashboard toont data van verkeerde datum door tijdzone-conversie
+## Fix: Droogijs statistieken verbergen bij Tilburg filter
 
 ### Het probleem
 
-De KPI Dashboard toont 52 cilinders en 5 voltooide orders voor Tilburg, maar die horen eigenlijk bij 31 januari (niet februari). Dit komt door een tijdzone-bug:
+Wanneer "SOL Tilburg" is geselecteerd als locatie, worden de droogijs-statistieken nog steeds getoond (5.064 kg en 28 orders). Dit is incorrect omdat droogijsproductie uitsluitend in Emmen plaatsvindt.
 
-- De datum `1 februari 2026 00:00 CET` wordt via `.toISOString()` omgezet naar `2026-01-31T23:00:00Z` (UTC)
-- `.split('T')[0]` pakt dan `2026-01-31` in plaats van `2026-02-01`
-- Hierdoor worden 5 orders van 31 januari (52 cilinders) onterecht meegeteld
+Er zijn twee oorzaken:
 
-Dit probleem zit op meerdere plekken in de code waar `.toISOString().split('T')[0]` wordt gebruikt voor datumconversie.
+1. **Droogijs data wordt altijd opgehaald** -- De RPC-aanroep voor droogijs gebruikt `p_location: null`, waardoor altijd alle droogijsdata wordt opgehaald, ongeacht de locatiefilter.
+2. **"Totaal orders" telt droogijs mee** -- Het totaal aantal orders is de som van droogijs- en cilinderorders. Bij Tilburg moeten droogijsorders niet meetellen.
 
 ### Oplossing
 
-Vervang alle `.toISOString().split('T')[0]` conversies door een lokale datumformattering die de tijdzone respecteert. Gebruik de bestaande `format()` functie van `date-fns` (al geimporteerd in ProductionPlanning) of een handmatige lokale formatter.
+**Bestand: `src/components/production/ProductionPlanning.tsx`**
 
-### Bestanden die worden aangepast
+Twee aanpassingen in de `fetchStats` functie:
 
-**1. `src/components/production/KPIDashboard.tsx`**
+1. **Droogijs-statistieken overslaan bij Tilburg**: Wanneer `selectedLocation === "sol_tilburg"`, sla de droogijs RPC-aanroepen over en zet de waarden op 0.
 
-Voeg een helper-functie toe die lokaal formatteert:
-```
-const toLocalDateString = (date: Date) => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-```
+2. **Droogijs stat card verbergen bij Tilburg**: De "Droogijs gepland" kaart wordt niet gerenderd wanneer Tilburg is geselecteerd (consistent met hoe rapportages dit al doen).
 
-Vervang alle voorkomens van `.toISOString().split('T')[0]` door `toLocalDateString()`:
-- Regel 87: `fromDate` berekening
-- Regel 88: `toDate` berekening  
-- Regel 98: `prevFromDate` berekening
-- Regel 99: `prevToDate` berekening
-- Regel 215: `startStr` in `fetchWeeklySparkline`
-- Regel 216: `endStr` in `fetchWeeklySparkline`
+3. **Totaal orders corrigeren**: Bij Tilburg worden alleen cilinderorders geteld.
 
-Dit zorgt ervoor dat `1 feb 2026 00:00 CET` correct wordt als `2026-02-01`, ongeacht de tijdzone van de gebruiker.
+### Technische details
 
-### Impact
+**In `fetchStats` (regel 193-214):**
+- Als `selectedLocation === "sol_tilburg"`: skip de dry ice RPC calls, zet `dryIceToday`, `previousDryIceToday` op 0, en tel geen droogijsorders mee bij `weekOrders`.
 
-Na deze fix zal het KPI Dashboard voor Tilburg correct 0 cilinders en 0 orders tonen in februari, omdat alle 5 orders op 31 januari vallen en buiten de geselecteerde periode vallen.
+**In de render (regel 395-408):**
+- Wrap de droogijs StatCard in een conditie: `{selectedLocation !== "sol_tilburg" && <StatCard ... />}`
+- Pas de grid-kolommen aan zodat de layout klopt met of zonder de droogijs-kaart.
+
