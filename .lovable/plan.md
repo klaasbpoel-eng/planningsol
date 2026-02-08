@@ -1,35 +1,58 @@
 
-# Fix: Horizontaal scrollen op mobiel voorkomen
+
+# Plan: Export hele gas_cylinder_orders tabel naar Excel
 
 ## Probleem
 
-Op mobiele apparaten kan de hele pagina horizontaal verschoven worden, waardoor er witte ruimte zichtbaar wordt aan de rechterkant. Dit wordt veroorzaakt door elementen die breder zijn dan het scherm.
+De tabel bevat ~140.000 records. De Supabase API heeft een standaard limiet van 1.000 rijen per query. Alles via de frontend ophalen (zelfs met weekly chunking) zou tientallen requests vereisen en traag/onbetrouwbaar zijn.
 
-## Oorzaak
+## Aanpak
 
-Er zijn meerdere plekken waar content buiten het scherm kan uitsteken:
-
-1. **Geen overflow beveiliging** op de pagina-wrapper (`ProductionPlanningPage.tsx`) - het `gradient-mesh` div mist `overflow-x: hidden`
-2. **KPI Dashboard "Additional Stats Row"** - gebruikt `grid-cols-3` zonder responsive aanpassing, waardoor tekst en iconen op smalle schermen buiten beeld vallen
-3. **KPI Dashboard header** - de badges en tekst in de `CardHeader` kunnen op smalle schermen te breed worden
+Een **backend functie** die server-side alle data ophaalt en een CSV bestand genereert. CSV wordt gekozen boven .xlsx omdat:
+- Het server-side geen zware libraries nodig heeft (xlsx is ~2MB)
+- CSV opent prima in Excel
+- Het is veel sneller te genereren bij 140k rijen
 
 ## Wijzigingen
 
 | Bestand | Wijziging |
 |---------|-----------|
-| `src/pages/ProductionPlanningPage.tsx` | Voeg `overflow-x-hidden` toe aan de page wrapper |
-| `src/components/production/KPIDashboard.tsx` | Maak de "Additional Stats Row" responsive (`grid-cols-1 sm:grid-cols-3`) en voeg `overflow-hidden` toe aan de card |
-| `src/index.css` | Voeg globale `overflow-x: hidden` toe aan `body` om horizontaal scrollen app-breed te voorkomen |
+| `supabase/functions/export-gas-cylinder-orders/index.ts` | Nieuwe backend functie die alle orders ophaalt en als CSV retourneert |
+| `src/components/production/GasCylinderPlanning.tsx` | Export knop toevoegen die de backend functie aanroept en het CSV bestand download |
 
 ## Technische Details
 
-### 1. Globale overflow fix (`src/index.css`)
-Voeg `overflow-x: hidden` toe aan de body styling om app-breed horizontaal scrollen te voorkomen. Dit is de veiligste aanpak zodat geen enkele pagina dit probleem kan veroorzaken.
+### 1. Backend functie (`supabase/functions/export-gas-cylinder-orders/index.ts`)
 
-### 2. Page wrapper (`ProductionPlanningPage.tsx`)
-Voeg `overflow-x-hidden` toe aan de `min-h-screen gradient-mesh` div als extra beveiliging.
+- Gebruikt de Supabase service role key (server-side, geen RLS limiet)
+- Haalt alle records op uit `gas_cylinder_orders` met een JOIN op `gas_types` voor de gastype naam
+- Paginatie server-side: haalt data op in batches van 10.000 rijen via `.range()`
+- Genereert een CSV string met de kolommen: Locatie, Ordernummer, Klant, Gastype, Kwaliteit, Aantal Cilinders, Cilindergrootte, Druk (bar), Datum, Status, Opmerkingen
+- Vertaalt technische waarden naar Nederlandse labels (bijv. `sol_emmen` -> `SOL Emmen`, `completed` -> `Voltooid`)
+- Retourneert het CSV bestand met juiste headers (`Content-Type: text/csv`, `Content-Disposition: attachment`)
+- Beveiligd: controleert of de gebruiker is ingelogd via de Authorization header
 
-### 3. KPI Dashboard (`KPIDashboard.tsx`)
-- Verander de "Additional Stats Row" van `grid-cols-3` naar `grid-cols-1 sm:grid-cols-3` zodat de statistieken op mobiel onder elkaar staan
-- Voeg `overflow-hidden` toe aan de wrapper Card
-- Maak de header badges `flex-wrap` zodat ze op smalle schermen kunnen wrappen
+### 2. Export knop (`GasCylinderPlanning.tsx`)
+
+- Voegt een "Excel export" knop toe in de header (naast bestaande knoppen)
+- Knop roept de backend functie aan via `fetch()` met de auth token
+- Download het resultaat als `.csv` bestand (opent direct in Excel)
+- Toont een loading state en foutmeldingen via toast
+- Bestandsnaam: `gascilinder-orders-export-YYYY-MM-DD.csv`
+
+### Data Flow
+
+```text
+[Knop klik] -> [Backend Functie]
+                   |
+                   v
+            [Supabase DB query]
+            (batches van 10.000)
+                   |
+                   v
+            [CSV generatie]
+                   |
+                   v
+            [Download in browser]
+```
+
