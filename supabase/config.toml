@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.sync-schema]
 verify_jwt = false
+
+[functions.sync-mysql-schema]
+verify_jwt = false
+
+[functions.sync-mysql]
+verify_jwt = false
