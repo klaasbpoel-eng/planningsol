@@ -7,8 +7,9 @@ import { UserApprovalManagement } from "./UserApprovalManagement";
 import { CustomerManagement } from "../customers/CustomerManagement";
 import { EmployeeList } from "./EmployeeList";
 import { DatabaseBackupRestore } from "./DatabaseBackupRestore";
+import { ExternalDatabaseSettings } from "./ExternalDatabaseSettings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Users, Factory, Calendar, Building2, UserCog } from "lucide-react";
+import { Settings, Users, Factory, Calendar, Building2, UserCog, Database } from "lucide-react";
 
 export function AdminSettings() {
   return (
@@ -41,6 +42,10 @@ export function AdminSettings() {
           <TabsTrigger value="customers" className="gap-2 data-[state=active]:bg-background">
             <Building2 className="h-4 w-4" />
             Klanten
+          </TabsTrigger>
+          <TabsTrigger value="external-db" className="gap-2 data-[state=active]:bg-background">
+            <Database className="h-4 w-4" />
+            Externe Databases
           </TabsTrigger>
         </TabsList>
 
@@ -81,6 +86,10 @@ export function AdminSettings() {
 
         <TabsContent value="customers" className="space-y-4 animate-fade-in-up">
           <CustomerManagement isAdmin />
+        </TabsContent>
+
+        <TabsContent value="external-db" className="space-y-4 animate-fade-in-up">
+          <ExternalDatabaseSettings />
         </TabsContent>
       </Tabs>
     </div>
