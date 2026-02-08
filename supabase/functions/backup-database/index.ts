@@ -21,7 +21,7 @@ const TABLES = [
 ];
 
 async function fetchAllRows(
-  client: ReturnType<typeof createClient>,
+  client: any,
   table: string
 ) {
   const allRows: unknown[] = [];
