@@ -8,6 +8,7 @@ import { CustomerManagement } from "../customers/CustomerManagement";
 import { EmployeeList } from "./EmployeeList";
 import { DatabaseBackupRestore } from "./DatabaseBackupRestore";
 import { MigrationSettings } from "./MigrationSettings";
+import { DataSourceSettings } from "./DataSourceSettings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Factory, Calendar, Building2, UserCog, Download } from "lucide-react";
 
@@ -89,6 +90,7 @@ export function AdminSettings() {
         </TabsContent>
 
         <TabsContent value="migration" className="space-y-4 animate-fade-in-up">
+          <DataSourceSettings />
           <MigrationSettings />
         </TabsContent>
       </Tabs>

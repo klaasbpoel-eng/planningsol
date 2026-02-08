@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 import { CustomerDialog } from "./CustomerDialog";
 import {
   AlertDialog,
@@ -61,16 +62,13 @@ export function CustomerManagement({ isAdmin = false }: CustomerManagementProps)
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
 
   const fetchCustomers = async () => {
-    const { data, error } = await supabase
-      .from("customers")
-      .select("*")
-      .order("name");
-
-    if (error) {
+    try {
+      const data = await api.customers.getAll();
+      // Ensure date strings are compatible if needed, though JS usually handles ISO strings fine
+      setCustomers(data || []);
+    } catch (error) {
       console.error("Error fetching customers:", error);
       toast.error("Fout bij ophalen klanten");
-    } else {
-      setCustomers(data || []);
     }
     setLoading(false);
   };
@@ -87,34 +85,26 @@ export function CustomerManagement({ isAdmin = false }: CustomerManagementProps)
   const handleDelete = async () => {
     if (!customerToDelete) return;
 
-    const { error } = await supabase
-      .from("customers")
-      .delete()
-      .eq("id", customerToDelete.id);
-
-    if (error) {
-      console.error("Error deleting customer:", error);
-      toast.error("Fout bij verwijderen klant");
-    } else {
+    try {
+      await api.customers.delete(customerToDelete.id);
       toast.success("Klant verwijderd");
       fetchCustomers();
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      toast.error("Fout bij verwijderen klant");
     }
     setDeleteDialogOpen(false);
     setCustomerToDelete(null);
   };
 
   const handleToggleActive = async (customer: Customer) => {
-    const { error } = await supabase
-      .from("customers")
-      .update({ is_active: !customer.is_active })
-      .eq("id", customer.id);
-
-    if (error) {
-      console.error("Error updating customer:", error);
-      toast.error("Fout bij bijwerken klant");
-    } else {
+    try {
+      await api.customers.toggleActive(customer.id, customer.is_active);
       toast.success(customer.is_active ? "Klant gedeactiveerd" : "Klant geactiveerd");
       fetchCustomers();
+    } catch (error) {
+      console.error("Error updating customer:", error);
+      toast.error("Fout bij bijwerken klant");
     }
   };
 
