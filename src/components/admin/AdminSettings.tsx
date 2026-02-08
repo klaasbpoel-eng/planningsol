@@ -7,11 +7,9 @@ import { UserApprovalManagement } from "./UserApprovalManagement";
 import { CustomerManagement } from "../customers/CustomerManagement";
 import { EmployeeList } from "./EmployeeList";
 import { DatabaseBackupRestore } from "./DatabaseBackupRestore";
-import { ExternalDatabaseSettings } from "./ExternalDatabaseSettings";
 import { MigrationSettings } from "./MigrationSettings";
-import { SupabaseSyncSettings } from "./SupabaseSyncSettings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Users, Factory, Calendar, Building2, UserCog, Database, ArrowRightLeft, RefreshCw } from "lucide-react";
+import { Settings, Factory, Calendar, Building2, UserCog, ArrowRightLeft } from "lucide-react";
 
 export function AdminSettings() {
   return (
@@ -45,17 +43,9 @@ export function AdminSettings() {
             <Building2 className="h-4 w-4" />
             Klanten
           </TabsTrigger>
-          <TabsTrigger value="external-db" className="gap-2 data-[state=active]:bg-background">
-            <Database className="h-4 w-4" />
-            Externe Databases
-          </TabsTrigger>
           <TabsTrigger value="migration" className="gap-2 data-[state=active]:bg-background">
             <ArrowRightLeft className="h-4 w-4" />
             Migratie
-          </TabsTrigger>
-          <TabsTrigger value="sync" className="gap-2 data-[state=active]:bg-background">
-            <RefreshCw className="h-4 w-4" />
-            Supabase Sync
           </TabsTrigger>
         </TabsList>
 
@@ -98,16 +88,8 @@ export function AdminSettings() {
           <CustomerManagement isAdmin />
         </TabsContent>
 
-        <TabsContent value="external-db" className="space-y-4 animate-fade-in-up">
-          <ExternalDatabaseSettings />
-        </TabsContent>
-
         <TabsContent value="migration" className="space-y-4 animate-fade-in-up">
           <MigrationSettings />
-        </TabsContent>
-
-        <TabsContent value="sync" className="space-y-4 animate-fade-in-up">
-          <SupabaseSyncSettings />
         </TabsContent>
       </Tabs>
     </div>
