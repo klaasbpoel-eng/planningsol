@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Snowflake, Calendar, Package, Trash2, Box, Repeat, Edit2, AlertTriangle, Filter, X, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from "lucide-react";
@@ -175,14 +176,13 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
   }, [yearFilter]);
 
   const fetchDailyCapacity = async () => {
-    const { data } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "dry_ice_daily_capacity_kg")
-      .maybeSingle();
-
-    if (data?.value) {
-      setDailyCapacity(Number(data.value));
+    try {
+      const data = await api.appSettings.getByKey("dry_ice_daily_capacity_kg");
+      if (data?.value) {
+        setDailyCapacity(Number(data.value));
+      }
+    } catch (error) {
+      console.error("Error fetching daily capacity:", error);
     }
   };
 
@@ -191,43 +191,35 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
     const startDate = `${yearFilter}-01-01`;
     const endDate = `${yearFilter}-12-31`;
 
-    const { data, error } = await supabase
-      .from("dry_ice_orders")
-      .select("*")
-      .gte("scheduled_date", startDate)
-      .lte("scheduled_date", endDate)
-      .order("scheduled_date", { ascending: true });
-
-    if (error) {
+    try {
+      const data = await api.dryIceOrders.getAll(startDate, endDate);
+      setOrders((data as DryIceOrder[]) || []);
+    } catch (error) {
       console.error("Error fetching orders:", error);
       toast.error("Fout bij ophalen orders");
-    } else {
-      setOrders(data || []);
     }
     setLoading(false);
   };
 
   const fetchProductTypes = async () => {
-    const { data, error } = await supabase
-      .from("dry_ice_product_types")
-      .select("id, name")
-      .eq("is_active", true)
-      .order("sort_order");
-
-    if (!error && data) {
-      setProductTypes(data);
+    try {
+      const data = await api.dryIceProductTypes.getAll();
+      if (data) {
+        setProductTypes(data);
+      }
+    } catch (error) {
+      console.error("Error fetching product types:", error);
     }
   };
 
   const fetchPackaging = async () => {
-    const { data, error } = await supabase
-      .from("dry_ice_packaging")
-      .select("id, name")
-      .eq("is_active", true)
-      .order("sort_order");
-
-    if (!error && data) {
-      setPackagingOptions(data);
+    try {
+      const data = await api.dryIcePackaging.getAll();
+      if (data) {
+        setPackagingOptions(data);
+      }
+    } catch (error) {
+      console.error("Error fetching packaging:", error);
     }
   };
 
@@ -239,17 +231,14 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
   const handleConfirmDelete = async () => {
     if (!orderToDelete) return;
 
-    const { error } = await supabase
-      .from("dry_ice_orders")
-      .delete()
-      .eq("id", orderToDelete.id);
-
-    if (error) {
-      toast.error("Fout bij verwijderen order");
-    } else {
+    try {
+      await api.dryIceOrders.delete(orderToDelete.id);
       toast.success("Order verwijderd");
       fetchOrders();
       onDataChanged?.();
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      toast.error("Fout bij verwijderen order");
     }
     setDeleteDialogOpen(false);
     setOrderToDelete(null);
@@ -261,16 +250,13 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
       order.id === id ? { ...order, status: newStatus } : order
     ));
 
-    const { error } = await supabase
-      .from("dry_ice_orders")
-      .update({ status: newStatus as "pending" | "in_progress" | "completed" | "cancelled" })
-      .eq("id", id);
-
-    if (error) {
+    try {
+      await api.dryIceOrders.update(id, { status: newStatus });
+      toast.success("Status bijgewerkt");
+    } catch (error) {
+      console.error("Error updating status:", error);
       toast.error("Fout bij bijwerken status");
       fetchOrders(); // Revert on error
-    } else {
-      toast.success("Status bijgewerkt");
     }
   };
 

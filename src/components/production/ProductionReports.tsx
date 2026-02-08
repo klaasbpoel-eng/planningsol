@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, lazy, Suspense, useCallback } from "react";
+import { api } from "@/lib/api";
 
 // Type definitions for RPC responses
 interface DailyProductionData {
@@ -88,7 +89,6 @@ const ChartLoadingFallback = () => (
 import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, differenceInDays, subDays, startOfYear, endOfYear, subYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn, formatNumber } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ReportExportButtons } from "./ReportExportButtons";
@@ -219,11 +219,21 @@ export function ProductionReports({
       const prevFromDate = format(prevFrom, "yyyy-MM-dd");
       const prevToDate = format(prevTo, "yyyy-MM-dd");
 
-      console.log("[ProductionReports] Fetching RPC data for period:", { fromDate, toDate, location });
+      console.log("[ProductionReports] Fetching data for period:", { fromDate, toDate, location });
 
       const locationParam = location === "all" ? null : location;
 
-      // Fetch all data in parallel using RPC calls
+      // Helper to match Supabase RPC response structure { data, error }
+      const fetchSafely = async (fn: () => Promise<any>) => {
+        try {
+          const data = await fn();
+          return { data, error: null };
+        } catch (error) {
+          return { data: null, error };
+        }
+      };
+
+      // Fetch all data in parallel using api.reports
       const [
         dailyRes,
         gasTypeRes,
@@ -235,69 +245,37 @@ export function ProductionReports({
         gasCategoryRes
       ] = await Promise.all([
         // Daily production data for charts
-        supabase.rpc("get_daily_production_by_period", {
-          p_from_date: fromDate,
-          p_to_date: toDate,
-          p_location: locationParam
-        }),
+        fetchSafely(() => api.reports.getDailyProductionByPeriod(fromDate, toDate, locationParam)),
         // Gas type distribution
-        supabase.rpc("get_gas_type_distribution_by_period", {
-          p_from_date: fromDate,
-          p_to_date: toDate,
-          p_location: locationParam
-        }),
+        fetchSafely(() => api.reports.getGasTypeDistribution(fromDate, toDate, locationParam)),
         // Current period efficiency stats (cylinders)
-        supabase.rpc("get_production_efficiency_by_period", {
-          p_from_date: fromDate,
-          p_to_date: toDate,
-          p_location: locationParam
-        }),
+        fetchSafely(() => api.reports.getProductionEfficiency(fromDate, toDate, locationParam)),
         // Current period efficiency stats (dry ice)
-        supabase.rpc("get_dry_ice_efficiency_by_period", {
-          p_from_date: fromDate,
-          p_to_date: toDate,
-          p_location: locationParam
-        }),
+        fetchSafely(() => api.reports.getDryIceEfficiency(fromDate, toDate, locationParam)),
         // Previous period efficiency (cylinders)
-        supabase.rpc("get_production_efficiency_by_period", {
-          p_from_date: prevFromDate,
-          p_to_date: prevToDate,
-          p_location: locationParam
-        }),
+        fetchSafely(() => api.reports.getProductionEfficiency(prevFromDate, prevToDate, locationParam)),
         // Previous period efficiency (dry ice)
-        supabase.rpc("get_dry_ice_efficiency_by_period", {
-          p_from_date: prevFromDate,
-          p_to_date: prevToDate,
-          p_location: locationParam
-        }),
+        fetchSafely(() => api.reports.getDryIceEfficiency(prevFromDate, prevToDate, locationParam)),
         // Customer totals for ranking
-        supabase.rpc("get_customer_totals_by_period", {
-          p_from_date: fromDate,
-          p_to_date: toDate,
-          p_location: locationParam
-        }),
-        // Gas category distribution (NEW)
-        supabase.rpc("get_gas_category_distribution_by_period" as any, {
-          p_from_date: fromDate,
-          p_to_date: toDate,
-          p_location: locationParam
-        })
+        fetchSafely(() => api.reports.getCustomerTotals(fromDate, toDate, locationParam)),
+        // Gas category distribution
+        fetchSafely(() => api.reports.getGasCategoryDistribution(fromDate, toDate, locationParam))
       ]);
 
-      // Log RPC responses for debugging
-      console.log("[ProductionReports] Daily production RPC:", dailyRes.data?.length || 0, "days");
-      console.log("[ProductionReports] Gas type distribution RPC:", gasTypeRes.data?.length || 0, "types");
-      console.log("[ProductionReports] Cylinder efficiency RPC:", cylinderEffRes.data);
-      console.log("[ProductionReports] Dry ice efficiency RPC:", dryIceEffRes.data);
-      console.log("[ProductionReports] Customer totals RPC:", customerTotalsRes.data?.length || 0, "customers");
+      // Log responses for debugging
+      console.log("[ProductionReports] Daily production:", dailyRes.data?.length || 0, "days");
+      console.log("[ProductionReports] Gas type distribution:", gasTypeRes.data?.length || 0, "types");
+      console.log("[ProductionReports] Cylinder efficiency:", cylinderEffRes.data);
+      console.log("[ProductionReports] Dry ice efficiency:", dryIceEffRes.data);
+      console.log("[ProductionReports] Customer totals:", customerTotalsRes.data?.length || 0, "customers");
 
       // Handle errors
-      if (dailyRes.error) console.error("[ProductionReports] Daily production RPC error:", dailyRes.error);
-      if (gasTypeRes.error) console.error("[ProductionReports] Gas type distribution RPC error:", gasTypeRes.error);
-      if (cylinderEffRes.error) console.error("[ProductionReports] Cylinder efficiency RPC error:", cylinderEffRes.error);
-      if (dryIceEffRes.error) console.error("[ProductionReports] Dry ice efficiency RPC error:", dryIceEffRes.error);
-      if (customerTotalsRes.error) console.error("[ProductionReports] Customer totals RPC error:", customerTotalsRes.error);
-      if (gasCategoryRes.error) console.error("[ProductionReports] Gas category distribution RPC error:", gasCategoryRes.error);
+      if (dailyRes.error) console.error("[ProductionReports] Daily production error:", dailyRes.error);
+      if (gasTypeRes.error) console.error("[ProductionReports] Gas type distribution error:", gasTypeRes.error);
+      if (cylinderEffRes.error) console.error("[ProductionReports] Cylinder efficiency error:", cylinderEffRes.error);
+      if (dryIceEffRes.error) console.error("[ProductionReports] Dry ice efficiency error:", dryIceEffRes.error);
+      if (customerTotalsRes.error) console.error("[ProductionReports] Customer totals error:", customerTotalsRes.error);
+      if (gasCategoryRes.error) console.error("[ProductionReports] Gas category distribution error:", gasCategoryRes.error);
 
       // Set daily production data
       setDailyProduction(dailyRes.data || []);

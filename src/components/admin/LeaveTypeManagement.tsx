@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,12 +22,19 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Palmtree, Loader2 } from "lucide-react";
-import type { Database } from "@/integrations/supabase/types";
+// import type { Database } from "@/integrations/supabase/types";
 
-type TimeOffType = Database["public"]["Tables"]["time_off_types"]["Row"];
+// type TimeOffType = Database["public"]["Tables"]["time_off_types"]["Row"];
+interface TimeOffType {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string;
+  is_active: boolean;
+  created_at?: string;
+}
 
 interface LeaveTypeFormData {
   name: string;
@@ -54,12 +62,7 @@ export function LeaveTypeManagement() {
 
   const fetchLeaveTypes = async () => {
     try {
-      const { data, error } = await supabase
-        .from("time_off_types")
-        .select("*")
-        .order("name");
-
-      if (error) throw error;
+      const data = await api.timeOffTypes.getAll();
       setLeaveTypes(data || []);
     } catch (error) {
       console.error("Error fetching leave types:", error);
@@ -105,27 +108,20 @@ export function LeaveTypeManagement() {
 
     try {
       if (editingType) {
-        const { error } = await supabase
-          .from("time_off_types")
-          .update({
-            name: formData.name.trim(),
-            description: formData.description.trim() || null,
-            color: formData.color,
-            is_active: formData.is_active,
-          })
-          .eq("id", editingType.id);
-
-        if (error) throw error;
-        toast.success("Verloftype bijgewerkt");
-      } else {
-        const { error } = await supabase.from("time_off_types").insert({
+        await api.timeOffTypes.update(editingType.id, {
           name: formData.name.trim(),
           description: formData.description.trim() || null,
           color: formData.color,
           is_active: formData.is_active,
         });
-
-        if (error) throw error;
+        toast.success("Verloftype bijgewerkt");
+      } else {
+        await api.timeOffTypes.create({
+          name: formData.name.trim(),
+          description: formData.description.trim() || null,
+          color: formData.color,
+          is_active: formData.is_active,
+        });
         toast.success("Verloftype aangemaakt");
       }
 
@@ -145,12 +141,7 @@ export function LeaveTypeManagement() {
     setSaving(true);
 
     try {
-      const { error } = await supabase
-        .from("time_off_types")
-        .delete()
-        .eq("id", deletingType.id);
-
-      if (error) throw error;
+      await api.timeOffTypes.delete(deletingType.id);
       toast.success("Verloftype verwijderd");
       setDeleteDialogOpen(false);
       fetchLeaveTypes();

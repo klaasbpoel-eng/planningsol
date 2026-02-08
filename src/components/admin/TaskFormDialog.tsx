@@ -28,6 +28,7 @@ import { CalendarIcon, Clock, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -85,7 +86,7 @@ export function TaskFormDialog({
         const taskType = taskTypes.find((t) => t.id === task.type_id);
         const mainCategoryId = taskType?.parent_id || (taskType && !taskType.parent_id ? task.type_id : null);
         const subCategoryId = taskType?.parent_id ? task.type_id : null;
-        
+
         setFormData({
           due_date: task.due_date ? new Date(task.due_date) : undefined,
           priority: task.priority,
@@ -138,20 +139,15 @@ export function TaskFormDialog({
       };
 
       if (mode === "create") {
-        const { error } = await supabase.from("tasks").insert({
+        await api.tasks.create({
           ...taskData,
           created_by: user.id,
         });
 
-        if (error) throw error;
         toast.success("Taak aangemaakt");
       } else if (task) {
-        const { error } = await supabase
-          .from("tasks")
-          .update(taskData)
-          .eq("id", task.id);
+        await api.tasks.update(task.id, taskData);
 
-        if (error) throw error;
         toast.success("Taak bijgewerkt");
       }
 
@@ -225,8 +221,8 @@ export function TaskFormDialog({
               <Select
                 value={formData.main_category_id || "none"}
                 onValueChange={(value) =>
-                  setFormData({ 
-                    ...formData, 
+                  setFormData({
+                    ...formData,
                     main_category_id: value === "none" ? null : value,
                     type_id: null // Reset subcategory when main category changes
                   })

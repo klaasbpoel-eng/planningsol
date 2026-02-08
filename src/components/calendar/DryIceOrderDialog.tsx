@@ -52,6 +52,7 @@ import {
 import { format, parseISO } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -153,24 +154,20 @@ export function DryIceOrderDialog({
     setSaving(true);
 
     try {
-      const { error } = await supabase
-        .from("dry_ice_orders")
-        .update({
-          status: status as "pending" | "in_progress" | "completed" | "cancelled",
-          scheduled_date: scheduledDate ? format(scheduledDate, "yyyy-MM-dd") : order.scheduled_date,
-          quantity_kg: quantity,
-          product_type_id: productTypeId || null,
-          packaging_id: packagingId || null,
-          container_has_wheels: containerHasWheels,
-          notes: notes || null,
-          is_recurring: isRecurring,
-          recurrence_end_date: isRecurring && !isInfiniteRecurrence && recurrenceEndDate
-            ? format(recurrenceEndDate, "yyyy-MM-dd")
-            : null,
-        })
-        .eq("id", order.id);
+      await api.dryIceOrders.update(order.id, {
+        status: status as "pending" | "in_progress" | "completed" | "cancelled",
+        scheduled_date: scheduledDate ? format(scheduledDate, "yyyy-MM-dd") : order.scheduled_date,
+        quantity_kg: quantity,
+        product_type_id: productTypeId || null,
+        packaging_id: packagingId || null,
+        container_has_wheels: containerHasWheels,
+        notes: notes || null,
+        is_recurring: isRecurring,
+        recurrence_end_date: isRecurring && !isInfiniteRecurrence && recurrenceEndDate
+          ? format(recurrenceEndDate, "yyyy-MM-dd")
+          : null,
+      });
 
-      if (error) throw error;
       toast.success("Droogijs order bijgewerkt");
 
       setIsEditing(false);
@@ -190,28 +187,16 @@ export function DryIceOrderDialog({
     setDeleting(true);
 
     try {
-      let query = supabase.from("dry_ice_orders").delete();
-
       if (scope === 'series' && (order.is_recurring || order.parent_order_id)) {
         // Delete all orders in the series
-        // The series ID is either the parent_order_id (if this is a child)
-        // or the order.id (if this is the parent)
         const seriesId = order.parent_order_id || order.id;
-
-        // We want to delete:
-        // 1. The parent order (id = seriesId)
-        // 2. All child orders (parent_order_id = seriesId)
-        query = query.or(`id.eq.${seriesId},parent_order_id.eq.${seriesId}`);
+        await api.dryIceOrders.deleteSeries(seriesId);
+        toast.success("Volledige reeks verwijderd");
       } else {
         // Delete only this specific order
-        query = query.eq("id", order.id);
+        await api.dryIceOrders.delete(order.id);
+        toast.success("Droogijs order verwijderd");
       }
-
-      const { error } = await query;
-
-      if (error) throw error;
-
-      toast.success(scope === 'series' ? "Volledige reeks verwijderd" : "Droogijs order verwijderd");
 
       setShowDeleteConfirm(false);
       onOpenChange(false);

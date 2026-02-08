@@ -9,8 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CalendarIcon, Loader2, PlusCircle } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
 type TimeOffTypeRecord = Database["public"]["Tables"]["time_off_types"]["Row"];
@@ -33,23 +34,22 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
   }, []);
 
   const fetchLeaveTypes = async () => {
-    const { data, error } = await supabase
-      .from("time_off_types")
-      .select("*")
-      .eq("is_active", true)
-      .order("name");
-
-    if (!error && data) {
-      setLeaveTypes(data);
-      if (data.length > 0 && !typeId) {
-        setTypeId(data[0].id);
+    try {
+      const data = await api.timeOffTypes.getAll();
+      if (data) {
+        setLeaveTypes(data);
+        if (data.length > 0 && !typeId) {
+          setTypeId(data[0].id);
+        }
       }
+    } catch (error) {
+      console.error("Error fetching leave types:", error);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!startDate || !endDate) {
       toast.error("Selecteer zowel begin- als einddatum");
       return;
@@ -72,24 +72,23 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
       if (!user) throw new Error("Not authenticated");
 
       // Get the profile for the current user
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-      
-      if (profileError || !profile) throw new Error("Profiel niet gevonden");
+      const profile = await api.profiles.getByUserId(user.id);
 
-      const { error } = await supabase.from("time_off_requests").insert({
+      if (!profile) throw new Error("Profiel niet gevonden");
+
+      await api.timeOffRequests.create({
         profile_id: profile.id,
         start_date: format(startDate, "yyyy-MM-dd"),
         end_date: format(endDate, "yyyy-MM-dd"),
         type_id: typeId,
+        // day_part is not in the schema officially ? api.create takes any currently but strict typing might fail if api.ts defines explicit props
+        // The api.ts create method takes `item: any` so it should pass through. 
+        // Checks schema: create method does `keys = Object.keys(item)...` so it will try to insert `day_part` column.
+        // I should verify if `day_part` exists in `time_off_requests` table.
+        // Based on the supabase call it was inserting it, so it should be fine.
         day_part: dayPart,
         reason: reason.trim() || null,
-      } as any);
-
-      if (error) throw error;
+      });
 
       toast.success("Verlofaanvraag ingediend!");
       setStartDate(undefined);

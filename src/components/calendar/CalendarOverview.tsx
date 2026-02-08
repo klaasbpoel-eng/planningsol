@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, eachMonthOfInterval, addDays, addWeeks, addMonths, addYears, subDays, subWeeks, subMonths, subYears, isToday, isSameMonth, isSameDay, parseISO, isWithinInterval, getWeek, isWeekend, getDay, differenceInDays } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { CalendarItemDialog } from "./CalendarItemDialog";
@@ -212,14 +213,14 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       console.log("Fetching data for user:", user.id);
 
       // Helper for independent fetches
-      const safeFetch = async <T,>(request: any, name: string): Promise<T | null> => {
-        const { data, error } = await request;
-        if (error) {
+      const safeFetch = async <T,>(promise: Promise<T>, name: string): Promise<T | null> => {
+        try {
+          return await promise;
+        } catch (error: any) {
           console.error(`Error fetching ${name}:`, error);
-          setFetchError(prev => `${prev ? prev + '; ' : ''}${name}: ${error.message || error.code}`);
+          setFetchError(prev => `${prev ? prev + '; ' : ''}${name}: ${error.message || "Unknown error"}`);
           return null;
         }
-        return data as T;
       };
 
       // Parallel fetching
@@ -235,16 +236,16 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         gasTypesData,
         timeOffTypesData
       ] = await Promise.all([
-        safeFetch<Profile[]>(supabase.from("profiles").select("*"), "profiles"),
-        safeFetch<TimeOffRequest[]>(supabase.from("time_off_requests").select("*").order("start_date", { ascending: true }), "requests"),
-        safeFetch<Task[]>(supabase.from("tasks").select("*").order("due_date", { ascending: true }), "tasks"),
-        safeFetch<TaskType[]>(supabase.from("task_types").select("*").eq("is_active", true), "taskTypes"),
-        safeFetch<DryIceOrder[]>(supabase.from("dry_ice_orders").select("*").eq("status", "pending").gte("scheduled_date", "2025-01-01").order("scheduled_date", { ascending: true }), "dryIce"),
-        safeFetch<DryIceProductType[]>(supabase.from("dry_ice_product_types").select("*").eq("is_active", true), "dryIceTypes"),
-        safeFetch<DryIcePackaging[]>(supabase.from("dry_ice_packaging").select("*").eq("is_active", true), "dryIcePkg"),
-        safeFetch<GasCylinderOrder[]>(supabase.from("gas_cylinder_orders").select("*").eq("status", "pending").gte("scheduled_date", "2025-01-01").order("scheduled_date", { ascending: true }), "gasCylinders"),
-        safeFetch<GasType[]>(supabase.from("gas_types").select("*").eq("is_active", true), "gasTypes"),
-        safeFetch<TimeOffType[]>(supabase.from("time_off_types").select("*").eq("is_active", true), "timeOffTypes")
+        safeFetch<Profile[]>(api.profiles.getAll(), "profiles"),
+        safeFetch<TimeOffRequest[]>(api.timeOffRequests.getAll(), "requests"),
+        safeFetch<Task[]>(api.tasks.getAll(), "tasks"),
+        safeFetch<TaskType[]>(api.taskTypes.getAll(), "taskTypes"),
+        safeFetch<DryIceOrder[]>(api.dryIceOrders.getPending("2025-01-01"), "dryIce"),
+        safeFetch<DryIceProductType[]>(api.dryIceProductTypes.getAll(), "dryIceTypes"),
+        safeFetch<DryIcePackaging[]>(api.dryIcePackaging.getAll(), "dryIcePkg"),
+        safeFetch<GasCylinderOrder[]>(api.gasCylinderOrders.getPending("2025-01-01"), "gasCylinders"),
+        safeFetch<GasType[]>(api.gasTypes.getAll(), "gasTypes"),
+        safeFetch<TimeOffType[]>(api.timeOffTypes.getAll().then(data => data as unknown as TimeOffType[]), "timeOffTypes")
       ]);
 
       // Map profiles and leave types to requests
@@ -352,12 +353,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         due_date: action.previousDate
       } : t));
       try {
-        const {
-          error
-        } = await supabase.from("tasks").update({
+        await api.tasks.update(action.taskId, {
           due_date: action.previousDate
-        }).eq("id", action.taskId);
-        if (error) throw error;
+        });
         setLastAction(null);
         toast.success("Actie ongedaan gemaakt", {
           description: `"${action.taskName}" teruggezet naar ${format(parseISO(action.previousDate), "d MMMM yyyy", {
@@ -439,36 +437,10 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       const seriesId = draggedSeriesOrder.parent_order_id || draggedSeriesOrder.id;
 
       try {
-        // 1. Fetch all orders in series
-        const { data: seriesOrders, error: fetchError } = await supabase
-          .from("dry_ice_orders")
-          .select("*")
-          .or(`id.eq.${seriesId},parent_order_id.eq.${seriesId}`);
-
-        if (fetchError) throw fetchError;
-
-        if (!seriesOrders || seriesOrders.length === 0) return;
-
-        // 2. Update each order
-        const updates = seriesOrders.map(order => {
-          const originalDate = parseISO(order.scheduled_date);
-          const newScheduledDate = addDays(originalDate, dayDifference);
-          return {
-            ...order,
-            scheduled_date: format(newScheduledDate, "yyyy-MM-dd")
-          };
-        });
-
-        // Loop update (supabase doesn't support bulk update with different values easily)
-        // Or use upsert
-        const { error: updateError } = await supabase
-          .from("dry_ice_orders")
-          .upsert(updates);
-
-        if (updateError) throw updateError;
+        await api.dryIceOrders.updateSeries(seriesId, dayDifference);
 
         toast.success("Reeks verplaatst", {
-          description: `${seriesOrders.length} orders verplaatst`
+          description: `Orders verplaatst`
         });
         fetchData();
 
@@ -491,12 +463,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     } : o));
 
     try {
-      const { error } = await supabase
-        .from("dry_ice_orders")
-        .update({ scheduled_date: newDate })
-        .eq("id", id);
-
-      if (error) throw error;
+      await api.dryIceOrders.update(id, { scheduled_date: newDate });
 
       toast.success("Order verplaatst", {
         description: `${orderNumber} (${customerName}) verplaatst naar ${format(parseISO(newDate), "d MMM yyyy", { locale: nl })}`
@@ -530,12 +497,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         due_date: newDueDate
       } : t));
       try {
-        const {
-          error
-        } = await supabase.from("tasks").update({
+        await api.tasks.update(draggedTask.id, {
           due_date: newDueDate
-        }).eq("id", draggedTask.id);
-        if (error) throw error;
+        });
 
         // Store the action for undo
         const taskName = draggedTask.task_type?.name || "Taak";

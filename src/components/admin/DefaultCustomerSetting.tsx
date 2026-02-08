@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
@@ -9,7 +10,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Building2, Loader2, Check } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface Customer {
@@ -25,29 +25,23 @@ export function DefaultCustomerSetting() {
 
   useEffect(() => {
     const fetchData = async () => {
-      // Fetch customers
-      const { data: customersData } = await supabase
-        .from("customers")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
+      try {
+        // Fetch customers
+        const customersData = await api.customers.getAll();
+        if (customersData) {
+          setCustomers(customersData);
+        }
 
-      if (customersData) {
-        setCustomers(customersData);
+        // Fetch current setting
+        const settingData = await api.appSettings.getByKey("default_customer_name");
+        if (settingData?.value) {
+          setDefaultCustomerName(settingData.value);
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
       }
-
-      // Fetch current setting
-      const { data: settingData } = await supabase
-        .from("app_settings")
-        .select("value")
-        .eq("key", "default_customer_name")
-        .single();
-
-      if (settingData?.value) {
-        setDefaultCustomerName(settingData.value);
-      }
-
-      setLoading(false);
     };
 
     fetchData();
@@ -57,19 +51,15 @@ export function DefaultCustomerSetting() {
     setSaving(true);
     setDefaultCustomerName(customerName);
 
-    const { error } = await supabase
-      .from("app_settings")
-      .update({ value: customerName })
-      .eq("key", "default_customer_name");
-
-    if (error) {
+    try {
+      await api.appSettings.upsert("default_customer_name", customerName, "Name of the default customer for new orders");
+      toast.success("Standaardklant bijgewerkt");
+    } catch (error) {
       toast.error("Fout bij opslaan instelling");
       console.error("Error saving setting:", error);
-    } else {
-      toast.success("Standaardklant bijgewerkt");
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
   };
 
   if (loading) {

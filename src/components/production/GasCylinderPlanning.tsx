@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Trash2, Filter, CalendarIcon, X, Edit2, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, MapPin, Download, Loader2 } from "lucide-react";
@@ -142,7 +143,7 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
     "Januari", "Februari", "Maart", "April", "Mei", "Juni",
     "Juli", "Augustus", "September", "Oktober", "November", "December"
   ];
-  
+
   // Unique customers from orders for filtering
   const uniqueCustomers = [...new Set(orders.map(o => o.customer_name))].sort();
   const { permissions, isAdmin } = useUserPermissions(userId);
@@ -160,7 +161,7 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
     if (sortColumn !== column) {
       return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
     }
-    return sortDirection === "asc" 
+    return sortDirection === "asc"
       ? <ArrowUp className="h-4 w-4 ml-1" />
       : <ArrowDown className="h-4 w-4 ml-1" />;
   };
@@ -207,7 +208,7 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
       .select("id, name, color")
       .eq("is_active", true)
       .order("name");
-    
+
     if (data) {
       setGasTypes(data);
     }
@@ -215,22 +216,13 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
 
   // Fetch data for a single week (to bypass Supabase 1000-row default limit)
   const fetchWeekData = async (startDate: string, endDate: string) => {
-    const { data, error } = await supabase
-      .from("gas_cylinder_orders")
-      .select(`
-        *,
-        gas_type_ref:gas_types(id, name, color)
-      `)
-      .gte("scheduled_date", startDate)
-      .lte("scheduled_date", endDate)
-      .order("scheduled_date", { ascending: true })
-      .limit(5000);
-    
-    if (error) {
+    try {
+      const data = await api.gasCylinderOrders.getAll(startDate, endDate);
+      return (data as GasCylinderOrder[]) || [];
+    } catch (error) {
       console.error(`Error fetching orders for ${startDate} - ${endDate}:`, error);
       return [];
     }
-    return (data as GasCylinderOrder[]) || [];
   };
 
   // Get all weeks for a given month
@@ -238,7 +230,7 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
     const weeks: { startDate: string; endDate: string }[] = [];
     const monthStr = String(month).padStart(2, '0');
     const lastDay = new Date(year, month, 0).getDate();
-    
+
     let currentDay = 1;
     while (currentDay <= lastDay) {
       const endDay = Math.min(currentDay + 6, lastDay);
@@ -254,32 +246,32 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
   const fetchMonthData = async (year: number, month: number) => {
     // Split month into weeks to bypass 1000-row limit
     const weeks = getWeeksInMonth(year, month);
-    const weekPromises = weeks.map(({ startDate, endDate }) => 
+    const weekPromises = weeks.map(({ startDate, endDate }) =>
       fetchWeekData(startDate, endDate)
     );
     const weekResults = await Promise.all(weekPromises);
-    
+
     // Combine and deduplicate (in case of edge cases)
     const allOrders = weekResults.flat();
     const uniqueOrders = Array.from(
       new Map(allOrders.map(o => [o.id, o])).values()
     );
-    return uniqueOrders.sort((a, b) => 
+    return uniqueOrders.sort((a, b) =>
       a.scheduled_date.localeCompare(b.scheduled_date)
     );
   };
 
   const fetchOrders = async () => {
     setLoading(true);
-    
+
     try {
       if (monthFilter === 0) {
         // Hele jaar: laad alle 12 maanden parallel
-        const monthPromises = Array.from({ length: 12 }, (_, i) => 
+        const monthPromises = Array.from({ length: 12 }, (_, i) =>
           fetchMonthData(yearFilter, i + 1)
         );
         const allMonthData = await Promise.all(monthPromises);
-        const combinedOrders = allMonthData.flat().sort((a, b) => 
+        const combinedOrders = allMonthData.flat().sort((a, b) =>
           a.scheduled_date.localeCompare(b.scheduled_date)
         );
         // Deduplicate across months (shouldn't happen but safety first)
@@ -296,7 +288,7 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
       console.error("Error fetching orders:", error);
       toast.error("Fout bij ophalen orders");
     }
-    
+
     setLoading(false);
   };
 
@@ -313,18 +305,15 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
 
   const handleConfirmDelete = async () => {
     if (!orderToDelete) return;
-    
-    const { error } = await supabase
-      .from("gas_cylinder_orders")
-      .delete()
-      .eq("id", orderToDelete.id);
 
-    if (error) {
-      toast.error("Fout bij verwijderen order");
-    } else {
+    try {
+      await api.gasCylinderOrders.delete(orderToDelete.id);
       toast.success("Order verwijderd");
       fetchOrders();
       onDataChanged?.();
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      toast.error("Fout bij verwijderen order");
     }
     setDeleteDialogOpen(false);
     setOrderToDelete(null);
@@ -332,20 +321,17 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     // Optimistic update
-    setOrders(prev => prev.map(order => 
+    setOrders(prev => prev.map(order =>
       order.id === id ? { ...order, status: newStatus } : order
     ));
 
-    const { error } = await supabase
-      .from("gas_cylinder_orders")
-      .update({ status: newStatus as "pending" | "in_progress" | "completed" | "cancelled" })
-      .eq("id", id);
-
-    if (error) {
+    try {
+      await api.gasCylinderOrders.update(id, { status: newStatus });
+      toast.success("Status bijgewerkt");
+    } catch (error) {
+      console.error("Error updating status:", error);
       toast.error("Fout bij bijwerken status");
       fetchOrders(); // Revert on error
-    } else {
-      toast.success("Status bijgewerkt");
     }
   };
 
@@ -375,7 +361,7 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
     if (order.gas_type_ref?.name) {
       return order.gas_type_ref.name;
     }
-    
+
     // Fallback: Try to find matching gas type from loaded gas types using gas_type_id
     if (order.gas_type_id) {
       const matchingGasType = gasTypes.find(gt => gt.id === order.gas_type_id);
@@ -383,7 +369,7 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
         return matchingGasType.name;
       }
     }
-    
+
     // Legacy fallback: check notes for "Gastype: Name" format (for old imported data)
     if (order.notes) {
       const gasTypeMatch = order.notes.match(/^Gastype:\s*(.+?)(?:\n|$)/i);
@@ -391,7 +377,7 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
         return gasTypeMatch[1].trim();
       }
     }
-    
+
     // Final fallback: use enum labels
     const gasTypeLabels: Record<string, string> = {
       co2: "CO₂",
@@ -410,7 +396,7 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
     if (order.gas_type_ref?.color) {
       return order.gas_type_ref.color;
     }
-    
+
     // Fallback: Try to find matching gas type from loaded gas types using gas_type_id
     if (order.gas_type_id) {
       const matchingGasType = gasTypes.find(gt => gt.id === order.gas_type_id);
@@ -418,7 +404,7 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
         return matchingGasType.color;
       }
     }
-    
+
     return "#6b7280"; // default gray
   };
 
@@ -472,22 +458,22 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
   // Total counts for the selected period (all orders, not filtered by location)
   const totalOrderCount = orders.length;
   const totalCylinderCount = orders.reduce((sum, o) => sum + o.cylinder_count, 0);
-  
+
   // Filtered counts for current view
   const filteredOrderCount = filteredOrders.length;
   const filteredCylinderCount = filteredOrders.reduce((sum, o) => sum + o.cylinder_count, 0);
 
   // Period label for display
-  const periodLabel = monthFilter === 0 
-    ? `${yearFilter}` 
+  const periodLabel = monthFilter === 0
+    ? `${yearFilter}`
     : `${monthNames[monthFilter - 1]} ${yearFilter}`;
 
   // Check if any filters are active
-  const hasActiveFilters = pressureFilter !== "all" || 
-    gasTypeFilter.length > 0 || 
-    dateFilter !== undefined || 
-    statusFilter !== "all" || 
-    gradeFilter !== "all" || 
+  const hasActiveFilters = pressureFilter !== "all" ||
+    gasTypeFilter.length > 0 ||
+    dateFilter !== undefined ||
+    statusFilter !== "all" ||
+    gradeFilter !== "all" ||
     customerFilter !== "all" ||
     yearFilter !== new Date().getFullYear() ||
     monthFilter !== new Date().getMonth() + 1;
@@ -648,8 +634,8 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
               <EmptyState
                 variant={hasActiveFilters ? "search" : "gascylinder"}
                 title={hasActiveFilters ? "Geen vulorders gevonden" : "Geen vulorders gepland"}
-                description={hasActiveFilters 
-                  ? "Pas de filters aan of voeg een nieuwe order toe." 
+                description={hasActiveFilters
+                  ? "Pas de filters aan of voeg een nieuwe order toe."
                   : "Voeg een nieuwe vulorder toe om te beginnen."}
                 size="md"
               />
@@ -670,17 +656,17 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
                       canEdit={permissions?.canEditOrders}
                       canDelete={permissions?.canDeleteOrders}
                     >
-                      <OrderDetail 
-                        label="Gastype" 
+                      <OrderDetail
+                        label="Gastype"
                         value={
                           <div className="flex items-center gap-1.5">
-                            <div 
-                              className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                            <div
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                               style={{ backgroundColor: getGasTypeColor(order) }}
                             />
                             <span className="truncate">{getGasTypeLabel(order)}</span>
                           </div>
-                        } 
+                        }
                       />
                       <OrderDetail label="Aantal" value={`${order.cylinder_count} cilinders`} />
                       <OrderDetail label="Druk" value={`${order.pressure} bar`} />
@@ -776,8 +762,8 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
                           <TableCell className="font-medium">{order.customer_name}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <div 
-                                className="w-3 h-3 rounded-full" 
+                              <div
+                                className="w-3 h-3 rounded-full"
                                 style={{ backgroundColor: getGasTypeColor(order) }}
                               />
                               {getGasTypeLabel(order)}
@@ -787,8 +773,8 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
                           <TableCell>{order.pressure} bar</TableCell>
                           <TableCell>{format(new Date(order.scheduled_date), "dd-MM-yyyy")}</TableCell>
                           <TableCell>
-                            <Select 
-                              value={order.status} 
+                            <Select
+                              value={order.status}
                               onValueChange={(v) => handleStatusChange(order.id, v)}
                             >
                               <SelectTrigger className="h-8 w-[110px]">
@@ -805,8 +791,8 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
                               {permissions?.canEditOrders && (
-                                <Button 
-                                  variant="ghost" 
+                                <Button
+                                  variant="ghost"
                                   size="icon"
                                   onClick={() => handleEditOrder(order)}
                                 >
@@ -814,8 +800,8 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
                                 </Button>
                               )}
                               {permissions?.canDeleteOrders && (
-                                <Button 
-                                  variant="ghost" 
+                                <Button
+                                  variant="ghost"
                                   size="icon"
                                   onClick={() => handleDeleteClick(order)}
                                 >
@@ -862,8 +848,8 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
               <div className="text-center p-3 rounded-lg bg-muted/50">
                 <span className="text-muted-foreground text-xs">Voltooid</span>
                 <p className="font-medium">
-                  {filteredOrders.filter(o => 
-                    o.scheduled_date === format(new Date(), "yyyy-MM-dd") && 
+                  {filteredOrders.filter(o =>
+                    o.scheduled_date === format(new Date(), "yyyy-MM-dd") &&
                     o.status === "completed"
                   ).length}
                 </p>
@@ -1005,13 +991,13 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
           <AlertDialogHeader>
             <AlertDialogTitle>Order verwijderen</AlertDialogTitle>
             <AlertDialogDescription>
-              Weet je zeker dat je order {orderToDelete?.order_number} wilt verwijderen? 
+              Weet je zeker dat je order {orderToDelete?.order_number} wilt verwijderen?
               Deze actie kan niet ongedaan worden gemaakt.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuleren</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleConfirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

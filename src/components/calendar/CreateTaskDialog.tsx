@@ -24,6 +24,7 @@ import { CalendarDays, ClipboardList, Plus, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -120,21 +121,19 @@ export function CreateTaskDialog({
       // Use subcategory if selected, otherwise main category
       const typeId = subcategoryId || categoryId || null;
 
-      const { error } = await supabase.from("tasks").insert({
+      await api.tasks.create({
         status,
         priority,
         due_date: format(dueDate, "yyyy-MM-dd"),
         assigned_to: assignedTo || null,
         created_by: currentUserId,
-        type_id: typeId,
+        task_type_id: typeId,
         start_time: hasTime && startTime ? startTime : null,
         end_time: hasTime && endTime ? endTime : null,
       });
 
-      if (error) throw error;
-
       toast.success("Taak aangemaakt");
-      
+
       resetForm();
       onCreate();
       onOpenChange(false);

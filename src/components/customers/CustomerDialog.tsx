@@ -13,9 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Building2, Save } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { toast } from "sonner";
 
+// ... (keep interface)
 interface Customer {
   id: string;
   name: string;
@@ -40,34 +41,7 @@ export function CustomerDialog({
   customer,
   onSaved,
 }: CustomerDialogProps) {
-  const [saving, setSaving] = useState(false);
-  const [name, setName] = useState("");
-  const [contactPerson, setContactPerson] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [notes, setNotes] = useState("");
-  const [isActive, setIsActive] = useState(true);
-
-  useEffect(() => {
-    if (customer) {
-      setName(customer.name);
-      setContactPerson(customer.contact_person || "");
-      setEmail(customer.email || "");
-      setPhone(customer.phone || "");
-      setAddress(customer.address || "");
-      setNotes(customer.notes || "");
-      setIsActive(customer.is_active);
-    } else {
-      setName("");
-      setContactPerson("");
-      setEmail("");
-      setPhone("");
-      setAddress("");
-      setNotes("");
-      setIsActive(true);
-    }
-  }, [customer, open]);
+  // ... (keep state and useEffect)
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -89,16 +63,10 @@ export function CustomerDialog({
 
     try {
       if (customer) {
-        const { error } = await supabase
-          .from("customers")
-          .update(customerData)
-          .eq("id", customer.id);
-
-        if (error) throw error;
+        await api.customers.update(customer.id, customerData);
         toast.success("Klant bijgewerkt");
       } else {
-        const { error } = await supabase.from("customers").insert(customerData);
-        if (error) throw error;
+        await api.customers.create(customerData);
         toast.success("Klant toegevoegd");
       }
 

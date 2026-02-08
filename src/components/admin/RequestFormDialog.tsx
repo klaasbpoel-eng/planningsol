@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, Loader2, Plus, Edit } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -61,14 +61,13 @@ export function RequestFormDialog({
   }, [open]);
 
   const fetchLeaveTypes = async () => {
-    const { data, error } = await supabase
-      .from("time_off_types")
-      .select("*")
-      .eq("is_active", true)
-      .order("name");
-
-    if (!error && data) {
-      setLeaveTypes(data);
+    try {
+      const data = await api.timeOffTypes.getAll();
+      if (data) {
+        setLeaveTypes(data);
+      }
+    } catch (error) {
+      console.error("Error fetching leave types:", error);
     }
   };
 
@@ -81,9 +80,9 @@ export function RequestFormDialog({
         });
       } else if (request) {
         // Use profile_id for new schema, fall back to finding profile by user_id for old data
-        const profileId = (request as any).profile_id || 
+        const profileId = (request as any).profile_id ||
           employees.find(e => e.user_id === request.user_id)?.id || "";
-        const typeId = (request as any).type_id || 
+        const typeId = (request as any).type_id ||
           leaveTypes.find(lt => lt.name.toLowerCase() === request.type)?.id || "";
         setFormData({
           profile_id: profileId,
@@ -121,32 +120,27 @@ export function RequestFormDialog({
     setSaving(true);
     try {
       if (isCreateMode) {
-        const { error } = await supabase.from("time_off_requests").insert({
+        await api.timeOffRequests.create({
           profile_id: formData.profile_id,
           type_id: formData.type_id,
           start_date: format(formData.start_date, "yyyy-MM-dd"),
           end_date: format(formData.end_date, "yyyy-MM-dd"),
           reason: formData.reason || null,
           status: formData.status,
-        } as any);
+        });
 
-        if (error) throw error;
         toast.success("Aanvraag succesvol aangemaakt");
       } else {
         if (!request) return;
 
-        const { error } = await supabase
-          .from("time_off_requests")
-          .update({
-            type_id: formData.type_id,
-            start_date: format(formData.start_date, "yyyy-MM-dd"),
-            end_date: format(formData.end_date, "yyyy-MM-dd"),
-            reason: formData.reason || null,
-            status: formData.status,
-          } as any)
-          .eq("id", request.id);
+        await api.timeOffRequests.update(request.id, {
+          type_id: formData.type_id,
+          start_date: format(formData.start_date, "yyyy-MM-dd"),
+          end_date: format(formData.end_date, "yyyy-MM-dd"),
+          reason: formData.reason || null,
+          status: formData.status,
+        });
 
-        if (error) throw error;
         toast.success("Aanvraag succesvol bijgewerkt");
       }
 

@@ -25,6 +25,7 @@ import { CalendarDays, Cylinder, Plus } from "lucide-react";
 import { format, subYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CustomerSelect } from "./CustomerSelect";
@@ -286,21 +287,15 @@ export function CreateGasCylinderOrderDialog({
         location: location,
       };
 
-      const { error } = await supabase.from("gas_cylinder_orders").insert(insertData);
-
-      if (error) {
-        console.error("Error creating order:", error);
-        toast.error("Fout bij aanmaken order: " + error.message);
-        return;
-      }
+      await api.gasCylinderOrders.create(insertData);
 
       toast.success("Vulorder aangemaakt");
       resetForm();
       onCreated();
       onOpenChange(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating order:", error);
-      toast.error("Fout bij aanmaken order");
+      toast.error("Fout bij aanmaken order: " + (error.message || "Onbekende fout"));
     } finally {
       setSaving(false);
     }

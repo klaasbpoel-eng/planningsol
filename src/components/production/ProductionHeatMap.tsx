@@ -1,17 +1,17 @@
 import { useState, useEffect, useMemo } from "react";
+import { api } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { 
-  CalendarDays, 
-  ChevronLeft, 
+import {
+  CalendarDays,
+  ChevronLeft,
   ChevronRight,
   Cylinder,
   Snowflake
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { cn, formatNumber } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -46,27 +46,30 @@ export function ProductionHeatMap({ location, refreshKey = 0 }: ProductionHeatMa
 
   const fetchHeatMapData = async () => {
     setLoading(true);
-    
-    const locationParam = location === "all" ? null : location;
-    
-    const { data, error } = await supabase.rpc("get_daily_production_totals", {
-      p_year: currentYear,
-      p_month: currentMonth,
-      p_location: locationParam
-    });
 
-    if (data && !error) {
-      const dataMap = new Map<string, DailyData>();
-      data.forEach((row: { production_date: string; cylinder_count: number; dry_ice_kg: number }) => {
-        dataMap.set(row.production_date, {
-          date: row.production_date,
-          cylinders: Number(row.cylinder_count),
-          dryIce: Number(row.dry_ice_kg)
+    const locationParam = location === "all" ? null : location;
+    const fromDate = format(startOfMonth(currentDate), "yyyy-MM-dd");
+    const toDate = format(endOfMonth(currentDate), "yyyy-MM-dd");
+
+    try {
+      const data = await api.reports.getDailyProductionByPeriod(fromDate, toDate, locationParam);
+
+      if (data) {
+        const dataMap = new Map<string, DailyData>();
+        // @ts-ignore - Supabase RPC types might not be fully inferred yet
+        data.forEach((row: { production_date: string; cylinder_count: number; dry_ice_kg: number }) => {
+          dataMap.set(row.production_date, {
+            date: row.production_date,
+            cylinders: Number(row.cylinder_count),
+            dryIce: Number(row.dry_ice_kg)
+          });
         });
-      });
-      setDailyData(dataMap);
+        setDailyData(dataMap);
+      }
+    } catch (error) {
+      console.error("Error fetching heatmap data:", error);
     }
-    
+
     setLoading(false);
   };
 
@@ -151,11 +154,11 @@ export function ProductionHeatMap({ location, refreshKey = 0 }: ProductionHeatMa
               Volume-intensiteit per dag
             </CardDescription>
           </div>
-          
+
           <div className="flex items-center gap-2">
-            <ToggleGroup 
-              type="single" 
-              value={viewType} 
+            <ToggleGroup
+              type="single"
+              value={viewType}
               onValueChange={(v) => v && setViewType(v as ViewType)}
               className="bg-muted/50 rounded-lg p-0.5"
             >
@@ -170,26 +173,26 @@ export function ProductionHeatMap({ location, refreshKey = 0 }: ProductionHeatMa
             </ToggleGroup>
           </div>
         </div>
-        
+
         {/* Month Navigation */}
         <div className="flex items-center justify-between mt-4">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="sm"
             onClick={() => setCurrentDate(subMonths(currentDate, 1))}
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
             Vorige
           </Button>
-          
+
           <div className="text-center">
             <span className="text-lg font-semibold capitalize">
               {format(currentDate, "MMMM yyyy", { locale: nl })}
             </span>
           </div>
-          
-          <Button 
-            variant="ghost" 
+
+          <Button
+            variant="ghost"
             size="sm"
             onClick={() => setCurrentDate(addMonths(currentDate, 1))}
           >
@@ -198,7 +201,7 @@ export function ProductionHeatMap({ location, refreshKey = 0 }: ProductionHeatMa
           </Button>
         </div>
       </CardHeader>
-      
+
       <CardContent>
         <FadeIn show={true}>
           {/* Summary Stats */}
@@ -227,34 +230,34 @@ export function ProductionHeatMap({ location, refreshKey = 0 }: ProductionHeatMa
           {/* Calendar Grid */}
           <div className="grid grid-cols-7 gap-1 mb-2">
             {weekDays.map(day => (
-              <div 
-                key={day} 
+              <div
+                key={day}
                 className="text-center text-xs font-medium text-muted-foreground py-1"
               >
                 {day}
               </div>
             ))}
           </div>
-          
+
           <TooltipProvider>
             <div className="grid grid-cols-7 gap-1">
               {/* Empty cells for offset */}
               {Array.from({ length: firstDayOffset }).map((_, i) => (
                 <div key={`empty-${i}`} className="aspect-square" />
               ))}
-              
+
               {/* Day cells */}
               {daysInMonth.map(day => {
                 const dateStr = format(day, "yyyy-MM-dd");
                 const data = dailyData.get(dateStr);
-                const value = data 
+                const value = data
                   ? (viewType === "cylinders" ? data.cylinders : data.dryIce)
                   : 0;
-                
+
                 return (
                   <Tooltip key={dateStr}>
                     <TooltipTrigger asChild>
-                      <div 
+                      <div
                         className={cn(
                           "aspect-square rounded-md flex items-center justify-center text-xs font-medium cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-primary/50 hover:scale-105",
                           getIntensityClass(value),

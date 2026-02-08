@@ -23,6 +23,7 @@ import { CalendarDays, Palmtree, Plus } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -132,18 +133,16 @@ export function CreateLeaveRequestDialog({
     try {
       // Use profile_id and type_id for the new schema
       // Admin-created requests are automatically approved
-      const { error } = await supabase.from("time_off_requests").insert({
+      await api.timeOffRequests.create({
         profile_id: profileId,
+        leave_type_id: typeId,
         start_date: format(startDate, "yyyy-MM-dd"),
         end_date: format(endDate, "yyyy-MM-dd"),
-        type_id: typeId,
-        reason: reason.trim() || null,
-        ...(isAdmin && { status: 'approved' }),
-      } as any);
+        notes: reason.trim() || null,
+        status: isAdmin ? 'approved' : 'pending',
+      });
 
-      if (error) throw error;
-
-      const employeeName = isAdmin 
+      const employeeName = isAdmin
         ? profiles.find(p => p.id === profileId)?.full_name || "Medewerker"
         : "Je";
 
@@ -164,8 +163,8 @@ export function CreateLeaveRequestDialog({
     }
   };
 
-  const duration = startDate && endDate 
-    ? differenceInDays(endDate, startDate) + 1 
+  const duration = startDate && endDate
+    ? differenceInDays(endDate, startDate) + 1
     : 0;
 
   return (
@@ -179,7 +178,7 @@ export function CreateLeaveRequestDialog({
             <div className="flex-1">
               <DialogTitle className="text-lg">Nieuwe verlofaanvraag</DialogTitle>
               <DialogDescription>
-                {isAdmin 
+                {isAdmin
                   ? "Maak een verlofaanvraag aan voor een medewerker"
                   : "Dien een nieuwe verlofaanvraag in"
                 }
