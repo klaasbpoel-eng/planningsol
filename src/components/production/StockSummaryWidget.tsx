@@ -3,22 +3,25 @@ import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Upload } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
 import { getStockStatus, type StockStatus } from "./StockStatusBadge";
 import { StockExcelImportDialog, type StockItem } from "./StockExcelImportDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
-// StockItem is imported from StockExcelImportDialog
+
+type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 
 interface StockSummaryWidgetProps {
   refreshKey?: number;
   isRefreshing?: boolean;
   className?: string;
+  selectedLocation?: ProductionLocation;
 }
 
-// Mock data based on Excel structure - can be replaced with database fetch
-const mockStockData: StockItem[] = [
+// Default mock data for Emmen
+const defaultEmmenStock: StockItem[] = [
   { subCode: "250049", description: "Lucht Inhalatie (tech) (50L)", averageConsumption: 11, numberOnStock: 3, difference: -8 },
   { subCode: "201112", description: "Zuurstof Medicinaal Gasv. SOL act. geint. 300bar (1L)", averageConsumption: 5, numberOnStock: 1, difference: -4 },
   { subCode: "201107", description: "Zuurstof Medicinaal Gasv. SOL P.I. (1L)", averageConsumption: 5, numberOnStock: 3, difference: -2 },
@@ -47,8 +50,12 @@ interface StatusConfig {
   items: StockItem[];
 }
 
-export function StockSummaryWidget({ refreshKey, isRefreshing, className }: StockSummaryWidgetProps) {
-  const [stockData, setStockData] = useState<StockItem[]>(mockStockData);
+export function StockSummaryWidget({ refreshKey, isRefreshing, className, selectedLocation = "all" }: StockSummaryWidgetProps) {
+  // Store stock data per location
+  const [stockByLocation, setStockByLocation] = useState<Record<string, StockItem[]>>({
+    sol_emmen: defaultEmmenStock,
+    sol_tilburg: [],
+  });
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [userId, setUserId] = useState<string | undefined>();
   const { isAdmin } = useUserRole(userId);
@@ -61,9 +68,43 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
     getUser();
   }, []);
 
+  // Determine which stock data to display based on selected location
+  const stockData = useMemo(() => {
+    if (selectedLocation === "all") {
+      // Combine both locations, avoiding duplicates by subCode
+      const combined = new Map<string, StockItem>();
+      for (const loc of ["sol_emmen", "sol_tilburg"]) {
+        for (const item of stockByLocation[loc] || []) {
+          if (combined.has(item.subCode)) {
+            const existing = combined.get(item.subCode)!;
+            combined.set(item.subCode, {
+              ...existing,
+              averageConsumption: existing.averageConsumption + item.averageConsumption,
+              numberOnStock: existing.numberOnStock + item.numberOnStock,
+              difference: (existing.numberOnStock + item.numberOnStock) - (existing.averageConsumption + item.averageConsumption),
+            });
+          } else {
+            combined.set(item.subCode, { ...item });
+          }
+        }
+      }
+      return Array.from(combined.values());
+    }
+    return stockByLocation[selectedLocation] || [];
+  }, [stockByLocation, selectedLocation]);
+
   const handleImported = (data: StockItem[]) => {
-    setStockData(data);
+    // Import data for the currently selected location
+    const targetLocation = selectedLocation === "all" ? "sol_emmen" : selectedLocation;
+    setStockByLocation(prev => ({
+      ...prev,
+      [targetLocation]: data,
+    }));
   };
+
+  const importLocationLabel = selectedLocation === "sol_tilburg" ? "SOL Tilburg" 
+    : selectedLocation === "sol_emmen" ? "SOL Emmen" 
+    : "SOL Emmen";
 
   // Group items by status
   const statusConfigs = useMemo(() => {
@@ -128,21 +169,27 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
     ? "critical"
     : statusConfigs.find((s) => s.status === "low" && s.count > 0)
       ? "low"
-      : "ok";
+      : stockData.length === 0
+        ? "empty"
+        : "ok";
 
   const overallColor =
     overallStatus === "critical"
       ? "text-red-500"
       : overallStatus === "low"
         ? "text-orange-500"
-        : "text-green-500";
+        : overallStatus === "empty"
+          ? "text-muted-foreground"
+          : "text-green-500";
 
   const overallLabel =
     overallStatus === "critical"
       ? "Actie vereist"
       : overallStatus === "low"
         ? "Aandacht"
-        : "Op voorraad";
+        : overallStatus === "empty"
+          ? "Geen data"
+          : "Op voorraad";
 
   return (
     <Card
@@ -157,6 +204,11 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
           <span className="flex items-center gap-2">
             <Package className="h-4 w-4 text-blue-500" />
             Voorraadstatus
+            {selectedLocation !== "all" && (
+              <Badge variant="outline" className="text-[10px] py-0 px-1">
+                {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
+              </Badge>
+            )}
           </span>
           {isAdmin && (
             <Button
@@ -164,7 +216,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
               size="icon"
               className="h-6 w-6"
               onClick={() => setImportDialogOpen(true)}
-              title="Excel importeren"
+              title={`Excel importeren voor ${importLocationLabel}`}
             >
               <Upload className="h-3.5 w-3.5" />
             </Button>
@@ -176,83 +228,95 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className }: Stoc
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         onImported={handleImported}
+        locationLabel={importLocationLabel}
       />
       <CardContent>
         <div className={cn("text-2xl font-bold mb-2", overallColor)}>{overallLabel}</div>
-        <div className="grid grid-cols-4 gap-1">
-          {statusConfigs.map((config) => {
-            const Icon = config.icon;
-            return (
-              <Dialog key={config.status}>
-                <DialogTrigger asChild>
-                  <div
-                    className={cn(
-                      "flex flex-col items-center p-1 rounded cursor-pointer transition-all hover:scale-105",
-                      config.bgColor
-                    )}
-                  >
-                    <Icon className={cn("h-3 w-3", config.color)} />
-                    <span className={cn("text-sm font-bold", config.color)}>{formatNumber(config.count, 0)}</span>
-                    <span className="text-[9px] text-muted-foreground">{config.label}</span>
-                  </div>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                      <Icon className={cn("h-5 w-5", config.color)} />
-                      <span className={config.color}>{config.fullLabel}</span>
-                      <span className="ml-auto text-sm font-normal text-muted-foreground">
-                        {formatNumber(config.count, 0)} items
-                      </span>
-                    </DialogTitle>
-                  </DialogHeader>
-                  {config.items.length > 0 ? (
-                    <ScrollArea className="max-h-[60vh]">
-                      <div className="space-y-2">
-                        {config.items.map((item) => (
-                          <div
-                            key={item.subCode}
-                            className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium">
-                                {item.description}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Code: {item.subCode}
-                              </div>
-                            </div>
-                            <div className="text-right ml-3 flex-shrink-0 space-y-1">
-                              <div className="flex items-center justify-end gap-2 text-xs">
-                                <span className="text-muted-foreground">Voorraad:</span>
-                                <span className="font-semibold w-8 text-right">{formatNumber(item.numberOnStock, 0)}</span>
-                              </div>
-                              <div className="flex items-center justify-end gap-2 text-xs">
-                                <span className="text-muted-foreground">Gem. verbr:</span>
-                                <span className="font-semibold w-8 text-right">{formatNumber(item.averageConsumption, 0)}</span>
-                              </div>
-                              <div className={cn(
-                                "flex items-center justify-end gap-2 text-xs font-semibold",
-                                item.difference < 0 ? "text-red-500" : item.difference > 0 ? "text-green-500" : "text-muted-foreground"
-                              )}>
-                                <span>Verschil:</span>
-                                <span className="w-8 text-right">{item.difference > 0 ? "+" : ""}{formatNumber(item.difference, 0)}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  ) : (
-                    <div className="py-8 text-center text-sm text-muted-foreground">
-                      Geen items in deze categorie
+        {stockData.length === 0 ? (
+          <div className="text-xs text-muted-foreground text-center py-2">
+            Importeer een Excel bestand om voorraaddata te zien
+          </div>
+        ) : (
+          <div className="grid grid-cols-4 gap-1">
+            {statusConfigs.map((config) => {
+              const Icon = config.icon;
+              return (
+                <Dialog key={config.status}>
+                  <DialogTrigger asChild>
+                    <div
+                      className={cn(
+                        "flex flex-col items-center p-1 rounded cursor-pointer transition-all hover:scale-105",
+                        config.bgColor
+                      )}
+                    >
+                      <Icon className={cn("h-3 w-3", config.color)} />
+                      <span className={cn("text-sm font-bold", config.color)}>{formatNumber(config.count, 0)}</span>
+                      <span className="text-[9px] text-muted-foreground">{config.label}</span>
                     </div>
-                  )}
-                </DialogContent>
-              </Dialog>
-            );
-          })}
-        </div>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Icon className={cn("h-5 w-5", config.color)} />
+                        <span className={config.color}>{config.fullLabel}</span>
+                        {selectedLocation !== "all" && (
+                          <Badge variant="outline" className="text-xs">
+                            {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
+                          </Badge>
+                        )}
+                        <span className="ml-auto text-sm font-normal text-muted-foreground">
+                          {formatNumber(config.count, 0)} items
+                        </span>
+                      </DialogTitle>
+                    </DialogHeader>
+                    {config.items.length > 0 ? (
+                      <ScrollArea className="max-h-[60vh]">
+                        <div className="space-y-2">
+                          {config.items.map((item) => (
+                            <div
+                              key={item.subCode}
+                              className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium">
+                                  {item.description}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Code: {item.subCode}
+                                </div>
+                              </div>
+                              <div className="text-right ml-3 flex-shrink-0 space-y-1">
+                                <div className="flex items-center justify-end gap-2 text-xs">
+                                  <span className="text-muted-foreground">Voorraad:</span>
+                                  <span className="font-semibold w-8 text-right">{formatNumber(item.numberOnStock, 0)}</span>
+                                </div>
+                                <div className="flex items-center justify-end gap-2 text-xs">
+                                  <span className="text-muted-foreground">Gem. verbr:</span>
+                                  <span className="font-semibold w-8 text-right">{formatNumber(item.averageConsumption, 0)}</span>
+                                </div>
+                                <div className={cn(
+                                  "flex items-center justify-end gap-2 text-xs font-semibold",
+                                  item.difference < 0 ? "text-red-500" : item.difference > 0 ? "text-green-500" : "text-muted-foreground"
+                                )}>
+                                  <span>Verschil:</span>
+                                  <span className="w-8 text-right">{item.difference > 0 ? "+" : ""}{formatNumber(item.difference, 0)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <div className="py-8 text-center text-sm text-muted-foreground">
+                        Geen items in deze categorie
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
+              );
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -473,6 +473,7 @@ export function ProductionPlanning({
               <StockSummaryWidget
                 refreshKey={refreshKey}
                 isRefreshing={isRefreshing}
+                selectedLocation={selectedLocation}
               />
 
               <TopCustomersWidget

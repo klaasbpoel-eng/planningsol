@@ -9,7 +9,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from "lucide-react";
@@ -19,6 +18,7 @@ interface StockExcelImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImported: (data: StockItem[]) => void;
+  locationLabel?: string;
 }
 
 export interface StockItem {
@@ -40,6 +40,7 @@ export function StockExcelImportDialog({
   open,
   onOpenChange,
   onImported,
+  locationLabel = "SOL Emmen",
 }: StockExcelImportDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<StockItem[]>([]);
@@ -190,7 +191,7 @@ export function StockExcelImportDialog({
 
     onImported(parsedData);
     setStep("done");
-    toast.success(`${parsedData.length} voorraad items geïmporteerd`);
+    toast.success(`${parsedData.length} voorraad items geïmporteerd voor ${locationLabel}`);
   };
 
   const handleClose = () => {
@@ -207,7 +208,7 @@ export function StockExcelImportDialog({
             Voorraad Importeren vanuit Excel
           </DialogTitle>
           <DialogDescription>
-            Upload een Excel bestand met voorraadgegevens. Het bestand moet kolommen bevatten voor artikelcode, omschrijving, gemiddeld verbruik en voorraad.
+            Upload een Excel bestand met voorraadgegevens voor <strong>{locationLabel}</strong>. Het bestand moet kolommen bevatten voor artikelcode, omschrijving, gemiddeld verbruik en voorraad.
           </DialogDescription>
         </DialogHeader>
 
@@ -215,9 +216,12 @@ export function StockExcelImportDialog({
           {step === "upload" && (
             <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-lg">
               <Upload className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-sm text-muted-foreground mb-4">
+              <p className="text-sm text-muted-foreground mb-2">
                 Sleep een Excel bestand hierheen of klik om te selecteren
               </p>
+              <Badge variant="outline" className="mb-4">
+                Locatie: {locationLabel}
+              </Badge>
               <input
                 type="file"
                 accept=".xlsx,.xls"
@@ -242,6 +246,9 @@ export function StockExcelImportDialog({
                 </Badge>
                 <Badge variant="secondary">
                   {parsedData.length} items
+                </Badge>
+                <Badge variant="default">
+                  {locationLabel}
                 </Badge>
                 {stats && stats.skipped > 0 && (
                   <Badge variant="destructive">
@@ -305,7 +312,7 @@ export function StockExcelImportDialog({
               <CheckCircle2 className="h-16 w-16 text-green-500 mb-4" />
               <h3 className="text-lg font-semibold mb-2">Import Voltooid!</h3>
               <p className="text-sm text-muted-foreground">
-                {parsedData.length} voorraad items zijn succesvol geïmporteerd.
+                {parsedData.length} voorraad items zijn succesvol geïmporteerd voor {locationLabel}.
               </p>
             </div>
           )}
