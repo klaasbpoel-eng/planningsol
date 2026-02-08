@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Client } from "https://deno.land/x/mysql@v2.12.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,7 +25,7 @@ const TABLE_SQLS: { name: string; sql: string }[] = [
       id CHAR(36) NOT NULL PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
       description TEXT,
-      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
       sort_order INT NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -37,7 +38,7 @@ const TABLE_SQLS: { name: string; sql: string }[] = [
       name VARCHAR(255) NOT NULL,
       description TEXT,
       capacity_liters DECIMAL(10,2),
-      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
       sort_order INT NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -50,7 +51,7 @@ const TABLE_SQLS: { name: string; sql: string }[] = [
       name VARCHAR(255) NOT NULL,
       description TEXT,
       capacity_kg DECIMAL(10,2),
-      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
       sort_order INT NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -62,7 +63,7 @@ const TABLE_SQLS: { name: string; sql: string }[] = [
       id CHAR(36) NOT NULL PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
       description TEXT,
-      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
       sort_order INT NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -75,7 +76,7 @@ const TABLE_SQLS: { name: string; sql: string }[] = [
       name VARCHAR(255) NOT NULL,
       description TEXT,
       color VARCHAR(20) NOT NULL DEFAULT '#06b6d4',
-      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
       sort_order INT NOT NULL DEFAULT 0,
       parent_id CHAR(36),
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -90,7 +91,7 @@ const TABLE_SQLS: { name: string; sql: string }[] = [
       name VARCHAR(255) NOT NULL,
       description TEXT,
       color VARCHAR(20) NOT NULL DEFAULT '#3b82f6',
-      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`,
@@ -102,7 +103,7 @@ const TABLE_SQLS: { name: string; sql: string }[] = [
       name VARCHAR(255) NOT NULL,
       description TEXT,
       color VARCHAR(20) NOT NULL DEFAULT '#3b82f6',
-      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
       sort_order INT NOT NULL DEFAULT 0,
       category_id CHAR(36),
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -120,7 +121,7 @@ const TABLE_SQLS: { name: string; sql: string }[] = [
       phone VARCHAR(100),
       address TEXT,
       notes TEXT,
-      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`,
@@ -132,14 +133,14 @@ const TABLE_SQLS: { name: string; sql: string }[] = [
       order_number VARCHAR(100) NOT NULL,
       customer_name VARCHAR(255) NOT NULL,
       customer_id CHAR(36),
-      gas_type ENUM('co2','nitrogen','argon','acetylene','oxygen','helium','other') NOT NULL DEFAULT 'co2',
+      gas_type VARCHAR(50) NOT NULL DEFAULT 'co2',
       gas_type_id CHAR(36),
-      gas_grade ENUM('medical','technical') NOT NULL DEFAULT 'technical',
+      gas_grade VARCHAR(50) NOT NULL DEFAULT 'technical',
       cylinder_size VARCHAR(100) NOT NULL DEFAULT 'medium',
       cylinder_count INT NOT NULL,
       pressure INT NOT NULL DEFAULT 200,
-      status ENUM('pending','in_progress','completed','cancelled') NOT NULL DEFAULT 'pending',
-      location ENUM('sol_emmen','sol_tilburg') NOT NULL DEFAULT 'sol_emmen',
+      status VARCHAR(50) NOT NULL DEFAULT 'pending',
+      location VARCHAR(50) NOT NULL DEFAULT 'sol_emmen',
       scheduled_date DATE NOT NULL,
       notes TEXT,
       created_by CHAR(36),
@@ -157,16 +158,16 @@ const TABLE_SQLS: { name: string; sql: string }[] = [
       order_number VARCHAR(100) NOT NULL,
       customer_name VARCHAR(255) NOT NULL,
       customer_id CHAR(36),
-      product_type ENUM('blocks','pellets','sticks') NOT NULL DEFAULT 'blocks',
+      product_type VARCHAR(50) NOT NULL DEFAULT 'blocks',
       product_type_id CHAR(36),
       packaging_id CHAR(36),
       quantity_kg DECIMAL(10,2) NOT NULL,
       box_count INT,
-      container_has_wheels BOOLEAN,
-      status ENUM('pending','in_progress','completed','cancelled') NOT NULL DEFAULT 'pending',
-      location ENUM('sol_emmen','sol_tilburg') NOT NULL DEFAULT 'sol_emmen',
+      container_has_wheels TINYINT(1),
+      status VARCHAR(50) NOT NULL DEFAULT 'pending',
+      location VARCHAR(50) NOT NULL DEFAULT 'sol_emmen',
       scheduled_date DATE NOT NULL,
-      is_recurring BOOLEAN DEFAULT FALSE,
+      is_recurring TINYINT(1) DEFAULT 0,
       parent_order_id CHAR(36),
       recurrence_end_date DATE,
       notes TEXT,
@@ -227,16 +228,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Use fetch to connect to MySQL via a simple TCP approach won't work in edge functions.
-    // Instead, we'll use the mysql2 npm package via esm.sh
-    const { default: mysql } = await import("https://esm.sh/mysql2@3.11.0/promise?target=deno");
-
-    const connection = await mysql.createConnection({
-      host: mysqlHost,
+    const client = await new Client().connect({
+      hostname: mysqlHost,
       port: parseInt(mysqlPort || "3306"),
-      user: mysqlUser,
+      username: mysqlUser,
       password: mysqlPassword,
-      database: mysqlDatabase,
+      db: mysqlDatabase,
     });
 
     const results: { name: string; status: "created" | "error"; error?: string }[] = [];
@@ -247,14 +244,14 @@ Deno.serve(async (req) => {
 
     for (const table of selectedTables) {
       try {
-        await connection.execute(table.sql);
+        await client.execute(table.sql);
         results.push({ name: table.name, status: "created" });
       } catch (e) {
         results.push({ name: table.name, status: "error", error: e.message });
       }
     }
 
-    await connection.end();
+    await client.close();
 
     const errors = results.filter((r) => r.status === "error");
 

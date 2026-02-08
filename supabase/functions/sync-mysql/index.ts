@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Client } from "https://deno.land/x/mysql@v2.12.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,9 +9,6 @@ const corsHeaders = {
 
 const BATCH_SIZE = 500;
 
-// Column mappings: some Postgres columns need transformation for MySQL
-// Timestamps: Postgres timestamptz -> MySQL DATETIME (strip timezone)
-// Booleans: Postgres bool -> MySQL TINYINT(1) (true->1, false->0)
 function transformRowForMySQL(row: Record<string, any>): Record<string, any> {
   const result: Record<string, any> = {};
   for (const [key, value] of Object.entries(row)) {
@@ -29,7 +27,6 @@ function escapeValue(val: any): string {
   if (val === null || val === undefined) return "NULL";
   if (typeof val === "number") return String(val);
   if (typeof val === "boolean") return val ? "1" : "0";
-  // Escape string
   const str = String(val).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, "\\n").replace(/\r/g, "\\r");
   return `'${str}'`;
 }
@@ -89,14 +86,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { default: mysql } = await import("https://esm.sh/mysql2@3.11.0/promise?target=deno");
-
-    const connection = await mysql.createConnection({
-      host: mysqlHost,
+    const client = await new Client().connect({
+      hostname: mysqlHost,
       port: parseInt(mysqlPort || "3306"),
-      user: mysqlUser,
+      username: mysqlUser,
       password: mysqlPassword,
-      database: mysqlDatabase,
+      db: mysqlDatabase,
     });
 
     const currentTable = tables[tableIndex];
@@ -130,7 +125,7 @@ Deno.serve(async (req) => {
             .join(", ");
 
           const sql = `INSERT INTO ${escapeColumnName(currentTable)} (${columns.map(escapeColumnName).join(", ")}) VALUES (${values.join(", ")}) ON DUPLICATE KEY UPDATE ${updateClause}`;
-          await connection.execute(sql);
+          await client.execute(sql);
           tInserted++;
         } catch (e) {
           tErrors.push(`Row ${row.id || "?"}: ${e.message?.substring(0, 100)}`);
@@ -138,7 +133,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    await connection.end();
+    await client.close();
 
     // Check if more batches for this table
     if (fetchedRows.length === BATCH_SIZE) {
