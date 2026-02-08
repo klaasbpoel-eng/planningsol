@@ -13,7 +13,11 @@ import {
     Plus,
     Trash2,
     Download,
-    FileCode
+    FileCode,
+    Server,
+    Edit,
+    MoreVertical,
+    Pencil
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -32,12 +36,32 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-const STORAGE_KEY_CONFIG = "antigravity_external_db_config";
+const STORAGE_KEY_CONNECTIONS = "antigravity_external_db_connections";
 const STORAGE_KEY_QUERIES = "antigravity_external_db_queries";
+// Legacy key for migration
+const STORAGE_KEY_LEGACY_CONFIG = "antigravity_external_db_config";
+
+interface ConnectionConfig {
+    id: string;
+    name: string;
+    type: string;
+    host: string;
+    port: string;
+    username: string;
+    password: string;
+    database: string;
+}
 
 interface Query {
     id: string;
+    connectionId: string;
     name: string;
     sql: string;
 }
@@ -45,6 +69,7 @@ interface Query {
 const DEFAULT_QUERIES: Query[] = [
     {
         id: "q1",
+        connectionId: "", // Will need assignment
         name: "Voorraad vs Gemiddeld",
         sql: `SELECT
     AfnameEmmenAVGDAY.SubCode,
@@ -60,6 +85,7 @@ ORDER BY
     },
     {
         id: "q2",
+        connectionId: "", // Will need assignment
         name: "Gemiddeld Verbruik (Leverbonnen)",
         sql: `SELECT
     dbo_VI_WEB_DELIVERY_NOTES_DETAILS_DELIVERY.SubCode,
@@ -92,33 +118,61 @@ HAVING
 ];
 
 export function ExternalDatabaseSettings() {
-    const [config, setConfig] = useState({
-        type: "mssql", // Default to MSSQL for the user's queries
+    const [connections, setConnections] = useState<ConnectionConfig[]>([]);
+    const [queries, setQueries] = useState<Query[]>([]);
+
+    // Connection Dialog State
+    const [isConnectionDialogOpen, setIsConnectionDialogOpen] = useState(false);
+    const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
+    const [connForm, setConnForm] = useState<ConnectionConfig>({
+        id: "",
+        name: "",
+        type: "mssql",
         host: "",
-        port: "1433", // Default MSSQL port
+        port: "1433",
         username: "",
         password: "",
-        database: "",
+        database: ""
     });
-    const [queries, setQueries] = useState<Query[]>([]);
-    const [isSaving, setIsSaving] = useState(false);
-    const [isTesting, setIsTesting] = useState(false);
 
-    // New Query State
+    // Query Dialog State
     const [newQueryOpen, setNewQueryOpen] = useState(false);
-    const [newQueryName, setNewQueryName] = useState("");
-    const [newQuerySQL, setNewQuerySQL] = useState("");
+    const [editingQueryId, setEditingQueryId] = useState<string | null>(null);
+    const [queryForm, setQueryForm] = useState<{ name: string, sql: string, connectionId: string }>({
+        name: "",
+        sql: "",
+        connectionId: ""
+    });
 
     useEffect(() => {
-        const savedConfig = localStorage.getItem(STORAGE_KEY_CONFIG);
-        if (savedConfig) {
+        // Load Connections
+        const savedConnections = localStorage.getItem(STORAGE_KEY_CONNECTIONS);
+        if (savedConnections) {
             try {
-                setConfig(JSON.parse(savedConfig));
+                setConnections(JSON.parse(savedConnections));
             } catch (e) {
-                console.error("Failed to parse saved DB config", e);
+                console.error("Failed to parse connections", e);
+            }
+        } else {
+            // Migrate legacy single config if exists
+            const legacyConfig = localStorage.getItem(STORAGE_KEY_LEGACY_CONFIG);
+            if (legacyConfig) {
+                try {
+                    const conf = JSON.parse(legacyConfig);
+                    const newConn: ConnectionConfig = {
+                        id: crypto.randomUUID(),
+                        name: "Default Connection",
+                        ...conf
+                    };
+                    setConnections([newConn]);
+                    localStorage.setItem(STORAGE_KEY_CONNECTIONS, JSON.stringify([newConn]));
+                } catch (e) {
+                    console.error("Failed to migrate legacy config", e);
+                }
             }
         }
 
+        // Load Queries
         const savedQueries = localStorage.getItem(STORAGE_KEY_QUERIES);
         if (savedQueries) {
             try {
@@ -127,123 +181,237 @@ export function ExternalDatabaseSettings() {
                 console.error("Failed to parse queries", e);
             }
         } else {
-            // Load defaults if nothing saved
             setQueries(DEFAULT_QUERIES);
         }
     }, []);
 
-    const handleChange = (field: string, value: string) => {
-        setConfig((prev) => ({ ...prev, [field]: value }));
+    const saveConnections = (newConns: ConnectionConfig[]) => {
+        setConnections(newConns);
+        localStorage.setItem(STORAGE_KEY_CONNECTIONS, JSON.stringify(newConns));
     };
 
-    const handleSaveConfig = () => {
-        setIsSaving(true);
-        setTimeout(() => {
-            localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(config));
-            toast.success("Database instellingen lokaal opgeslagen");
-            setIsSaving(false);
-        }, 500);
+    const saveQueries = (newQueries: Query[]) => {
+        setQueries(newQueries);
+        localStorage.setItem(STORAGE_KEY_QUERIES, JSON.stringify(newQueries));
     };
 
-    const handleSaveQueries = (updatedQueries: Query[]) => {
-        setQueries(updatedQueries);
-        localStorage.setItem(STORAGE_KEY_QUERIES, JSON.stringify(updatedQueries));
-    };
+    // --- Connection Handlers ---
 
-    const handleAddQuery = () => {
-        if (!newQueryName || !newQuerySQL) return;
-        const newQuery: Query = {
+    const handleOpenAddConnection = () => {
+        setEditingConnection(null);
+        setConnForm({
             id: crypto.randomUUID(),
-            name: newQueryName,
-            sql: newQuerySQL
-        };
-        handleSaveQueries([...queries, newQuery]);
-        setNewQueryName("");
-        setNewQuerySQL("");
+            name: "",
+            type: "mssql",
+            host: "",
+            port: "1433",
+            username: "",
+            password: "",
+            database: ""
+        });
+        setIsConnectionDialogOpen(true);
+    };
+
+    const handleEditConnection = (conn: ConnectionConfig) => {
+        setEditingConnection(conn);
+        setConnForm({ ...conn });
+        setIsConnectionDialogOpen(true);
+    };
+
+    const handleDeleteConnection = (id: string) => {
+        const updated = connections.filter(c => c.id !== id);
+        saveConnections(updated);
+        toast.success("Connectie verwijderd");
+    };
+
+    const handleSaveConnection = () => {
+        if (!connForm.name || !connForm.host) {
+            toast.error("Naam en Host zijn verplicht");
+            return;
+        }
+
+        let updatedConns = [...connections];
+        if (editingConnection) {
+            updatedConns = updatedConns.map(c => c.id === editingConnection.id ? connForm : c);
+        } else {
+            updatedConns.push(connForm);
+        }
+
+        saveConnections(updatedConns);
+        setIsConnectionDialogOpen(false);
+        toast.success(editingConnection ? "Connectie bijgewerkt" : "Connectie toegevoegd");
+    };
+
+    // --- Query Handlers ---
+
+    const handleOpenAddQuery = () => {
+        setEditingQueryId(null);
+        setQueryForm({ name: "", sql: "", connectionId: "" });
+        setNewQueryOpen(true);
+    };
+
+    const handleEditQuery = (query: Query) => {
+        setEditingQueryId(query.id);
+        setQueryForm({
+            name: query.name,
+            sql: query.sql,
+            connectionId: query.connectionId
+        });
+        setNewQueryOpen(true);
+    };
+
+    const handleSaveQuery = () => {
+        if (!queryForm.name || !queryForm.sql) {
+            toast.error("Naam en SQL zijn verplicht");
+            return;
+        }
+
+        let targetConnId = queryForm.connectionId;
+        if (!targetConnId && connections.length === 1) {
+            targetConnId = connections[0].id;
+        }
+
+        if (!targetConnId && connections.length > 0) {
+            toast.error("Selecteer een connectie");
+            return;
+        }
+
+        if (editingQueryId) {
+            // Update existing
+            const updatedQueries = queries.map(q =>
+                q.id === editingQueryId
+                    ? { ...q, ...queryForm, connectionId: targetConnId }
+                    : q
+            );
+            saveQueries(updatedQueries);
+            toast.success("Query bijgewerkt");
+        } else {
+            // Create new
+            const newQuery: Query = {
+                id: crypto.randomUUID(),
+                connectionId: targetConnId,
+                name: queryForm.name,
+                sql: queryForm.sql
+            };
+            saveQueries([...queries, newQuery]);
+            toast.success("Query toegevoegd");
+        }
+
         setNewQueryOpen(false);
-        toast.success("Query toegevoegd");
     };
 
     const handleDeleteQuery = (id: string) => {
-        handleSaveQueries(queries.filter(q => q.id !== id));
+        saveQueries(queries.filter(q => q.id !== id));
         toast.success("Query verwijderd");
     };
 
-    const handleTestConnection = () => {
-        setIsTesting(true);
-        setTimeout(() => {
-            if (config.host && config.username) {
-                toast.success("Verbinding succesvol (simulatie)");
-            } else {
-                toast.error("Vul eerst alle velden in");
-            }
-            setIsTesting(false);
-        }, 1000);
+    const handleUpdateQueryConnection = (queryId: string, connId: string) => {
+        const updated = queries.map(q => q.id === queryId ? { ...q, connectionId: connId } : q);
+        saveQueries(updated);
     };
 
+    // --- Script Generation ---
+
     const generateRunnerScript = () => {
+        // 1. Group queries by connection
+        // Filter connections that are actually used or just pass all? Pass all.
+        const connectionsMap = connections.reduce((acc, conn) => {
+            acc[conn.id] = conn;
+            return acc;
+        }, {} as Record<string, ConnectionConfig>);
+
+        // We need to ensure queries have valid connections
+        const validQueries = queries.filter(q => connectionsMap[q.connectionId] || (!q.connectionId && connections.length === 1));
+
         const scriptContent = `
 const sql = require('mssql');
 const ExcelJS = require('exceljs');
 const fs = require('fs');
 
-// Configuration
-const config = {
-    user: '${config.username}',
-    password: '${config.password.replace(/'/g, "\\'")}',
-    server: '${config.host}',
-    port: ${parseInt(config.port) || 1433},
-    database: '${config.database}',
-    options: {
-        encrypt: true, // Use this if you're on Azure or require encryption
-        trustServerCertificate: true // Change to false for production
-    }
-};
-
-const queries = ${JSON.stringify(queries, null, 2)};
+// --- Configurations ---
+const connections = ${JSON.stringify(connections, null, 2)};
+const queries = ${JSON.stringify(validQueries, null, 2)};
 
 async function run() {
-    try {
-        console.log('Connecting to database...');
-        await sql.connect(config);
-        console.log('Connected!');
+    const workbook = new ExcelJS.Workbook();
+    console.log('Starting execution...');
 
-        const workbook = new ExcelJS.Workbook();
+    // We will iterate over connections to reuse pools if multiple queries share a connection
+    // But simplistic approach: iterate queries and connect on demand (or group by connection)
 
-        for (const query of queries) {
-            console.log(\`Running query: \${query.name}...\`);
-            try {
-                const result = await sql.query(query.sql);
-                const worksheet = workbook.addWorksheet(query.name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 30));
-                
-                if (result.recordset.length > 0) {
-                    // Add headers
-                    const columns = Object.keys(result.recordset[0]).map(key => ({ header: key, key: key }));
-                    worksheet.columns = columns;
-                    
-                    // Add rows
-                    worksheet.addRows(result.recordset);
-                }
-                console.log(\`Query \${query.name} completed. Rows: \${result.recordset.length}\`);
-            } catch (err) {
-                console.error(\`Error running query \${query.name}: \`, err.message);
-                const ws = workbook.addWorksheet(query.name.substring(0, 10) + '_ERROR');
-                ws.addRow(['Error', err.message]);
-            }
+    // Better: Group queries by Connection ID
+    const queriesByConn = {};
+    for (const q of queries) {
+        // Fallback for single connection scenario
+        const connId = q.connectionId || (connections.length === 1 ? connections[0].id : null);
+        if (!connId) {
+            console.warn(\`Skipping query "\${q.name}" (No connection assigned)\`);
+            continue;
+        }
+        if (!queriesByConn[connId]) queriesByConn[connId] = [];
+        queriesByConn[connId].push(q);
+    }
+
+    for (const [connId, connQueries] of Object.entries(queriesByConn)) {
+        const connConfig = connections.find(c => c.id === connId);
+        if (!connConfig) {
+             console.error(\`Connection config not found for ID \${connId}\`);
+             continue;
         }
 
-        const filename = \`Export_\${new Date().toISOString().replace(/[:.]/g, '-')}.xlsx\`;
-        await workbook.xlsx.writeFile(filename);
-        console.log(\`Done! Data exported to \${filename}\`);
+        console.log(\`\\n--- Connecting to \${connConfig.name} (\${connConfig.host}) ---\`);
 
-        process.exit(0);
-    } catch (err) {
-        console.error('Database connection failed:', err);
-        process.exit(1);
+        const sqlConfig = {
+            user: connConfig.username,
+            password: connConfig.password,
+            server: connConfig.host,
+            port: parseInt(connConfig.port) || 1433,
+            database: connConfig.database,
+            options: {
+                encrypt: true,
+                trustServerCertificate: true
+            }
+        };
+
+        let pool = null;
+        try {
+            pool = await new sql.ConnectionPool(sqlConfig).connect();
+            console.log('Connected!');
+
+            for (const query of connQueries) {
+                console.log(\`Running query: \${query.name}...\`);
+                try {
+                    const result = await pool.request().query(query.sql);
+                    const safeName = query.name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 30) || 'Query';
+                    const worksheet = workbook.addWorksheet(safeName);
+
+                    if (result.recordset && result.recordset.length > 0) {
+                        const columns = Object.keys(result.recordset[0]).map(key => ({ header: key, key: key }));
+                        worksheet.columns = columns;
+                        worksheet.addRows(result.recordset);
+                    }
+                    console.log(\`  -> Rows: \${result.recordset ? result.recordset.length : 0}\`);
+                } catch (err) {
+                    console.error(\`  -> Error: \${err.message}\`);
+                    // Create error sheet if needed
+                    const ws = workbook.addWorksheet(query.name.substring(0, 10) + '_ERROR');
+                    ws.addRow(['Error', err.message]);
+                }
+            }
+
+        } catch (err) {
+            console.error(\`Failed to connect to \${connConfig.name}: \`, err.message);
+        } finally {
+            if (pool) await pool.close();
+        }
     }
+
+    const filename = \`Export_\${new Date().toISOString().replace(/[:.]/g, '-')}.xlsx\`;
+    await workbook.xlsx.writeFile(filename);
+    console.log(\`\\nDone! Data exported to \${filename}\`);
 }
 
-run();
+run().catch(console.error);
 `;
         return scriptContent;
     };
@@ -259,105 +427,71 @@ run();
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        toast.success("Script gedownload, zie instructies");
+        toast.success("Script gedownload");
     };
 
     return (
         <div className="space-y-6">
-            {/* Configuration Card */}
+            {/* Connections Section */}
             <Card>
                 <CardHeader>
-                    <div className="flex items-center gap-2">
-                        <Database className="h-5 w-5 text-cyan-500" />
-                        <div>
-                            <CardTitle className="text-lg">Externe Database Configuratie</CardTitle>
-                            <CardDescription>
-                                Verbinding voor VPN/lokale netwerken
-                            </CardDescription>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Server className="h-5 w-5 text-cyan-500" />
+                            <div>
+                                <CardTitle className="text-lg">Database Connecties</CardTitle>
+                                <CardDescription>Beheer uw database connecties</CardDescription>
+                            </div>
                         </div>
+                        <Button size="sm" onClick={handleOpenAddConnection} className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            Nieuwe Connectie
+                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label>Database Type</Label>
-                            <Select
-                                value={config.type}
-                                onValueChange={(val) => handleChange("type", val)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Kies type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="mssql">SQL Server (MSSQL)</SelectItem>
-                                    <SelectItem value="mysql">MySQL / MariaDB</SelectItem>
-                                    <SelectItem value="postgres">PostgreSQL</SelectItem>
-                                </SelectContent>
-                            </Select>
+                    {connections.length === 0 ? (
+                        <div className="text-center py-6 text-muted-foreground border-2 border-dashed rounded-lg">
+                            Geen connecties geconfigureerd.
                         </div>
-
-                        <div className="space-y-2">
-                            <Label>Host (IP of Domein)</Label>
-                            <Input
-                                value={config.host}
-                                onChange={(e) => handleChange("host", e.target.value)}
-                                placeholder="bv. 192.168.1.100"
-                            />
+                    ) : (
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                            {connections.map((conn) => (
+                                <div key={conn.id} className="border rounded-lg p-4 bg-card hover:border-cyan-500/50 transition-colors relative group">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <Database className="h-4 w-4 text-cyan-500" />
+                                            <span className="font-semibold">{conn.name}</span>
+                                        </div>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                                <DropdownMenuItem onClick={() => handleEditConnection(conn)}>
+                                                    <Edit className="mr-2 h-4 w-4" /> Bewerken
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleDeleteConnection(conn.id)} className="text-destructive">
+                                                    <Trash2 className="mr-2 h-4 w-4" /> Verwijderen
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground space-y-1">
+                                        <p>{conn.type}://{conn.host}:{conn.port}</p>
+                                        <p>User: {conn.username}</p>
+                                        <p>Database: {conn.database}</p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-
-                        <div className="space-y-2">
-                            <Label>Poort</Label>
-                            <Input
-                                value={config.port}
-                                onChange={(e) => handleChange("port", e.target.value)}
-                                placeholder="bv. 1433"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Database Naam</Label>
-                            <Input
-                                value={config.database}
-                                onChange={(e) => handleChange("database", e.target.value)}
-                                placeholder="bv. productie_db"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Gebruikersnaam</Label>
-                            <Input
-                                value={config.username}
-                                onChange={(e) => handleChange("username", e.target.value)}
-                                placeholder="db_user"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Wachtwoord</Label>
-                            <Input
-                                type="password"
-                                value={config.password}
-                                onChange={(e) => handleChange("password", e.target.value)}
-                                placeholder="••••••••"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="flex justify-between pt-4 border-t">
-                        <Button variant="outline" onClick={handleTestConnection} disabled={isTesting}>
-                            {isTesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                            Test Verbinding
-                        </Button>
-
-                        <Button onClick={handleSaveConfig} disabled={isSaving}>
-                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                            Opslaan
-                        </Button>
-                    </div>
+                    )}
                 </CardContent>
             </Card>
 
-            {/* Query Management Card */}
+            {/* Query Management Section */}
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between">
@@ -365,72 +499,107 @@ run();
                             <FileCode className="h-5 w-5 text-purple-500" />
                             <div>
                                 <CardTitle className="text-lg">Opgeslagen Queries</CardTitle>
-                                <CardDescription>
-                                    Beheer SQL queries voor export
-                                </CardDescription>
+                                <CardDescription>Beheer en koppel queries aan connecties</CardDescription>
                             </div>
                         </div>
                         <Dialog open={newQueryOpen} onOpenChange={setNewQueryOpen}>
                             <DialogTrigger asChild>
-                                <Button size="sm" className="gap-2">
+                                <Button size="sm" className="gap-2" onClick={handleOpenAddQuery}>
                                     <Plus className="h-4 w-4" />
                                     Nieuwe Query
                                 </Button>
                             </DialogTrigger>
                             <DialogContent className="max-w-2xl">
                                 <DialogHeader>
-                                    <DialogTitle>Nieuwe Query Toevoegen</DialogTitle>
-                                    <DialogDescription>
-                                        Voeg een SQL query toe die uitgevoerd zal worden door het script.
-                                    </DialogDescription>
+                                    <DialogTitle>{editingQueryId ? 'Query Bewerken' : 'Nieuwe Query Toevoegen'}</DialogTitle>
                                 </DialogHeader>
                                 <div className="space-y-4 py-4">
-                                    <div className="space-y-2">
-                                        <Label>Naam</Label>
-                                        <Input
-                                            value={newQueryName}
-                                            onChange={(e) => setNewQueryName(e.target.value)}
-                                            placeholder="bv. Maandrapportage"
-                                        />
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Naam</Label>
+                                            <Input
+                                                value={queryForm.name}
+                                                onChange={(e) => setQueryForm({ ...queryForm, name: e.target.value })}
+                                                placeholder="bv. Maandrapportage"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Connectie</Label>
+                                            <Select
+                                                value={queryForm.connectionId}
+                                                onValueChange={(val) => setQueryForm({ ...queryForm, connectionId: val })}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Kies connectie" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {connections.map(c => (
+                                                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
                                     </div>
                                     <div className="space-y-2">
                                         <Label>SQL Query</Label>
                                         <Textarea
-                                            value={newQuerySQL}
-                                            onChange={(e) => setNewQuerySQL(e.target.value)}
+                                            value={queryForm.sql}
+                                            onChange={(e) => setQueryForm({ ...queryForm, sql: e.target.value })}
                                             placeholder="SELECT * FROM ..."
                                             className="h-64 font-mono text-xs"
                                         />
                                     </div>
                                 </div>
                                 <DialogFooter>
-                                    <Button onClick={handleAddQuery}>Toevoegen</Button>
+                                    <Button onClick={handleSaveQuery}>
+                                        {editingQueryId ? 'Opslaan' : 'Toevoegen'}
+                                    </Button>
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    {queries.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
-                            Geen queries opgeslagen. Voeg er een toe om te beginnen.
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {queries.map((query) => (
-                                <div
-                                    key={query.id}
-                                    className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
-                                >
-                                    <div className="flex items-center gap-3 overflow-hidden">
-                                        <Play className="h-4 w-4 text-muted-foreground" />
-                                        <div className="truncate">
+                <CardContent>
+                    <div className="space-y-2">
+                        {queries.length === 0 ? (
+                            <div className="text-center py-4 text-muted-foreground">Geen queries.</div>
+                        ) : queries.map((query) => (
+                            <div
+                                key={query.id}
+                                className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
+                            >
+                                <div className="flex items-center gap-3 overflow-hidden flex-1">
+                                    <Play className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    <div className="grid gap-1 min-w-0">
+                                        <div className="flex items-center gap-2">
                                             <p className="font-medium truncate">{query.name}</p>
-                                            <p className="text-xs text-muted-foreground truncate max-w-[300px]">
-                                                {query.sql.substring(0, 50)}...
-                                            </p>
+                                            <Select
+                                                value={query.connectionId}
+                                                onValueChange={(val) => handleUpdateQueryConnection(query.id, val)}
+                                            >
+                                                <SelectTrigger className="h-6 w-[150px] text-xs">
+                                                    <SelectValue placeholder="Selecteer DB" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {connections.map(c => (
+                                                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         </div>
+                                        <p className="text-xs text-muted-foreground truncate font-mono">
+                                            {query.sql.substring(0, 60)}...
+                                        </p>
                                     </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleEditQuery(query)}
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                    </Button>
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -440,33 +609,102 @@ run();
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </div>
-                            ))}
-                        </div>
-                    )}
+                            </div>
+                        ))}
+                    </div>
 
-                    <div className="pt-4 border-t space-y-4">
-                        <div className="p-4 bg-muted/50 rounded-lg text-sm space-y-2">
-                            <h4 className="font-medium flex items-center gap-2">
-                                <Download className="h-4 w-4" />
-                                Instructies voor lokale uitvoer
-                            </h4>
-                            <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                                <li>Configureer de databasegegevens hierboven en sla op.</li>
-                                <li>Download het runner script via de knop hieronder.</li>
-                                <li>Zorg dat <strong>Node.js</strong> geïnstalleerd is op uw PC.</li>
-                                <li>Open een terminal in de map waar het script staat.</li>
-                                <li>Installeer benodigdheden: <code className="bg-background px-1 rounded">npm install mssql exceljs</code></li>
-                                <li>Start het script: <code className="bg-background px-1 rounded">node run_queries.js</code></li>
-                            </ol>
-                        </div>
-
+                    <div className="pt-6 mt-4 border-t">
                         <Button className="w-full gap-2" variant="secondary" onClick={handleDownloadScript}>
                             <Download className="h-4 w-4" />
                             Download Script (run_queries.js)
                         </Button>
+                        <p className="text-xs text-center text-muted-foreground mt-2">
+                            Dit script zal verbinding maken met alle geconfigureerde databases en de queries uitvoeren.
+                        </p>
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Connection Edit Dialog */}
+            <Dialog open={isConnectionDialogOpen} onOpenChange={setIsConnectionDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{editingConnection ? 'Connectie Bewerken' : 'Nieuwe Connectie'}</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Naam</Label>
+                                <Input
+                                    value={connForm.name}
+                                    onChange={(e) => setConnForm({ ...connForm, name: e.target.value })}
+                                    placeholder="bv. Magazijn"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Type</Label>
+                                <Select
+                                    value={connForm.type}
+                                    onValueChange={(val) => setConnForm({ ...connForm, type: val })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="mssql">SQL Server</SelectItem>
+                                        <SelectItem value="mysql">MySQL</SelectItem>
+                                        <SelectItem value="postgres">PostgreSQL</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Host</Label>
+                            <Input
+                                value={connForm.host}
+                                onChange={(e) => setConnForm({ ...connForm, host: e.target.value })}
+                                placeholder="bv. 192.168.1.100"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Poort</Label>
+                                <Input
+                                    value={connForm.port}
+                                    onChange={(e) => setConnForm({ ...connForm, port: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Database</Label>
+                                <Input
+                                    value={connForm.database}
+                                    onChange={(e) => setConnForm({ ...connForm, database: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Gebruikersnaam</Label>
+                                <Input
+                                    value={connForm.username}
+                                    onChange={(e) => setConnForm({ ...connForm, username: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Wachtwoord</Label>
+                                <Input
+                                    type="password"
+                                    value={connForm.password}
+                                    onChange={(e) => setConnForm({ ...connForm, password: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button onClick={handleSaveConnection}>Opslaan</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
