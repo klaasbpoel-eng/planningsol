@@ -12,6 +12,7 @@ import { TableSkeleton, ChartSkeleton } from "@/components/ui/skeletons";
 
 const GasCylinderPlanning = lazy(() => import("./GasCylinderPlanning").then(m => ({ default: m.GasCylinderPlanning })));
 const ProductionReports = lazy(() => import("./ProductionReports").then(m => ({ default: m.ProductionReports })));
+const DryIcePlanning = lazy(() => import("./DryIcePlanning").then(m => ({ default: m.DryIcePlanning })));
 
 
 // ... (existing code)
@@ -475,7 +476,7 @@ export function ProductionPlanning({
           "w-full max-w-5xl grid bg-muted/50 backdrop-blur-sm overflow-x-auto h-auto p-1",
           showAdvancedTabs
             ? "grid-cols-3 sm:grid-cols-6"
-            : "grid-cols-2"
+            : "grid-cols-2 sm:grid-cols-3"
         )}>
 
           <TabsTrigger
@@ -485,6 +486,14 @@ export function ProductionPlanning({
             <Cylinder className="h-4 w-4 flex-shrink-0" />
             <span className="hidden sm:inline">Gascilinders</span>
             <span className="sm:hidden">Cilinders</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="droogijs"
+            className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+          >
+            <Snowflake className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline">Droogijs</span>
+            <span className="sm:hidden">Droogijs</span>
           </TabsTrigger>
           {showAdvancedTabs && (
             <>
@@ -502,6 +511,15 @@ export function ProductionPlanning({
         </TabsList>
 
 
+
+        <TabsContent value="droogijs" className="mt-6">
+          <Suspense fallback={<TabLoadingFallback />}>
+            <DryIcePlanning
+              onDataChanged={handleDataChanged}
+              location={selectedLocation}
+            />
+          </Suspense>
+        </TabsContent>
 
         <TabsContent value="gascilinders" className="mt-6">
           <Suspense fallback={<TabLoadingFallback />}>
