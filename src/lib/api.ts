@@ -149,9 +149,9 @@ function stripRelations(data: any, keys: string[] = []): any {
 
 // --- Generic CRUD helpers for primary source routing ---
 
-async function primaryRead(table: string, options?: { 
-    orderBy?: string; 
-    orderAsc?: boolean; 
+async function primaryRead(table: string, options?: {
+    orderBy?: string;
+    orderAsc?: boolean;
     secondOrder?: string;
     selectQuery?: string;
     filters?: Array<{ column: string; op: string; value: any }>;
@@ -159,15 +159,15 @@ async function primaryRead(table: string, options?: {
     mysqlQuery?: string;
 }) {
     const source = getPrimarySource();
-    
+
     if (source === "mysql") {
         const q = options?.mysqlQuery || `SELECT * FROM ${table}${options?.orderBy ? ` ORDER BY ${options.orderBy}${options.orderAsc === false ? ' DESC' : ''}` : ''}`;
         return await executeMySQL(q);
     }
-    
+
     const client = getPrimarySupabaseClient();
     let query = client.from(table).select(options?.selectQuery || "*");
-    
+
     if (options?.filters) {
         for (const f of options.filters) {
             if (f.op === "eq") query = query.eq(f.column, f.value);
@@ -176,7 +176,7 @@ async function primaryRead(table: string, options?: {
             else if (f.op === "or") query = query.or(f.value);
         }
     }
-    
+
     if (options?.orderBy) {
         query = query.order(options.orderBy, { ascending: options.orderAsc !== false });
     }
@@ -186,7 +186,7 @@ async function primaryRead(table: string, options?: {
     if (options?.limit) {
         query = query.limit(options.limit);
     }
-    
+
     const { data, error } = await query;
     if (error) throw error;
     return data;
@@ -194,7 +194,7 @@ async function primaryRead(table: string, options?: {
 
 async function primaryCreate(table: string, item: any, relationKeys: string[] = []) {
     const source = getPrimarySource();
-    
+
     if (source === "mysql") {
         const { query, params } = buildInsert(table, item);
         await executeMySQL(query, params);
@@ -207,13 +207,13 @@ async function primaryCreate(table: string, item: any, relationKeys: string[] = 
         });
         return item;
     }
-    
+
     const client = getPrimarySupabaseClient();
     const { data, error } = await client.from(table).insert(item).select().single();
     if (error) throw error;
-    
+
     const syncData = relationKeys.length > 0 ? stripRelations(data, relationKeys) : data;
-    
+
     syncToMySQL(async () => {
         const { query, params } = buildInsert(table, syncData);
         await executeMySQL(query, params);
@@ -224,13 +224,13 @@ async function primaryCreate(table: string, item: any, relationKeys: string[] = 
     syncToCloud(async () => {
         await (supabase.from as any)(table).upsert(syncData);
     });
-    
+
     return data;
 }
 
 async function primaryUpdate(table: string, id: string, item: any, relationKeys: string[] = []) {
     const source = getPrimarySource();
-    
+
     if (source === "mysql") {
         const { query, params } = buildUpdate(table, item, id);
         await executeMySQL(query, params);
@@ -242,13 +242,13 @@ async function primaryUpdate(table: string, id: string, item: any, relationKeys:
         });
         return { id, ...item };
     }
-    
+
     const client = getPrimarySupabaseClient();
     const { data, error } = await client.from(table).update(item).eq("id", id).select().single();
     if (error) throw error;
-    
+
     const syncData = relationKeys.length > 0 ? stripRelations(data, relationKeys) : data;
-    
+
     syncToMySQL(async () => {
         const { query, params } = buildUpdate(table, syncData, id);
         await executeMySQL(query, params);
@@ -259,13 +259,13 @@ async function primaryUpdate(table: string, id: string, item: any, relationKeys:
     syncToCloud(async () => {
         await (supabase.from as any)(table).upsert(syncData);
     });
-    
+
     return data;
 }
 
 async function primaryDelete(table: string, id: string) {
     const source = getPrimarySource();
-    
+
     if (source === "mysql") {
         await executeMySQL(`DELETE FROM ${table} WHERE id = ?`, [id]);
         syncToCloud(async () => {
@@ -276,11 +276,11 @@ async function primaryDelete(table: string, id: string) {
         });
         return true;
     }
-    
+
     const client = getPrimarySupabaseClient();
     const { error } = await client.from(table).delete().eq("id", id);
     if (error) throw error;
-    
+
     syncToMySQL(async () => {
         await executeMySQL(`DELETE FROM ${table} WHERE id = ?`, [id]);
     });
@@ -290,7 +290,7 @@ async function primaryDelete(table: string, id: string) {
     syncToCloud(async () => {
         await (supabase.from as any)(table).delete().eq("id", id);
     });
-    
+
     return true;
 }
 
@@ -423,7 +423,7 @@ export const api = {
         },
         upsert: async (key: string, value: string, description?: string) => {
             const source = getPrimarySource();
-            
+
             if (source === "mysql") {
                 await executeMySQL(
                     "INSERT INTO app_settings (`key`, value, description) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = ?, description = ?",
@@ -437,7 +437,7 @@ export const api = {
                 });
                 return { key, value, description };
             }
-            
+
             const client = getPrimarySupabaseClient();
             const { data, error } = await client
                 .from("app_settings")
@@ -445,7 +445,7 @@ export const api = {
                 .select()
                 .single();
             if (error) throw error;
-            
+
             syncToMySQL(async () => {
                 await executeMySQL(
                     "INSERT INTO app_settings (`key`, value, description) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = ?, description = ?",
@@ -526,7 +526,7 @@ export const api = {
         },
         updateSeries: async (seriesId: string, dayDifference: number) => {
             const source = getPrimarySource();
-            
+
             if (source === "mysql") {
                 await executeMySQL(
                     `UPDATE dry_ice_orders SET scheduled_date = DATE_ADD(scheduled_date, INTERVAL ? DAY) WHERE id = ? OR parent_order_id = ?`,
@@ -546,7 +546,7 @@ export const api = {
                 });
                 return true;
             }
-            
+
             const client = getPrimarySupabaseClient();
             const { data: seriesOrders, error: fetchError } = await client
                 .from("dry_ice_orders")
@@ -584,7 +584,7 @@ export const api = {
         },
         deleteSeries: async (seriesId: string) => {
             const source = getPrimarySource();
-            
+
             if (source === "mysql") {
                 await executeMySQL("DELETE FROM dry_ice_orders WHERE id = ? OR parent_order_id = ?", [seriesId, seriesId]);
                 syncToCloud(async () => {
@@ -595,11 +595,11 @@ export const api = {
                 });
                 return true;
             }
-            
+
             const client = getPrimarySupabaseClient();
             const { error } = await client.from("dry_ice_orders").delete().or(`id.eq.${seriesId},parent_order_id.eq.${seriesId}`);
             if (error) throw error;
-            
+
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM dry_ice_orders WHERE id = ? OR parent_order_id = ?", [seriesId, seriesId]);
             });
@@ -669,8 +669,38 @@ export const api = {
 
     reports: {
         getDailyProductionByPeriod: async (fromDate: string, toDate: string, location: string | null) => {
-            // Reports always use cloud Supabase RPCs (they rely on RLS/RBAC)
-            const { data, error } = await supabase.rpc("get_daily_production_by_period", {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const locClause = location ? " AND location = ?" : "";
+                const baseParams = [fromDate, toDate];
+                if (location) baseParams.push(location);
+                // We need params for both parts of UNION
+                const params = [...baseParams, ...baseParams];
+
+                const query = `
+                    SELECT 
+                        production_date,
+                        CAST(COALESCE(SUM(cylinder_count), 0) AS SIGNED) as cylinder_count,
+                        COALESCE(SUM(dry_ice_kg), 0) as dry_ice_kg
+                    FROM (
+                        SELECT scheduled_date as production_date, cylinder_count, 0 as dry_ice_kg 
+                        FROM gas_cylinder_orders 
+                        WHERE scheduled_date >= ? AND scheduled_date <= ? AND status != 'cancelled'${locClause}
+                        
+                        UNION ALL
+                        
+                        SELECT scheduled_date as production_date, 0 as cylinder_count, quantity_kg as dry_ice_kg 
+                        FROM dry_ice_orders 
+                        WHERE scheduled_date >= ? AND scheduled_date <= ? AND status != 'cancelled'${locClause}
+                    ) as combined
+                    GROUP BY production_date
+                    ORDER BY production_date
+                `;
+                return executeMySQL(query, params);
+            }
+
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.rpc("get_daily_production_by_period", {
                 p_from_date: fromDate,
                 p_to_date: toDate,
                 p_location: location
@@ -680,7 +710,29 @@ export const api = {
         },
 
         getGasTypeDistribution: async (fromDate: string, toDate: string, location: string | null) => {
-            const { data, error } = await supabase.rpc("get_gas_type_distribution_by_period", {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const params = [fromDate, toDate];
+                if (location) params.push(location);
+                const locClause = location ? " AND gco.location = ?" : "";
+
+                const query = `
+                    SELECT 
+                        gt.id as gas_type_id,
+                        COALESCE(gt.name, 'Onbekend') as gas_type_name,
+                        COALESCE(gt.color, '#3b82f6') as gas_type_color,
+                        CAST(COALESCE(SUM(gco.cylinder_count), 0) AS SIGNED) as total_cylinders
+                    FROM gas_cylinder_orders gco
+                    LEFT JOIN gas_types gt ON gco.gas_type_id = gt.id
+                    WHERE gco.scheduled_date >= ? AND gco.scheduled_date <= ? AND gco.status != 'cancelled'${locClause}
+                    GROUP BY gt.id, gt.name, gt.color
+                    ORDER BY total_cylinders DESC
+                `;
+                return executeMySQL(query, params);
+            }
+
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.rpc("get_gas_type_distribution_by_period", {
                 p_from_date: fromDate,
                 p_to_date: toDate,
                 p_location: location
@@ -690,7 +742,29 @@ export const api = {
         },
 
         getGasCategoryDistribution: async (fromDate: string, toDate: string, location: string | null) => {
-            const { data, error } = await supabase.rpc("get_gas_category_distribution_by_period" as any, {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const params = [fromDate, toDate];
+                if (location) params.push(location);
+                const locClause = location ? " AND gco.location = ?" : "";
+
+                const query = `
+                    SELECT 
+                        gtc.id as category_id,
+                        COALESCE(gtc.name, 'Geen categorie') as category_name,
+                        CAST(COALESCE(SUM(gco.cylinder_count), 0) AS SIGNED) as total_cylinders
+                    FROM gas_cylinder_orders gco
+                    LEFT JOIN gas_types gt ON gco.gas_type_id = gt.id
+                    LEFT JOIN gas_type_categories gtc ON gt.category_id = gtc.id
+                    WHERE gco.scheduled_date >= ? AND gco.scheduled_date <= ? AND gco.status != 'cancelled'${locClause}
+                    GROUP BY gtc.id, gtc.name
+                    ORDER BY total_cylinders DESC
+                `;
+                return executeMySQL(query, params);
+            }
+
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.rpc("get_gas_category_distribution_by_period" as any, {
                 p_from_date: fromDate,
                 p_to_date: toDate,
                 p_location: location
@@ -700,7 +774,32 @@ export const api = {
         },
 
         getProductionEfficiency: async (fromDate: string, toDate: string, location: string | null) => {
-            const { data, error } = await supabase.rpc("get_production_efficiency_by_period", {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const params = [fromDate, toDate];
+                if (location) params.push(location);
+                const locClause = location ? " AND location = ?" : "";
+
+                const query = `
+                    SELECT 
+                        COUNT(*) as total_orders,
+                        COALESCE(SUM(status = 'completed'), 0) as completed_orders,
+                        COALESCE(SUM(status = 'pending'), 0) as pending_orders,
+                        COALESCE(SUM(status = 'cancelled'), 0) as cancelled_orders,
+                        CASE 
+                            WHEN (COUNT(*) - COALESCE(SUM(status = 'cancelled'), 0)) = 0 THEN 0
+                            ELSE ROUND(COALESCE(SUM(status = 'completed'), 0) * 100.0 / (COUNT(*) - COALESCE(SUM(status = 'cancelled'), 0)), 1)
+                        END as efficiency_rate,
+                        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN cylinder_count ELSE 0 END), 0) as total_cylinders,
+                        COALESCE(SUM(CASE WHEN status = 'completed' THEN cylinder_count ELSE 0 END), 0) as completed_cylinders
+                    FROM gas_cylinder_orders
+                    WHERE scheduled_date >= ? AND scheduled_date <= ?${locClause}
+                `;
+                return executeMySQL(query, params);
+            }
+
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.rpc("get_production_efficiency_by_period", {
                 p_from_date: fromDate,
                 p_to_date: toDate,
                 p_location: location
@@ -710,7 +809,32 @@ export const api = {
         },
 
         getDryIceEfficiency: async (fromDate: string, toDate: string, location: string | null) => {
-            const { data, error } = await supabase.rpc("get_dry_ice_efficiency_by_period", {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const params = [fromDate, toDate];
+                if (location) params.push(location);
+                const locClause = location ? " AND location = ?" : "";
+
+                const query = `
+                    SELECT 
+                        COUNT(*) as total_orders,
+                        COALESCE(SUM(status = 'completed'), 0) as completed_orders,
+                        COALESCE(SUM(status = 'pending'), 0) as pending_orders,
+                        COALESCE(SUM(status = 'cancelled'), 0) as cancelled_orders,
+                        CASE 
+                            WHEN (COUNT(*) - COALESCE(SUM(status = 'cancelled'), 0)) = 0 THEN 0
+                            ELSE ROUND(COALESCE(SUM(status = 'completed'), 0) * 100.0 / (COUNT(*) - COALESCE(SUM(status = 'cancelled'), 0)), 1)
+                        END as efficiency_rate,
+                        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN quantity_kg ELSE 0 END), 0) as total_kg,
+                        COALESCE(SUM(CASE WHEN status = 'completed' THEN quantity_kg ELSE 0 END), 0) as completed_kg
+                    FROM dry_ice_orders
+                    WHERE scheduled_date >= ? AND scheduled_date <= ?${locClause}
+                `;
+                return executeMySQL(query, params);
+            }
+
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.rpc("get_dry_ice_efficiency_by_period", {
                 p_from_date: fromDate,
                 p_to_date: toDate,
                 p_location: location
@@ -720,7 +844,38 @@ export const api = {
         },
 
         getCustomerTotals: async (fromDate: string, toDate: string, location: string | null) => {
-            const { data, error } = await supabase.rpc("get_customer_totals_by_period", {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const locClause = location ? " AND location = ?" : "";
+                const baseParams = [fromDate, toDate];
+                if (location) baseParams.push(location);
+                const params = [...baseParams, ...baseParams];
+
+                const query = `
+                    SELECT 
+                        customer_id,
+                        MAX(customer_name) as customer_name,
+                        CAST(COALESCE(SUM(cylinder_count), 0) AS SIGNED) as total_cylinders,
+                        COALESCE(SUM(dry_ice_kg), 0) as total_dry_ice_kg
+                    FROM (
+                        SELECT customer_id, customer_name, cylinder_count, 0 as dry_ice_kg 
+                        FROM gas_cylinder_orders 
+                        WHERE scheduled_date >= ? AND scheduled_date <= ? AND status != 'cancelled'${locClause}
+                        
+                        UNION ALL
+                        
+                        SELECT customer_id, customer_name, 0 as cylinder_count, quantity_kg as dry_ice_kg 
+                        FROM dry_ice_orders 
+                        WHERE scheduled_date >= ? AND scheduled_date <= ? AND status != 'cancelled'${locClause}
+                    ) as combined
+                    GROUP BY customer_id
+                    ORDER BY total_cylinders DESC
+                `;
+                return executeMySQL(query, params);
+            }
+
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.rpc("get_customer_totals_by_period", {
                 p_from_date: fromDate,
                 p_to_date: toDate,
                 p_location: location
