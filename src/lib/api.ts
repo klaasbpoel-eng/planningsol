@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { STORAGE_KEY_DATA_SOURCE, DataSourceConfig } from "@/components/admin/DataSourceSettings";
 import { toast } from "sonner";
 
@@ -42,7 +43,6 @@ async function executeMySQL(query: string, params: any[] = []) {
 }
 
 // --- Dual-Write MySQL Sync Helper ---
-// Fire-and-forget: runs the MySQL sync if enabled, logs errors but never blocks the primary operation
 async function syncToMySQL(fn: () => Promise<void>) {
     const config = getConfig();
     if (!config?.useMySQL) return;
@@ -55,6 +55,31 @@ async function syncToMySQL(fn: () => Promise<void>) {
     }
 }
 
+// --- External Supabase Sync Helper ---
+let externalSupabaseClient: SupabaseClient | null = null;
+let cachedExtUrl: string | null = null;
+
+function getExternalSupabaseClient(): SupabaseClient | null {
+    const config = getConfig();
+    if (!config?.useExternalSupabase || !config.externalSupabaseUrl || !config.externalSupabaseAnonKey) return null;
+    // Recreate client if URL changed
+    if (!externalSupabaseClient || cachedExtUrl !== config.externalSupabaseUrl) {
+        externalSupabaseClient = createClient(config.externalSupabaseUrl, config.externalSupabaseAnonKey);
+        cachedExtUrl = config.externalSupabaseUrl;
+    }
+    return externalSupabaseClient;
+}
+
+async function syncToExternalSupabase(fn: (client: SupabaseClient) => Promise<void>) {
+    const client = getExternalSupabaseClient();
+    if (!client) return;
+    try {
+        await fn(client);
+    } catch (err) {
+        console.error("External Supabase sync failed:", err);
+        toast.error("Externe Supabase sync mislukt - data staat wel in de primaire database");
+    }
+}
 // Helper to build a MySQL INSERT from a data object
 function buildInsert(table: string, data: Record<string, any>, excludeKeys: string[] = []): { query: string; params: any[] } {
     const keys = Object.keys(data).filter(k => !excludeKeys.includes(k) && data[k] !== undefined);
@@ -78,6 +103,13 @@ function buildUpdate(table: string, data: Record<string, any>, id: string, exclu
     };
 }
 
+// Helper to strip join/relation keys for external sync
+function stripRelations(data: any, keys: string[] = []): any {
+    const copy = { ...data };
+    keys.forEach(k => delete copy[k]);
+    return copy;
+}
+
 // --- Data Provider Interface ---
 
 export const api = {
@@ -97,6 +129,9 @@ export const api = {
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM customers WHERE id = ?", [id]);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("customers").delete().eq("id", id);
+            });
             return true;
         },
 
@@ -110,6 +145,9 @@ export const api = {
                 const newState = currentState ? 0 : 1;
                 await executeMySQL("UPDATE customers SET is_active = ? WHERE id = ?", [newState, id]);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("customers").update({ is_active: !currentState }).eq("id", id);
+            });
             return true;
         },
 
@@ -120,6 +158,9 @@ export const api = {
                 const { query, params } = buildInsert("customers", data);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("customers").upsert(data);
+            });
             return data;
         },
 
@@ -129,6 +170,9 @@ export const api = {
             syncToMySQL(async () => {
                 const { query, params } = buildUpdate("customers", data, id);
                 await executeMySQL(query, params);
+            });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("customers").upsert(data);
             });
             return data;
         }
@@ -151,6 +195,9 @@ export const api = {
                 const { query, params } = buildInsert("gas_types", data);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("gas_types").upsert(data);
+            });
             return data;
         },
         update: async (id: string, item: any) => {
@@ -160,6 +207,9 @@ export const api = {
                 const { query, params } = buildUpdate("gas_types", data, id);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("gas_types").upsert(data);
+            });
             return data;
         },
         delete: async (id: string) => {
@@ -167,6 +217,9 @@ export const api = {
             if (error) throw error;
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM gas_types WHERE id = ?", [id]);
+            });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("gas_types").delete().eq("id", id);
             });
             return true;
         }
@@ -185,6 +238,9 @@ export const api = {
                 const { query, params } = buildInsert("cylinder_sizes", data);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("cylinder_sizes").upsert(data);
+            });
             return data;
         },
         update: async (id: string, item: any) => {
@@ -194,6 +250,9 @@ export const api = {
                 const { query, params } = buildUpdate("cylinder_sizes", data, id);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("cylinder_sizes").upsert(data);
+            });
             return data;
         },
         delete: async (id: string) => {
@@ -201,6 +260,9 @@ export const api = {
             if (error) throw error;
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM cylinder_sizes WHERE id = ?", [id]);
+            });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("cylinder_sizes").delete().eq("id", id);
             });
             return true;
         }
@@ -219,6 +281,9 @@ export const api = {
                 const { query, params } = buildInsert("dry_ice_product_types", data);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("dry_ice_product_types").upsert(data);
+            });
             return data;
         },
         update: async (id: string, item: any) => {
@@ -228,6 +293,9 @@ export const api = {
                 const { query, params } = buildUpdate("dry_ice_product_types", data, id);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("dry_ice_product_types").upsert(data);
+            });
             return data;
         },
         delete: async (id: string) => {
@@ -235,6 +303,9 @@ export const api = {
             if (error) throw error;
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM dry_ice_product_types WHERE id = ?", [id]);
+            });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("dry_ice_product_types").delete().eq("id", id);
             });
             return true;
         }
@@ -253,6 +324,9 @@ export const api = {
                 const { query, params } = buildInsert("dry_ice_packaging", data);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("dry_ice_packaging").upsert(data);
+            });
             return data;
         },
         update: async (id: string, item: any) => {
@@ -262,6 +336,9 @@ export const api = {
                 const { query, params } = buildUpdate("dry_ice_packaging", data, id);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("dry_ice_packaging").upsert(data);
+            });
             return data;
         },
         delete: async (id: string) => {
@@ -269,6 +346,9 @@ export const api = {
             if (error) throw error;
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM dry_ice_packaging WHERE id = ?", [id]);
+            });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("dry_ice_packaging").delete().eq("id", id);
             });
             return true;
         }
@@ -287,6 +367,9 @@ export const api = {
                 const { query, params } = buildInsert("task_types", data);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("task_types").upsert(data);
+            });
             return data;
         },
         update: async (id: string, item: any) => {
@@ -296,6 +379,9 @@ export const api = {
                 const { query, params } = buildUpdate("task_types", data, id);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("task_types").upsert(data);
+            });
             return data;
         },
         delete: async (id: string) => {
@@ -303,6 +389,9 @@ export const api = {
             if (error) throw error;
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM task_types WHERE id = ?", [id]);
+            });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("task_types").delete().eq("id", id);
             });
             return true;
         }
@@ -321,6 +410,9 @@ export const api = {
                 const { query, params } = buildInsert("gas_type_categories", data);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("gas_type_categories").upsert(data);
+            });
             return data;
         },
         update: async (id: string, item: any) => {
@@ -330,6 +422,9 @@ export const api = {
                 const { query, params } = buildUpdate("gas_type_categories", data, id);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("gas_type_categories").upsert(data);
+            });
             return data;
         },
         delete: async (id: string) => {
@@ -337,6 +432,9 @@ export const api = {
             if (error) throw error;
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM gas_type_categories WHERE id = ?", [id]);
+            });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("gas_type_categories").delete().eq("id", id);
             });
             return true;
         }
@@ -368,6 +466,9 @@ export const api = {
                     [key, value, description || null, value, description || null]
                 );
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("app_settings").upsert(data, { onConflict: "key" });
+            });
             return data;
         }
     },
@@ -391,10 +492,13 @@ export const api = {
             const { data, error } = await supabase.from("gas_cylinder_orders").insert(item).select().single();
             if (error) throw error;
             syncToMySQL(async () => {
-                const syncData = { ...data } as any;
-                delete syncData.gas_type_ref;
+                const syncData = stripRelations(data, ['gas_type_ref']);
                 const { query, params } = buildInsert("gas_cylinder_orders", syncData);
                 await executeMySQL(query, params);
+            });
+            syncToExternalSupabase(async (ext) => {
+                const syncData = stripRelations(data, ['gas_type_ref']);
+                await ext.from("gas_cylinder_orders").upsert(syncData);
             });
             return data;
         },
@@ -402,10 +506,13 @@ export const api = {
             const { data, error } = await supabase.from("gas_cylinder_orders").update(item).eq("id", id).select().single();
             if (error) throw error;
             syncToMySQL(async () => {
-                const syncData = { ...data } as any;
-                delete syncData.gas_type_ref;
+                const syncData = stripRelations(data, ['gas_type_ref']);
                 const { query, params } = buildUpdate("gas_cylinder_orders", syncData, id);
                 await executeMySQL(query, params);
+            });
+            syncToExternalSupabase(async (ext) => {
+                const syncData = stripRelations(data, ['gas_type_ref']);
+                await ext.from("gas_cylinder_orders").upsert(syncData);
             });
             return data;
         },
@@ -414,6 +521,9 @@ export const api = {
             if (error) throw error;
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM gas_cylinder_orders WHERE id = ?", [id]);
+            });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("gas_cylinder_orders").delete().eq("id", id);
             });
             return true;
         },
@@ -460,6 +570,9 @@ export const api = {
                 const { query, params } = buildInsert("dry_ice_orders", data);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("dry_ice_orders").upsert(data);
+            });
             return data;
         },
         update: async (id: string, item: any) => {
@@ -469,10 +582,12 @@ export const api = {
                 const { query, params } = buildUpdate("dry_ice_orders", data, id);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("dry_ice_orders").upsert(data);
+            });
             return data;
         },
         updateSeries: async (seriesId: string, dayDifference: number) => {
-            // Fetch, update dates, upsert back to Supabase
             const { data: seriesOrders, error: fetchError } = await supabase
                 .from("dry_ice_orders")
                 .select("*")
@@ -499,6 +614,9 @@ export const api = {
                     [dayDifference, seriesId, seriesId]
                 );
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("dry_ice_orders").upsert(updates);
+            });
             return true;
         },
         delete: async (id: string) => {
@@ -507,6 +625,9 @@ export const api = {
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM dry_ice_orders WHERE id = ?", [id]);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("dry_ice_orders").delete().eq("id", id);
+            });
             return true;
         },
         deleteSeries: async (seriesId: string) => {
@@ -514,6 +635,9 @@ export const api = {
             if (error) throw error;
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM dry_ice_orders WHERE id = ? OR parent_order_id = ?", [seriesId, seriesId]);
+            });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("dry_ice_orders").delete().or(`id.eq.${seriesId},parent_order_id.eq.${seriesId}`);
             });
             return true;
         }
@@ -532,6 +656,9 @@ export const api = {
                 const { query, params } = buildInsert("tasks", data);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("tasks").upsert(data);
+            });
             return data;
         },
         update: async (id: string, item: any) => {
@@ -541,6 +668,9 @@ export const api = {
                 const { query, params } = buildUpdate("tasks", data, id);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("tasks").upsert(data);
+            });
             return data;
         },
         delete: async (id: string) => {
@@ -548,6 +678,9 @@ export const api = {
             if (error) throw error;
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM tasks WHERE id = ?", [id]);
+            });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("tasks").delete().eq("id", id);
             });
             return true;
         }
@@ -566,6 +699,9 @@ export const api = {
                 const { query, params } = buildInsert("time_off_requests", data);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("time_off_requests").upsert(data);
+            });
             return data;
         },
         update: async (id: string, item: any) => {
@@ -575,6 +711,9 @@ export const api = {
                 const { query, params } = buildUpdate("time_off_requests", data, id);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("time_off_requests").upsert(data);
+            });
             return data;
         },
         delete: async (id: string) => {
@@ -582,6 +721,9 @@ export const api = {
             if (error) throw error;
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM time_off_requests WHERE id = ?", [id]);
+            });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("time_off_requests").delete().eq("id", id);
             });
             return true;
         }
@@ -605,6 +747,9 @@ export const api = {
                 const { query, params } = buildInsert("profiles", data);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("profiles").upsert(data);
+            });
             return data;
         },
         update: async (id: string, item: any) => {
@@ -613,6 +758,9 @@ export const api = {
             syncToMySQL(async () => {
                 const { query, params } = buildUpdate("profiles", data, id);
                 await executeMySQL(query, params);
+            });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("profiles").upsert(data);
             });
             return data;
         }
@@ -693,6 +841,9 @@ export const api = {
                 const { query, params } = buildInsert("time_off_types", data);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("time_off_types").upsert(data);
+            });
             return data;
         },
         update: async (id: string, item: any) => {
@@ -702,6 +853,9 @@ export const api = {
                 const { query, params } = buildUpdate("time_off_types", data, id);
                 await executeMySQL(query, params);
             });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("time_off_types").upsert(data);
+            });
             return data;
         },
         delete: async (id: string) => {
@@ -709,6 +863,9 @@ export const api = {
             if (error) throw error;
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM time_off_types WHERE id = ?", [id]);
+            });
+            syncToExternalSupabase(async (ext) => {
+                await ext.from("time_off_types").delete().eq("id", id);
             });
             return true;
         }
@@ -780,5 +937,4 @@ export const api = {
             }
         }
     },
-
 };
