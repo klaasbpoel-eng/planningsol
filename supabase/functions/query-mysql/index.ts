@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import mysql from "npm:mysql2/promise";
+import mysql from "https://esm.sh/mysql2@3.9.7/promise";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
