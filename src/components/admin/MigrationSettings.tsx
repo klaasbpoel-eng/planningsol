@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { DatabaseExportSettings } from "./DatabaseExportSettings";
+import { SupabaseExportSettings } from "./SupabaseExportSettings";
 
 const AVAILABLE_TABLES = [
   "app_settings",
@@ -63,6 +64,7 @@ export function MigrationSettings() {
       </Card>
 
       <DatabaseExportSettings selectedTables={selectedTables} />
+      <SupabaseExportSettings selectedTables={selectedTables} />
     </div>
   );
 }
