@@ -1,94 +1,63 @@
 
-## Externe Supabase Database Optie Toevoegen
+
+## Externe Supabase Export Toevoegen
 
 ### Wat er verandert
 
-Naast de bestaande MySQL sync-optie wordt een tweede optie toegevoegd: **"Gebruik Externe Supabase Database"**. Wanneer ingeschakeld, worden alle write-operaties (create, update, delete) ook naar een externe Supabase-instantie gesynchroniseerd via dezelfde dual-write aanpak.
+Naast de bestaande MySQL export komt er een **Supabase Export** knop op de MigrationSettings pagina. Deze leest de geselecteerde tabellen direct vanuit de primaire database en downloadt ze als een JSON-bestand dat geimporteerd kan worden in een externe Supabase-instantie.
 
 ### Wijzigingen
 
-**1. `src/components/admin/DataSourceSettings.tsx` -- UI uitbreiden**
+**1. Nieuw bestand: `src/components/admin/SupabaseExportSettings.tsx`**
 
-- Nieuwe velden toevoegen aan het `DataSourceConfig` interface:
-  - `useExternalSupabase: boolean`
-  - `externalSupabaseUrl: string`
-  - `externalSupabaseAnonKey: string`
-- Een tweede toggle-sectie toevoegen: "Gebruik Externe Supabase Database" met velden voor URL en Anon Key
-- Een "Test Verbinding" knop voor de externe Supabase (doet een simpele query om te checken of de verbinding werkt)
-- De beschrijving bovenaan aanpassen: "Kies of u een externe MySQL en/of Supabase database wilt synchroniseren"
+Een nieuw component, vergelijkbaar met `DatabaseExportSettings`, dat:
+- De geselecteerde tabellen als prop ontvangt
+- Per tabel alle rijen ophaalt vanuit Supabase (in batches van 1000)
+- Alles bundelt in een JSON-bestand met structuur `{ tableName: rows[] }`
+- Het bestand downloadt als `.json` (gecomprimeerd als `.json.gz` indien mogelijk)
+- Voortgang toont via toast-meldingen
 
-**2. `src/lib/api.ts` -- Sync naar externe Supabase toevoegen**
+Dit werkt volledig client-side (geen edge function nodig) omdat de data al via de primaire Supabase client beschikbaar is.
 
-- Een `createExternalSupabaseClient()` helper toevoegen die een tweede Supabase client aanmaakt met de externe URL en Anon Key uit de config
-- Een `syncToExternalSupabase()` helper toevoegen, vergelijkbaar met `syncToMySQL()`:
-  - Controleert of externe Supabase sync is ingeschakeld
-  - Voert de operatie uit op de externe Supabase client
-  - Logt fouten maar blokkeert niet
-- Alle ~40 write-methodes uitbreiden met een extra `syncToExternalSupabase()` call na de bestaande MySQL sync
+**2. Bestand aanpassen: `src/components/admin/MigrationSettings.tsx`**
 
-Voorbeeld van de nieuwe flow per write-operatie:
+- Import van het nieuwe `SupabaseExportSettings` component
+- Toevoegen onder de bestaande `DatabaseExportSettings` component
 
-```text
-1. Schrijf naar primaire Supabase (altijd)
-2. if (useMySQL) -> sync naar MySQL (bestaand)
-3. if (useExternalSupabase) -> sync naar externe Supabase (nieuw)
-```
+### Resultaat
 
-### Overzicht bestanden
-
-| Bestand | Wijziging |
-|---------|-----------|
-| `src/components/admin/DataSourceSettings.tsx` | Interface uitbreiden, tweede toggle + formulier, test-knop |
-| `src/lib/api.ts` | `syncToExternalSupabase` helper + alle write-methodes uitbreiden |
+De export-pagina toont dan:
+1. Tabellen selectie (bestaand)
+2. MySQL Export knop (bestaand)
+3. **Supabase Export knop (nieuw)** -- downloadt een JSON-bestand
 
 ### Technische details
 
-De externe Supabase client wordt lazy aangemaakt en gecached:
-
 ```typescript
-import { createClient } from '@supabase/supabase-js';
-
-let externalClient: ReturnType<typeof createClient> | null = null;
-
-function getExternalSupabaseClient() {
-  const config = getConfig();
-  if (!config?.useExternalSupabase || !config.externalSupabaseUrl || !config.externalSupabaseAnonKey) return null;
-  if (!externalClient) {
-    externalClient = createClient(config.externalSupabaseUrl, config.externalSupabaseAnonKey);
+// SupabaseExportSettings.tsx - kernlogica
+const allData: Record<string, any[]> = {};
+for (const table of selectedTables) {
+  let allRows: any[] = [];
+  let offset = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from(table)
+      .select("*")
+      .range(offset, offset + 999);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allRows = [...allRows, ...data];
+    offset += data.length;
+    if (data.length < 1000) break;
   }
-  return externalClient;
+  allData[table] = allRows;
+  totalRows += allRows.length;
 }
-
-async function syncToExternalSupabase(fn: (client: ReturnType<typeof createClient>) => Promise<void>) {
-  const client = getExternalSupabaseClient();
-  if (!client) return;
-  try {
-    await fn(client);
-  } catch (err) {
-    console.error("External Supabase sync failed:", err);
-    toast.error("Externe Supabase sync mislukt - data staat wel in de primaire database");
-  }
-}
+// Download als JSON(.gz)
 ```
 
-Per write-methode wordt dan een extra sync toegevoegd, bijvoorbeeld:
+| Bestand | Wijziging |
+|---------|-----------|
+| `src/components/admin/SupabaseExportSettings.tsx` | Nieuw -- Export component voor Supabase JSON download |
+| `src/components/admin/MigrationSettings.tsx` | Import + toevoegen van SupabaseExportSettings |
 
-```typescript
-create: async (item: any) => {
-  // 1. Primaire Supabase
-  const { data, error } = await supabase.from("customers").insert(item).select().single();
-  if (error) throw error;
-
-  // 2. MySQL sync
-  syncToMySQL(async () => { /* bestaand */ });
-
-  // 3. Externe Supabase sync
-  syncToExternalSupabase(async (ext) => {
-    await ext.from("customers").upsert(data);
-  });
-
-  return data;
-}
-```
-
-De externe Supabase sync gebruikt `upsert` in plaats van `insert` om idempotent te zijn bij eventuele retries.
