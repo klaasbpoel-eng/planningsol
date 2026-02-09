@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { STORAGE_KEY_DATA_SOURCE, DataSourceConfig } from "@/components/admin/DataSourceSettings";
+import { STORAGE_KEY_DATA_SOURCE, DataSourceConfig, PrimarySource } from "@/components/admin/DataSourceSettings";
 import { toast } from "sonner";
 
 // Helper to get config
@@ -12,6 +12,23 @@ function getConfig(): DataSourceConfig | null {
     } catch {
         return null;
     }
+}
+
+// --- Primary Source Helpers ---
+
+export function getPrimarySource(): PrimarySource {
+    const config = getConfig();
+    return config?.primarySource || "cloud";
+}
+
+export function getPrimarySupabaseClient(): SupabaseClient {
+    const source = getPrimarySource();
+    if (source === "external_supabase") {
+        const ext = getExternalSupabaseClient();
+        if (!ext) throw new Error("Externe Supabase niet geconfigureerd");
+        return ext;
+    }
+    return supabase; // cloud (default)
 }
 
 // Generic MySQL Query Executor
@@ -42,35 +59,24 @@ async function executeMySQL(query: string, params: any[] = []) {
     return data.data;
 }
 
-// --- Dual-Write MySQL Sync Helper ---
+// --- Smart Sync Helpers ---
+// Only sync to targets that are NOT the primary source
+
 async function syncToMySQL(fn: () => Promise<void>) {
     const config = getConfig();
     if (!config?.useMySQL) return;
+    if (getPrimarySource() === "mysql") return; // already written to MySQL as primary
 
     try {
         await fn();
     } catch (err) {
         console.error("MySQL sync failed:", err);
-        toast.error("MySQL sync mislukt - data staat wel in de cloud database");
+        toast.error("MySQL sync mislukt - data staat wel in de primaire database");
     }
-}
-
-// --- External Supabase Sync Helper ---
-let externalSupabaseClient: SupabaseClient | null = null;
-let cachedExtUrl: string | null = null;
-
-function getExternalSupabaseClient(): SupabaseClient | null {
-    const config = getConfig();
-    if (!config?.useExternalSupabase || !config.externalSupabaseUrl || !config.externalSupabaseAnonKey) return null;
-    // Recreate client if URL changed
-    if (!externalSupabaseClient || cachedExtUrl !== config.externalSupabaseUrl) {
-        externalSupabaseClient = createClient(config.externalSupabaseUrl, config.externalSupabaseAnonKey);
-        cachedExtUrl = config.externalSupabaseUrl;
-    }
-    return externalSupabaseClient;
 }
 
 async function syncToExternalSupabase(fn: (client: SupabaseClient) => Promise<void>) {
+    if (getPrimarySource() === "external_supabase") return; // already written as primary
     const client = getExternalSupabaseClient();
     if (!client) return;
     try {
@@ -80,6 +86,37 @@ async function syncToExternalSupabase(fn: (client: SupabaseClient) => Promise<vo
         toast.error("Externe Supabase sync mislukt - data staat wel in de primaire database");
     }
 }
+
+async function syncToCloud(fn: () => Promise<void>) {
+    if (getPrimarySource() === "cloud") return; // already written to cloud as primary
+    const config = getConfig();
+    // Only sync back to cloud if user has enabled at least one sync option or if primary is not cloud
+    // We always sync back to cloud when primary is external, to keep cloud in sync
+    if (!config) return;
+    try {
+        await fn();
+    } catch (err) {
+        console.error("Cloud sync failed:", err);
+        toast.error("Cloud sync mislukt - data staat wel in de primaire database");
+    }
+}
+
+// --- External Supabase Client ---
+let externalSupabaseClient: SupabaseClient | null = null;
+let cachedExtUrl: string | null = null;
+
+function getExternalSupabaseClient(): SupabaseClient | null {
+    const config = getConfig();
+    if (!config?.externalSupabaseUrl || !config.externalSupabaseAnonKey) return null;
+    // Need external client if it's primary OR sync is enabled
+    if (!config.useExternalSupabase && config.primarySource !== "external_supabase") return null;
+    if (!externalSupabaseClient || cachedExtUrl !== config.externalSupabaseUrl) {
+        externalSupabaseClient = createClient(config.externalSupabaseUrl, config.externalSupabaseAnonKey);
+        cachedExtUrl = config.externalSupabaseUrl;
+    }
+    return externalSupabaseClient;
+}
+
 // Helper to build a MySQL INSERT from a data object
 function buildInsert(table: string, data: Record<string, any>, excludeKeys: string[] = []): { query: string; params: any[] } {
     const keys = Object.keys(data).filter(k => !excludeKeys.includes(k) && data[k] !== undefined);
@@ -110,339 +147,273 @@ function stripRelations(data: any, keys: string[] = []): any {
     return copy;
 }
 
+// --- Generic CRUD helpers for primary source routing ---
+
+async function primaryRead(table: string, options?: { 
+    orderBy?: string; 
+    orderAsc?: boolean; 
+    secondOrder?: string;
+    selectQuery?: string;
+    filters?: Array<{ column: string; op: string; value: any }>;
+    limit?: number;
+    mysqlQuery?: string;
+}) {
+    const source = getPrimarySource();
+    
+    if (source === "mysql") {
+        const q = options?.mysqlQuery || `SELECT * FROM ${table}${options?.orderBy ? ` ORDER BY ${options.orderBy}${options.orderAsc === false ? ' DESC' : ''}` : ''}`;
+        return await executeMySQL(q);
+    }
+    
+    const client = getPrimarySupabaseClient();
+    let query = client.from(table).select(options?.selectQuery || "*");
+    
+    if (options?.filters) {
+        for (const f of options.filters) {
+            if (f.op === "eq") query = query.eq(f.column, f.value);
+            else if (f.op === "gte") query = query.gte(f.column, f.value);
+            else if (f.op === "lte") query = query.lte(f.column, f.value);
+            else if (f.op === "or") query = query.or(f.value);
+        }
+    }
+    
+    if (options?.orderBy) {
+        query = query.order(options.orderBy, { ascending: options.orderAsc !== false });
+    }
+    if (options?.secondOrder) {
+        query = query.order(options.secondOrder, { ascending: true });
+    }
+    if (options?.limit) {
+        query = query.limit(options.limit);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+}
+
+async function primaryCreate(table: string, item: any, relationKeys: string[] = []) {
+    const source = getPrimarySource();
+    
+    if (source === "mysql") {
+        const { query, params } = buildInsert(table, item);
+        await executeMySQL(query, params);
+        // Sync to cloud and external supabase
+        syncToCloud(async () => {
+            await (supabase.from as any)(table).upsert(item);
+        });
+        syncToExternalSupabase(async (ext) => {
+            await (ext.from as any)(table).upsert(item);
+        });
+        return item;
+    }
+    
+    const client = getPrimarySupabaseClient();
+    const { data, error } = await client.from(table).insert(item).select().single();
+    if (error) throw error;
+    
+    const syncData = relationKeys.length > 0 ? stripRelations(data, relationKeys) : data;
+    
+    syncToMySQL(async () => {
+        const { query, params } = buildInsert(table, syncData);
+        await executeMySQL(query, params);
+    });
+    syncToExternalSupabase(async (ext) => {
+        await (ext.from as any)(table).upsert(syncData);
+    });
+    syncToCloud(async () => {
+        await (supabase.from as any)(table).upsert(syncData);
+    });
+    
+    return data;
+}
+
+async function primaryUpdate(table: string, id: string, item: any, relationKeys: string[] = []) {
+    const source = getPrimarySource();
+    
+    if (source === "mysql") {
+        const { query, params } = buildUpdate(table, item, id);
+        await executeMySQL(query, params);
+        syncToCloud(async () => {
+            await (supabase.from as any)(table).update(item).eq("id", id);
+        });
+        syncToExternalSupabase(async (ext) => {
+            await (ext.from as any)(table).update(item).eq("id", id);
+        });
+        return { id, ...item };
+    }
+    
+    const client = getPrimarySupabaseClient();
+    const { data, error } = await client.from(table).update(item).eq("id", id).select().single();
+    if (error) throw error;
+    
+    const syncData = relationKeys.length > 0 ? stripRelations(data, relationKeys) : data;
+    
+    syncToMySQL(async () => {
+        const { query, params } = buildUpdate(table, syncData, id);
+        await executeMySQL(query, params);
+    });
+    syncToExternalSupabase(async (ext) => {
+        await (ext.from as any)(table).upsert(syncData);
+    });
+    syncToCloud(async () => {
+        await (supabase.from as any)(table).upsert(syncData);
+    });
+    
+    return data;
+}
+
+async function primaryDelete(table: string, id: string) {
+    const source = getPrimarySource();
+    
+    if (source === "mysql") {
+        await executeMySQL(`DELETE FROM ${table} WHERE id = ?`, [id]);
+        syncToCloud(async () => {
+            await (supabase.from as any)(table).delete().eq("id", id);
+        });
+        syncToExternalSupabase(async (ext) => {
+            await (ext.from as any)(table).delete().eq("id", id);
+        });
+        return true;
+    }
+    
+    const client = getPrimarySupabaseClient();
+    const { error } = await client.from(table).delete().eq("id", id);
+    if (error) throw error;
+    
+    syncToMySQL(async () => {
+        await executeMySQL(`DELETE FROM ${table} WHERE id = ?`, [id]);
+    });
+    syncToExternalSupabase(async (ext) => {
+        await (ext.from as any)(table).delete().eq("id", id);
+    });
+    syncToCloud(async () => {
+        await (supabase.from as any)(table).delete().eq("id", id);
+    });
+    
+    return true;
+}
+
 // --- Data Provider Interface ---
 
 export const api = {
     customers: {
         getAll: async () => {
-            const { data, error } = await supabase
-                .from("customers")
-                .select("*")
-                .order("name");
-            if (error) throw error;
-            return data;
+            return primaryRead("customers", { orderBy: "name" });
         },
-
         delete: async (id: string) => {
-            const { error } = await supabase.from("customers").delete().eq("id", id);
-            if (error) throw error;
-            syncToMySQL(async () => {
-                await executeMySQL("DELETE FROM customers WHERE id = ?", [id]);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("customers").delete().eq("id", id);
-            });
-            return true;
+            return primaryDelete("customers", id);
         },
-
         toggleActive: async (id: string, currentState: boolean) => {
-            const { error } = await supabase
-                .from("customers")
-                .update({ is_active: !currentState })
-                .eq("id", id);
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const newState = currentState ? 0 : 1;
-                await executeMySQL("UPDATE customers SET is_active = ? WHERE id = ?", [newState, id]);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("customers").update({ is_active: !currentState }).eq("id", id);
-            });
-            return true;
+            return primaryUpdate("customers", id, { is_active: !currentState });
         },
-
         create: async (item: any) => {
-            const { data, error } = await supabase.from("customers").insert(item).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildInsert("customers", data);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("customers").upsert(data);
-            });
-            return data;
+            return primaryCreate("customers", item);
         },
-
         update: async (id: string, item: any) => {
-            const { data, error } = await supabase.from("customers").update(item).eq("id", id).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildUpdate("customers", data, id);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("customers").upsert(data);
-            });
-            return data;
+            return primaryUpdate("customers", id, item);
         }
     },
 
     gasTypes: {
         getAll: async () => {
-            const { data, error } = await supabase
-                .from("gas_types")
-                .select("*")
-                .order("sort_order", { ascending: true })
-                .order("name", { ascending: true });
-            if (error) throw error;
-            return data;
+            return primaryRead("gas_types", { orderBy: "sort_order", secondOrder: "name" });
         },
         create: async (item: any) => {
-            const { data, error } = await supabase.from("gas_types").insert(item).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildInsert("gas_types", data);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("gas_types").upsert(data);
-            });
-            return data;
+            return primaryCreate("gas_types", item);
         },
         update: async (id: string, item: any) => {
-            const { data, error } = await supabase.from("gas_types").update(item).eq("id", id).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildUpdate("gas_types", data, id);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("gas_types").upsert(data);
-            });
-            return data;
+            return primaryUpdate("gas_types", id, item);
         },
         delete: async (id: string) => {
-            const { error } = await supabase.from("gas_types").delete().eq("id", id);
-            if (error) throw error;
-            syncToMySQL(async () => {
-                await executeMySQL("DELETE FROM gas_types WHERE id = ?", [id]);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("gas_types").delete().eq("id", id);
-            });
-            return true;
+            return primaryDelete("gas_types", id);
         }
     },
 
     cylinderSizes: {
         getAll: async () => {
-            const { data, error } = await supabase.from("cylinder_sizes").select("*").order("sort_order", { ascending: true });
-            if (error) throw error;
-            return data;
+            return primaryRead("cylinder_sizes", { orderBy: "sort_order" });
         },
         create: async (item: any) => {
-            const { data, error } = await supabase.from("cylinder_sizes").insert(item).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildInsert("cylinder_sizes", data);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("cylinder_sizes").upsert(data);
-            });
-            return data;
+            return primaryCreate("cylinder_sizes", item);
         },
         update: async (id: string, item: any) => {
-            const { data, error } = await supabase.from("cylinder_sizes").update(item).eq("id", id).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildUpdate("cylinder_sizes", data, id);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("cylinder_sizes").upsert(data);
-            });
-            return data;
+            return primaryUpdate("cylinder_sizes", id, item);
         },
         delete: async (id: string) => {
-            const { error } = await supabase.from("cylinder_sizes").delete().eq("id", id);
-            if (error) throw error;
-            syncToMySQL(async () => {
-                await executeMySQL("DELETE FROM cylinder_sizes WHERE id = ?", [id]);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("cylinder_sizes").delete().eq("id", id);
-            });
-            return true;
+            return primaryDelete("cylinder_sizes", id);
         }
     },
 
     dryIceProductTypes: {
         getAll: async () => {
-            const { data, error } = await supabase.from("dry_ice_product_types").select("*").order("sort_order", { ascending: true });
-            if (error) throw error;
-            return data;
+            return primaryRead("dry_ice_product_types", { orderBy: "sort_order" });
         },
         create: async (item: any) => {
-            const { data, error } = await supabase.from("dry_ice_product_types").insert(item).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildInsert("dry_ice_product_types", data);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("dry_ice_product_types").upsert(data);
-            });
-            return data;
+            return primaryCreate("dry_ice_product_types", item);
         },
         update: async (id: string, item: any) => {
-            const { data, error } = await supabase.from("dry_ice_product_types").update(item).eq("id", id).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildUpdate("dry_ice_product_types", data, id);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("dry_ice_product_types").upsert(data);
-            });
-            return data;
+            return primaryUpdate("dry_ice_product_types", id, item);
         },
         delete: async (id: string) => {
-            const { error } = await supabase.from("dry_ice_product_types").delete().eq("id", id);
-            if (error) throw error;
-            syncToMySQL(async () => {
-                await executeMySQL("DELETE FROM dry_ice_product_types WHERE id = ?", [id]);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("dry_ice_product_types").delete().eq("id", id);
-            });
-            return true;
+            return primaryDelete("dry_ice_product_types", id);
         }
     },
 
     dryIcePackaging: {
         getAll: async () => {
-            const { data, error } = await supabase.from("dry_ice_packaging").select("*").order("sort_order", { ascending: true });
-            if (error) throw error;
-            return data;
+            return primaryRead("dry_ice_packaging", { orderBy: "sort_order" });
         },
         create: async (item: any) => {
-            const { data, error } = await supabase.from("dry_ice_packaging").insert(item).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildInsert("dry_ice_packaging", data);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("dry_ice_packaging").upsert(data);
-            });
-            return data;
+            return primaryCreate("dry_ice_packaging", item);
         },
         update: async (id: string, item: any) => {
-            const { data, error } = await supabase.from("dry_ice_packaging").update(item).eq("id", id).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildUpdate("dry_ice_packaging", data, id);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("dry_ice_packaging").upsert(data);
-            });
-            return data;
+            return primaryUpdate("dry_ice_packaging", id, item);
         },
         delete: async (id: string) => {
-            const { error } = await supabase.from("dry_ice_packaging").delete().eq("id", id);
-            if (error) throw error;
-            syncToMySQL(async () => {
-                await executeMySQL("DELETE FROM dry_ice_packaging WHERE id = ?", [id]);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("dry_ice_packaging").delete().eq("id", id);
-            });
-            return true;
+            return primaryDelete("dry_ice_packaging", id);
         }
     },
 
     taskTypes: {
         getAll: async () => {
-            const { data, error } = await supabase.from("task_types").select("*").order("sort_order", { ascending: true });
-            if (error) throw error;
-            return data;
+            return primaryRead("task_types", { orderBy: "sort_order" });
         },
         create: async (item: any) => {
-            const { data, error } = await supabase.from("task_types").insert(item).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildInsert("task_types", data);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("task_types").upsert(data);
-            });
-            return data;
+            return primaryCreate("task_types", item);
         },
         update: async (id: string, item: any) => {
-            const { data, error } = await supabase.from("task_types").update(item).eq("id", id).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildUpdate("task_types", data, id);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("task_types").upsert(data);
-            });
-            return data;
+            return primaryUpdate("task_types", id, item);
         },
         delete: async (id: string) => {
-            const { error } = await supabase.from("task_types").delete().eq("id", id);
-            if (error) throw error;
-            syncToMySQL(async () => {
-                await executeMySQL("DELETE FROM task_types WHERE id = ?", [id]);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("task_types").delete().eq("id", id);
-            });
-            return true;
+            return primaryDelete("task_types", id);
         }
     },
 
     gasTypeCategories: {
         getAll: async () => {
-            const { data, error } = await supabase.from("gas_type_categories").select("*").order("sort_order", { ascending: true });
-            if (error) throw error;
-            return data;
+            return primaryRead("gas_type_categories", { orderBy: "sort_order" });
         },
         create: async (item: any) => {
-            const { data, error } = await supabase.from("gas_type_categories").insert(item).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildInsert("gas_type_categories", data);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("gas_type_categories").upsert(data);
-            });
-            return data;
+            return primaryCreate("gas_type_categories", item);
         },
         update: async (id: string, item: any) => {
-            const { data, error } = await supabase.from("gas_type_categories").update(item).eq("id", id).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildUpdate("gas_type_categories", data, id);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("gas_type_categories").upsert(data);
-            });
-            return data;
+            return primaryUpdate("gas_type_categories", id, item);
         },
         delete: async (id: string) => {
-            const { error } = await supabase.from("gas_type_categories").delete().eq("id", id);
-            if (error) throw error;
-            syncToMySQL(async () => {
-                await executeMySQL("DELETE FROM gas_type_categories WHERE id = ?", [id]);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("gas_type_categories").delete().eq("id", id);
-            });
-            return true;
+            return primaryDelete("gas_type_categories", id);
         }
     },
 
     appSettings: {
         getByKey: async (key: string) => {
-            const { data, error } = await supabase
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const rows = await executeMySQL("SELECT value, description FROM app_settings WHERE `key` = ? LIMIT 1", [key]);
+                return rows?.[0] || null;
+            }
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client
                 .from("app_settings")
                 .select("value, description")
                 .eq("key", key)
@@ -451,15 +422,30 @@ export const api = {
             return data;
         },
         upsert: async (key: string, value: string, description?: string) => {
-            const { data, error } = await supabase
+            const source = getPrimarySource();
+            
+            if (source === "mysql") {
+                await executeMySQL(
+                    "INSERT INTO app_settings (`key`, value, description) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = ?, description = ?",
+                    [key, value, description || null, value, description || null]
+                );
+                syncToCloud(async () => {
+                    await supabase.from("app_settings").upsert({ key, value, description }, { onConflict: "key" });
+                });
+                syncToExternalSupabase(async (ext) => {
+                    await ext.from("app_settings").upsert({ key, value, description }, { onConflict: "key" });
+                });
+                return { key, value, description };
+            }
+            
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client
                 .from("app_settings")
-                .upsert(
-                    { key, value, description },
-                    { onConflict: "key" }
-                )
+                .upsert({ key, value, description }, { onConflict: "key" })
                 .select()
                 .single();
             if (error) throw error;
+            
             syncToMySQL(async () => {
                 await executeMySQL(
                     "INSERT INTO app_settings (`key`, value, description) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = ?, description = ?",
@@ -469,126 +455,100 @@ export const api = {
             syncToExternalSupabase(async (ext) => {
                 await ext.from("app_settings").upsert(data, { onConflict: "key" });
             });
+            syncToCloud(async () => {
+                await supabase.from("app_settings").upsert(data, { onConflict: "key" });
+            });
             return data;
         }
     },
 
     gasCylinderOrders: {
         getAll: async (startDate: string, endDate: string) => {
-            const { data, error } = await supabase
-                .from("gas_cylinder_orders")
-                .select(`
-                    *,
-                    gas_type_ref:gas_types(id, name, color)
-                `)
-                .gte("scheduled_date", startDate)
-                .lte("scheduled_date", endDate)
-                .order("scheduled_date", { ascending: true })
-                .limit(5000);
-            if (error) throw error;
-            return data;
+            return primaryRead("gas_cylinder_orders", {
+                selectQuery: `*, gas_type_ref:gas_types(id, name, color)`,
+                filters: [
+                    { column: "scheduled_date", op: "gte", value: startDate },
+                    { column: "scheduled_date", op: "lte", value: endDate }
+                ],
+                orderBy: "scheduled_date",
+                limit: 5000,
+                mysqlQuery: `SELECT * FROM gas_cylinder_orders WHERE scheduled_date >= '${startDate}' AND scheduled_date <= '${endDate}' ORDER BY scheduled_date LIMIT 5000`
+            });
         },
         create: async (item: any) => {
-            const { data, error } = await supabase.from("gas_cylinder_orders").insert(item).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const syncData = stripRelations(data, ['gas_type_ref']);
-                const { query, params } = buildInsert("gas_cylinder_orders", syncData);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                const syncData = stripRelations(data, ['gas_type_ref']);
-                await ext.from("gas_cylinder_orders").upsert(syncData);
-            });
-            return data;
+            return primaryCreate("gas_cylinder_orders", item, ['gas_type_ref']);
         },
         update: async (id: string, item: any) => {
-            const { data, error } = await supabase.from("gas_cylinder_orders").update(item).eq("id", id).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const syncData = stripRelations(data, ['gas_type_ref']);
-                const { query, params } = buildUpdate("gas_cylinder_orders", syncData, id);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                const syncData = stripRelations(data, ['gas_type_ref']);
-                await ext.from("gas_cylinder_orders").upsert(syncData);
-            });
-            return data;
+            return primaryUpdate("gas_cylinder_orders", id, item, ['gas_type_ref']);
         },
         delete: async (id: string) => {
-            const { error } = await supabase.from("gas_cylinder_orders").delete().eq("id", id);
-            if (error) throw error;
-            syncToMySQL(async () => {
-                await executeMySQL("DELETE FROM gas_cylinder_orders WHERE id = ?", [id]);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("gas_cylinder_orders").delete().eq("id", id);
-            });
-            return true;
+            return primaryDelete("gas_cylinder_orders", id);
         },
         getPending: async (fromDate: string) => {
-            const { data, error } = await supabase
-                .from("gas_cylinder_orders")
-                .select(`
-                    *,
-                    gas_type_ref:gas_types(id, name, color)
-                `)
-                .eq("status", "pending")
-                .gte("scheduled_date", fromDate)
-                .order("scheduled_date", { ascending: true });
-            if (error) throw error;
-            return data;
+            return primaryRead("gas_cylinder_orders", {
+                selectQuery: `*, gas_type_ref:gas_types(id, name, color)`,
+                filters: [
+                    { column: "status", op: "eq", value: "pending" },
+                    { column: "scheduled_date", op: "gte", value: fromDate }
+                ],
+                orderBy: "scheduled_date",
+                mysqlQuery: `SELECT * FROM gas_cylinder_orders WHERE status = 'pending' AND scheduled_date >= '${fromDate}' ORDER BY scheduled_date`
+            });
         }
     },
 
     dryIceOrders: {
         getAll: async (startDate: string, endDate: string) => {
-            const { data, error } = await supabase
-                .from("dry_ice_orders")
-                .select("*")
-                .gte("scheduled_date", startDate)
-                .lte("scheduled_date", endDate)
-                .order("scheduled_date", { ascending: true });
-            if (error) throw error;
-            return data;
+            return primaryRead("dry_ice_orders", {
+                filters: [
+                    { column: "scheduled_date", op: "gte", value: startDate },
+                    { column: "scheduled_date", op: "lte", value: endDate }
+                ],
+                orderBy: "scheduled_date",
+                mysqlQuery: `SELECT * FROM dry_ice_orders WHERE scheduled_date >= '${startDate}' AND scheduled_date <= '${endDate}' ORDER BY scheduled_date`
+            });
         },
         getPending: async (fromDate: string) => {
-            const { data, error } = await supabase
-                .from("dry_ice_orders")
-                .select("*")
-                .eq("status", "pending")
-                .gte("scheduled_date", fromDate)
-                .order("scheduled_date", { ascending: true });
-            if (error) throw error;
-            return data;
+            return primaryRead("dry_ice_orders", {
+                filters: [
+                    { column: "status", op: "eq", value: "pending" },
+                    { column: "scheduled_date", op: "gte", value: fromDate }
+                ],
+                orderBy: "scheduled_date",
+                mysqlQuery: `SELECT * FROM dry_ice_orders WHERE status = 'pending' AND scheduled_date >= '${fromDate}' ORDER BY scheduled_date`
+            });
         },
         create: async (item: any) => {
-            const { data, error } = await supabase.from("dry_ice_orders").insert(item).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildInsert("dry_ice_orders", data);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("dry_ice_orders").upsert(data);
-            });
-            return data;
+            return primaryCreate("dry_ice_orders", item);
         },
         update: async (id: string, item: any) => {
-            const { data, error } = await supabase.from("dry_ice_orders").update(item).eq("id", id).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildUpdate("dry_ice_orders", data, id);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("dry_ice_orders").upsert(data);
-            });
-            return data;
+            return primaryUpdate("dry_ice_orders", id, item);
         },
         updateSeries: async (seriesId: string, dayDifference: number) => {
-            const { data: seriesOrders, error: fetchError } = await supabase
+            const source = getPrimarySource();
+            
+            if (source === "mysql") {
+                await executeMySQL(
+                    `UPDATE dry_ice_orders SET scheduled_date = DATE_ADD(scheduled_date, INTERVAL ? DAY) WHERE id = ? OR parent_order_id = ?`,
+                    [dayDifference, seriesId, seriesId]
+                );
+                // Sync to others
+                syncToCloud(async () => {
+                    const { data } = await supabase.from("dry_ice_orders").select("*").or(`id.eq.${seriesId},parent_order_id.eq.${seriesId}`);
+                    if (data) {
+                        const updates = data.map((o: any) => {
+                            const d = new Date(o.scheduled_date);
+                            d.setDate(d.getDate() + dayDifference);
+                            return { ...o, scheduled_date: d.toISOString().split('T')[0] };
+                        });
+                        await supabase.from("dry_ice_orders").upsert(updates);
+                    }
+                });
+                return true;
+            }
+            
+            const client = getPrimarySupabaseClient();
+            const { data: seriesOrders, error: fetchError } = await client
                 .from("dry_ice_orders")
                 .select("*")
                 .or(`id.eq.${seriesId},parent_order_id.eq.${seriesId}`);
@@ -599,13 +559,10 @@ export const api = {
             const updates = seriesOrders.map((order: any) => {
                 const date = new Date(order.scheduled_date);
                 date.setDate(date.getDate() + dayDifference);
-                return {
-                    ...order,
-                    scheduled_date: date.toISOString().split('T')[0]
-                };
+                return { ...order, scheduled_date: date.toISOString().split('T')[0] };
             });
 
-            const { error: updateError } = await supabase.from("dry_ice_orders").upsert(updates);
+            const { error: updateError } = await client.from("dry_ice_orders").upsert(updates);
             if (updateError) throw updateError;
 
             syncToMySQL(async () => {
@@ -617,27 +574,40 @@ export const api = {
             syncToExternalSupabase(async (ext) => {
                 await ext.from("dry_ice_orders").upsert(updates);
             });
+            syncToCloud(async () => {
+                await supabase.from("dry_ice_orders").upsert(updates);
+            });
             return true;
         },
         delete: async (id: string) => {
-            const { error } = await supabase.from("dry_ice_orders").delete().eq("id", id);
-            if (error) throw error;
-            syncToMySQL(async () => {
-                await executeMySQL("DELETE FROM dry_ice_orders WHERE id = ?", [id]);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("dry_ice_orders").delete().eq("id", id);
-            });
-            return true;
+            return primaryDelete("dry_ice_orders", id);
         },
         deleteSeries: async (seriesId: string) => {
-            const { error } = await supabase.from("dry_ice_orders").delete().or(`id.eq.${seriesId},parent_order_id.eq.${seriesId}`);
+            const source = getPrimarySource();
+            
+            if (source === "mysql") {
+                await executeMySQL("DELETE FROM dry_ice_orders WHERE id = ? OR parent_order_id = ?", [seriesId, seriesId]);
+                syncToCloud(async () => {
+                    await supabase.from("dry_ice_orders").delete().or(`id.eq.${seriesId},parent_order_id.eq.${seriesId}`);
+                });
+                syncToExternalSupabase(async (ext) => {
+                    await ext.from("dry_ice_orders").delete().or(`id.eq.${seriesId},parent_order_id.eq.${seriesId}`);
+                });
+                return true;
+            }
+            
+            const client = getPrimarySupabaseClient();
+            const { error } = await client.from("dry_ice_orders").delete().or(`id.eq.${seriesId},parent_order_id.eq.${seriesId}`);
             if (error) throw error;
+            
             syncToMySQL(async () => {
                 await executeMySQL("DELETE FROM dry_ice_orders WHERE id = ? OR parent_order_id = ?", [seriesId, seriesId]);
             });
             syncToExternalSupabase(async (ext) => {
                 await ext.from("dry_ice_orders").delete().or(`id.eq.${seriesId},parent_order_id.eq.${seriesId}`);
+            });
+            syncToCloud(async () => {
+                await supabase.from("dry_ice_orders").delete().or(`id.eq.${seriesId},parent_order_id.eq.${seriesId}`);
             });
             return true;
         }
@@ -645,129 +615,61 @@ export const api = {
 
     tasks: {
         getAll: async () => {
-            const { data, error } = await supabase.from("tasks").select("*").order("due_date", { ascending: true });
-            if (error) throw error;
-            return data;
+            return primaryRead("tasks", { orderBy: "due_date" });
         },
         create: async (item: any) => {
-            const { data, error } = await supabase.from("tasks").insert(item).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildInsert("tasks", data);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("tasks").upsert(data);
-            });
-            return data;
+            return primaryCreate("tasks", item);
         },
         update: async (id: string, item: any) => {
-            const { data, error } = await supabase.from("tasks").update(item).eq("id", id).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildUpdate("tasks", data, id);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("tasks").upsert(data);
-            });
-            return data;
+            return primaryUpdate("tasks", id, item);
         },
         delete: async (id: string) => {
-            const { error } = await supabase.from("tasks").delete().eq("id", id);
-            if (error) throw error;
-            syncToMySQL(async () => {
-                await executeMySQL("DELETE FROM tasks WHERE id = ?", [id]);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("tasks").delete().eq("id", id);
-            });
-            return true;
+            return primaryDelete("tasks", id);
         }
     },
 
     timeOffRequests: {
         getAll: async () => {
-            const { data, error } = await supabase.from("time_off_requests").select("*").order("start_date", { ascending: false });
-            if (error) throw error;
-            return data;
+            return primaryRead("time_off_requests", { orderBy: "start_date", orderAsc: false });
         },
         create: async (item: any) => {
-            const { data, error } = await supabase.from("time_off_requests").insert(item).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildInsert("time_off_requests", data);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("time_off_requests").upsert(data);
-            });
-            return data;
+            return primaryCreate("time_off_requests", item);
         },
         update: async (id: string, item: any) => {
-            const { data, error } = await supabase.from("time_off_requests").update(item).eq("id", id).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildUpdate("time_off_requests", data, id);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("time_off_requests").upsert(data);
-            });
-            return data;
+            return primaryUpdate("time_off_requests", id, item);
         },
         delete: async (id: string) => {
-            const { error } = await supabase.from("time_off_requests").delete().eq("id", id);
-            if (error) throw error;
-            syncToMySQL(async () => {
-                await executeMySQL("DELETE FROM time_off_requests WHERE id = ?", [id]);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("time_off_requests").delete().eq("id", id);
-            });
-            return true;
+            return primaryDelete("time_off_requests", id);
         }
     },
 
     profiles: {
         getAll: async () => {
-            const { data, error } = await supabase.from("profiles").select("*").order("full_name");
-            if (error) throw error;
-            return data;
+            return primaryRead("profiles", { orderBy: "full_name" });
         },
         getByUserId: async (userId: string) => {
-            const { data, error } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const rows = await executeMySQL("SELECT * FROM profiles WHERE user_id = ? LIMIT 1", [userId]);
+                if (!rows || rows.length === 0) throw new Error("Profile not found");
+                return rows[0];
+            }
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.from("profiles").select("*").eq("user_id", userId).single();
             if (error) throw error;
             return data;
         },
         create: async (item: any) => {
-            const { data, error } = await supabase.from("profiles").insert(item).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildInsert("profiles", data);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("profiles").upsert(data);
-            });
-            return data;
+            return primaryCreate("profiles", item);
         },
         update: async (id: string, item: any) => {
-            const { data, error } = await supabase.from("profiles").update(item).eq("id", id).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildUpdate("profiles", data, id);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("profiles").upsert(data);
-            });
-            return data;
+            return primaryUpdate("profiles", id, item);
         }
     },
 
     reports: {
         getDailyProductionByPeriod: async (fromDate: string, toDate: string, location: string | null) => {
+            // Reports always use cloud Supabase RPCs (they rely on RLS/RBAC)
             const { data, error } = await supabase.rpc("get_daily_production_by_period", {
                 p_from_date: fromDate,
                 p_to_date: toDate,
@@ -830,51 +732,23 @@ export const api = {
 
     timeOffTypes: {
         getAll: async () => {
-            const { data, error } = await supabase.from("time_off_types").select("*").order("name");
-            if (error) throw error;
-            return data;
+            return primaryRead("time_off_types", { orderBy: "name" });
         },
         create: async (item: any) => {
-            const { data, error } = await supabase.from("time_off_types").insert(item).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildInsert("time_off_types", data);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("time_off_types").upsert(data);
-            });
-            return data;
+            return primaryCreate("time_off_types", item);
         },
         update: async (id: string, item: any) => {
-            const { data, error } = await supabase.from("time_off_types").update(item).eq("id", id).select().single();
-            if (error) throw error;
-            syncToMySQL(async () => {
-                const { query, params } = buildUpdate("time_off_types", data, id);
-                await executeMySQL(query, params);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("time_off_types").upsert(data);
-            });
-            return data;
+            return primaryUpdate("time_off_types", id, item);
         },
         delete: async (id: string) => {
-            const { error } = await supabase.from("time_off_types").delete().eq("id", id);
-            if (error) throw error;
-            syncToMySQL(async () => {
-                await executeMySQL("DELETE FROM time_off_types WHERE id = ?", [id]);
-            });
-            syncToExternalSupabase(async (ext) => {
-                await ext.from("time_off_types").delete().eq("id", id);
-            });
-            return true;
+            return primaryDelete("time_off_types", id);
         }
     },
 
     admin: {
         repairDatabase: async () => {
             const config = getConfig();
-            if (config?.useMySQL) {
+            if (config?.useMySQL || config?.primarySource === "mysql") {
                 const queries = [
                     `CREATE TABLE IF NOT EXISTS profiles (
                         id CHAR(36) PRIMARY KEY,

@@ -4,14 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
-import { Database, Save, Activity, Cloud } from "lucide-react";
+import { Database, Save, Activity, Cloud, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { createClient } from "@supabase/supabase-js";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const STORAGE_KEY_DATA_SOURCE = "antigravity_data_source_config";
 
+export type PrimarySource = "cloud" | "external_supabase" | "mysql";
+
 export interface DataSourceConfig {
+    primarySource: PrimarySource;
     useMySQL: boolean;
     mysqlHost: string;
     mysqlPort: string;
@@ -24,6 +29,7 @@ export interface DataSourceConfig {
 }
 
 const DEFAULT_CONFIG: DataSourceConfig = {
+    primarySource: "cloud",
     useMySQL: false,
     mysqlHost: "",
     mysqlPort: "3306",
@@ -103,24 +109,77 @@ export function DataSourceSettings() {
         }
     };
 
+    const isMySQLConfigured = !!(config.mysqlHost && config.mysqlUser && config.mysqlPassword && config.mysqlDatabase);
+    const isExternalSupabaseConfigured = !!(config.externalSupabaseUrl && config.externalSupabaseAnonKey);
+
+    const showPrimaryWarning =
+        (config.primarySource === "mysql" && !isMySQLConfigured) ||
+        (config.primarySource === "external_supabase" && !isExternalSupabaseConfigured);
+
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Database className="h-5 w-5 text-primary" />
-                    Databron Synchronisatie
+                    Databron Instellingen
                 </CardTitle>
                 <CardDescription>
-                    Kies of u een externe MySQL en/of Supabase database wilt synchroniseren.
+                    Kies uw primaire databron en configureer optionele synchronisatie.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+                {/* Primary Source Selection */}
+                <div className="space-y-3 border p-4 rounded-lg">
+                    <Label className="text-base font-semibold">Primaire Databron</Label>
+                    <p className="text-xs text-muted-foreground">
+                        Bepaalt welke database wordt gebruikt voor alle lees-, schrijf- en verwijderoperaties.
+                    </p>
+                    <RadioGroup
+                        value={config.primarySource}
+                        onValueChange={(v) => handleChange("primarySource", v)}
+                        className="grid gap-3 pt-1"
+                    >
+                        <div className="flex items-center space-x-3">
+                            <RadioGroupItem value="cloud" id="primary-cloud" />
+                            <Label htmlFor="primary-cloud" className="flex flex-col cursor-pointer">
+                                <span className="font-medium">Lovable Cloud (standaard)</span>
+                                <span className="text-xs text-muted-foreground">De ingebouwde cloud database</span>
+                            </Label>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                            <RadioGroupItem value="external_supabase" id="primary-ext-sb" />
+                            <Label htmlFor="primary-ext-sb" className="flex flex-col cursor-pointer">
+                                <span className="font-medium">Externe Supabase</span>
+                                <span className="text-xs text-muted-foreground">Een zelf geconfigureerde Supabase-instantie</span>
+                            </Label>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                            <RadioGroupItem value="mysql" id="primary-mysql" />
+                            <Label htmlFor="primary-mysql" className="flex flex-col cursor-pointer">
+                                <span className="font-medium">MySQL</span>
+                                <span className="text-xs text-muted-foreground">Een externe MySQL server (geen RLS-beveiliging)</span>
+                            </Label>
+                        </div>
+                    </RadioGroup>
+
+                    {showPrimaryWarning && (
+                        <Alert variant="destructive" className="mt-3">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertDescription>
+                                {config.primarySource === "mysql"
+                                    ? "MySQL is geselecteerd als primaire bron, maar de verbindingsgegevens zijn niet (volledig) ingevuld. Configureer deze hieronder."
+                                    : "Externe Supabase is geselecteerd als primaire bron, maar de URL en/of Anon Key zijn niet ingevuld. Configureer deze hieronder."}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                </div>
+
                 {/* MySQL Toggle */}
                 <div className="flex items-center justify-between space-x-2 border p-4 rounded-lg">
                     <Label htmlFor="use-mysql" className="flex flex-col space-y-1">
-                        <span>Gebruik Externe MySQL Database</span>
+                        <span>MySQL Synchronisatie</span>
                         <span className="font-normal text-xs text-muted-foreground">
-                            Schakel dit in om data te synchroniseren naar uw eigen MySQL server.
+                            Synchroniseer data naar uw eigen MySQL server (naast de primaire bron).
                         </span>
                     </Label>
                     <Switch
@@ -130,7 +189,7 @@ export function DataSourceSettings() {
                     />
                 </div>
 
-                {config.useMySQL && (
+                {(config.useMySQL || config.primarySource === "mysql") && (
                     <div className="space-y-4 border-t pt-4 animate-in fade-in slide-in-from-top-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -190,9 +249,9 @@ export function DataSourceSettings() {
                 {/* External Supabase Toggle */}
                 <div className="flex items-center justify-between space-x-2 border p-4 rounded-lg">
                     <Label htmlFor="use-external-supabase" className="flex flex-col space-y-1">
-                        <span>Gebruik Externe Supabase Database</span>
+                        <span>Externe Supabase Synchronisatie</span>
                         <span className="font-normal text-xs text-muted-foreground">
-                            Schakel dit in om data te synchroniseren naar een externe Supabase instantie.
+                            Synchroniseer data naar een externe Supabase instantie (naast de primaire bron).
                         </span>
                     </Label>
                     <Switch
@@ -202,7 +261,7 @@ export function DataSourceSettings() {
                     />
                 </div>
 
-                {config.useExternalSupabase && (
+                {(config.useExternalSupabase || config.primarySource === "external_supabase") && (
                     <div className="space-y-4 border-t pt-4 animate-in fade-in slide-in-from-top-4">
                         <div className="space-y-2">
                             <Label>Supabase URL</Label>
