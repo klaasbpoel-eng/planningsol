@@ -6,6 +6,7 @@ import { Download, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const PUBLISHED_URL = "https://planningsol.lovable.app";
 
@@ -50,27 +51,42 @@ Opmerkingen:
 
 type ExportStatus = "idle" | "fetching" | "downloading" | "zipping" | "done" | "error";
 
+async function proxyFetch(url: string): Promise<{ content: string; contentType: string; binary?: boolean }> {
+  const { data, error } = await supabase.functions.invoke("fetch-published-site", {
+    body: { url },
+  });
+  if (error) throw new Error(`Proxy fetch failed: ${error.message}`);
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+function base64ToBlob(base64: string, contentType: string): Blob {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: contentType });
+}
+
 export function DirectAdminExport() {
   const [status, setStatus] = useState<ExportStatus>("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const extractAssetUrls = (html: string, baseUrl: string): string[] => {
+  const extractAssetUrls = (html: string): string[] => {
     const urls: string[] = [];
-    // Match script src and link href
     const scriptMatches = html.matchAll(/<script[^>]+src=["']([^"']+)["']/g);
     for (const m of scriptMatches) urls.push(m[1]);
 
     const linkMatches = html.matchAll(/<link[^>]+href=["']([^"']+)["']/g);
     for (const m of linkMatches) {
-      // Only include CSS and icons, not external resources
       const href = m[1];
-      if (!href.startsWith("http") || href.startsWith(baseUrl)) {
+      if (!href.startsWith("http") || href.startsWith(PUBLISHED_URL)) {
         urls.push(href);
       }
     }
 
-    // Match any other referenced assets in the HTML (favicons, images, etc.)
     const imgMatches = html.matchAll(/<img[^>]+src=["']([^"']+)["']/g);
     for (const m of imgMatches) {
       if (!m[1].startsWith("data:")) urls.push(m[1]);
@@ -79,14 +95,14 @@ export function DirectAdminExport() {
     return [...new Set(urls)];
   };
 
-  const resolveUrl = (url: string, baseUrl: string): string => {
+  const resolveUrl = (url: string): string => {
     if (url.startsWith("http")) return url;
-    if (url.startsWith("/")) return `${baseUrl}${url}`;
-    return `${baseUrl}/${url}`;
+    if (url.startsWith("/")) return `${PUBLISHED_URL}${url}`;
+    return `${PUBLISHED_URL}/${url}`;
   };
 
-  const getPathFromUrl = (url: string, baseUrl: string): string => {
-    const resolved = resolveUrl(url, baseUrl);
+  const getPathFromUrl = (url: string): string => {
+    const resolved = resolveUrl(url);
     try {
       const parsed = new URL(resolved);
       return parsed.pathname.startsWith("/") ? parsed.pathname.slice(1) : parsed.pathname;
@@ -101,17 +117,16 @@ export function DirectAdminExport() {
     setError(null);
 
     try {
-      // 1. Fetch index.html
-      const indexRes = await fetch(PUBLISHED_URL);
-      if (!indexRes.ok) throw new Error(`Kan de gepubliceerde site niet ophalen (${indexRes.status}). Zorg dat de app is gepubliceerd.`);
-      let indexHtml = await indexRes.text();
+      // 1. Fetch index.html via proxy
+      const indexResult = await proxyFetch(PUBLISHED_URL);
+      const indexHtml = indexResult.content;
       setProgress(20);
 
       // 2. Parse asset URLs
-      const assetUrls = extractAssetUrls(indexHtml, PUBLISHED_URL);
+      const assetUrls = extractAssetUrls(indexHtml);
       setStatus("downloading");
 
-      // 3. Download all assets
+      // 3. Download all assets via proxy
       const zip = new JSZip();
       const publicHtml = zip.folder("public_html")!;
 
@@ -120,15 +135,16 @@ export function DirectAdminExport() {
 
       for (const url of assetUrls) {
         try {
-          const fullUrl = resolveUrl(url, PUBLISHED_URL);
-          const res = await fetch(fullUrl);
-          if (!res.ok) {
-            console.warn(`Kon asset niet downloaden: ${fullUrl} (${res.status})`);
-            continue;
+          const fullUrl = resolveUrl(url);
+          const result = await proxyFetch(fullUrl);
+          const path = getPathFromUrl(url);
+
+          if (result.binary) {
+            publicHtml.file(path, base64ToBlob(result.content, result.contentType));
+          } else {
+            publicHtml.file(path, result.content);
           }
-          const blob = await res.blob();
-          const path = getPathFromUrl(url, PUBLISHED_URL);
-          publicHtml.file(path, blob);
+
           downloaded++;
           setProgress(20 + Math.round((downloaded / totalAssets) * 60));
         } catch (e) {
