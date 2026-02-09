@@ -1,125 +1,84 @@
 
 
-## Primaire Database Keuze Toevoegen
+## DirectAdmin Deployment Export + Build Fix
 
-### Wat er verandert
+### 1. Build Error Fix
 
-Er komt een nieuwe instelling **"Primaire Databron"** waarmee je kiest welke database wordt gebruikt voor alle lees-, schrijf- en verwijderoperaties. De drie opties zijn:
+The edge function `supabase/functions/query-mysql/index.ts` uses `npm:mysql2/promise` which fails in the current Deno environment. This will be fixed by using the `esm.sh` CDN import pattern instead, consistent with the Supabase client import on line 1 of the same file.
 
-- **Lovable Cloud** (standaard) -- de huidige Supabase-instantie
-- **Externe Supabase** -- een zelf geconfigureerde Supabase-instantie
-- **MySQL** -- een externe MySQL server
+**Change:** Replace `import mysql from "npm:mysql2/promise"` with a compatible ESM import.
 
-Dit staat los van de sync-toggles. Sync kopieert data naar extra databases; de primaire keuze bepaalt waar de app daadwerkelijk mee werkt.
+### 2. DirectAdmin Export Feature
 
-### Wijzigingen
+A new component will be added to the Admin Settings that generates a ZIP file containing everything needed to deploy the app on a DirectAdmin (shared hosting) environment. Since this is a Vite/React SPA, the deployment package consists of the production build output plus hosting configuration files.
 
-**1. `src/components/admin/DataSourceSettings.tsx` -- UI uitbreiden**
+**What the ZIP will contain:**
 
-- Nieuw veld toevoegen aan `DataSourceConfig`: `primarySource: "cloud" | "external_supabase" | "mysql"` (default: `"cloud"`)
-- Bovenaan het formulier een RadioGroup toevoegen met de drie opties
-- Bij keuze "Externe Supabase" of "MySQL" een waarschuwing tonen dat de betreffende verbindingsgegevens ook ingevuld moeten zijn
-- De sync-toggles blijven apart bestaan onder de primaire keuze
+| File | Purpose |
+|------|---------|
+| `public_html/` | All built assets (the Vite production build output, fetched from the published site) |
+| `.htaccess` | Apache rewrite rules for SPA routing (all routes to index.html) |
+| `README.txt` | Deployment instructions |
 
-**2. `src/lib/api.ts` -- Primaire database logica**
+**How it works:**
 
-- Nieuwe helper `getPrimaryClient()` die op basis van `config.primarySource` het juiste "client-object" teruggeeft:
-  - `"cloud"` -> de standaard `supabase` client (huidige gedrag)
-  - `"external_supabase"` -> de externe Supabase client (hergebruikt `getExternalSupabaseClient()`)
-  - `"mysql"` -> een speciaal object dat alle queries via `executeMySQL()` uitvoert
+Since we cannot run `vite build` in the browser, the component will:
+1. Fetch the published site's `index.html` and parse it for asset references (JS, CSS chunks)
+2. Fetch all referenced assets
+3. Bundle everything into a ZIP using the existing approach (client-side, using JSZip library)
+4. Include a pre-configured `.htaccess` for Apache/DirectAdmin SPA routing
+5. Include a `README.txt` with step-by-step deployment instructions
 
-- Voor Supabase-gebaseerde primaire bronnen (cloud + extern) verandert er weinig: de bestaande code gebruikt gewoon een andere client
-- Voor MySQL als primaire bron moeten de reads ook via `executeMySQL()` lopen; hiervoor wordt een wrapper-functie per tabel gemaakt
+**New dependency:** `jszip` (for creating ZIP files client-side)
 
-- De sync-logica wordt aangepast: als MySQL primair is, hoeft niet meer naar MySQL gesync te worden (en vice versa)
+### Files
 
-De kernstructuur per methode wordt:
+| File | Change |
+|------|--------|
+| `supabase/functions/query-mysql/index.ts` | Fix mysql2 import for Deno compatibility |
+| `src/components/admin/DirectAdminExport.tsx` | **New** -- Component with "Download ZIP" button |
+| `src/components/admin/AdminSettings.tsx` | Add DirectAdmin export tab/section under "Database Export" or as new tab |
 
+### Technical Details
+
+**`.htaccess` contents (generated in ZIP):**
 ```text
-Huidige flow:
-  1. Lees/schrijf naar Supabase Cloud
-  2. Sync naar MySQL (optioneel)
-  3. Sync naar Externe Supabase (optioneel)
+RewriteEngine On
+RewriteBase /
+RewriteRule ^index\.html$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
 
-Nieuwe flow:
-  1. Lees/schrijf naar PRIMAIRE bron (Cloud, Extern Supabase, of MySQL)
-  2. Sync naar de andere twee (alleen als ingeschakeld EN niet zelf de primaire)
+# Enable gzip compression
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
+</IfModule>
+
+# Cache static assets
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType image/png "access plus 1 month"
+  ExpiresByType image/svg+xml "access plus 1 month"
+</IfModule>
 ```
 
-### Technische details
+**DirectAdminExport component approach:**
+- Fetches the published app URL's HTML
+- Parses all `<script>` and `<link>` tags to find asset URLs
+- Downloads each asset via fetch
+- Packages all files into a ZIP using JSZip
+- Triggers browser download of the ZIP
 
-Nieuwe helper in `api.ts`:
-
-```typescript
-type PrimarySource = "cloud" | "external_supabase" | "mysql";
-
-function getPrimarySource(): PrimarySource {
-  const config = getConfig();
-  return config?.primarySource || "cloud";
-}
-
-function getPrimarySupabaseClient(): SupabaseClient {
-  const source = getPrimarySource();
-  if (source === "external_supabase") {
-    const ext = getExternalSupabaseClient();
-    if (!ext) throw new Error("Externe Supabase niet geconfigureerd");
-    return ext;
-  }
-  return supabase; // cloud (default)
-}
+**README.txt contents (generated):**
+```
+SOL Planner - DirectAdmin Deployment
+=====================================
+1. Upload the contents of the public_html folder to your domain's public_html directory
+2. Upload the .htaccess file to the same directory
+3. Ensure mod_rewrite is enabled on your hosting
+4. Visit your domain to verify the deployment
 ```
 
-Per API-methode wordt `supabase` vervangen door `getPrimarySupabaseClient()` voor cloud/extern, en een aparte MySQL-branch voor MySQL als primaire bron:
-
-```typescript
-getAll: async () => {
-  const source = getPrimarySource();
-  if (source === "mysql") {
-    return await executeMySQL("SELECT * FROM customers ORDER BY name");
-  }
-  const client = getPrimarySupabaseClient();
-  const { data, error } = await client.from("customers").select("*").order("name");
-  if (error) throw error;
-  return data;
-},
-```
-
-Sync-logica wordt slim: niet syncen naar de bron die al primair is:
-
-```typescript
-// Na een write:
-if (getPrimarySource() !== "mysql") {
-  syncToMySQL(async () => { ... });
-}
-if (getPrimarySource() !== "external_supabase") {
-  syncToExternalSupabase(async (ext) => { ... });
-}
-// Cloud krijgt alleen sync als het NIET primair is:
-if (getPrimarySource() !== "cloud") {
-  syncToCloud(async () => { ... }); // nieuw: terugschrijven naar cloud
-}
-```
-
-### UI voorbeeld
-
-De RadioGroup bovenaan het DataSourceSettings formulier:
-
-```text
-Primaire Databron
-  (*) Lovable Cloud (standaard)
-  ( ) Externe Supabase
-  ( ) MySQL
-```
-
-Met een waarschuwingstekst als de gekozen bron niet geconfigureerd is.
-
-### Overzicht bestanden
-
-| Bestand | Wijziging |
-|---------|-----------|
-| `src/components/admin/DataSourceSettings.tsx` | `primarySource` veld + RadioGroup UI + validatie-waarschuwing |
-| `src/lib/api.ts` | `getPrimarySource()`, `getPrimarySupabaseClient()` helpers + alle ~50 methodes aanpassen voor primaire bron routing + slimme sync |
-
-### Risico's
-- MySQL als primaire bron heeft geen RLS-beveiliging -- alle authenticatie/autorisatie wordt dan aan de MySQL-kant verwacht
-- Bij wisselen van primaire bron moeten beide databases in sync zijn, anders ontbreekt er data
