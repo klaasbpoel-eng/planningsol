@@ -27,6 +27,7 @@ import { CalendarDays, Snowflake, Plus, Repeat } from "lucide-react";
 import { format, addWeeks, addYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CustomerSelect } from "./CustomerSelect";
@@ -76,22 +77,13 @@ export function CreateDryIceOrderDialog({
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         // Fetch profile with production_location
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("id, production_location")
-          .eq("user_id", user.id)
-          .maybeSingle();
+        const profile = await api.profiles.getByUserId(user.id);
 
         if (profile) {
           setCurrentProfileId(profile.id);
 
           // Check user role
-          const { data: roleData } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", user.id)
-            .maybeSingle();
-
+          const roleData = await api.userRoles.get(user.id);
           const userRole = roleData?.role || "user";
           const isAdmin = userRole === "admin";
 
@@ -116,18 +108,10 @@ export function CreateDryIceOrderDialog({
   }, []);
 
   const fetchProductTypes = async () => {
-    const { data } = await supabase
-      .from("dry_ice_product_types")
-      .select("id, name")
-      .eq("is_active", true)
-      .order("sort_order");
+    const data = await api.dryIceProductTypes.getAll();
 
     // Fetch default product type setting
-    const { data: defaultSetting } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "dry_ice_default_product_type_id")
-      .maybeSingle();
+    const defaultSetting = await api.appSettings.getByKey("dry_ice_default_product_type_id");
 
     if (data && data.length > 0) {
       setProductTypes(data);
@@ -142,11 +126,7 @@ export function CreateDryIceOrderDialog({
   };
 
   const fetchPackaging = async () => {
-    const { data } = await supabase
-      .from("dry_ice_packaging")
-      .select("id, name")
-      .eq("is_active", true)
-      .order("sort_order");
+    const data = await api.dryIcePackaging.getAll();
     if (data) {
       setPackagingOptions(data);
     }
@@ -158,11 +138,7 @@ export function CreateDryIceOrderDialog({
     setQuantityKg("");
 
     // Fetch default product type setting for reset
-    const { data: defaultSetting } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "dry_ice_default_product_type_id")
-      .maybeSingle();
+    const defaultSetting = await api.appSettings.getByKey("dry_ice_default_product_type_id");
 
     if (productTypes.length > 0) {
       if (defaultSetting?.value && productTypes.find(pt => pt.id === defaultSetting.value)) {
@@ -289,13 +265,8 @@ export function CreateDryIceOrderDialog({
         parent_order_id: null
       };
 
-      const { data: parentOrder, error: parentError } = await supabase
-        .from("dry_ice_orders")
-        .insert(parentOrderData)
-        .select()
-        .single();
+      const parentOrder = await api.dryIceOrders.create(parentOrderData);
 
-      if (parentError) throw parentError;
       if (!parentOrder) throw new Error("Failed to create parent order");
 
       // Insert child orders if any
@@ -307,17 +278,19 @@ export function CreateDryIceOrderDialog({
           parent_order_id: parentOrder.id
         }));
 
-        const { error: childrenError } = await supabase
-          .from("dry_ice_orders")
-          .insert(childOrders);
-
-        if (childrenError) throw childrenError;
+        // Note: api.create doesn't support bulk insert yet, loop for now or add bulk to api
+        // Since api.dryIceOrders.create calls primaryCreate which handles single item,
+        // we should either add createMany or loop.
+        // For now, let's loop to ensure compatibility.
+        // Or better: check if primaryCreate supports array? getPrimarySupabaseClient().insert(item) supports array.
+        // But buildInsert (MySQL) might not.
+        // Let's loop to be safe and consistent with current api interface.
+        for (const child of childOrders) {
+          await api.dryIceOrders.create(child);
+        }
       }
 
-      // We don't need 'ordersToInsert', we know the count
-      const ordersToInsert = orderDates; // mapping for count usage below
-
-      const orderCount = ordersToInsert.length;
+      const orderCount = orderDates.length;
       toast.success(
         orderCount > 1
           ? `${orderCount} productieorders aangemaakt`

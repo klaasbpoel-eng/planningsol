@@ -47,6 +47,7 @@ import {
 import { format, parseISO } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -114,20 +115,12 @@ export function GasCylinderOrderDialog({
 
   useEffect(() => {
     const fetchGasTypes = async () => {
-      const { data } = await supabase
-        .from("gas_types")
-        .select("id, name, color")
-        .eq("is_active", true)
-        .order("name");
+      const data = await api.gasTypes.getAll();
       if (data) setGasTypes(data);
     };
 
     const fetchCylinderSizes = async () => {
-      const { data } = await supabase
-        .from("cylinder_sizes")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("capacity_liters", { ascending: true });
+      const data = await api.cylinderSizes.getAll();
       if (data) setCylinderSizes(data);
     };
 
@@ -212,22 +205,18 @@ export function GasCylinderOrderDialog({
       const selectedGasType = gasTypes.find(t => t.id === gasTypeId);
       const mappedGasType = selectedGasType ? mapGasTypeToEnum(selectedGasType.name) : order.gas_type;
 
-      const { error } = await supabase
-        .from("gas_cylinder_orders")
-        .update({
-          status: status as "pending" | "in_progress" | "completed" | "cancelled",
-          scheduled_date: scheduledDate ? format(scheduledDate, "yyyy-MM-dd") : order.scheduled_date,
-          cylinder_count: count,
-          gas_type: mappedGasType as "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other",
-          gas_type_id: gasTypeId || null,
-          gas_grade: gasGrade as "medical" | "technical",
-          cylinder_size: cylinderSize,
-          pressure: pressureValue,
-          notes: notes || null,
-        })
-        .eq("id", order.id);
+      await api.gasCylinderOrders.update(order.id, {
+        status: status as "pending" | "in_progress" | "completed" | "cancelled",
+        scheduled_date: scheduledDate ? format(scheduledDate, "yyyy-MM-dd") : order.scheduled_date,
+        cylinder_count: count,
+        gas_type: mappedGasType as "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other",
+        gas_type_id: gasTypeId || null,
+        gas_grade: gasGrade as "medical" | "technical",
+        cylinder_size: cylinderSize,
+        pressure: pressureValue,
+        notes: notes || null,
+      });
 
-      if (error) throw error;
       toast.success("Gascilinder order bijgewerkt");
 
       setIsEditing(false);
@@ -247,12 +236,7 @@ export function GasCylinderOrderDialog({
     setDeleting(true);
 
     try {
-      const { error } = await supabase
-        .from("gas_cylinder_orders")
-        .delete()
-        .eq("id", order.id);
-
-      if (error) throw error;
+      await api.gasCylinderOrders.delete(order.id);
 
       toast.success("Gascilinder order verwijderd");
 

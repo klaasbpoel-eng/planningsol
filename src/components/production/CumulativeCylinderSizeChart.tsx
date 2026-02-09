@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown, Minus, Trophy, Ruler } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import {
   LineChart,
@@ -47,7 +47,7 @@ const MONTH_NAMES = [
 // Generate colors for cylinder sizes based on capacity
 const getColorForSize = (name: string, index: number): string => {
   const colors = [
-    "#06b6d4", "#f97316", "#22c55e", "#ef4444", "#8b5cf6", 
+    "#06b6d4", "#f97316", "#22c55e", "#ef4444", "#8b5cf6",
     "#eab308", "#ec4899", "#14b8a6", "#6366f1", "#84cc16",
     "#f43f5e", "#0ea5e9", "#a855f7", "#10b981", "#f59e0b"
   ];
@@ -99,22 +99,22 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
     setLoading(true);
 
     // Fetch cylinder sizes metadata for capacity info
-    const { data: cylinderSizesData } = await supabase
-      .from("cylinder_sizes")
-      .select("name, capacity_liters")
-      .eq("is_active", true)
-      .order("sort_order");
+    const { data: cylinderSizesData } = await api.cylinderSizes.getAll();
 
     const cylinderSizeCapacities = new Map<string, number | null>();
-    cylinderSizesData?.forEach(cs => {
+    cylinderSizesData?.forEach((cs: any) => {
       cylinderSizeCapacities.set(cs.name, cs.capacity_liters);
     });
 
     const locationParam = location !== "all" ? location : null;
 
     const [result1, result2] = await Promise.all([
-      supabase.rpc("get_monthly_cylinder_totals_by_size", { p_year: selectedYear1, p_location: locationParam }),
-      supabase.rpc("get_monthly_cylinder_totals_by_size", { p_year: selectedYear2, p_location: locationParam })
+      api.reports.getMonthlyCylinderTotalsBySize(selectedYear1, locationParam)
+        .then(data => ({ data, error: null }))
+        .catch(error => ({ data: null, error })),
+      api.reports.getMonthlyCylinderTotalsBySize(selectedYear2, locationParam)
+        .then(data => ({ data, error: null }))
+        .catch(error => ({ data: null, error }))
     ]);
 
     const processData = (data: any[]): CylinderSizeData[] => {
@@ -180,20 +180,20 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
       const info = allCylinderSizes.find(cs => cs.name === sizeName);
       const year1DataItem = yearData.find(yd => yd.year === selectedYear1);
       const year2DataItem = yearData.find(yd => yd.year === selectedYear2);
-      
+
       const size1 = year1DataItem?.cylinderSizes.find(cs => cs.name === sizeName);
       const size2 = year2DataItem?.cylinderSizes.find(cs => cs.name === sizeName);
-      
+
       const total1 = size1?.months.reduce((a, b) => a + b, 0) || 0;
       const total2 = size2?.months.reduce((a, b) => a + b, 0) || 0;
-      
+
       let percentChange = 0;
       if (total2 > 0) {
         percentChange = ((total1 - total2) / total2) * 100;
       } else if (total1 > 0) {
         percentChange = 100;
       }
-      
+
       return {
         name: sizeName,
         capacityLiters: info?.capacityLiters ?? null,
@@ -357,21 +357,21 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
           <div className="flex items-center justify-between">
             <Label className="text-sm text-muted-foreground">Selecteer cilindergroottes</Label>
             <div className="flex gap-2">
-              <button 
+              <button
                 onClick={selectTopFive}
                 className="text-xs text-primary font-medium px-2 py-1 rounded-md transition-all duration-200 hover:bg-primary/10 hover:scale-105 active:scale-95"
               >
                 Top 5
               </button>
               <span className="text-muted-foreground">|</span>
-              <button 
+              <button
                 onClick={selectAllSizes}
                 className="text-xs text-primary font-medium px-2 py-1 rounded-md transition-all duration-200 hover:bg-primary/10 hover:scale-105 active:scale-95"
               >
                 Alles
               </button>
               <span className="text-muted-foreground">|</span>
-              <button 
+              <button
                 onClick={clearSizes}
                 className="text-xs text-primary font-medium px-2 py-1 rounded-md transition-all duration-200 hover:bg-primary/10 hover:scale-105 active:scale-95"
               >
@@ -384,24 +384,23 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
               const isSelected = selectedSizes.includes(size.name);
               const isTopFive = topFiveSizes.includes(size.name);
               const topRank = topFiveSizes.indexOf(size.name);
-              const shouldAnimate = 
-                (animatingTopFive && isTopFive) || 
-                animatingAll || 
+              const shouldAnimate =
+                (animatingTopFive && isTopFive) ||
+                animatingAll ||
                 (animatingClear && isSelected);
               const sizeVolume = getSizeVolume(size.name);
               const sizeColor = cylinderSizeColors.get(size.name) || "#94a3b8";
-              
+
               return (
                 <TooltipProvider key={size.name} delayDuration={0}>
                   <UITooltip>
                     <TooltipTrigger asChild>
                       <Badge
                         variant={isSelected ? "default" : "outline"}
-                        className={`cursor-pointer transition-all duration-200 flex items-center gap-1 hover:scale-105 hover:shadow-md active:scale-95 ${
-                          shouldAnimate 
-                            ? "animate-[pulse_0.3s_ease-in-out_2] scale-110" 
+                        className={`cursor-pointer transition-all duration-200 flex items-center gap-1 hover:scale-105 hover:shadow-md active:scale-95 ${shouldAnimate
+                            ? "animate-[pulse_0.3s_ease-in-out_2] scale-110"
                             : ""
-                        }`}
+                          }`}
                         style={{
                           backgroundColor: isSelected ? sizeColor : undefined,
                           borderColor: sizeColor,
@@ -410,13 +409,12 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
                         onClick={() => toggleSize(size.name)}
                       >
                         {isTopFive && (
-                          <Trophy 
-                            className={`h-3 w-3 ${
-                              topRank === 0 ? "text-yellow-400" : 
-                              topRank === 1 ? "text-gray-300" : 
-                              topRank === 2 ? "text-amber-600" : 
-                              isSelected ? "text-white/70" : "opacity-50"
-                            }`} 
+                          <Trophy
+                            className={`h-3 w-3 ${topRank === 0 ? "text-yellow-400" :
+                                topRank === 1 ? "text-gray-300" :
+                                  topRank === 2 ? "text-amber-600" :
+                                    isSelected ? "text-white/70" : "opacity-50"
+                              }`}
                           />
                         )}
                         {size.name}
@@ -457,12 +455,12 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
         {selectedSizes.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {growthData.map(item => (
-              <div 
+              <div
                 key={item.name}
                 className="flex items-center justify-between p-3 rounded-lg border bg-card"
               >
                 <div className="flex items-center gap-2">
-                  <span 
+                  <span
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: item.color }}
                   />
@@ -478,13 +476,12 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
                     <div>{formatNumber(item.total1, 0)} ({selectedYear1})</div>
                     <div>{formatNumber(item.total2, 0)} ({selectedYear2})</div>
                   </div>
-                  <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                    item.percentChange > 0 
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
-                      : item.percentChange < 0 
+                  <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${item.percentChange > 0
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                      : item.percentChange < 0
                         ? 'bg-red-500/10 text-red-600 dark:text-red-400'
                         : 'bg-muted text-muted-foreground'
-                  }`}>
+                    }`}>
                     {item.percentChange > 0 ? (
                       <TrendingUp className="h-3 w-3" />
                     ) : item.percentChange < 0 ? (
@@ -522,9 +519,9 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="monthName" className="text-xs" />
               <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'hsl(var(--background))', 
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--background))',
                   border: '1px solid hsl(var(--border))',
                   borderRadius: '8px'
                 }}
@@ -536,9 +533,9 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
               {selectedSizes.map(sizeName => {
                 const color = cylinderSizeColors.get(sizeName) || "#94a3b8";
                 return [
-                  <Line 
+                  <Line
                     key={`${sizeName}_${selectedYear1}`}
-                    type="monotone" 
+                    type="monotone"
                     dataKey={`${sizeName}_${selectedYear1}`}
                     name={`${sizeName}_${selectedYear1}`}
                     stroke={color}
@@ -546,9 +543,9 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
                     dot={{ fill: color, strokeWidth: 2 }}
                     activeDot={{ r: 6, stroke: color }}
                   />,
-                  <Line 
+                  <Line
                     key={`${sizeName}_${selectedYear2}`}
-                    type="monotone" 
+                    type="monotone"
                     dataKey={`${sizeName}_${selectedYear2}`}
                     name={`${sizeName}_${selectedYear2}`}
                     stroke={color}

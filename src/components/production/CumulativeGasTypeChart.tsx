@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown, Minus, Trophy } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { getGasColor } from "@/constants/gasColors";
 import {
@@ -80,8 +80,12 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
     const locationParam = location !== "all" ? location : null;
 
     const [result1, result2] = await Promise.all([
-      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: selectedYear1, p_location: locationParam }),
-      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: selectedYear2, p_location: locationParam })
+      api.reports.getMonthlyCylinderTotalsByGasType(selectedYear1, locationParam)
+        .then(data => ({ data, error: null }))
+        .catch(error => ({ data: null, error })),
+      api.reports.getMonthlyCylinderTotalsByGasType(selectedYear2, locationParam)
+        .then(data => ({ data, error: null }))
+        .catch(error => ({ data: null, error }))
     ]);
 
     const processData = (data: any[]): GasTypeData[] => {
@@ -357,8 +361,8 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
                       <Badge
                         variant={isSelected ? "default" : "outline"}
                         className={`cursor-pointer transition-all duration-200 flex items-center gap-1 hover:scale-105 hover:shadow-md active:scale-95 ${shouldAnimate
-                            ? "animate-[pulse_0.3s_ease-in-out_2] scale-110"
-                            : ""
+                          ? "animate-[pulse_0.3s_ease-in-out_2] scale-110"
+                          : ""
                           }`}
                         style={{
                           backgroundColor: isSelected ? gasType.color : undefined,
@@ -370,9 +374,9 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
                         {isTopFive && (
                           <Trophy
                             className={`h-3 w-3 ${topRank === 0 ? "text-yellow-400" :
-                                topRank === 1 ? "text-gray-300" :
-                                  topRank === 2 ? "text-amber-600" :
-                                    isSelected ? "text-white/70" : "opacity-50"
+                              topRank === 1 ? "text-gray-300" :
+                                topRank === 2 ? "text-amber-600" :
+                                  isSelected ? "text-white/70" : "opacity-50"
                               }`}
                           />
                         )}
@@ -423,10 +427,10 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
                     <div>{formatNumber(item.total2, 0)} ({selectedYear2})</div>
                   </div>
                   <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${item.percentChange > 0
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                      : item.percentChange < 0
-                        ? 'bg-red-500/10 text-red-600 dark:text-red-400'
-                        : 'bg-muted text-muted-foreground'
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    : item.percentChange < 0
+                      ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                      : 'bg-muted text-muted-foreground'
                     }`}>
                     {item.percentChange > 0 ? (
                       <TrendingUp className="h-3 w-3" />

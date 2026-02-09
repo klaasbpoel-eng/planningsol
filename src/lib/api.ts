@@ -315,35 +315,7 @@ export const api = {
         }
     },
 
-    gasTypes: {
-        getAll: async () => {
-            return primaryRead("gas_types", { orderBy: "sort_order", secondOrder: "name" });
-        },
-        create: async (item: any) => {
-            return primaryCreate("gas_types", item);
-        },
-        update: async (id: string, item: any) => {
-            return primaryUpdate("gas_types", id, item);
-        },
-        delete: async (id: string) => {
-            return primaryDelete("gas_types", id);
-        }
-    },
 
-    cylinderSizes: {
-        getAll: async () => {
-            return primaryRead("cylinder_sizes", { orderBy: "sort_order" });
-        },
-        create: async (item: any) => {
-            return primaryCreate("cylinder_sizes", item);
-        },
-        update: async (id: string, item: any) => {
-            return primaryUpdate("cylinder_sizes", id, item);
-        },
-        delete: async (id: string) => {
-            return primaryDelete("cylinder_sizes", id);
-        }
-    },
 
     dryIceProductTypes: {
         getAll: async () => {
@@ -632,6 +604,13 @@ export const api = {
         getAll: async () => {
             return primaryRead("time_off_requests", { orderBy: "start_date", orderAsc: false });
         },
+        getByUser: async (userId: string) => {
+            return primaryRead("time_off_requests", {
+                filters: [{ column: "user_id", op: "eq", value: userId }],
+                orderBy: "created_at",
+                orderAsc: false
+            });
+        },
         create: async (item: any) => {
             return primaryCreate("time_off_requests", item);
         },
@@ -808,6 +787,87 @@ export const api = {
             return data;
         },
 
+        getProductionEfficiencyYearly: async (year: number, location: string | null) => {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const params: any[] = [year];
+                if (location) params.push(location);
+                const locClause = location ? " AND location = ?" : "";
+
+                const query = `
+                    SELECT 
+                        COUNT(*) as total_orders,
+                        COALESCE(SUM(status = 'completed'), 0) as completed_orders,
+                        COALESCE(SUM(status = 'pending'), 0) as pending_orders,
+                        COALESCE(SUM(status = 'cancelled'), 0) as cancelled_orders,
+                        CASE 
+                            WHEN (COUNT(*) - COALESCE(SUM(status = 'cancelled'), 0)) = 0 THEN 0
+                            ELSE ROUND(COALESCE(SUM(status = 'completed'), 0) * 100.0 / (COUNT(*) - COALESCE(SUM(status = 'cancelled'), 0)), 1)
+                        END as efficiency_rate,
+                        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN cylinder_count ELSE 0 END), 0) as total_cylinders,
+                        COALESCE(SUM(CASE WHEN status = 'completed' THEN cylinder_count ELSE 0 END), 0) as completed_cylinders
+                    FROM gas_cylinder_orders
+                    WHERE YEAR(scheduled_date) = ?${locClause}
+                `;
+                return executeMySQL(query, params);
+            }
+
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.rpc("get_production_efficiency", {
+                p_year: year,
+                p_location: location
+            });
+            if (error) throw error;
+            return data;
+        },
+
+        getCylinderTotal: async (fromDate: string, toDate: string, location: string | null) => {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const params = [fromDate, toDate];
+                if (location) params.push(location);
+                const locClause = location ? " AND location = ?" : "";
+
+                const query = `SELECT COALESCE(SUM(cylinder_count), 0) as total FROM gas_cylinder_orders WHERE scheduled_date >= ? AND scheduled_date <= ? AND status != 'cancelled'${locClause}`;
+                const rows = await executeMySQL(query, params);
+                return rows?.[0]?.total || 0;
+            }
+
+            const client = getPrimarySupabaseClient();
+            let query = client
+                .from("gas_cylinder_orders")
+                .select("cylinder_count")
+                .gte("scheduled_date", fromDate)
+                .lte("scheduled_date", toDate)
+                .neq("status", "cancelled");
+
+            if (location) {
+                query = query.eq("location", location);
+            }
+
+            const { data, error } = await query;
+            if (error) throw error;
+            return data?.reduce((sum, o) => sum + o.cylinder_count, 0) || 0;
+        },
+
+        getCustomerSegments: async (year: number, location: string | null) => {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                // Return empty array for MySQL for now as this is a complex analysis query
+                // that likely relies on window functions or specific views.
+                // TODO: Implement MySQL equivalent for customer segmentation
+                return [];
+            }
+
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.rpc("get_customer_segments", {
+                p_year: year,
+                p_location: location
+            });
+            if (error) throw error;
+            return data;
+        },
+
         getDryIceEfficiency: async (fromDate: string, toDate: string, location: string | null) => {
             const source = getPrimarySource();
             if (source === "mysql") {
@@ -846,7 +906,8 @@ export const api = {
         getCustomerTotals: async (fromDate: string, toDate: string, location: string | null) => {
             const source = getPrimarySource();
             if (source === "mysql") {
-                const locClause = location ? " AND location = ?" : "";
+                const locClauseCyl = location ? " AND location = ?" : "";
+                const locClauseDry = location ? " AND location = ?" : "";
                 const baseParams = [fromDate, toDate];
                 if (location) baseParams.push(location);
                 const params = [...baseParams, ...baseParams];
@@ -855,18 +916,18 @@ export const api = {
                     SELECT 
                         customer_id,
                         MAX(customer_name) as customer_name,
-                        CAST(COALESCE(SUM(cylinder_count), 0) AS SIGNED) as total_cylinders,
-                        COALESCE(SUM(dry_ice_kg), 0) as total_dry_ice_kg
+                        CAST(sum(cylinders) AS SIGNED) as total_cylinders,
+                        sum(dry_ice) as total_dry_ice_kg
                     FROM (
-                        SELECT customer_id, customer_name, cylinder_count, 0 as dry_ice_kg 
+                        SELECT customer_id, customer_name, cylinder_count as cylinders, 0 as dry_ice
                         FROM gas_cylinder_orders 
-                        WHERE scheduled_date >= ? AND scheduled_date <= ? AND status != 'cancelled'${locClause}
+                        WHERE scheduled_date >= ? AND scheduled_date <= ? AND status != 'cancelled'${locClauseCyl}
                         
                         UNION ALL
                         
-                        SELECT customer_id, customer_name, 0 as cylinder_count, quantity_kg as dry_ice_kg 
+                        SELECT customer_id, customer_name, 0 as cylinders, quantity_kg as dry_ice
                         FROM dry_ice_orders 
-                        WHERE scheduled_date >= ? AND scheduled_date <= ? AND status != 'cancelled'${locClause}
+                        WHERE scheduled_date >= ? AND scheduled_date <= ? AND status != 'cancelled'${locClauseDry}
                     ) as combined
                     GROUP BY customer_id
                     ORDER BY total_cylinders DESC
@@ -880,6 +941,262 @@ export const api = {
                 p_to_date: toDate,
                 p_location: location
             });
+            if (error) throw error;
+            return data;
+        },
+
+        getMonthlyOrderTotals: async (year: number, orderType: 'cylinder' | 'dry_ice', location: string | null) => {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const table = orderType === 'cylinder' ? 'gas_cylinder_orders' : 'dry_ice_orders';
+                const col = orderType === 'cylinder' ? 'cylinder_count' : 'quantity_kg';
+                const params: any[] = [year, year];
+                if (location) params.push(location);
+                const locClause = location ? " AND location = ?" : "";
+
+                const query = `
+                    SELECT 
+                        MONTH(scheduled_date) as month,
+                        SUM(${col}) as total_value
+                    FROM ${table}
+                    WHERE scheduled_date >= STR_TO_DATE(CONCAT(?, '-01-01'), '%Y-%m-%d')
+                      AND scheduled_date <= STR_TO_DATE(CONCAT(?, '-12-31'), '%Y-%m-%d')
+                      AND status != 'cancelled'${locClause}
+                    GROUP BY MONTH(scheduled_date)
+                    ORDER BY month
+                `;
+                return executeMySQL(query, params);
+            }
+
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.rpc("get_monthly_order_totals", {
+                p_year: year,
+                p_order_type: orderType,
+                p_location: location
+            });
+            if (error) throw error;
+            return data;
+        },
+
+        getMonthlyCylinderTotalsByGasType: async (year: number, location: string | null) => {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const params: any[] = [year, year];
+                if (location) params.push(location);
+                const locClause = location ? " AND gco.location = ?" : "";
+
+                const query = `
+                    SELECT 
+                        MONTH(gco.scheduled_date) as month,
+                        gt.id as gas_type_id,
+                        gt.name as gas_type_name,
+                        gt.color as gas_type_color,
+                        CAST(COALESCE(SUM(gco.cylinder_count), 0) AS SIGNED) as total_cylinders
+                    FROM gas_cylinder_orders gco
+                    LEFT JOIN gas_types gt ON gco.gas_type_id = gt.id
+                    WHERE gco.scheduled_date >= STR_TO_DATE(CONCAT(?, '-01-01'), '%Y-%m-%d')
+                      AND gco.scheduled_date <= STR_TO_DATE(CONCAT(?, '-12-31'), '%Y-%m-%d')
+                      AND gco.status != 'cancelled'${locClause}
+                    GROUP BY MONTH(gco.scheduled_date), gt.id, gt.name, gt.color
+                    ORDER BY month, gas_type_name
+                `;
+                return executeMySQL(query, params);
+            }
+
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.rpc("get_monthly_cylinder_totals_by_gas_type", {
+                p_year: year,
+                p_location: location
+            });
+            if (error) throw error;
+            return data;
+        },
+
+        getMonthlyCylinderTotalsBySize: async (year: number, location: string | null) => {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const params: any[] = [year, year];
+                if (location) params.push(location);
+                const locClause = location ? " AND gco.location = ?" : "";
+
+                const query = `
+                    SELECT 
+                        MONTH(gco.scheduled_date) as month,
+                        gco.cylinder_size,
+                        CAST(COALESCE(SUM(gco.cylinder_count), 0) AS SIGNED) as total_cylinders
+                    FROM gas_cylinder_orders gco
+                    WHERE gco.scheduled_date >= STR_TO_DATE(CONCAT(?, '-01-01'), '%Y-%m-%d')
+                      AND gco.scheduled_date <= STR_TO_DATE(CONCAT(?, '-12-31'), '%Y-%m-%d')
+                      AND gco.status != 'cancelled'${locClause}
+                    GROUP BY MONTH(gco.scheduled_date), gco.cylinder_size
+                    ORDER BY month, gco.cylinder_size
+                `;
+                return executeMySQL(query, params);
+            }
+
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.rpc("get_monthly_cylinder_totals_by_size", {
+                p_year: year,
+                p_location: location
+            });
+            if (error) throw error;
+            return data;
+        },
+
+        getYearlyTotalsByCustomer: async (year: number, location: string | null) => {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const finalParams: any[] = [year, year];
+                if (location) finalParams.push(location);
+                finalParams.push(year, year);
+                if (location) finalParams.push(location);
+
+                const locClauseCyl = location ? " AND gco.location = ?" : "";
+                const locClauseDry = location ? " AND dio.location = ?" : "";
+
+                const query = `
+                    SELECT 
+                        customer_id,
+                        MAX(customer_name) as customer_name,
+                        CAST(SUM(cylinders) AS SIGNED) as total_cylinders,
+                        SUM(dry_ice) as total_dry_ice_kg
+                    FROM (
+                        SELECT customer_id, customer_name, cylinder_count as cylinders, 0 as dry_ice
+                        FROM gas_cylinder_orders gco
+                        WHERE gco.scheduled_date >= STR_TO_DATE(CONCAT(?, '-01-01'), '%Y-%m-%d')
+                          AND gco.scheduled_date <= STR_TO_DATE(CONCAT(?, '-12-31'), '%Y-%m-%d')
+                          AND gco.status != 'cancelled'${locClauseCyl}
+                        
+                        UNION ALL
+                        
+                        SELECT customer_id, customer_name, 0 as cylinders, quantity_kg as dry_ice
+                        FROM dry_ice_orders dio
+                        WHERE dio.scheduled_date >= STR_TO_DATE(CONCAT(?, '-01-01'), '%Y-%m-%d')
+                          AND dio.scheduled_date <= STR_TO_DATE(CONCAT(?, '-12-31'), '%Y-%m-%d')
+                          AND dio.status != 'cancelled'${locClauseDry}
+                    ) as combined
+                    GROUP BY customer_id
+                    ORDER BY (SUM(cylinders) + SUM(dry_ice)) DESC
+                `;
+                return executeMySQL(query, finalParams);
+            }
+
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.rpc("get_yearly_totals_by_customer", {
+                p_year: year,
+                p_location: location
+            });
+            if (error) throw error;
+            return data;
+        },
+
+        getMonthlyCylinderTotalsByCustomer: async (year: number, location: string | null) => {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const params: any[] = [year, year];
+                if (location) params.push(location);
+                const locClause = location ? " AND gco.location = ?" : "";
+
+                const query = `
+                    SELECT 
+                        MONTH(gco.scheduled_date) as month,
+                        gco.customer_id,
+                        gco.customer_name,
+                        CAST(COALESCE(SUM(gco.cylinder_count), 0) AS SIGNED) as total_cylinders
+                    FROM gas_cylinder_orders gco
+                    WHERE gco.scheduled_date >= STR_TO_DATE(CONCAT(?, '-01-01'), '%Y-%m-%d')
+                      AND gco.scheduled_date <= STR_TO_DATE(CONCAT(?, '-12-31'), '%Y-%m-%d')
+                      AND gco.status != 'cancelled'${locClause}
+                    GROUP BY MONTH(gco.scheduled_date), gco.customer_id, gco.customer_name
+                    ORDER BY month, total_cylinders DESC
+                `;
+                return executeMySQL(query, params);
+            }
+
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.rpc("get_monthly_cylinder_totals_by_customer", {
+                p_year: year,
+                p_location: location
+            });
+            if (error) throw error;
+            return data;
+        }
+    },
+
+    cylinderSizes: {
+        getAll: async () => {
+            return primaryRead("cylinder_sizes", {
+                orderBy: "sort_order",
+                filters: [{ column: "is_active", op: "eq", value: true }]
+            });
+        },
+        create: async (item: any) => {
+            return primaryCreate("cylinder_sizes", item);
+        },
+        update: async (id: string, item: any) => {
+            return primaryUpdate("cylinder_sizes", id, item);
+        },
+        delete: async (id: string) => {
+            return primaryDelete("cylinder_sizes", id);
+        }
+    },
+
+    gasTypes: {
+        getAll: async () => {
+            return primaryRead("gas_types", {
+                orderBy: "sort_order",
+                secondOrder: "name",
+                filters: [{ column: "is_active", op: "eq", value: true }]
+            });
+        },
+        getByLocation: async (location: string) => {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                // MySQL implementation of "get_distinct_gas_type_ids_by_location" logic
+                // Assuming we want gas types that have been ordered at this location?
+                // Or just all gas types? The RPC name suggests distinct IDs used at location.
+                // Let's implement the logic: Select gas_types that have orders in this location.
+                const query = `
+                    SELECT DISTINCT gt.id
+                    FROM gas_types gt
+                    JOIN gas_cylinder_orders gco ON gco.gas_type_id = gt.id
+                    WHERE gco.location = ?
+                `;
+                const rows = await executeMySQL(query, [location]);
+                return rows || [];
+            }
+
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client.rpc("get_distinct_gas_type_ids_by_location", {
+                p_location: location
+            });
+            if (error) throw error;
+            return data;
+        },
+        create: async (item: any) => {
+            return primaryCreate("gas_types", item);
+        },
+        update: async (id: string, item: any) => {
+            return primaryUpdate("gas_types", id, item);
+        },
+        delete: async (id: string) => {
+            return primaryDelete("gas_types", id);
+        }
+    },
+
+    userRoles: {
+        get: async (userId: string) => {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const rows = await executeMySQL("SELECT role FROM user_roles WHERE user_id = ? LIMIT 1", [userId]);
+                return rows?.[0] || null;
+            }
+            const client = getPrimarySupabaseClient();
+            const { data, error } = await client
+                .from("user_roles")
+                .select("role")
+                .eq("user_id", userId)
+                .maybeSingle();
             if (error) throw error;
             return data;
         }
@@ -905,55 +1222,55 @@ export const api = {
             const config = getConfig();
             if (config?.useMySQL || config?.primarySource === "mysql") {
                 const queries = [
-                    `CREATE TABLE IF NOT EXISTS profiles (
-                        id CHAR(36) PRIMARY KEY,
-                        user_id CHAR(36),
-                        full_name VARCHAR(255),
-                        job_title VARCHAR(255),
-                        department VARCHAR(255),
-                        email VARCHAR(255),
-                        phone VARCHAR(255),
-                        location VARCHAR(255),
-                        production_location VARCHAR(255),
-                        employment_type VARCHAR(255),
-                        hire_date DATE,
-                        date_of_birth DATE,
-                        emergency_contact_name VARCHAR(255),
-                        emergency_contact_phone VARCHAR(255),
-                        manager_id CHAR(36),
-                        is_approved BOOLEAN DEFAULT FALSE,
-                        approved_by CHAR(36),
-                        approved_at DATETIME,
-                        intended_role VARCHAR(255),
-                        address TEXT,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                    )`,
-                    `CREATE TABLE IF NOT EXISTS time_off_requests (
-                        id CHAR(36) PRIMARY KEY,
-                        user_id CHAR(36),
-                        profile_id CHAR(36) NOT NULL,
-                        start_date DATE NOT NULL,
-                        end_date DATE NOT NULL,
-                        day_part VARCHAR(50),
-                        type VARCHAR(50) NOT NULL,
-                        type_id CHAR(36),
-                        status VARCHAR(50) NOT NULL DEFAULT 'pending',
-                        reason TEXT,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                    )`,
-                    `CREATE TABLE IF NOT EXISTS task_types (
-                        id CHAR(36) PRIMARY KEY,
-                        name VARCHAR(255) NOT NULL,
-                        description TEXT,
-                        color VARCHAR(50),
-                        is_active BOOLEAN DEFAULT TRUE,
-                        sort_order INT DEFAULT 0,
-                        parent_id CHAR(36),
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                    )`
+                    `CREATE TABLE IF NOT EXISTS profiles(
+                    id CHAR(36) PRIMARY KEY,
+                    user_id CHAR(36),
+                    full_name VARCHAR(255),
+                    job_title VARCHAR(255),
+                    department VARCHAR(255),
+                    email VARCHAR(255),
+                    phone VARCHAR(255),
+                    location VARCHAR(255),
+                    production_location VARCHAR(255),
+                    employment_type VARCHAR(255),
+                    hire_date DATE,
+                    date_of_birth DATE,
+                    emergency_contact_name VARCHAR(255),
+                    emergency_contact_phone VARCHAR(255),
+                    manager_id CHAR(36),
+                    is_approved BOOLEAN DEFAULT FALSE,
+                    approved_by CHAR(36),
+                    approved_at DATETIME,
+                    intended_role VARCHAR(255),
+                    address TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )`,
+                    `CREATE TABLE IF NOT EXISTS time_off_requests(
+                    id CHAR(36) PRIMARY KEY,
+                    user_id CHAR(36),
+                    profile_id CHAR(36) NOT NULL,
+                    start_date DATE NOT NULL,
+                    end_date DATE NOT NULL,
+                    day_part VARCHAR(50),
+                    type VARCHAR(50) NOT NULL,
+                    type_id CHAR(36),
+                    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+                    reason TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )`,
+                    `CREATE TABLE IF NOT EXISTS task_types(
+                    id CHAR(36) PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    color VARCHAR(50),
+                    is_active BOOLEAN DEFAULT TRUE,
+                    sort_order INT DEFAULT 0,
+                    parent_id CHAR(36),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )`
                 ];
 
                 for (const query of queries) {

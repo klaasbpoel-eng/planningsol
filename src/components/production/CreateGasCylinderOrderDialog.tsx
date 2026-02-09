@@ -74,22 +74,13 @@ export function CreateGasCylinderOrderDialog({
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         // Fetch profile with production_location
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("id, production_location")
-          .eq("user_id", user.id)
-          .single();
+        const profile = await api.profiles.getByUserId(user.id);
 
         if (profile) {
           setCurrentProfileId(profile.id);
 
           // Check user role
-          const { data: roleData } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", user.id)
-            .maybeSingle();
-
+          const roleData = await api.userRoles.get(user.id);
           const userRole = roleData?.role || "user";
           const isAdmin = userRole === "admin";
 
@@ -113,11 +104,7 @@ export function CreateGasCylinderOrderDialog({
 
   useEffect(() => {
     const fetchCylinderSizes = async () => {
-      const { data } = await supabase
-        .from("cylinder_sizes")
-        .select("id, name, capacity_liters")
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
+      const data = await api.cylinderSizes.getAll();
 
       if (data) {
         setCylinderSizes(data);
@@ -130,13 +117,13 @@ export function CreateGasCylinderOrderDialog({
     if (open) {
       // Fetch gas types and location-specific history
       const loadData = async () => {
-        const { data: gasTypesData } = await supabase
-          .from("gas_types")
-          .select("id, name, color")
-          .eq("is_active", true);
+        const gasTypesData = await api.gasTypes.getAll();
 
         if (gasTypesData) {
           // Sort all types alphabetically for the dropdown display
+          // api.gasTypes.getAll sorts by sort_order then name.
+          // The UI wants alphabetical sort strictly?
+          // The previous code sorted by name.
           const sortedTypes = [...gasTypesData].sort((a, b) => a.name.localeCompare(b.name));
           setGasTypes(sortedTypes);
 
@@ -178,11 +165,10 @@ export function CreateGasCylinderOrderDialog({
       if (!location) return;
 
       // Use RPC to efficiently get distinct gas type IDs for this location
-      const { data: locationGasTypes } = await supabase
-        .rpc("get_distinct_gas_type_ids_by_location", { p_location: location });
+      const locationGasTypes = await api.gasTypes.getByLocation(location);
 
       if (locationGasTypes && locationGasTypes.length > 0) {
-        const uniqueIds = new Set(locationGasTypes.map((row: { gas_type_id: string }) => row.gas_type_id).filter(Boolean));
+        const uniqueIds = new Set(locationGasTypes.map((row: { gas_type_id: string }) => row.gas_type_id).filter(Boolean)) as Set<string>;
         setLocationGasIds(uniqueIds);
       } else {
         // No history for this location - show all gas types

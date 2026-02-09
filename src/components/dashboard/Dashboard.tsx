@@ -12,6 +12,7 @@ import type { Database } from "@/integrations/supabase/types";
 import type { RolePermissions, AppRole } from "@/hooks/useUserPermissions";
 import { StatCardSkeleton, TimeOffCalendarSkeleton, TableSkeleton } from "@/components/ui/skeletons";
 import { FadeIn } from "@/components/ui/fade-in";
+import { api } from "@/lib/api";
 import { startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO } from "date-fns";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
@@ -41,14 +42,10 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
-        .from("time_off_requests")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setRequests(data || []);
+      const data = await api.timeOffRequests.getByUser(user.id);
+      if (data) {
+        setRequests(data);
+      }
     } catch (error) {
       console.error("Error fetching requests:", error);
     } finally {

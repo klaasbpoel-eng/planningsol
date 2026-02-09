@@ -17,7 +17,7 @@ import {
   Minus,
   AlertTriangle
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
 import { FadeIn } from "@/components/ui/fade-in";
 import {
@@ -109,16 +109,8 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
         // Fetch current period data
         // Use RPC function for server-side aggregation (avoids 1000 row limit)
         const [currentRes, prevRes] = await Promise.all([
-          supabase.rpc("get_production_efficiency_by_period", {
-            p_from_date: fromDate,
-            p_to_date: toDate,
-            p_location: locationParam
-          }),
-          supabase.rpc("get_production_efficiency_by_period", {
-            p_from_date: prevFromDate,
-            p_to_date: prevToDate,
-            p_location: locationParam
-          })
+          api.reports.getProductionEfficiency(fromDate, toDate, locationParam).then(data => ({ data, error: null })).catch(error => ({ data: null, error })),
+          api.reports.getProductionEfficiency(prevFromDate, prevToDate, locationParam).then(data => ({ data, error: null })).catch(error => ({ data: null, error }))
         ]);
 
         // Log errors if any
@@ -165,14 +157,8 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
         console.log("[KPIDashboard] Calling year-based RPC:", { currentYear, locationParam });
 
         const [currentResult, previousResult] = await Promise.all([
-          supabase.rpc("get_production_efficiency", {
-            p_year: currentYear,
-            p_location: locationParam
-          }),
-          supabase.rpc("get_production_efficiency", {
-            p_year: currentYear - 1,
-            p_location: locationParam
-          })
+          api.reports.getProductionEfficiencyYearly(currentYear, locationParam).then(data => ({ data, error: null })).catch(error => ({ data: null, error })),
+          api.reports.getProductionEfficiencyYearly(currentYear - 1, locationParam).then(data => ({ data, error: null })).catch(error => ({ data: null, error }))
         ]);
 
         // Log errors if any
@@ -220,23 +206,13 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 6);
 
-      const toLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const toLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const startStr = toLocal(weekStart);
       const endStr = toLocal(weekEnd);
 
-      let query = supabase
-        .from("gas_cylinder_orders")
-        .select("cylinder_count")
-        .gte("scheduled_date", startStr)
-        .lte("scheduled_date", endStr)
-        .neq("status", "cancelled");
+      let query = api.reports.getCylinderTotal(startStr, endStr, locationParam);
 
-      if (locationParam === "sol_emmen" || locationParam === "sol_tilburg") {
-        query = query.eq("location", locationParam);
-      }
-
-      const { data } = await query;
-      const total = data?.reduce((sum, o) => sum + o.cylinder_count, 0) || 0;
+      const total = await query;
 
       weeks.push({
         week: `W${8 - i}`,

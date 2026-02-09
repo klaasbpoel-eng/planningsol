@@ -27,7 +27,7 @@ const TabLoadingFallback = () => (
 const ReportLoadingFallback = () => (
   <ChartSkeleton height={350} />
 );
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { format, subWeeks, startOfMonth, endOfMonth, differenceInDays, subDays, startOfYear, endOfYear, startOfWeek, endOfWeek, isSameDay, isSameMonth, isSameYear, subMonths, subYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn, formatNumber } from "@/lib/utils";
@@ -193,71 +193,48 @@ export function ProductionPlanning({
       const isTilburg = selectedLocation === "sol_tilburg";
 
       // Skip dry ice RPC calls for Tilburg (dry ice is only produced in Emmen)
+      // Skip dry ice RPC calls for Tilburg (dry ice is only produced in Emmen)
       const dryIcePromise = isTilburg
-        ? Promise.resolve({ data: [{ total_kg: 0, total_orders: 0 }], error: null })
-        : supabase.rpc("get_dry_ice_efficiency_by_period", {
-            p_from_date: fromDate,
-            p_to_date: toDate,
-            p_location: null
-          });
+        ? Promise.resolve([{ total_kg: 0, total_orders: 0 }] as any)
+        : api.reports.getDryIceEfficiency(fromDate, toDate, null);
       const prevDryIcePromise = isTilburg
-        ? Promise.resolve({ data: [{ total_kg: 0, total_orders: 0 }], error: null })
-        : supabase.rpc("get_dry_ice_efficiency_by_period", {
-            p_from_date: prevFromDate,
-            p_to_date: prevToDate,
-            p_location: null
-          });
+        ? Promise.resolve([{ total_kg: 0, total_orders: 0 }] as any)
+        : api.reports.getDryIceEfficiency(prevFromDate, prevToDate, null);
 
-      const [dryIceRes, cylinderRes, prevDryIceRes, prevCylinderRes] = await Promise.all([
+      const [dryIceData, cylinderData, prevDryIceData, prevCylinderData] = await Promise.all([
         dryIcePromise,
-        supabase.rpc("get_production_efficiency_by_period", {
-          p_from_date: fromDate,
-          p_to_date: toDate,
-          p_location: locationParam
-        }),
+        api.reports.getProductionEfficiency(fromDate, toDate, locationParam),
         prevDryIcePromise,
-        supabase.rpc("get_production_efficiency_by_period", {
-          p_from_date: prevFromDate,
-          p_to_date: prevToDate,
-          p_location: locationParam
-        })
+        api.reports.getProductionEfficiency(prevFromDate, prevToDate, locationParam)
       ]);
 
       // Handle dry ice current period
-      if (dryIceRes.error) {
-        console.error("[ProductionPlanning] Dry ice RPC error:", dryIceRes.error);
-      } else if (dryIceRes.data?.[0]) {
-        setDryIceToday(Number(dryIceRes.data[0].total_kg) || 0);
+      if (dryIceData?.[0]) {
+        setDryIceToday(Number(dryIceData[0].total_kg) || 0);
       }
 
       // Handle cylinder current period
-      if (cylinderRes.error) {
-        console.error("[ProductionPlanning] Cylinder RPC error:", cylinderRes.error);
-      } else if (cylinderRes.data?.[0]) {
-        setCylindersToday(Number(cylinderRes.data[0].total_cylinders) || 0);
+      if (cylinderData?.[0]) {
+        setCylindersToday(Number(cylinderData[0].total_cylinders) || 0);
       }
 
       // Handle dry ice previous period
-      if (prevDryIceRes.error) {
-        console.error("[ProductionPlanning] Prev dry ice RPC error:", prevDryIceRes.error);
-      } else if (prevDryIceRes.data?.[0]) {
-        setPreviousDryIceToday(Number(prevDryIceRes.data[0].total_kg) || 0);
+      if (prevDryIceData?.[0]) {
+        setPreviousDryIceToday(Number(prevDryIceData[0].total_kg) || 0);
       }
 
       // Handle cylinder previous period
-      if (prevCylinderRes.error) {
-        console.error("[ProductionPlanning] Prev cylinder RPC error:", prevCylinderRes.error);
-      } else if (prevCylinderRes.data?.[0]) {
-        setPreviousCylindersToday(Number(prevCylinderRes.data[0].total_cylinders) || 0);
+      if (prevCylinderData?.[0]) {
+        setPreviousCylindersToday(Number(prevCylinderData[0].total_cylinders) || 0);
       }
 
       // Calculate total orders from RPC responses
-      const currentDryIceOrders = isTilburg ? 0 : (dryIceRes.data?.[0]?.total_orders || 0);
-      const currentCylinderOrders = cylinderRes.data?.[0]?.total_orders || 0;
+      const currentDryIceOrders = isTilburg ? 0 : (dryIceData?.[0]?.total_orders || 0);
+      const currentCylinderOrders = cylinderData?.[0]?.total_orders || 0;
       setWeekOrders(Number(currentDryIceOrders) + Number(currentCylinderOrders));
 
-      const prevDryIceOrders = isTilburg ? 0 : (prevDryIceRes.data?.[0]?.total_orders || 0);
-      const prevCylinderOrders = prevCylinderRes.data?.[0]?.total_orders || 0;
+      const prevDryIceOrders = isTilburg ? 0 : (prevDryIceData?.[0]?.total_orders || 0);
+      const prevCylinderOrders = prevCylinderData?.[0]?.total_orders || 0;
       setPreviousWeekOrders(Number(prevDryIceOrders) + Number(prevCylinderOrders));
 
     } catch (error) {

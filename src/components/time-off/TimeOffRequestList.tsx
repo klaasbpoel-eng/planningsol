@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { format, differenceInDays } from "date-fns";
 import { Calendar, Clock, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { nl } from "date-fns/locale";
+import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -19,16 +21,12 @@ interface TimeOffRequestListProps {
 export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListProps) {
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from("time_off_requests")
-        .delete()
-        .eq("id", id);
+      await api.timeOffRequests.delete(id);
 
-      if (error) throw error;
       toast.success("Aanvraag verwijderd");
       onDelete();
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error("Fout bij verwijderen: " + error.message);
     }
   };
 
@@ -92,7 +90,7 @@ export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListPro
       <CardContent className="space-y-3">
         {requests.map((request) => {
           const days = differenceInDays(new Date(request.end_date), new Date(request.start_date)) + 1;
-          
+
           return (
             <div
               key={request.id}
@@ -108,28 +106,28 @@ export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListPro
                       {request.status}
                     </Badge>
                   </div>
-                  
+
                   <div className="flex items-center gap-2 text-sm text-foreground">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
-                      {format(new Date(request.start_date), "MMM d")} 
-                      {request.start_date !== request.end_date && 
+                      {format(new Date(request.start_date), "MMM d")}
+                      {request.start_date !== request.end_date &&
                         ` — ${format(new Date(request.end_date), "MMM d, yyyy")}`}
-                      {request.start_date === request.end_date && 
+                      {request.start_date === request.end_date &&
                         `, ${format(new Date(request.start_date), "yyyy")}`}
                     </span>
                     <span className="text-muted-foreground">
                       ({days} dag{days !== 1 ? 'en' : ''})
                     </span>
                   </div>
-                  
+
                   {request.reason && (
                     <p className="text-sm text-muted-foreground line-clamp-2">
                       {request.reason}
                     </p>
                   )}
                 </div>
-                
+
                 {request.status === "pending" && (
                   <Button
                     variant="ghost"

@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { 
-  Users, 
-  Trophy, 
+import {
+  Users,
+  Trophy,
   Medal,
   Award,
   TrendingUp,
@@ -19,7 +19,7 @@ import {
   ChevronUp,
   AlertTriangle
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
 import { FadeIn } from "@/components/ui/fade-in";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -60,25 +60,25 @@ export function CustomerSegmentation({ location, refreshKey = 0 }: CustomerSegme
 
   const fetchCustomerSegments = async () => {
     setLoading(true);
-    
-    const locationParam = location === "all" ? null : location;
-    
-    const { data, error } = await supabase.rpc("get_customer_segments", {
-      p_year: currentYear,
-      p_location: locationParam
-    });
 
-    if (data && !error) {
-      setCustomers(data as CustomerSegment[]);
+    const locationParam = location === "all" ? null : location;
+
+    try {
+      const data = await api.reports.getCustomerSegments(currentYear, locationParam);
+      if (data) {
+        setCustomers(data as CustomerSegment[]);
+      }
+    } catch (error) {
+      console.error("[CustomerSegmentation] Error fetching segments:", error);
     }
-    
+
     setLoading(false);
   };
 
   const filteredCustomers = useMemo(() => {
     if (!searchQuery) return customers;
     const query = searchQuery.toLowerCase();
-    return customers.filter(c => 
+    return customers.filter(c =>
       c.customer_name.toLowerCase().includes(query)
     );
   }, [customers, searchQuery]);
@@ -210,7 +210,7 @@ export function CustomerSegmentation({ location, refreshKey = 0 }: CustomerSegme
             </div>
           </CardHeader>
         </CollapsibleTrigger>
-        
+
         <CollapsibleContent>
           <CardContent className="pt-0">
             <FadeIn show={true}>
@@ -224,7 +224,7 @@ export function CustomerSegmentation({ location, refreshKey = 0 }: CustomerSegme
                   </div>
                   <p className="text-2xl font-bold text-yellow-500">{tierStats.gold}</p>
                 </div>
-                
+
                 <div className="p-3 rounded-lg bg-gradient-to-br from-slate-400/10 to-slate-400/5 border border-slate-400/20">
                   <div className="flex items-center gap-2 mb-1">
                     <Medal className="h-4 w-4 text-slate-400" />
@@ -232,7 +232,7 @@ export function CustomerSegmentation({ location, refreshKey = 0 }: CustomerSegme
                   </div>
                   <p className="text-2xl font-bold text-slate-400">{tierStats.silver}</p>
                 </div>
-                
+
                 <div className="p-3 rounded-lg bg-gradient-to-br from-amber-600/10 to-amber-600/5 border border-amber-600/20">
                   <div className="flex items-center gap-2 mb-1">
                     <Award className="h-4 w-4 text-amber-600" />
@@ -244,7 +244,7 @@ export function CustomerSegmentation({ location, refreshKey = 0 }: CustomerSegme
                 {/* Risk Alert */}
                 <div className={cn(
                   "p-3 rounded-lg border",
-                  trendStats.declining > 0 
+                  trendStats.declining > 0
                     ? "bg-gradient-to-br from-destructive/10 to-destructive/5 border-destructive/20"
                     : "bg-gradient-to-br from-success/10 to-success/5 border-success/20"
                 )}>
@@ -302,7 +302,7 @@ export function CustomerSegmentation({ location, refreshKey = 0 }: CustomerSegme
                                   <span className="font-medium truncate">
                                     {customer.customer_name}
                                   </span>
-                                  <Badge 
+                                  <Badge
                                     variant={getTrendBadgeVariant(customer.trend)}
                                     className="text-xs h-5 gap-1"
                                   >
@@ -348,7 +348,7 @@ export function CustomerSegmentation({ location, refreshKey = 0 }: CustomerSegme
                       </Tooltip>
                     </TooltipProvider>
                   ))}
-                  
+
                   {filteredCustomers.length === 0 && (
                     <div className="text-center py-8 text-muted-foreground">
                       <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />

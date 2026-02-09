@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Cylinder, Snowflake, LineChart as LineChartIcon, Trophy } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { ChartSkeleton } from "@/components/ui/skeletons/chart-skeleton";
 import {
@@ -88,15 +88,16 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
         const orderType = type === "cylinders" ? "cylinder" : "dry_ice";
         const locationParam = location === "all" ? null : location;
 
-        // Fetch all years in parallel using RPC
+        // Fetch all years in parallel using API
         const results = await Promise.all(
-          years.map(year =>
-            supabase.rpc("get_monthly_order_totals", {
-              p_year: year,
-              p_order_type: orderType,
-              p_location: locationParam
-            })
-          )
+          years.map(async (year) => {
+            try {
+              const data = await api.reports.getMonthlyOrderTotals(year, orderType, locationParam);
+              return { data, error: null };
+            } catch (err) {
+              return { data: null, error: err };
+            }
+          })
         );
 
         console.log(`[CumulativeYearChart] Fetched ${results.length} years for ${type}`);
@@ -105,7 +106,7 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
 
         results.forEach((result, index) => {
           const year = years[index];
-          
+
           if (result.error) {
             console.error(`[CumulativeYearChart] RPC error for ${year}:`, result.error);
             return;
@@ -315,8 +316,8 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
                       <Badge
                         variant={isSelected ? "default" : "outline"}
                         className={`cursor-pointer transition-all duration-200 flex items-center gap-1 hover:scale-105 hover:shadow-md active:scale-95 ${shouldAnimate
-                            ? "animate-[pulse_0.3s_ease-in-out_2] scale-110"
-                            : ""
+                          ? "animate-[pulse_0.3s_ease-in-out_2] scale-110"
+                          : ""
                           }`}
                         style={{
                           backgroundColor: isSelected ? getYearColor(year) : undefined,
@@ -328,9 +329,9 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
                         {isTopFive && (
                           <Trophy
                             className={`h-3 w-3 ${topRank === 0 ? "text-yellow-400" :
-                                topRank === 1 ? "text-gray-300" :
-                                  topRank === 2 ? "text-amber-600" :
-                                    isSelected ? "text-white/70" : "opacity-50"
+                              topRank === 1 ? "text-gray-300" :
+                                topRank === 2 ? "text-amber-600" :
+                                  isSelected ? "text-white/70" : "opacity-50"
                               }`}
                           />
                         )}

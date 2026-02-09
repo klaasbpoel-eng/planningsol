@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
 import { FadeIn } from "@/components/ui/fade-in";
 import { CustomerListSkeleton } from "@/components/ui/skeletons";
@@ -34,11 +34,11 @@ interface TopCustomersWidgetProps {
   dateRange?: DateRange;
 }
 
-export const TopCustomersWidget = React.memo(function TopCustomersWidget({ 
-  refreshKey = 0, 
-  isRefreshing = false, 
+export const TopCustomersWidget = React.memo(function TopCustomersWidget({
+  refreshKey = 0,
+  isRefreshing = false,
   location = "all",
-  dateRange 
+  dateRange
 }: TopCustomersWidgetProps) {
   const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +49,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
 
   const fetchTopCustomers = async () => {
     setLoading(true);
-    
+
     try {
       // Determine if using custom date range or year-based
       if (dateRange) {
@@ -71,29 +71,20 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
     // Pass location filter to the RPC function (null for "all")
     const locationFilter = location === "all" ? null : location;
 
-    const [currentRes, previousRes] = await Promise.all([
-      supabase.rpc("get_yearly_totals_by_customer", { 
-        p_year: currentYear,
-        p_location: locationFilter
+    const [currentData, previousData] = await Promise.all([
+      api.reports.getYearlyTotalsByCustomer(currentYear, locationFilter).catch(error => {
+        console.error("[TopCustomersWidget] Error fetching current year data:", error);
+        return null;
       }),
-      supabase.rpc("get_yearly_totals_by_customer", { 
-        p_year: previousYear,
-        p_location: locationFilter
+      api.reports.getYearlyTotalsByCustomer(previousYear, locationFilter).catch(error => {
+        console.error("[TopCustomersWidget] Error fetching previous year data:", error);
+        return null;
       })
     ]);
 
-   // Log errors for debugging
-   if (currentRes.error) {
-     console.error("[TopCustomersWidget] Error fetching current year data:", currentRes.error);
-     return;
-   }
-   if (previousRes.error) {
-     console.error("[TopCustomersWidget] Error fetching previous year data:", previousRes.error);
-   }
-
     const previousMap = new Map<string, { cylinders: number; dryIce: number }>();
-    if (previousRes.data) {
-      previousRes.data.forEach((c: { customer_name: string; total_cylinders: number; total_dry_ice_kg: number }) => {
+    if (previousData) {
+      previousData.forEach((c: { customer_name: string; total_cylinders: number; total_dry_ice_kg: number }) => {
         previousMap.set(c.customer_name, {
           cylinders: Number(c.total_cylinders) || 0,
           dryIce: Number(c.total_dry_ice_kg) || 0
@@ -101,12 +92,12 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
       });
     }
 
-    const enriched: CustomerData[] = (currentRes.data || []).map((c: { customer_id: string | null; customer_name: string; total_cylinders: number; total_dry_ice_kg: number }) => {
+    const enriched: CustomerData[] = (currentData || []).map((c: { customer_id: string | null; customer_name: string; total_cylinders: number; total_dry_ice_kg: number }) => {
       const prev = previousMap.get(c.customer_name) || { cylinders: 0, dryIce: 0 };
       const currentTotal = Number(c.total_cylinders) + Number(c.total_dry_ice_kg);
       const previousTotal = prev.cylinders + prev.dryIce;
-      const changePercent = previousTotal > 0 
-        ? ((currentTotal - previousTotal) / previousTotal) * 100 
+      const changePercent = previousTotal > 0
+        ? ((currentTotal - previousTotal) / previousTotal) * 100
         : currentTotal > 0 ? 100 : 0;
 
       return {
@@ -131,57 +122,46 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
   const fetchCustomersByDateRange = async (range: DateRange) => {
     const fromDate = format(range.from, "yyyy-MM-dd");
     const toDate = format(range.to, "yyyy-MM-dd");
-    
+
     // Calculate previous period (same length, immediately before)
     const periodLength = differenceInDays(range.to, range.from);
     const prevTo = subDays(range.from, 1);
     const prevFrom = subDays(prevTo, periodLength);
     const prevFromDate = format(prevFrom, "yyyy-MM-dd");
     const prevToDate = format(prevTo, "yyyy-MM-dd");
-    
+
     const locationFilter = location === "all" ? null : location;
-    
+
     // Use RPC function for server-side aggregation (avoids 1000 row limit)
-    const [currentRes, previousRes] = await Promise.all([
-      supabase.rpc("get_customer_totals_by_period", {
-        p_from_date: fromDate,
-        p_to_date: toDate,
-        p_location: locationFilter
+    const [currentData, previousData] = await Promise.all([
+      api.reports.getCustomerTotals(fromDate, toDate, locationFilter).catch(error => {
+        console.error("[TopCustomersWidget] Error fetching current period data:", error);
+        return null;
       }),
-      supabase.rpc("get_customer_totals_by_period", {
-        p_from_date: prevFromDate,
-        p_to_date: prevToDate,
-        p_location: locationFilter
+      api.reports.getCustomerTotals(prevFromDate, prevToDate, locationFilter).catch(error => {
+        console.error("[TopCustomersWidget] Error fetching previous period data:", error);
+        return null;
       })
     ]);
-    
-   // Log errors for debugging
-   if (currentRes.error) {
-     console.error("[TopCustomersWidget] Error fetching current period data:", currentRes.error);
-     return;
-   }
-   if (previousRes.error) {
-     console.error("[TopCustomersWidget] Error fetching previous period data:", previousRes.error);
-   }
 
     // Build previous period map for trend calculation
     const prevMap = new Map<string, { cylinders: number; dryIce: number }>();
-    if (previousRes.data) {
-      previousRes.data.forEach((c: { customer_name: string; total_cylinders: number; total_dry_ice_kg: number }) => {
+    if (previousData) {
+      previousData.forEach((c: { customer_name: string; total_cylinders: number; total_dry_ice_kg: number }) => {
         prevMap.set(c.customer_name, {
           cylinders: Number(c.total_cylinders) || 0,
           dryIce: Number(c.total_dry_ice_kg) || 0
         });
       });
     }
-    
+
     // Build enriched customer data
-    const enriched: CustomerData[] = (currentRes.data || []).map((c: { customer_id: string | null; customer_name: string; total_cylinders: number; total_dry_ice_kg: number }) => {
+    const enriched: CustomerData[] = (currentData || []).map((c: { customer_id: string | null; customer_name: string; total_cylinders: number; total_dry_ice_kg: number }) => {
       const prev = prevMap.get(c.customer_name) || { cylinders: 0, dryIce: 0 };
       const currentTotal = Number(c.total_cylinders) + Number(c.total_dry_ice_kg);
       const previousTotal = prev.cylinders + prev.dryIce;
-      const changePercent = previousTotal > 0 
-        ? ((currentTotal - previousTotal) / previousTotal) * 100 
+      const changePercent = previousTotal > 0
+        ? ((currentTotal - previousTotal) / previousTotal) * 100
         : currentTotal > 0 ? 100 : 0;
 
       return {
@@ -231,7 +211,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
         <CardHeader className="pb-2">
           <CardDescription className="flex items-center gap-2 flex-wrap">
             <Trophy className="h-4 w-4 text-yellow-500" />
-            <span>Top 5 Klanten {dateRange 
+            <span>Top 5 Klanten {dateRange
               ? `${format(dateRange.from, "d MMM", { locale: nl })} - ${format(dateRange.to, "d MMM yyyy", { locale: nl })}`
               : new Date().getFullYear()
             }</span>
@@ -273,7 +253,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
                 </div>
                 <div className="flex items-center gap-1">
                   {getTrendIcon(customer.changePercent)}
-                  <Badge 
+                  <Badge
                     variant={customer.changePercent >= 0 ? "default" : "destructive"}
                     className="text-xs"
                   >

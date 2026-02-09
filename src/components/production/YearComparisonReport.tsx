@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users, Building2, Ruler } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -296,11 +296,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   }, []);
 
   const fetchGasTypes = async () => {
-    const { data } = await supabase
-      .from("gas_types")
-      .select("id, name, color")
-      .eq("is_active", true)
-      .order("sort_order");
+    const { data } = await api.gasTypes.getAll();
 
     if (data) {
       setGasTypes(data);
@@ -308,11 +304,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   };
 
   const fetchCylinderSizes = async () => {
-    const { data } = await supabase
-      .from("cylinder_sizes")
-      .select("id, name, capacity_liters")
-      .eq("is_active", true)
-      .order("sort_order");
+    const { data } = await api.cylinderSizes.getAll();
 
     if (data) {
       setCylinderSizes(data);
@@ -347,18 +339,18 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       currentCylinderSizeRes,
       previousCylinderSizeRes
     ] = await Promise.all([
-      supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "cylinder", p_location: locationFilter }),
-      supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "cylinder", p_location: locationFilter }),
-      supabase.rpc("get_monthly_order_totals", { p_year: currentYear, p_order_type: "dry_ice", p_location: locationFilter }),
-      supabase.rpc("get_monthly_order_totals", { p_year: previousYear, p_order_type: "dry_ice", p_location: locationFilter }),
-      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: currentYear, p_location: locationFilter }),
-      supabase.rpc("get_monthly_cylinder_totals_by_gas_type", { p_year: previousYear, p_location: locationFilter }),
-      supabase.rpc("get_yearly_totals_by_customer", { p_year: currentYear, p_location: locationFilter }),
-      supabase.rpc("get_yearly_totals_by_customer", { p_year: previousYear, p_location: locationFilter }),
-      supabase.rpc("get_monthly_cylinder_totals_by_customer", { p_year: currentYear, p_location: locationFilter }),
-      supabase.rpc("get_monthly_cylinder_totals_by_customer", { p_year: previousYear, p_location: locationFilter }),
-      supabase.rpc("get_monthly_cylinder_totals_by_size", { p_year: currentYear, p_location: locationFilter }),
-      supabase.rpc("get_monthly_cylinder_totals_by_size", { p_year: previousYear, p_location: locationFilter })
+      api.reports.getMonthlyOrderTotals(currentYear, "cylinder", locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyOrderTotals(previousYear, "cylinder", locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyOrderTotals(currentYear, "dry_ice", locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyOrderTotals(previousYear, "dry_ice", locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyCylinderTotalsByGasType(currentYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyCylinderTotalsByGasType(previousYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getYearlyTotalsByCustomer(currentYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getYearlyTotalsByCustomer(previousYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyCylinderTotalsByCustomer(currentYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyCylinderTotalsByCustomer(previousYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyCylinderTotalsBySize(currentYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyCylinderTotalsBySize(previousYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error }))
     ]);
 
     // Process cylinder data from aggregated results
