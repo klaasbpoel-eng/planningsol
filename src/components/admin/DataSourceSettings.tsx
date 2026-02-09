@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Database, Save, Activity } from "lucide-react";
+import { Database, Save, Activity, Cloud } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { createClient } from "@supabase/supabase-js";
 
 export const STORAGE_KEY_DATA_SOURCE = "antigravity_data_source_config";
 
@@ -17,6 +18,9 @@ export interface DataSourceConfig {
     mysqlUser: string;
     mysqlPassword: string;
     mysqlDatabase: string;
+    useExternalSupabase: boolean;
+    externalSupabaseUrl: string;
+    externalSupabaseAnonKey: string;
 }
 
 const DEFAULT_CONFIG: DataSourceConfig = {
@@ -26,11 +30,15 @@ const DEFAULT_CONFIG: DataSourceConfig = {
     mysqlUser: "",
     mysqlPassword: "",
     mysqlDatabase: "",
+    useExternalSupabase: false,
+    externalSupabaseUrl: "",
+    externalSupabaseAnonKey: "",
 };
 
 export function DataSourceSettings() {
     const [config, setConfig] = useState<DataSourceConfig>(DEFAULT_CONFIG);
     const [testing, setTesting] = useState(false);
+    const [testingSupabase, setTestingSupabase] = useState(false);
 
     useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY_DATA_SOURCE);
@@ -50,8 +58,6 @@ export function DataSourceSettings() {
     const handleSave = () => {
         localStorage.setItem(STORAGE_KEY_DATA_SOURCE, JSON.stringify(config));
         toast.success("Instellingen opgeslagen");
-        // Reload to apply changes globally if needed, or rely on context/events. 
-        // For now, simple reload is safest to ensure all components pick up new config.
         setTimeout(() => window.location.reload(), 1000);
     };
 
@@ -80,23 +86,41 @@ export function DataSourceSettings() {
         }
     };
 
+    const handleTestExternalSupabase = async () => {
+        setTestingSupabase(true);
+        try {
+            if (!config.externalSupabaseUrl || !config.externalSupabaseAnonKey) {
+                throw new Error("Vul URL en Anon Key in");
+            }
+            const extClient = createClient(config.externalSupabaseUrl, config.externalSupabaseAnonKey);
+            const { error } = await extClient.from("customers").select("id").limit(1);
+            if (error) throw error;
+            toast.success("Externe Supabase verbinding succesvol!");
+        } catch (err) {
+            toast.error(`Verbinding mislukt: ${err instanceof Error ? err.message : String(err)}`);
+        } finally {
+            setTestingSupabase(false);
+        }
+    };
+
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Database className="h-5 w-5 text-primary" />
-                    Primaire Databron
+                    Databron Synchronisatie
                 </CardTitle>
                 <CardDescription>
-                    Kies of u Supabase (Cloud) of uw eigen MySQL database wilt gebruiken.
+                    Kies of u een externe MySQL en/of Supabase database wilt synchroniseren.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+                {/* MySQL Toggle */}
                 <div className="flex items-center justify-between space-x-2 border p-4 rounded-lg">
                     <Label htmlFor="use-mysql" className="flex flex-col space-y-1">
                         <span>Gebruik Externe MySQL Database</span>
                         <span className="font-normal text-xs text-muted-foreground">
-                            Schakel dit in om data uit uw eigen MySQL server te lezen en schrijven.
+                            Schakel dit in om data te synchroniseren naar uw eigen MySQL server.
                         </span>
                     </Label>
                     <Switch
@@ -157,6 +181,50 @@ export function DataSourceSettings() {
                         <div className="flex justify-end gap-2 pt-2">
                             <Button variant="outline" onClick={handleTestConnection} disabled={testing}>
                                 <Activity className={`mr-2 h-4 w-4 ${testing ? 'animate-spin' : ''}`} />
+                                Test Verbinding
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* External Supabase Toggle */}
+                <div className="flex items-center justify-between space-x-2 border p-4 rounded-lg">
+                    <Label htmlFor="use-external-supabase" className="flex flex-col space-y-1">
+                        <span>Gebruik Externe Supabase Database</span>
+                        <span className="font-normal text-xs text-muted-foreground">
+                            Schakel dit in om data te synchroniseren naar een externe Supabase instantie.
+                        </span>
+                    </Label>
+                    <Switch
+                        id="use-external-supabase"
+                        checked={config.useExternalSupabase}
+                        onCheckedChange={(c) => handleChange("useExternalSupabase", c)}
+                    />
+                </div>
+
+                {config.useExternalSupabase && (
+                    <div className="space-y-4 border-t pt-4 animate-in fade-in slide-in-from-top-4">
+                        <div className="space-y-2">
+                            <Label>Supabase URL</Label>
+                            <Input
+                                value={config.externalSupabaseUrl}
+                                onChange={e => handleChange("externalSupabaseUrl", e.target.value)}
+                                placeholder="https://xxxxx.supabase.co"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Anon Key</Label>
+                            <Input
+                                type="password"
+                                value={config.externalSupabaseAnonKey}
+                                onChange={e => handleChange("externalSupabaseAnonKey", e.target.value)}
+                                placeholder="eyJhbGciOiJIUzI1NiIs..."
+                            />
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="outline" onClick={handleTestExternalSupabase} disabled={testingSupabase}>
+                                <Cloud className={`mr-2 h-4 w-4 ${testingSupabase ? 'animate-spin' : ''}`} />
                                 Test Verbinding
                             </Button>
                         </div>
