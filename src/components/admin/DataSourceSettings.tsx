@@ -197,6 +197,16 @@ export function DataSourceSettings() {
                                 <Input
                                     value={config.mysqlHost}
                                     onChange={e => handleChange("mysqlHost", e.target.value)}
+                                    onBlur={e => {
+                                        let h = e.target.value.trim();
+                                        h = h.replace(/^https?:\/\//i, "");
+                                        h = h.replace(/[?#].*$/, "");
+                                        h = h.replace(/\/.*$/, "");
+                                        h = h.replace(/:\d+$/, "");
+                                        if (h !== config.mysqlHost) {
+                                            handleChange("mysqlHost", h);
+                                        }
+                                    }}
                                     placeholder="localhost of IP"
                                 />
                             </div>
