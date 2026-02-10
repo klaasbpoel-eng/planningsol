@@ -1,11 +1,18 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import mysql from "https://esm.sh/mysql2@3.9.7/promise";
+import { Client } from "https://deno.land/x/mysql@v2.12.1/mod.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers":
         "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+function sanitizeHost(raw: string): string {
+    let h = raw.trim();
+    h = h.replace(/^https?:\/\//i, "");
+    h = h.replace(/\/.*$/, "");
+    h = h.replace(/:\d+$/, "");
+    return h;
+}
 
 Deno.serve(async (req) => {
     if (req.method === "OPTIONS") {
@@ -24,29 +31,23 @@ Deno.serve(async (req) => {
             throw new Error("Missing connection details or query");
         }
 
-        // Connect to MySQL
-        const connection = await mysql.createConnection({
-            host,
+        const client = await new Client().connect({
+            hostname: sanitizeHost(host),
             port: port || 3306,
-            user,
+            username: user,
             password,
-            database,
+            db: database,
         });
 
         try {
-            const [rows, fields] = await connection.execute(query, params || []);
-            await connection.end();
+            const result = await client.execute(query, params || []);
+            await client.close();
 
-            // Convert BigInt to string to avoid JSON serialization issues
-            const result = JSON.parse(JSON.stringify(rows, (key, value) =>
-                typeof value === "bigint" ? value.toString() : value
-            ));
-
-            return new Response(JSON.stringify({ data: result }), {
+            return new Response(JSON.stringify({ data: result.rows || [] }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         } catch (dbError) {
-            await connection.end();
+            await client.close();
             throw dbError;
         }
 
