@@ -442,9 +442,10 @@ export const api = {
                     { column: "scheduled_date", op: "gte", value: startDate },
                     { column: "scheduled_date", op: "lte", value: endDate }
                 ],
-                orderBy: "scheduled_date",
+                orderBy: "updated_at",
+                orderAsc: false,
                 limit: 5000,
-                mysqlQuery: `SELECT * FROM gas_cylinder_orders WHERE scheduled_date >= '${startDate}' AND scheduled_date <= '${endDate}' ORDER BY scheduled_date LIMIT 5000`
+                mysqlQuery: `SELECT * FROM gas_cylinder_orders WHERE scheduled_date >= '${startDate}' AND scheduled_date <= '${endDate}' ORDER BY updated_at DESC LIMIT 5000`
             });
         },
         create: async (item: any) => {
@@ -463,8 +464,9 @@ export const api = {
                     { column: "status", op: "eq", value: "pending" },
                     { column: "scheduled_date", op: "gte", value: fromDate }
                 ],
-                orderBy: "scheduled_date",
-                mysqlQuery: `SELECT * FROM gas_cylinder_orders WHERE status = 'pending' AND scheduled_date >= '${fromDate}' ORDER BY scheduled_date`
+                orderBy: "updated_at",
+                orderAsc: false,
+                mysqlQuery: `SELECT * FROM gas_cylinder_orders WHERE status = 'pending' AND scheduled_date >= '${fromDate}' ORDER BY updated_at DESC`
             });
         }
     },
