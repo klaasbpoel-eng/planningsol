@@ -1,77 +1,48 @@
 
-## Fix: MySQL Verbinding - Deno-compatibele MySQL Client
 
-### Probleem
+## Fix: Dropdowns in kalender-dialogen
 
-De `query-mysql` backend functie werkt niet omdat de `mysql2` library via `esm.sh` wordt geladen. Deze library is gebouwd voor Node.js en gebruikt interne Node.js modules (`net`, `tls`, `crypto`) die niet beschikbaar zijn in de Deno runtime. Hierdoor crasht de functie direct bij het opstarten met:
+### Wat wordt er gedaan
 
-```
-TypeError: Cannot read properties of undefined (reading 'prototype')
-```
+De dropdowns (categorie, medewerker, status, prioriteit) in de taak- en andere kalender-dialogen werken niet omdat ze door de dialog worden geblokkeerd. Dit wordt in twee stappen opgelost:
 
-Daarnaast bevat het host-veld in de instellingen een protocol-prefix (`https://`) die voor verbindingsfouten zorgt.
+### Stap 1: Dialog-component aanpassen
 
-### Oplossing
+**Bestand: `src/components/ui/dialog.tsx`**
 
-**1. Backend functie herschrijven met Deno-native MySQL client**
+Een handler toevoegen aan het DialogContent component die voorkomt dat de dialog sluit wanneer je op een dropdown-item klikt. De dropdown-menu's worden namelijk buiten de dialog gerenderd, waardoor de dialog denkt dat je "erbuiten" klikt.
 
-De `mysql2` import vervangen door de Deno-native MySQL driver (`deno.land/x/mysql@v2.12.1`). Deze driver is specifiek gebouwd voor Deno en heeft geen Node.js afhankelijkheden.
+### Stap 2: `modal={false}` terugdraaien
 
-**Bestand: `supabase/functions/query-mysql/index.ts`**
+In alle 5 kalender-dialogen wordt `modal={false}` weer verwijderd zodat de overlay en focus correct blijven werken:
 
-Wijzigingen:
-- Import wijzigen van `esm.sh/mysql2` naar `deno.land/x/mysql@v2.12.1/mod.ts`
-- Verbindingsparameters aanpassen aan de API van de nieuwe client (`hostname` i.p.v. `host`, `username` i.p.v. `user`, `db` i.p.v. `database`)
-- Query-uitvoering aanpassen: `client.execute(query, params)` retourneert `{ rows }` in plaats van een tuple `[rows, fields]`
-- Verbinding sluiten via `client.close()` i.p.v. `connection.end()`
-- Ongebruikte `createClient` import van supabase verwijderen
-- Host-sanitization toevoegen: protocol, paden en poortnummers uit de hostname strippen
+- `CreateTaskDialog.tsx`
+- `CreateLeaveRequestDialog.tsx`
+- `CreateDryIceOrderCalendarDialog.tsx`
+- `CalendarItemDialog.tsx` (2 plekken)
+- `DryIceOrderDialog.tsx`
 
-**2. Host-validatie toevoegen aan de instellingen**
+### Technisch detail
 
-**Bestand: `src/components/admin/DataSourceSettings.tsx`**
+De `DialogContent` component krijgt een `onPointerDownOutside` handler die controleert of de klik op een Radix dropdown-element was. Zo ja, dan wordt het sluiten van de dialog voorkomen:
 
-- `onBlur` handler toevoegen aan het Host invoerveld
-- Bij verlaten van het veld automatisch `https://`, `http://`, paden, query-parameters en poortnummers verwijderen
-- Zo wordt altijd alleen de kale hostname opgeslagen (bijv. `web0131.zxcs.nl`)
-
-### Technische details
-
-Huidige import (werkt niet):
 ```typescript
-import mysql from "https://esm.sh/mysql2@3.9.7/promise";
-```
-
-Nieuwe import (Deno-native):
-```typescript
-import { Client } from "https://deno.land/x/mysql@v2.12.1/mod.ts";
-```
-
-API-mapping:
-| Oud (mysql2)                    | Nieuw (deno_mysql)                  |
-|---------------------------------|-------------------------------------|
-| `mysql.createConnection({...})` | `new Client().connect({...})`       |
-| `host`                          | `hostname`                          |
-| `user`                          | `username`                          |
-| `database`                      | `db`                                |
-| `connection.execute(q, p)`      | `client.execute(q, p)`             |
-| `[rows, fields]` (tuple)       | `{ rows }` (object)                |
-| `connection.end()`              | `client.close()`                    |
-
-Host-sanitization in de backend functie:
-```typescript
-function sanitizeHost(raw: string): string {
-  let h = raw.trim();
-  h = h.replace(/^https?:\/\//i, "");
-  h = h.replace(/\/.*$/, "");
-  h = h.replace(/:\d+$/, "");
-  return h;
-}
+onPointerDownOutside={(e) => {
+  const target = e.target as HTMLElement;
+  if (target?.closest("[data-radix-popper-content-wrapper]")) {
+    e.preventDefault();
+  }
+}}
 ```
 
 ### Overzicht bestanden
 
 | Bestand | Wijziging |
 |---------|-----------|
-| `supabase/functions/query-mysql/index.ts` | Herschrijven: mysql2 vervangen door Deno-native MySQL client + host-sanitization |
-| `src/components/admin/DataSourceSettings.tsx` | onBlur host-validatie toevoegen |
+| `src/components/ui/dialog.tsx` | `onPointerDownOutside` handler toevoegen |
+| `src/components/calendar/CreateTaskDialog.tsx` | `modal={false}` verwijderen |
+| `src/components/calendar/CreateLeaveRequestDialog.tsx` | `modal={false}` verwijderen |
+| `src/components/calendar/CreateDryIceOrderCalendarDialog.tsx` | `modal={false}` verwijderen |
+| `src/components/calendar/CalendarItemDialog.tsx` | `modal={false}` verwijderen (2x) |
+| `src/components/calendar/DryIceOrderDialog.tsx` | `modal={false}` verwijderen |
+
