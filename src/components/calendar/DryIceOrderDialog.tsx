@@ -242,7 +242,7 @@ export function DryIceOrderDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={handleClose} modal={false}>
+      <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent className="sm:max-w-[500px] w-[95%] rounded-lg">
           <DialogHeader>
             <div className="flex items-center gap-3">

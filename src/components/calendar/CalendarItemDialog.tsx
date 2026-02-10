@@ -368,7 +368,7 @@ export function CalendarItemDialog({
     
     return (
       <>
-      <Dialog open={open} onOpenChange={handleClose} modal={false}>
+      <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <div className="flex items-center gap-3">
@@ -619,7 +619,7 @@ export function CalendarItemDialog({
   
   return (
     <>
-    <Dialog open={open} onOpenChange={handleClose} modal={false}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <div className="flex items-center gap-3">
