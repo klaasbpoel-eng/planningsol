@@ -1,84 +1,75 @@
 
+## Fix: Top 5 Klanten Widget + Build Errors
 
-## DirectAdmin Deployment Export + Build Fix
+### Probleem
 
-### 1. Build Error Fix
+De "Top 5 Klanten" widget toont "Geen klantdata beschikbaar" terwijl er wel data in de database staat (2.305 cilinders in februari 2026). Uit analyse blijkt:
 
-The edge function `supabase/functions/query-mysql/index.ts` uses `npm:mysql2/promise` which fails in the current Deno environment. This will be fixed by using the `esm.sh` CDN import pattern instead, consistent with the Supabase client import on line 1 of the same file.
+1. De RPC-functies `get_customer_totals_by_period` en `get_yearly_totals_by_customer` bestaan en bevatten correcte queries
+2. Er zijn geen RPC-calls zichtbaar in de netwerkverzoeken -- dit wijst erop dat de aanroep ofwel faalt voor de netwerkcall, ofwel de fout stil wordt afgevangen
+3. De `.catch()` in de widget retourneert `null`, waardoor `customers` leeg blijft zonder foutmelding
+4. Er zijn daarnaast 3 TypeScript build-fouten in edge functions die opgelost moeten worden
 
-**Change:** Replace `import mysql from "npm:mysql2/promise"` with a compatible ESM import.
+### Oorzaak
 
-### 2. DirectAdmin Export Feature
+De widget vangt fouten stil op via `.catch()` zonder feedback aan de gebruiker. Als de RPC-call faalt (bijv. door een kortstondig auth-probleem of type-mismatch), wordt dit niet zichtbaar.
 
-A new component will be added to the Admin Settings that generates a ZIP file containing everything needed to deploy the app on a DirectAdmin (shared hosting) environment. Since this is a Vite/React SPA, the deployment package consists of the production build output plus hosting configuration files.
+### Oplossing
 
-**What the ZIP will contain:**
+**1. `src/components/production/TopCustomersWidget.tsx` -- Betere foutafhandeling + fallback**
 
-| File | Purpose |
-|------|---------|
-| `public_html/` | All built assets (the Vite production build output, fetched from the published site) |
-| `.htaccess` | Apache rewrite rules for SPA routing (all routes to index.html) |
-| `README.txt` | Deployment instructions |
+- Error state toevoegen zodat fouten zichtbaar worden in de UI
+- Bij een fout: toon een "Opnieuw proberen" knop
+- Voeg een `console.error` toe met meer context zodat fouten makkelijker te debuggen zijn
+- Voeg een retry-mechanisme toe: als de eerste poging faalt, probeer het nog een keer na 1 seconde
 
-**How it works:**
+**2. Edge Function build errors fixen (3 bestanden)**
 
-Since we cannot run `vite build` in the browser, the component will:
-1. Fetch the published site's `index.html` and parse it for asset references (JS, CSS chunks)
-2. Fetch all referenced assets
-3. Bundle everything into a ZIP using the existing approach (client-side, using JSZip library)
-4. Include a pre-configured `.htaccess` for Apache/DirectAdmin SPA routing
-5. Include a `README.txt` with step-by-step deployment instructions
+Alle drie de fouten zijn hetzelfde: `'error' is of type 'unknown'`. Oplossing: cast `error` naar `Error` type.
 
-**New dependency:** `jszip` (for creating ZIP files client-side)
+| Bestand | Regel | Fix |
+|---------|-------|-----|
+| `supabase/functions/export-mysql-dump/index.ts` | 299 | `(e as Error).message` |
+| `supabase/functions/fetch-published-site/index.ts` | 47 | `(error as Error).message` |
+| `supabase/functions/query-mysql/index.ts` | 54 | `(error as Error).message` |
 
-### Files
+### Technische Details
 
-| File | Change |
-|------|--------|
-| `supabase/functions/query-mysql/index.ts` | Fix mysql2 import for Deno compatibility |
-| `src/components/admin/DirectAdminExport.tsx` | **New** -- Component with "Download ZIP" button |
-| `src/components/admin/AdminSettings.tsx` | Add DirectAdmin export tab/section under "Database Export" or as new tab |
+Aangepaste foutafhandeling in de widget:
 
-### Technical Details
+```typescript
+const [error, setError] = useState<string | null>(null);
 
-**`.htaccess` contents (generated in ZIP):**
-```text
-RewriteEngine On
-RewriteBase /
-RewriteRule ^index\.html$ - [L]
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule . /index.html [L]
-
-# Enable gzip compression
-<IfModule mod_deflate.c>
-  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
-</IfModule>
-
-# Cache static assets
-<IfModule mod_expires.c>
-  ExpiresActive On
-  ExpiresByType text/css "access plus 1 year"
-  ExpiresByType application/javascript "access plus 1 year"
-  ExpiresByType image/png "access plus 1 month"
-  ExpiresByType image/svg+xml "access plus 1 month"
-</IfModule>
+const fetchTopCustomers = async (retryCount = 0) => {
+  setLoading(true);
+  setError(null);
+  try {
+    if (dateRange) {
+      await fetchCustomersByDateRange(dateRange);
+    } else {
+      await fetchCustomersByYear();
+    }
+  } catch (err) {
+    console.error("Error fetching top customers:", err);
+    if (retryCount < 1) {
+      // Retry once after a short delay
+      setTimeout(() => fetchTopCustomers(retryCount + 1), 1000);
+      return;
+    }
+    setError("Kon klantdata niet laden");
+  } finally {
+    setLoading(false);
+  }
+};
 ```
 
-**DirectAdminExport component approach:**
-- Fetches the published app URL's HTML
-- Parses all `<script>` and `<link>` tags to find asset URLs
-- Downloads each asset via fetch
-- Packages all files into a ZIP using JSZip
-- Triggers browser download of the ZIP
+En in de render bij een fout een "Opnieuw proberen" knop tonen in plaats van alleen "Geen klantdata beschikbaar".
 
-**README.txt contents (generated):**
-```
-SOL Planner - DirectAdmin Deployment
-=====================================
-1. Upload the contents of the public_html folder to your domain's public_html directory
-2. Upload the .htaccess file to the same directory
-3. Ensure mod_rewrite is enabled on your hosting
-4. Visit your domain to verify the deployment
-```
+### Overzicht bestanden
 
+| Bestand | Wijziging |
+|---------|-----------|
+| `src/components/production/TopCustomersWidget.tsx` | Error state + retry logica + UI feedback bij fouten |
+| `supabase/functions/export-mysql-dump/index.ts` | Fix `unknown` type error |
+| `supabase/functions/fetch-published-site/index.ts` | Fix `unknown` type error |
+| `supabase/functions/query-mysql/index.ts` | Fix `unknown` type error |
