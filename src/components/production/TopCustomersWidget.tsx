@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Trophy, TrendingUp, TrendingDown, Minus, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
 import { FadeIn } from "@/components/ui/fade-in";
@@ -42,27 +43,33 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
 }: TopCustomersWidgetProps) {
   const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTopCustomers();
   }, [refreshKey, location, dateRange]);
 
-  const fetchTopCustomers = async () => {
+  const fetchTopCustomers = useCallback(async (retryCount = 0) => {
     setLoading(true);
+    setError(null);
 
     try {
-      // Determine if using custom date range or year-based
       if (dateRange) {
         await fetchCustomersByDateRange(dateRange);
       } else {
         await fetchCustomersByYear();
       }
-    } catch (error) {
-      console.error("Error fetching top customers:", error);
+    } catch (err) {
+      console.error("[TopCustomersWidget] Error fetching top customers:", err);
+      if (retryCount < 1) {
+        setTimeout(() => fetchTopCustomers(retryCount + 1), 1000);
+        return;
+      }
+      setError("Kon klantdata niet laden");
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange, location]);
 
   const fetchCustomersByYear = async () => {
     const currentYear = new Date().getFullYear();
@@ -74,7 +81,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
     const [currentData, previousData] = await Promise.all([
       api.reports.getYearlyTotalsByCustomer(currentYear, locationFilter).catch(error => {
         console.error("[TopCustomersWidget] Error fetching current year data:", error);
-        return null;
+        throw error;
       }),
       api.reports.getYearlyTotalsByCustomer(previousYear, locationFilter).catch(error => {
         console.error("[TopCustomersWidget] Error fetching previous year data:", error);
@@ -136,7 +143,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
     const [currentData, previousData] = await Promise.all([
       api.reports.getCustomerTotals(fromDate, toDate, locationFilter).catch(error => {
         console.error("[TopCustomersWidget] Error fetching current period data:", error);
-        return null;
+        throw error;
       }),
       api.reports.getCustomerTotals(prevFromDate, prevToDate, locationFilter).catch(error => {
         console.error("[TopCustomersWidget] Error fetching previous period data:", error);
@@ -228,7 +235,15 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          {customers.length === 0 ? (
+          {error ? (
+            <div className="text-center py-4 space-y-2">
+              <p className="text-sm text-destructive">{error}</p>
+              <Button variant="outline" size="sm" onClick={() => fetchTopCustomers()}>
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Opnieuw proberen
+              </Button>
+            </div>
+          ) : customers.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
               Geen klantdata beschikbaar
             </p>
