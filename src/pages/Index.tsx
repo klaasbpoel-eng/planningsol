@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { Dashboard } from "@/components/dashboard/Dashboard";
@@ -12,6 +13,7 @@ import { UserLaunchpad } from "@/components/dashboard/UserLaunchpad";
 import type { User } from "@supabase/supabase-js";
 
 const Index = () => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAdminView, setShowAdminView] = useState(false);
@@ -57,6 +59,11 @@ const Index = () => {
         <PendingApproval />
       </PageTransition>
     );
+  }
+  // Redirect customers to their order page
+  if (role === "customer") {
+    navigate("/bestellen", { replace: true });
+    return null;
   }
 
   // Show admin dashboard for admins who want to see it
