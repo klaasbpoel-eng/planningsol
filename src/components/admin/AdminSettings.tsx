@@ -1,4 +1,5 @@
 import { CustomerAssortmentManager } from "./CustomerAssortmentManager";
+import { CustomerUserLinkManager } from "./CustomerUserLinkManager";
 import { CategoryManagement } from "./CategoryManagement";
 import { LeaveTypeManagement } from "./LeaveTypeManagement";
 import { GasCylinderSettings } from "./GasCylinderSettings";
@@ -89,6 +90,7 @@ export function AdminSettings() {
 
         <TabsContent value="customers" className="space-y-4 animate-fade-in-up">
           <CustomerManagement isAdmin />
+          <CustomerUserLinkManager />
           <CustomerAssortmentManager />
         </TabsContent>
 
