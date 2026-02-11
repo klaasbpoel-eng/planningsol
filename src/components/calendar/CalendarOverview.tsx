@@ -1639,18 +1639,6 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
 
       <div className="px-4 py-4 border-b border-border/50">
         <div className="flex flex-col gap-5">
-          {fetchError && (
-            <Button variant="destructive" size="sm" onClick={() => {
-              // Trigger repair logic
-              // @ts-ignore
-              api.admin.repairDatabase().then(() => {
-                alert("Reparatie gereed. Herladen...");
-                window.location.reload();
-              }).catch((e: any) => alert("Fout: " + e.message));
-            }}>
-              Herstel Database
-            </Button>
-          )}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <CardTitle className="flex items-center gap-3 text-xl font-bold">

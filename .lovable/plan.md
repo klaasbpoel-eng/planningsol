@@ -1,77 +1,138 @@
 
-## Fix: MySQL Verbinding - Deno-compatibele MySQL Client
+## Snel Bestellen voor Klanten
 
-### Probleem
+### Overzicht
 
-De `query-mysql` backend functie werkt niet omdat de `mysql2` library via `esm.sh` wordt geladen. Deze library is gebouwd voor Node.js en gebruikt interne Node.js modules (`net`, `tls`, `crypto`) die niet beschikbaar zijn in de Deno runtime. Hierdoor crasht de functie direct bij het opstarten met:
+Een compleet klantbestelportaal waar klanten zelf inloggen en alleen hun eigen assortiment zien en kunnen bestellen. Dit bestaat uit drie onderdelen:
 
-```
-TypeError: Cannot read properties of undefined (reading 'prototype')
-```
+1. **Database-aanpassingen**: Klanten koppelen aan gebruikersaccounts + RLS policies
+2. **Admin: Assortimentbeheer**: Pagina waar admins producten aan klanten koppelen
+3. **Klantportaal: Snel Bestellen**: Bestelformulier waar klanten hun producten zien en bestellen
 
-Daarnaast bevat het host-veld in de instellingen een protocol-prefix (`https://`) die voor verbindingsfouten zorgt.
+---
 
-### Oplossing
+### Stap 1: Database-aanpassingen
 
-**1. Backend functie herschrijven met Deno-native MySQL client**
+**Nieuwe tabel: `customer_users`**
+Koppelt een Supabase auth-gebruiker aan een klant:
+- `user_id` (uuid, verwijst naar auth.users)
+- `customer_id` (uuid, verwijst naar customers)
 
-De `mysql2` import vervangen door de Deno-native MySQL driver (`deno.land/x/mysql@v2.12.1`). Deze driver is specifiek gebouwd voor Deno en heeft geen Node.js afhankelijkheden.
+Dit maakt het mogelijk dat een klant inlogt en automatisch zijn assortiment ziet.
 
-**Bestand: `supabase/functions/query-mysql/index.ts`**
+**Nieuwe `app_role` waarde: `customer`**
+Toevoegen aan de bestaande `app_role` enum zodat klanten een eigen rol krijgen en niet als 'user' worden behandeld.
 
-Wijzigingen:
-- Import wijzigen van `esm.sh/mysql2` naar `deno.land/x/mysql@v2.12.1/mod.ts`
-- Verbindingsparameters aanpassen aan de API van de nieuwe client (`hostname` i.p.v. `host`, `username` i.p.v. `user`, `db` i.p.v. `database`)
-- Query-uitvoering aanpassen: `client.execute(query, params)` retourneert `{ rows }` in plaats van een tuple `[rows, fields]`
-- Verbinding sluiten via `client.close()` i.p.v. `connection.end()`
-- Ongebruikte `createClient` import van supabase verwijderen
-- Host-sanitization toevoegen: protocol, paden en poortnummers uit de hostname strippen
+**RLS policies voor `customer_products`**
+- Klanten mogen alleen hun eigen assortiment zien (via `customer_users` koppeling)
+- Admins hebben volledige toegang
 
-**2. Host-validatie toevoegen aan de instellingen**
+**RLS policies voor `orders` en `order_items`**
+- Klanten mogen orders aanmaken voor hun eigen klant-account
+- Klanten mogen hun eigen orders inzien
 
-**Bestand: `src/components/admin/DataSourceSettings.tsx`**
+**RLS policy updates voor `products`**
+- Klanten mogen actieve producten lezen (nodig voor assortiment-weergave)
 
-- `onBlur` handler toevoegen aan het Host invoerveld
-- Bij verlaten van het veld automatisch `https://`, `http://`, paden, query-parameters en poortnummers verwijderen
-- Zo wordt altijd alleen de kale hostname opgeslagen (bijv. `web0131.zxcs.nl`)
+---
+
+### Stap 2: Admin - Assortimentbeheer
+
+**Nieuw component: `CustomerAssortmentManager`**
+
+Wordt toegevoegd aan het bestaande admin-gedeelte. Per klant kun je:
+- Producten zoeken en toevoegen aan het assortiment (via `customer_products` tabel)
+- Producten verwijderen uit het assortiment
+- Het huidige assortiment bekijken, gegroepeerd per categorie
+
+De admin selecteert een klant, ziet het huidige assortiment, en kan producten toevoegen/verwijderen met een zoekbare select.
+
+---
+
+### Stap 3: Klantportaal - Snel Bestellen
+
+**Nieuwe pagina: `/bestellen`**
+
+Wanneer een klant inlogt, komt deze op een bestelformulier:
+- Toont alleen producten uit het eigen assortiment (via `customer_products`)
+- Producten gegroepeerd per categorie met zoekfunctie
+- Per product een hoeveelheid-invoer (+/- knoppen)
+- Winkelwagen-overzicht met totalen
+- Optioneel notities-veld en gewenste leverdatum
+- Bevestig-knop die een `orders` + `order_items` record aanmaakt
+- Na bestelling: bevestigingsmelding met ordernummer
+
+**Nieuwe pagina: `/mijn-bestellingen`**
+
+Overzicht van eerdere bestellingen van de klant:
+- Ordernummer, datum, status, aantal items
+- Klik om details te bekijken
+
+---
+
+### Stap 4: Navigatie en routing
+
+- Klanten zien een aparte navigatie: "Bestellen" en "Mijn Bestellingen"
+- Medewerkers (operators/admins) zien de bestaande navigatie
+- Route `/bestellen` en `/mijn-bestellingen` toevoegen aan `App.tsx`
+
+---
+
+### Bestanden overzicht
+
+| Bestand | Actie |
+|---------|-------|
+| Migratie SQL | Nieuw: `customer_users` tabel, `customer` role, RLS policies |
+| `src/pages/CustomerOrderPage.tsx` | Nieuw: Snel Bestellen pagina |
+| `src/pages/CustomerOrderHistoryPage.tsx` | Nieuw: Mijn Bestellingen pagina |
+| `src/components/customer-portal/QuickOrderForm.tsx` | Nieuw: Bestelformulier component |
+| `src/components/customer-portal/OrderHistory.tsx` | Nieuw: Bestelgeschiedenis component |
+| `src/components/admin/CustomerAssortmentManager.tsx` | Nieuw: Admin assortimentbeheer |
+| `src/hooks/useCustomerPortal.ts` | Nieuw: Hook voor klant-data en bestelfunctionaliteit |
+| `src/App.tsx` | Aangepast: Nieuwe routes |
+| `src/components/layout/Header.tsx` | Aangepast: Klant-specifieke navigatie |
 
 ### Technische details
 
-Huidige import (werkt niet):
-```typescript
-import mysql from "https://esm.sh/mysql2@3.9.7/promise";
+**customer_users tabel:**
+```sql
+CREATE TABLE public.customer_users (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  customer_id uuid REFERENCES public.customers(id) ON DELETE CASCADE NOT NULL,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(user_id)
+);
 ```
 
-Nieuwe import (Deno-native):
+**Klant-assortiment ophalen (in hook):**
 ```typescript
-import { Client } from "https://deno.land/x/mysql@v2.12.1/mod.ts";
+const { data } = await supabase
+  .from("customer_products")
+  .select("*, product:products(*)")
+  .eq("customer_id", customerUser.customer_id);
 ```
 
-API-mapping:
-| Oud (mysql2)                    | Nieuw (deno_mysql)                  |
-|---------------------------------|-------------------------------------|
-| `mysql.createConnection({...})` | `new Client().connect({...})`       |
-| `host`                          | `hostname`                          |
-| `user`                          | `username`                          |
-| `database`                      | `db`                                |
-| `connection.execute(q, p)`      | `client.execute(q, p)`             |
-| `[rows, fields]` (tuple)       | `{ rows }` (object)                |
-| `connection.end()`              | `client.close()`                    |
-
-Host-sanitization in de backend functie:
+**Order aanmaken (in hook):**
 ```typescript
-function sanitizeHost(raw: string): string {
-  let h = raw.trim();
-  h = h.replace(/^https?:\/\//i, "");
-  h = h.replace(/\/.*$/, "");
-  h = h.replace(/:\d+$/, "");
-  return h;
-}
+// 1. Insert order
+const { data: order } = await supabase.from("orders").insert({
+  order_number: generateOrderNumber(),
+  customer_id: customerUser.customer_id,
+  customer_name: customerUser.customer_name,
+  created_by: profileId,
+  delivery_date: selectedDate,
+  notes
+}).select().single();
+
+// 2. Insert items
+await supabase.from("order_items").insert(
+  items.map(item => ({
+    order_id: order.id,
+    product_id: item.product_id,
+    article_code: item.article_code,
+    product_name: item.product_name,
+    quantity: item.quantity
+  }))
+);
 ```
-
-### Overzicht bestanden
-
-| Bestand | Wijziging |
-|---------|-----------|
-| `supabase/functions/query-mysql/index.ts` | Herschrijven: mysql2 vervangen door Deno-native MySQL client + host-sanitization |
-| `src/components/admin/DataSourceSettings.tsx` | onBlur host-validatie toevoegen |
