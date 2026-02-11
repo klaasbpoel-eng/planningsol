@@ -13,3 +13,6 @@ verify_jwt = false
 
 [functions.export-mysql-dump]
 verify_jwt = false
+
+[functions.trigger-github-workflow]
+verify_jwt = false
