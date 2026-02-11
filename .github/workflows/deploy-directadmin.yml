@@ -3,6 +3,16 @@ run-name: Deploy to DirectAdmin by @${{ github.actor }}
 
 on:
   workflow_dispatch:
+    inputs:
+      primary_source:
+        description: 'Primary Data Source'
+        required: true
+        default: 'cloud'
+        type: choice
+        options:
+        - cloud
+        - external_supabase
+        - mysql
 
 jobs:
   web-deploy:
@@ -26,6 +36,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_DEFAULT_PRIMARY_SOURCE: ${{ inputs.primary_source }}
 
       - name: 📂 Sync files (FTP)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5

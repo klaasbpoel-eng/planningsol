@@ -16,8 +16,8 @@ Deno.serve(async (req) => {
     const githubPat = Deno.env.get("GITHUB_PAT");
 
     if (!githubPat) {
-       console.error("Missing GITHUB_PAT env variable");
-       throw new Error("Server configuratie fout: GITHUB_PAT ontbreekt");
+      console.error("Missing GITHUB_PAT env variable");
+      throw new Error("Server configuratie fout: GITHUB_PAT ontbreekt");
     }
 
     // Verify the user is authenticated and is admin
@@ -42,9 +42,12 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Parse request body for inputs
+    const { primary_source } = await req.json().catch(() => ({}));
+
     // Trigger GitHub Workflow
     // Using 'deploy-directadmin.yml' as the workflow filename
-    console.log("Triggering GitHub Workflow...");
+    console.log(`Triggering GitHub Workflow with primary_source: ${primary_source || 'default'}...`);
     const res = await fetch(
       "https://api.github.com/repos/klaasbpoel-eng/planningsol/actions/workflows/deploy-directadmin.yml/dispatches",
       {
@@ -55,15 +58,18 @@ Deno.serve(async (req) => {
           "X-GitHub-Api-Version": "2022-11-28",
         },
         body: JSON.stringify({
-          ref: "main", 
+          ref: "main",
+          inputs: {
+            primary_source: primary_source || "cloud",
+          }
         }),
       }
     );
 
     if (!res.ok) {
-        const errorText = await res.text();
-        console.error("GitHub API Error:", res.status, errorText);
-        throw new Error(`Fout bij communicatie met GitHub: ${res.status}`);
+      const errorText = await res.text();
+      console.error("GitHub API Error:", res.status, errorText);
+      throw new Error(`Fout bij communicatie met GitHub: ${res.status}`);
     }
 
     return new Response(JSON.stringify({ message: "Deployment succesvol gestart! Het kan enkele minuten duren." }), {

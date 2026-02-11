@@ -3,15 +3,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Rocket, ExternalLink } from "lucide-react";
+import { Loader2, Rocket, ExternalLink, Database } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 export function DeploymentControl() {
     const [isLoading, setIsLoading] = useState(false);
+    const [selectedSource, setSelectedSource] = useState<string>("cloud");
 
     const handleDeploy = async () => {
         setIsLoading(true);
         try {
-            const { data, error } = await supabase.functions.invoke('trigger-github-workflow');
+            const { data, error } = await supabase.functions.invoke('trigger-github-workflow', {
+                body: {
+                    primary_source: selectedSource
+                }
+            });
 
             if (error) {
                 // Parse error body if possible
@@ -52,7 +59,39 @@ export function DeploymentControl() {
                     Zorg ervoor dat je alle lokale wijzigingen eerst hebt gesynchroniseerd ("Sync to GitHub").
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4">
+                <div className="space-y-2">
+                    <Label>Kies doel-database configuratie</Label>
+                    <Select value={selectedSource} onValueChange={setSelectedSource}>
+                        <SelectTrigger className="w-full md:w-[300px]">
+                            <SelectValue placeholder="Kies database..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="cloud">
+                                <span className="flex items-center gap-2">
+                                    <Database className="h-4 w-4" />
+                                    Lovable Cloud (Standaard)
+                                </span>
+                            </SelectItem>
+                            <SelectItem value="external_supabase">
+                                <span className="flex items-center gap-2">
+                                    <Database className="h-4 w-4 text-blue-500" />
+                                    Externe Supabase
+                                </span>
+                            </SelectItem>
+                            <SelectItem value="mysql">
+                                <span className="flex items-center gap-2">
+                                    <Database className="h-4 w-4 text-orange-500" />
+                                    MySQL
+                                </span>
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                        De geselecteerde database wordt ingesteld als primaire databron voor de nieuwe deployment.
+                    </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 pt-2">
                     <Button onClick={handleDeploy} disabled={isLoading}>
                         {isLoading ? (
                             <>

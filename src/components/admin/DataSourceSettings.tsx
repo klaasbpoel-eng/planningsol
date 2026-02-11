@@ -29,7 +29,7 @@ export interface DataSourceConfig {
 }
 
 const DEFAULT_CONFIG: DataSourceConfig = {
-    primarySource: "cloud",
+    primarySource: (import.meta.env.VITE_DEFAULT_PRIMARY_SOURCE as PrimarySource) || "cloud",
     useMySQL: false,
     mysqlHost: "",
     mysqlPort: "3306",
