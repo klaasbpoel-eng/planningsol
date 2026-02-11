@@ -10,6 +10,8 @@ import { DatabaseBackupRestore } from "./DatabaseBackupRestore";
 import { MigrationSettings } from "./MigrationSettings";
 import { DataSourceSettings } from "./DataSourceSettings";
 import { DirectAdminExport } from "./DirectAdminExport";
+import { DeploymentManual } from "./DeploymentManual";
+import { DeploymentControl } from "./DeploymentControl";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Factory, Calendar, Building2, UserCog, Download, Server } from "lucide-react";
 
@@ -45,6 +47,10 @@ export function AdminSettings() {
             <Building2 className="h-4 w-4" />
             Klanten
           </TabsTrigger>
+          <TabsTrigger value="deployment" className="gap-2 data-[state=active]:bg-background">
+            <Server className="h-4 w-4" />
+            Deploy Server
+          </TabsTrigger>
           <TabsTrigger value="migration" className="gap-2 data-[state=active]:bg-background">
             <Download className="h-4 w-4" />
             Database Export
@@ -54,6 +60,7 @@ export function AdminSettings() {
         <TabsContent value="general" className="space-y-4 animate-fade-in-up">
           <div className="grid gap-4">
             <DefaultCustomerSetting />
+            <DeploymentControl />
             <DatabaseBackupRestore />
           </div>
         </TabsContent>
@@ -88,6 +95,10 @@ export function AdminSettings() {
 
         <TabsContent value="customers" className="space-y-4 animate-fade-in-up">
           <CustomerManagement isAdmin />
+        </TabsContent>
+
+        <TabsContent value="deployment" className="space-y-4 animate-fade-in-up">
+          <DeploymentManual />
         </TabsContent>
 
         <TabsContent value="migration" className="space-y-4 animate-fade-in-up">
