@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
-export type AppRole = "admin" | "supervisor" | "operator" | "user" | "customer";
+export type AppRole = "admin" | "supervisor" | "operator" | "user";
 export type ProductionLocation = Database["public"]["Enums"]["production_location"] | null;
 
 export interface RolePermissions {
@@ -113,25 +113,6 @@ const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
     canViewKPIDashboard: false,
     canViewAdvancedWidgets: false,
     canViewCalendar: true,
-    canViewTeamCalendar: false,
-  },
-  customer: {
-    canManageUsers: false,
-    canApproveUsers: false,
-    canAssignRoles: false,
-    canAccessSettings: false,
-    canApproveTimeOff: false,
-    canManageOwnTimeOff: false,
-    canViewOrders: true,
-    canCreateOrders: true,
-    canEditOrders: false,
-    canDeleteOrders: false,
-    canManageCustomers: false,
-    canViewCustomers: false,
-    canViewReports: false,
-    canViewKPIDashboard: false,
-    canViewAdvancedWidgets: false,
-    canViewCalendar: false,
     canViewTeamCalendar: false,
   },
 };

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck, BookOpen, ShoppingCart, ClipboardList } from "lucide-react";
+import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck, BookOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,6 @@ const ROLE_LABELS: Record<string, string> = {
   supervisor: "Supervisor",
   operator: "Operator",
   user: "Gebruiker",
-  customer: "Klant",
 };
 
 const ROLE_COLORS: Record<string, string> = {
@@ -26,7 +25,6 @@ const ROLE_COLORS: Record<string, string> = {
   supervisor: "bg-purple-500/10 text-purple-600 border-purple-200",
   operator: "bg-blue-500/10 text-blue-600 border-blue-200",
   user: "bg-gray-500/10 text-gray-600 border-gray-200",
-  customer: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
 };
 
 interface HeaderProps {
@@ -57,120 +55,81 @@ export function Header({
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
-  const isCustomer = role === "customer";
-
-  const NavLinks = ({ mobile = false }: { mobile?: boolean }) => {
-    if (isCustomer) {
-      return (
-        <>
-          <Link to="/bestellen" onClick={mobile ? closeMobileMenu : undefined}>
-            <Button
-              variant="ghost"
-              size={mobile ? "lg" : "sm"}
-              className={`${mobile ? "w-full justify-start text-base h-12" : ""
-                } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/bestellen"
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
-                  : ""
-                }`}
-            >
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              Bestellen
-            </Button>
-          </Link>
-          <Link to="/mijn-bestellingen" onClick={mobile ? closeMobileMenu : undefined}>
-            <Button
-              variant="ghost"
-              size={mobile ? "lg" : "sm"}
-              className={`${mobile ? "w-full justify-start text-base h-12" : ""
-                } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/mijn-bestellingen"
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
-                  : ""
-                }`}
-            >
-              <ClipboardList className="h-4 w-4 mr-2" />
-              Mijn Bestellingen
-            </Button>
-          </Link>
-        </>
-      );
-    }
-
-    return (
-      <>
-        <Link to="/kalender" onClick={mobile ? closeMobileMenu : undefined}>
-          <Button
-            variant="ghost"
-            size={mobile ? "lg" : "sm"}
-            className={`${mobile ? "w-full justify-start text-base h-12" : ""
-              } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/kalender"
-                ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
-                : ""
-              }`}
-          >
-            <CalendarDays className="h-4 w-4 mr-2" />
-            Kalender
-          </Button>
-        </Link>
-        <Link to="/productie" onClick={mobile ? closeMobileMenu : undefined}>
-          <Button
-            variant="ghost"
-            size={mobile ? "lg" : "sm"}
-            className={`${mobile ? "w-full justify-start text-base h-12" : ""
-              } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/productie"
-                ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
-                : ""
-              }`}
-          >
-            <Factory className="h-4 w-4 mr-2" />
-            Productie
-          </Button>
-        </Link>
-        <Link to="/interne-bestellingen" onClick={mobile ? closeMobileMenu : undefined}>
-          <Button
-            variant="ghost"
-            size={mobile ? "lg" : "sm"}
-            className={`${mobile ? "w-full justify-start text-base h-12" : ""
-              } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/interne-bestellingen"
-                ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
-                : ""
-              }`}
-          >
-            <Truck className="h-4 w-4 mr-2" />
-            Interne Bestellingen
-          </Button>
-        </Link>
-        <Link to="/toolbox" onClick={mobile ? closeMobileMenu : undefined}>
-          <Button
-            variant="ghost"
-            size={mobile ? "lg" : "sm"}
-            className={`${mobile ? "w-full justify-start text-base h-12" : ""
-              } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/toolbox"
-                ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
-                : ""
-              }`}
-          >
-            <BookOpen className="h-4 w-4 mr-2" />
-            Toolbox
-          </Button>
-        </Link>
-        {isAdmin && onSwitchView && (
-          <Button
-            variant="ghost"
-            size={mobile ? "lg" : "sm"}
-            onClick={() => {
-              onSwitchView();
-              if (mobile) closeMobileMenu();
-            }}
-            className={`${mobile ? "w-full justify-start text-base h-12" : ""
-              } text-primary hover:bg-primary/10 hover:text-primary`}
-          >
-            <ArrowLeftRight className="h-4 w-4 mr-2" />
-            Medewerkersweergave
-          </Button>
-        )}
-      </>
-    );
-  };
+  const NavLinks = ({ mobile = false }: { mobile?: boolean }) => (
+    <>
+      <Link to="/kalender" onClick={mobile ? closeMobileMenu : undefined}>
+        <Button
+          variant={mobile ? "ghost" : "ghost"}
+          size={mobile ? "lg" : "sm"}
+          className={`${mobile ? "w-full justify-start text-base h-12" : ""
+            } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/kalender"
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
+              : ""
+            }`}
+        >
+          <CalendarDays className="h-4 w-4 mr-2" />
+          Kalender
+        </Button>
+      </Link>
+      <Link to="/productie" onClick={mobile ? closeMobileMenu : undefined}>
+        <Button
+          variant={mobile ? "ghost" : "ghost"}
+          size={mobile ? "lg" : "sm"}
+          className={`${mobile ? "w-full justify-start text-base h-12" : ""
+            } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/productie"
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
+              : ""
+            }`}
+        >
+          <Factory className="h-4 w-4 mr-2" />
+          Productie
+        </Button>
+      </Link>
+      <Link to="/interne-bestellingen" onClick={mobile ? closeMobileMenu : undefined}>
+        <Button
+          variant={mobile ? "ghost" : "ghost"}
+          size={mobile ? "lg" : "sm"}
+          className={`${mobile ? "w-full justify-start text-base h-12" : ""
+            } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/interne-bestellingen"
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
+              : ""
+            }`}
+        >
+          <Truck className="h-4 w-4 mr-2" />
+          Interne Bestellingen
+        </Button>
+      </Link>
+      <Link to="/toolbox" onClick={mobile ? closeMobileMenu : undefined}>
+        <Button
+          variant={mobile ? "ghost" : "ghost"}
+          size={mobile ? "lg" : "sm"}
+          className={`${mobile ? "w-full justify-start text-base h-12" : ""
+            } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/toolbox"
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
+              : ""
+            }`}
+        >
+          <BookOpen className="h-4 w-4 mr-2" />
+          Toolbox
+        </Button>
+      </Link>
+      {isAdmin && onSwitchView && (
+        <Button
+          variant="ghost"
+          size={mobile ? "lg" : "sm"}
+          onClick={() => {
+            onSwitchView();
+            if (mobile) closeMobileMenu();
+          }}
+          className={`${mobile ? "w-full justify-start text-base h-12" : ""
+            } text-primary hover:bg-primary/10 hover:text-primary`}
+        >
+          <ArrowLeftRight className="h-4 w-4 mr-2" />
+          Medewerkersweergave
+        </Button>
+      )}
+    </>
+  );
 
   return (
     <header className="sticky top-0 z-50 w-full bg-primary-foreground shadow-md border-b border-border/50">

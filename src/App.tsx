@@ -11,8 +11,6 @@ import InternalOrdersPage from "./pages/InternalOrdersPage";
 import NotFound from "./pages/NotFound";
 import ToolboxPage from "./pages/ToolboxPage";
 import DashboardPage from "./pages/DashboardPage";
-import CustomerOrderPage from "./pages/CustomerOrderPage";
-import CustomerOrderHistoryPage from "./pages/CustomerOrderHistoryPage";
 
 
 const queryClient = new QueryClient();
@@ -31,8 +29,6 @@ const App = () => (
             <Route path="/kalender" element={<CalendarPage />} />
             <Route path="/productie" element={<ProductionPlanningPage />} />
             <Route path="/interne-bestellingen" element={<InternalOrdersPage />} />
-            <Route path="/bestellen" element={<CustomerOrderPage />} />
-            <Route path="/mijn-bestellingen" element={<CustomerOrderHistoryPage />} />
             <Route path="/toolbox" element={<ToolboxPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
