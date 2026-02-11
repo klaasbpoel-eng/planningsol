@@ -87,6 +87,42 @@ export type Database = {
           },
         ]
       }
+      customer_users: {
+        Row: {
+          created_at: string | null
+          customer_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_users_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_users_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_limited"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
@@ -1268,6 +1304,7 @@ export type Database = {
         Args: { p_order_type: string; p_year: number }
         Returns: number
       }
+      get_customer_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_customer_segments: {
         Args: { p_location?: string; p_year: number }
         Returns: {
@@ -1427,7 +1464,7 @@ export type Database = {
       is_user_approved: { Args: never; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "user" | "operator" | "supervisor"
+      app_role: "admin" | "user" | "operator" | "supervisor" | "customer"
       dry_ice_product_type: "blocks" | "pellets" | "sticks"
       gas_grade: "medical" | "technical"
       gas_type:
@@ -1573,7 +1610,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user", "operator", "supervisor"],
+      app_role: ["admin", "user", "operator", "supervisor", "customer"],
       dry_ice_product_type: ["blocks", "pellets", "sticks"],
       gas_grade: ["medical", "technical"],
       gas_type: [
