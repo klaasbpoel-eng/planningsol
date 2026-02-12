@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Header } from "@/components/layout/Header";
 import { PageTransition } from "@/components/ui/page-transition";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { toast } from "sonner";
@@ -269,7 +270,9 @@ const ToolboxPage = () => {
 
     return (
         <PageTransition>
-            <div className="min-h-screen overflow-x-hidden">
+            <div className="min-h-screen gradient-mesh overflow-x-hidden">
+                <Header userEmail={session?.user?.email} />
+
                 <main className="container mx-auto px-4 py-8">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                         <div>

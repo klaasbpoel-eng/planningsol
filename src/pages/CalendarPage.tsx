@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Header } from "@/components/layout/Header";
 import { CalendarOverview } from "@/components/calendar/CalendarOverview";
 import { PageTransition } from "@/components/ui/page-transition";
 import { Loader2 } from "lucide-react";
@@ -47,7 +48,9 @@ const CalendarPage = () => {
 
   return (
     <PageTransition>
-      <div className="min-h-screen flex flex-col overflow-x-hidden">
+      <div className="min-h-screen flex flex-col gradient-mesh overflow-x-hidden">
+        <Header userEmail={user.email} />
+
         <main className="flex-1 flex flex-col w-full px-[1%] md:px-[10%]">
           <CalendarOverview currentUser={user} />
         </main>

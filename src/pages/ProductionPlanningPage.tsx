@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Header } from "@/components/layout/Header";
 import { ProductionPlanning } from "@/components/production/ProductionPlanning";
 import { PageTransition } from "@/components/ui/page-transition";
 import { Loader2 } from "lucide-react";
@@ -49,8 +50,8 @@ const ProductionPlanningPage = () => {
 
   return (
     <PageTransition>
-      <div className="min-h-screen overflow-x-hidden">
-
+      <div className="min-h-screen gradient-mesh overflow-x-hidden">
+        <Header userEmail={user.email} role={role} />
 
         <main className="px-[1%] md:px-[10%] py-8 w-full">
           <div className="mb-8">

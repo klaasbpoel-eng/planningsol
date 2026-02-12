@@ -27,24 +27,22 @@ const ROLE_COLORS: Record<string, string> = {
   user: "bg-gray-500/10 text-gray-600 border-gray-200",
 };
 
-import { useDashboard } from "@/contexts/DashboardContext";
-
 interface HeaderProps {
   userEmail?: string;
   isAdmin?: boolean;
+  onSwitchView?: () => void;
   role?: AppRole;
 }
 
 export function Header({
   userEmail,
   isAdmin,
+  onSwitchView,
   role = "user",
 }: HeaderProps) {
   const location = useLocation();
   const isMobile = useIsMobile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { toggleView, showAdminView, setShowAdminView } = useDashboard();
-
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -115,19 +113,19 @@ export function Header({
           Toolbox
         </Button>
       </Link>
-      {isAdmin && location.pathname === "/" && (
+      {isAdmin && onSwitchView && (
         <Button
           variant="ghost"
           size={mobile ? "lg" : "sm"}
           onClick={() => {
-            toggleView();
+            onSwitchView();
             if (mobile) closeMobileMenu();
           }}
           className={`${mobile ? "w-full justify-start text-base h-12" : ""
             } text-primary hover:bg-primary/10 hover:text-primary`}
         >
           <ArrowLeftRight className="h-4 w-4 mr-2" />
-          {showAdminView ? "Medewerkersweergave" : "Admin Dashboard"}
+          Medewerkersweergave
         </Button>
       )}
     </>
