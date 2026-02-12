@@ -855,10 +855,59 @@ export const api = {
         getCustomerSegments: async (year: number, location: string | null) => {
             const source = getPrimarySource();
             if (source === "mysql") {
-                // Return empty array for MySQL for now as this is a complex analysis query
-                // that likely relies on window functions or specific views.
-                // TODO: Implement MySQL equivalent for customer segmentation
-                return [];
+                const params: any[] = [year]; // For trend analysis year check
+
+                // Query params construction needs to match the placeholders in the query.
+                // Queries:
+                // 1. Trend analysis (year)
+                // 2. Subquery 1 (year)
+                // 3. Subquery 1 (location - optional)
+                // 4. Subquery 2 (year)
+                // 5. Subquery 2 (location - optional)
+
+                params.push(year); // Subquery 1 year
+                if (location) params.push(location); // Subquery 1 location
+                params.push(year); // Subquery 2 year
+                if (location) params.push(location); // Subquery 2 location
+
+                const locClauseCyl = location ? " AND location = ?" : "";
+                const locClauseDry = location ? " AND location = ?" : "";
+
+                const query = `
+                    SELECT 
+                        customer_id,
+                        COALESCE(MAX(customer_name), 'Onbekend') as customer_name,
+                        CAST(SUM(cylinders) AS SIGNED) as total_cylinders,
+                        SUM(dry_ice_kg) as total_dry_ice_kg,
+                        COUNT(*) as order_count,
+                        MIN(order_date) as first_order_date,
+                        MAX(order_date) as last_order_date,
+                        (SUM(cylinders) + SUM(dry_ice_kg)) / NULLIF(COUNT(*), 0) as avg_order_size,
+                        CASE 
+                            WHEN (SUM(cylinders) + SUM(dry_ice_kg)) >= 1000 THEN 'gold'
+                            WHEN (SUM(cylinders) + SUM(dry_ice_kg)) >= 500 THEN 'silver'
+                            ELSE 'bronze'
+                        END as tier,
+                        CASE 
+                            WHEN MIN(order_date) >= STR_TO_DATE(CONCAT(?, '-01-01'), '%Y-%m-%d') THEN 'new'
+                            ELSE 'stable'
+                        END as trend
+                    FROM (
+                        SELECT customer_id, customer_name, cylinder_count as cylinders, 0 as dry_ice_kg, scheduled_date as order_date 
+                        FROM gas_cylinder_orders 
+                        WHERE YEAR(scheduled_date) = ? AND status != 'cancelled'${locClauseCyl}
+                        
+                        UNION ALL
+                        
+                        SELECT customer_id, customer_name, 0 as cylinders, quantity_kg as dry_ice_kg, scheduled_date as order_date 
+                        FROM dry_ice_orders 
+                        WHERE YEAR(scheduled_date) = ? AND status != 'cancelled'${locClauseDry}
+                    ) as combined
+                    GROUP BY customer_id
+                    ORDER BY (SUM(cylinders) + SUM(dry_ice_kg)) DESC
+                `;
+
+                return executeMySQL(query, params);
             }
 
             const client = getPrimarySupabaseClient();
