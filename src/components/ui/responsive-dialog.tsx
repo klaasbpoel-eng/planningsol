@@ -107,8 +107,8 @@ export function ResponsiveDialogContent({
 
   if (isMobile) {
     return (
-      <DrawerContent className={cn("max-h-[90vh]", className)}>
-        <div className="overflow-y-auto pb-safe pb-8">
+      <DrawerContent className={cn("max-h-[90vh] flex flex-col", className)}>
+        <div className="overflow-y-auto flex-1 pb-safe pb-8">
           {children}
         </div>
       </DrawerContent>
@@ -143,7 +143,7 @@ export function ResponsiveDialogFooter({
 
   if (isMobile) {
     return (
-      <DrawerFooter className={cn("flex-col-reverse gap-2 pt-4", className)}>
+      <DrawerFooter className={cn("flex-col-reverse gap-2 pt-3 pb-safe border-t bg-background sticky bottom-0 z-10", className)}>
         {children}
       </DrawerFooter>
     );
