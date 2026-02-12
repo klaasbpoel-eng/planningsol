@@ -10,6 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -20,8 +22,8 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays, ClipboardList, Plus, Clock } from "lucide-react";
-import { format } from "date-fns";
+import { CalendarDays, ClipboardList, Plus, Clock, Users, Repeat } from "lucide-react";
+import { format, addWeeks, addYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -56,10 +58,17 @@ export function CreateTaskDialog({
   const [assignedTo, setAssignedTo] = useState(currentUserId || "");
   const [categoryId, setCategoryId] = useState<string>("");
   const [subcategoryId, setSubcategoryId] = useState<string>("");
+  const [description, setDescription] = useState("");
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
   const [hasTime, setHasTime] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+
+  // Recurrence state
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceInterval, setRecurrenceInterval] = useState<1 | 2>(1);
+  const [isInfiniteRecurrence, setIsInfiniteRecurrence] = useState(false);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
     if (open) {
@@ -92,6 +101,10 @@ export function CreateTaskDialog({
     setHasTime(false);
     setStartTime("");
     setEndTime("");
+    setIsRecurring(false);
+    setRecurrenceInterval(1);
+    setIsInfiniteRecurrence(false);
+    setRecurrenceEndDate(undefined);
   };
 
   const handleClose = () => {
@@ -115,24 +128,55 @@ export function CreateTaskDialog({
       return;
     }
 
+    if (isRecurring && !isInfiniteRecurrence && !recurrenceEndDate) {
+      toast.error("Selecteer een einddatum voor de herhaling");
+      return;
+    }
+
     setSaving(true);
 
     try {
       // Use subcategory if selected, otherwise main category
       const typeId = subcategoryId || categoryId || null;
 
-      await api.tasks.create({
+      // Generate dates for recurring tasks
+      const taskDates: Date[] = [dueDate];
+
+      if (isRecurring) {
+        // For infinite recurrence, create tasks for 1 year ahead
+        const endDate = isInfiniteRecurrence
+          ? addYears(dueDate, 1)
+          : recurrenceEndDate;
+
+        if (endDate) {
+          let nextDate = addWeeks(dueDate, recurrenceInterval);
+          while (nextDate <= endDate) {
+            taskDates.push(nextDate);
+            nextDate = addWeeks(nextDate, recurrenceInterval);
+          }
+        }
+      }
+
+      const tasksToCreate = taskDates.map(date => ({
         status,
         priority,
-        due_date: format(dueDate, "yyyy-MM-dd"),
-        assigned_to: assignedTo || null,
+        due_date: format(date, "yyyy-MM-dd"),
+        assigned_to: assignedTo === "everyone" ? null : (assignedTo || null),
         created_by: currentUserId,
-        task_type_id: typeId,
+        type_id: typeId,
         start_time: hasTime && startTime ? startTime : null,
         end_time: hasTime && endTime ? endTime : null,
-      });
+      }));
 
-      toast.success("Taak aangemaakt");
+      // Use api.tasks.create in parallel to ensure correct DB routing (and syncing)
+      // Direct supabase insert bypasses the api layer which might cause issues if primary source is not cloud
+      await Promise.all(tasksToCreate.map(task => api.tasks.create(task)));
+
+      toast.success(
+        tasksToCreate.length > 1
+          ? `${tasksToCreate.length} taken aangemaakt`
+          : "Taak aangemaakt"
+      );
 
       resetForm();
       onCreate();
@@ -258,6 +302,102 @@ export function CreateTaskDialog({
             </div>
           </div>
 
+          {/* Recurrence option */}
+          <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="isRecurringTask"
+                checked={isRecurring}
+                onCheckedChange={(checked) => {
+                  setIsRecurring(checked === true);
+                  if (!checked) {
+                    setRecurrenceEndDate(undefined);
+                    setRecurrenceInterval(1);
+                  }
+                }}
+              />
+              <Label htmlFor="isRecurringTask" className="flex items-center gap-2 cursor-pointer font-normal">
+                <Repeat className="h-4 w-4" />
+                Herhalen
+              </Label>
+            </div>
+
+            {isRecurring && (
+              <div className="space-y-3 pl-6">
+                <div className="space-y-2">
+                  <Label className="text-sm">Herhalingsinterval</Label>
+                  <RadioGroup
+                    value={recurrenceInterval.toString()}
+                    onValueChange={(v) => setRecurrenceInterval(parseInt(v) as 1 | 2)}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="1" id="interval-weekly-task" />
+                      <Label htmlFor="interval-weekly-task" className="font-normal cursor-pointer text-sm">Wekelijks</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="2" id="interval-biweekly-task" />
+                      <Label htmlFor="interval-biweekly-task" className="font-normal cursor-pointer text-sm">2-wekelijks</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="isInfiniteTask"
+                    checked={isInfiniteRecurrence}
+                    onCheckedChange={(checked) => {
+                      setIsInfiniteRecurrence(checked === true);
+                      if (checked) {
+                        setRecurrenceEndDate(undefined);
+                      }
+                    }}
+                  />
+                  <Label htmlFor="isInfiniteTask" className="cursor-pointer font-normal text-sm">
+                    Oneindig herhalen (1 jaar vooruit)
+                  </Label>
+                </div>
+
+                {!isInfiniteRecurrence && (
+                  <div className="space-y-2">
+                    <Label>
+                      Herhalen tot <span className="text-destructive">*</span>
+                    </Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !recurrenceEndDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarDays className="mr-2 h-4 w-4" />
+                          {recurrenceEndDate
+                            ? format(recurrenceEndDate, "d MMM yyyy", { locale: nl })
+                            : "Selecteer einddatum"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-auto p-0 bg-background border shadow-lg z-50"
+                        align="start"
+                      >
+                        <Calendar
+                          mode="single"
+                          selected={recurrenceEndDate}
+                          onSelect={setRecurrenceEndDate}
+                          locale={nl}
+                          disabled={(date) => dueDate ? date <= dueDate : false}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>
@@ -303,6 +443,12 @@ export function CreateTaskDialog({
                   <SelectValue placeholder="Selecteer medewerker" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="everyone" className="font-medium border-b mb-1">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Iedereen
+                    </div>
+                  </SelectItem>
                   {profiles.map((profile) => (
                     <SelectItem
                       key={profile.id}

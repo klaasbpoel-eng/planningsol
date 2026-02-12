@@ -135,10 +135,10 @@ export function CreateLeaveRequestDialog({
       // Admin-created requests are automatically approved
       await api.timeOffRequests.create({
         profile_id: profileId,
-        leave_type_id: typeId,
+        type_id: typeId,
         start_date: format(startDate, "yyyy-MM-dd"),
         end_date: format(endDate, "yyyy-MM-dd"),
-        notes: reason.trim() || null,
+        reason: reason.trim() || null,
         status: isAdmin ? 'approved' : 'pending',
       });
 

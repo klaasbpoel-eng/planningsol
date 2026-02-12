@@ -759,7 +759,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     if (!item.profile) {
       // Check if this is a task without assignment
       if ('assigned_to' in item && !item.assigned_to) {
-        return "Niet toegewezen";
+        return "Iedereen";
       }
       return "Onbekend";
     }
