@@ -31,6 +31,7 @@ type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 interface CustomerSegmentationProps {
   location: ProductionLocation;
   refreshKey?: number;
+  year?: number;
 }
 
 interface CustomerSegment {
@@ -46,17 +47,17 @@ interface CustomerSegment {
   trend: "new" | "growing" | "stable" | "declining";
 }
 
-export function CustomerSegmentation({ location, refreshKey = 0 }: CustomerSegmentationProps) {
+export function CustomerSegmentation({ location, refreshKey = 0, year }: CustomerSegmentationProps) {
   const [customers, setCustomers] = useState<CustomerSegment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = year ?? new Date().getFullYear();
 
   useEffect(() => {
     fetchCustomerSegments();
-  }, [location, refreshKey]);
+  }, [location, refreshKey, currentYear]);
 
   const fetchCustomerSegments = async () => {
     setLoading(true);

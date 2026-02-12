@@ -23,6 +23,7 @@ type ViewType = "cylinders" | "dryIce";
 interface ProductionHeatMapProps {
   location: ProductionLocation;
   refreshKey?: number;
+  dateRange?: { from: Date; to: Date };
 }
 
 interface DailyData {
@@ -31,14 +32,21 @@ interface DailyData {
   dryIce: number;
 }
 
-export function ProductionHeatMap({ location, refreshKey = 0 }: ProductionHeatMapProps) {
-  const [currentDate, setCurrentDate] = useState(new Date());
+export function ProductionHeatMap({ location, refreshKey = 0, dateRange }: ProductionHeatMapProps) {
+  const [currentDate, setCurrentDate] = useState(dateRange?.from ?? new Date());
   const [viewType, setViewType] = useState<ViewType>("cylinders");
   const [dailyData, setDailyData] = useState<Map<string, DailyData>>(new Map());
   const [loading, setLoading] = useState(true);
 
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
+
+  // Sync currentDate when dateRange changes externally
+  useEffect(() => {
+    if (dateRange?.from) {
+      setCurrentDate(dateRange.from);
+    }
+  }, [dateRange?.from.getTime()]);
 
   useEffect(() => {
     fetchHeatMapData();

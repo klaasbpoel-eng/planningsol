@@ -994,10 +994,10 @@ export function ProductionReports({
         <TabsContent value="insights" className="mt-6 space-y-6">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <Suspense fallback={<ChartLoadingFallback />}>
-              <ProductionHeatMap location={location} refreshKey={refreshKey} />
+              <ProductionHeatMap location={location} refreshKey={refreshKey} dateRange={dateRange} />
             </Suspense>
             <Suspense fallback={<ChartLoadingFallback />}>
-              <CustomerSegmentation location={location} refreshKey={refreshKey} />
+              <CustomerSegmentation location={location} refreshKey={refreshKey} year={dateRange.from.getFullYear()} />
             </Suspense>
           </div>
         </TabsContent>
