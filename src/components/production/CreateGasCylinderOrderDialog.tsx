@@ -23,6 +23,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays, Cylinder, Plus } from "lucide-react";
 import { format, subYears } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -41,6 +42,7 @@ export function CreateGasCylinderOrderDialog({
   onOpenChange,
   onCreated,
 }: CreateGasCylinderOrderDialogProps) {
+  const isMobile = useIsMobile();
   const [saving, setSaving] = useState(false);
   const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -318,7 +320,7 @@ export function CreateGasCylinderOrderDialog({
           </div>
         </ResponsiveDialogHeader>
 
-        <div className="space-y-4 py-4 px-4 sm:px-0">
+        <div className="space-y-3 sm:space-y-4 py-3 sm:py-4 px-4 sm:px-0">
           <div className="space-y-2">
             <Label>
               Klant <span className="text-destructive">*</span>
@@ -458,35 +460,47 @@ export function CreateGasCylinderOrderDialog({
             <Label>
               Geplande datum <span className="text-destructive">*</span>
             </Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal h-11 sm:h-10",
-                    !scheduledDate && "text-muted-foreground"
-                  )}
+            {isMobile ? (
+              <Input
+                type="date"
+                value={scheduledDate ? format(scheduledDate, "yyyy-MM-dd") : ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setScheduledDate(val ? new Date(val + "T00:00:00") : undefined);
+                }}
+                className="bg-background h-11"
+              />
+            ) : (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal h-10",
+                      !scheduledDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    {scheduledDate
+                      ? format(scheduledDate, "d MMM", { locale: nl })
+                      : "Datum"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-auto p-0 bg-background border shadow-lg z-50"
+                  align="start"
                 >
-                  <CalendarDays className="mr-2 h-4 w-4" />
-                  {scheduledDate
-                    ? format(scheduledDate, "d MMM", { locale: nl })
-                    : "Datum"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                className="w-auto p-0 bg-background border shadow-lg z-50"
-                align="start"
-              >
-                <Calendar
-                  mode="single"
-                  selected={scheduledDate}
-                  onSelect={setScheduledDate}
-                  locale={nl}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
+                  <Calendar
+                    mode="single"
+                    selected={scheduledDate}
+                    onSelect={setScheduledDate}
+                    locale={nl}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -496,8 +510,8 @@ export function CreateGasCylinderOrderDialog({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optionele notities..."
-              className="bg-background resize-none min-h-[80px]"
-              rows={3}
+              className="bg-background resize-none min-h-[60px] sm:min-h-[80px]"
+              rows={2}
             />
           </div>
 
