@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Users,
   Trophy,
@@ -285,9 +285,8 @@ export function CustomerSegmentation({ location, refreshKey = 0 }: CustomerSegme
               <ScrollArea className="h-[400px] pr-4">
                 <div className="space-y-2">
                   {filteredCustomers.map((customer, index) => (
-                    <TooltipProvider key={customer.customer_id || index}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
+                    <Popover key={customer.customer_id || index}>
+                      <PopoverTrigger asChild>
                           <div className={cn(
                             "p-3 rounded-lg border cursor-pointer transition-all duration-200",
                             "hover:bg-muted/50 hover:border-primary/30 hover:shadow-sm",
@@ -321,8 +320,8 @@ export function CustomerSegmentation({ location, refreshKey = 0 }: CustomerSegme
                               {getTierBadge(customer.tier)}
                             </div>
                           </div>
-                        </TooltipTrigger>
-                        <TooltipContent side="left" collisionPadding={16} className="max-w-xs">
+                      </PopoverTrigger>
+                      <PopoverContent side="left" collisionPadding={16} className="max-w-xs">
                           <div className="space-y-2">
                             <p className="font-semibold">{customer.customer_name}</p>
                             <div className="grid grid-cols-2 gap-2 text-xs">
@@ -344,9 +343,8 @@ export function CustomerSegmentation({ location, refreshKey = 0 }: CustomerSegme
                               </div>
                             </div>
                           </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                      </PopoverContent>
+                    </Popover>
                   ))}
 
                   {filteredCustomers.length === 0 && (
