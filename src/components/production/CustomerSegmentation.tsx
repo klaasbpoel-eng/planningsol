@@ -322,7 +322,7 @@ export function CustomerSegmentation({ location, refreshKey = 0 }: CustomerSegme
                             </div>
                           </div>
                         </TooltipTrigger>
-                        <TooltipContent side="right" className="max-w-xs">
+                        <TooltipContent side="left" collisionPadding={16} className="max-w-xs">
                           <div className="space-y-2">
                             <p className="font-semibold">{customer.customer_name}</p>
                             <div className="grid grid-cols-2 gap-2 text-xs">
