@@ -1,5 +1,4 @@
 import { useEffect, useState, useMemo } from "react";
-import { Header } from "@/components/layout/Header";
 import { TimeOffRequestForm } from "@/components/time-off/TimeOffRequestForm";
 import { TimeOffRequestList } from "@/components/time-off/TimeOffRequestList";
 import { TimeOffCalendar } from "@/components/time-off/TimeOffCalendar";
@@ -102,7 +101,6 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header userEmail={userEmail} role={role} />
         <main className="w-full px-[10%] py-8">
           {/* Role buttons skeleton */}
           <div className="flex flex-wrap gap-3 mb-6">
@@ -133,7 +131,6 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
-      <Header userEmail={userEmail} role={role} />
 
       <FadeIn show={!loading}>
         <main className="w-full px-[1%] md:px-[10%] py-8">

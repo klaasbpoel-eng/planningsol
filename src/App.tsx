@@ -13,27 +13,33 @@ import ToolboxPage from "./pages/ToolboxPage";
 import DashboardPage from "./pages/DashboardPage";
 
 
+import { DashboardProvider } from "@/contexts/DashboardContext";
+import { Layout } from "@/components/layout/Layout";
+
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/verlof" element={<DashboardPage />} />
-            <Route path="/kalender" element={<CalendarPage />} />
-            <Route path="/productie" element={<ProductionPlanningPage />} />
-            <Route path="/interne-bestellingen" element={<InternalOrdersPage />} />
-            <Route path="/toolbox" element={<ToolboxPage />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <DashboardProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route element={<Layout />}>
+                <Route path="/" element={<Index />} />
+                <Route path="/verlof" element={<DashboardPage />} />
+                <Route path="/kalender" element={<CalendarPage />} />
+                <Route path="/productie" element={<ProductionPlanningPage />} />
+                <Route path="/interne-bestellingen" element={<InternalOrdersPage />} />
+                <Route path="/toolbox" element={<ToolboxPage />} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </DashboardProvider>
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>

@@ -10,11 +10,12 @@ import { PageTransition } from "@/components/ui/page-transition";
 import { Loader2 } from "lucide-react";
 import { UserLaunchpad } from "@/components/dashboard/UserLaunchpad";
 import type { User } from "@supabase/supabase-js";
+import { useDashboard } from "@/contexts/DashboardContext";
 
 const Index = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showAdminView, setShowAdminView] = useState(false);
+  const { showAdminView, setShowAdminView } = useDashboard();
   const { role, permissions, loading: permissionsLoading, isAdmin } = useUserPermissions(user?.id);
   const { isApproved, loading: approvalLoading } = useApprovalStatus(user?.id);
 

@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Header } from "@/components/layout/Header";
 import { PageTransition } from "@/components/ui/page-transition";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -91,102 +90,98 @@ const InternalOrdersPage = () => {
 
     return (
         <PageTransition>
-            <div className="min-h-screen gradient-mesh overflow-x-hidden">
-                <Header userEmail={user?.email} role={role} />
+            <main className="w-full px-4 md:px-[10%] py-8">
+                <div className="mb-8 flex items-center justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gradient flex items-center gap-3">
+                            <ArrowLeftRight className="h-8 w-8 text-primary" />
+                            Interne Bestellingen
+                        </h1>
+                        <p className="text-muted-foreground mt-1">
+                            Beheer goederenstromen tussen Emmen en Tilburg
+                        </p>
+                    </div>
+                </div>
 
-                <main className="w-full px-4 md:px-[10%] py-8">
-                    <div className="mb-8 flex items-center justify-between">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gradient flex items-center gap-3">
-                                <ArrowLeftRight className="h-8 w-8 text-primary" />
-                                Interne Bestellingen
-                            </h1>
-                            <p className="text-muted-foreground mt-1">
-                                Beheer goederenstromen tussen Emmen en Tilburg
-                            </p>
-                        </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Left Column: Order Form */}
+                    <div className="lg:col-span-1 space-y-6">
+                        <Card className="glass-card sticky top-24">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Truck className="h-5 w-5 text-orange-500" />
+                                    Nieuwe Bestelling
+                                </CardTitle>
+                                <CardDescription>Maak een nieuwe verplaatsingsorder aan</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <InternalOrderForm
+                                    defaultFromLocation={productionLocation === "sol_emmen" ? "sol_tilburg" : "sol_emmen"}
+                                    defaultToLocation={productionLocation as ProductionLocation || "sol_tilburg"}
+                                    onSubmit={handleCreateOrder}
+                                    isSubmitting={isSubmitting}
+                                />
+                            </CardContent>
+                        </Card>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* Left Column: Order Form */}
-                        <div className="lg:col-span-1 space-y-6">
-                            <Card className="glass-card sticky top-24">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Truck className="h-5 w-5 text-orange-500" />
-                                        Nieuwe Bestelling
-                                    </CardTitle>
-                                    <CardDescription>Maak een nieuwe verplaatsingsorder aan</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <InternalOrderForm
-                                        defaultFromLocation={productionLocation === "sol_emmen" ? "sol_tilburg" : "sol_emmen"}
-                                        defaultToLocation={productionLocation as ProductionLocation || "sol_tilburg"}
-                                        onSubmit={handleCreateOrder}
-                                        isSubmitting={isSubmitting}
-                                    />
-                                </CardContent>
-                            </Card>
-                        </div>
+                    {/* Right Column: Order History / Dashboard */}
+                    <div className="lg:col-span-2">
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="incoming">
+                                    Inkomend (Naar {productionLocation === "sol_emmen" ? "Emmen" : "Tilburg"})
+                                </TabsTrigger>
+                                <TabsTrigger value="outgoing">
+                                    Uitgaand (Van {productionLocation === "sol_emmen" ? "Emmen" : "Tilburg"})
+                                </TabsTrigger>
+                            </TabsList>
 
-                        {/* Right Column: Order History / Dashboard */}
-                        <div className="lg:col-span-2">
-                            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                                <TabsList className="grid w-full grid-cols-2">
-                                    <TabsTrigger value="incoming">
-                                        Inkomend (Naar {productionLocation === "sol_emmen" ? "Emmen" : "Tilburg"})
-                                    </TabsTrigger>
-                                    <TabsTrigger value="outgoing">
-                                        Uitgaand (Van {productionLocation === "sol_emmen" ? "Emmen" : "Tilburg"})
-                                    </TabsTrigger>
-                                </TabsList>
+                            <TabsContent value="incoming" className="mt-4">
+                                <Card className="glass-card">
+                                    <CardHeader>
+                                        <CardTitle>Inkomende Bestellingen</CardTitle>
+                                        <CardDescription>Orders die onderweg zijn naar jouw locatie</CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <OrdersTable
+                                            orders={incomingOrders}
+                                            type="incoming"
+                                            productionLocation={productionLocation as ProductionLocation}
+                                            onUpdateStatus={updateOrderStatus}
+                                            loading={loading}
+                                            isAdmin={role === "admin"}
+                                            onDelete={deleteOrder}
+                                            onUpdate={handleUpdateOrder}
+                                        />
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
 
-                                <TabsContent value="incoming" className="mt-4">
-                                    <Card className="glass-card">
-                                        <CardHeader>
-                                            <CardTitle>Inkomende Bestellingen</CardTitle>
-                                            <CardDescription>Orders die onderweg zijn naar jouw locatie</CardDescription>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <OrdersTable
-                                                orders={incomingOrders}
-                                                type="incoming"
-                                                productionLocation={productionLocation as ProductionLocation}
-                                                onUpdateStatus={updateOrderStatus}
-                                                loading={loading}
-                                                isAdmin={role === "admin"}
-                                                onDelete={deleteOrder}
-                                                onUpdate={handleUpdateOrder}
-                                            />
-                                        </CardContent>
-                                    </Card>
-                                </TabsContent>
-
-                                <TabsContent value="outgoing" className="mt-4">
-                                    <Card className="glass-card">
-                                        <CardHeader>
-                                            <CardTitle>Uitgaande Bestellingen</CardTitle>
-                                            <CardDescription>Orders die jij hebt geplaatst voor verzending</CardDescription>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <OrdersTable
-                                                orders={outgoingOrders}
-                                                type="outgoing"
-                                                productionLocation={productionLocation as ProductionLocation}
-                                                onUpdateStatus={updateOrderStatus}
-                                                loading={loading}
-                                                isAdmin={role === "admin"}
-                                                onDelete={deleteOrder}
-                                                onUpdate={handleUpdateOrder}
-                                            />
-                                        </CardContent>
-                                    </Card>
-                                </TabsContent>
-                            </Tabs>
-                        </div>
+                            <TabsContent value="outgoing" className="mt-4">
+                                <Card className="glass-card">
+                                    <CardHeader>
+                                        <CardTitle>Uitgaande Bestellingen</CardTitle>
+                                        <CardDescription>Orders die jij hebt geplaatst voor verzending</CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <OrdersTable
+                                            orders={outgoingOrders}
+                                            type="outgoing"
+                                            productionLocation={productionLocation as ProductionLocation}
+                                            onUpdateStatus={updateOrderStatus}
+                                            loading={loading}
+                                            isAdmin={role === "admin"}
+                                            onDelete={deleteOrder}
+                                            onUpdate={handleUpdateOrder}
+                                        />
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+                        </Tabs>
                     </div>
-                </main>
-            </div>
+                </div>
+            </main>
         </PageTransition>
     );
 };

@@ -1,5 +1,4 @@
 import { useEffect, useState, useMemo } from "react";
-import { Header } from "@/components/layout/Header";
 import { AdminRequestList } from "@/components/admin/AdminRequestList";
 import { TeamCalendar } from "@/components/admin/TeamCalendar";
 import { EmployeeList } from "@/components/admin/EmployeeList";
@@ -154,7 +153,6 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
   return (
 
     <div className="min-h-screen bg-background">
-      <Header userEmail={userEmail} isAdmin onSwitchView={onSwitchView} role={role} />
 
       <main className="w-full px-[1%] md:px-[10%] py-8">
         <div className="mb-6">
