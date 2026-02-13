@@ -333,6 +333,8 @@ export function ProductionReports({
 
     if (isSameDay(from, startOfWeek(now, { weekStartsOn: 1 })) && isSameDay(to, endOfWeek(now, { weekStartsOn: 1 }))) return "week";
     if (isSameDay(from, startOfMonth(now)) && isSameDay(to, endOfMonth(now))) return "month";
+    const lastMonth = subMonths(now, 1);
+    if (isSameDay(from, startOfMonth(lastMonth)) && isSameDay(to, endOfMonth(lastMonth))) return "last-month";
     if (isSameDay(from, subMonths(startOfMonth(now), 2)) && isSameDay(to, endOfMonth(now))) return "quarter";
 
     // Last year
@@ -421,6 +423,7 @@ export function ProductionReports({
           <ToggleGroup type="single" variant="outline" size="sm" value={getActivePreset()} onValueChange={(val) => val && setPresetRange(val)} className="hidden lg:flex">
             <ToggleGroupItem value="week">Deze week</ToggleGroupItem>
             <ToggleGroupItem value="month">Deze maand</ToggleGroupItem>
+            <ToggleGroupItem value="last-month">Vorige maand</ToggleGroupItem>
             <ToggleGroupItem value="quarter">Kwartaal</ToggleGroupItem>
             <ToggleGroupItem value="last-year">Vorig jaar</ToggleGroupItem>
             <ToggleGroupItem value="this-year">Jaar</ToggleGroupItem>
