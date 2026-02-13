@@ -404,6 +404,7 @@ export function ProductionReports({
             <ToggleGroupItem value="week" onClick={() => setPresetRange("week")}>Deze week</ToggleGroupItem>
             <ToggleGroupItem value="month" onClick={() => setPresetRange("month")}>Deze maand</ToggleGroupItem>
             <ToggleGroupItem value="quarter" onClick={() => setPresetRange("quarter")}>Kwartaal</ToggleGroupItem>
+            <ToggleGroupItem value="last-year" onClick={() => setPresetRange("last-year")}>Vorig jaar</ToggleGroupItem>
             <ToggleGroupItem value="year" onClick={() => setPresetRange("this-year")}>Jaar</ToggleGroupItem>
           </ToggleGroup>
 
