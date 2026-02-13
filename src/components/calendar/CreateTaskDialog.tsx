@@ -54,7 +54,7 @@ export function CreateTaskDialog({
   const [status, setStatus] = useState("pending");
   const [priority, setPriority] = useState("medium");
   const [dueDate, setDueDate] = useState<Date | undefined>(initialDate);
-  const [assignedTo, setAssignedTo] = useState(currentUserId || "");
+  const [assignedTo, setAssignedTo] = useState("");
   const [title, setTitle] = useState("");
   const [hasTime, setHasTime] = useState(false);
   const [startTime, setStartTime] = useState("");
@@ -70,7 +70,7 @@ export function CreateTaskDialog({
     setStatus("pending");
     setPriority("medium");
     setDueDate(initialDate);
-    setAssignedTo(currentUserId || "");
+    setAssignedTo("");
     setTitle("");
     setHasTime(false);
     setStartTime("");
