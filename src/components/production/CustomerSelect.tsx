@@ -11,6 +11,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -27,6 +33,7 @@ import { Plus, Building2, Check, ChevronsUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Customer {
   id: string;
@@ -41,6 +48,7 @@ interface CustomerSelectProps {
 }
 
 export function CustomerSelect({ value, onValueChange, defaultCustomerName: propDefaultCustomer }: CustomerSelectProps) {
+  const isMobile = useIsMobile();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -126,80 +134,110 @@ export function CustomerSelect({ value, onValueChange, defaultCustomerName: prop
 
   const selectedCustomer = customers.find((c) => c.id === value);
 
+  const commandList = (
+    <Command>
+      <CommandInput placeholder="Zoek klant..." />
+      <CommandList>
+        <CommandEmpty>Geen klant gevonden.</CommandEmpty>
+        <CommandGroup>
+          {customers.map((customer) => (
+            <CommandItem
+              key={customer.id}
+              value={customer.name}
+              onSelect={() => {
+                onValueChange(customer.id, customer.name);
+                setOpen(false);
+              }}
+            >
+              <Check
+                className={cn(
+                  "mr-2 h-4 w-4",
+                  value === customer.id ? "opacity-100" : "opacity-0"
+                )}
+              />
+              <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
+              <span>{customer.name}</span>
+              {customer.contact_person && (
+                <span className="ml-2 text-muted-foreground text-sm">
+                  ({customer.contact_person})
+                </span>
+              )}
+            </CommandItem>
+          ))}
+          <CommandItem
+            value="nieuwe-klant-toevoegen"
+            onSelect={() => {
+              setShowNewCustomerDialog(true);
+              setOpen(false);
+            }}
+            className="text-primary"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            <span>Nieuwe klant toevoegen</span>
+          </CommandItem>
+        </CommandGroup>
+      </CommandList>
+    </Command>
+  );
+
+  const triggerContent = loading ? (
+    "Laden..."
+  ) : selectedCustomer ? (
+    <div className="flex items-center gap-2 truncate">
+      <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+      <span className="truncate">{selectedCustomer.name}</span>
+      {selectedCustomer.contact_person && (
+        <span className="text-muted-foreground text-sm truncate">
+          ({selectedCustomer.contact_person})
+        </span>
+      )}
+    </div>
+  ) : (
+    "Selecteer klant"
+  );
+
   return (
     <>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
+      {isMobile ? (
+        <>
           <Button
             variant="outline"
             role="combobox"
-            aria-expanded={open}
             className="w-full justify-between bg-background"
+            onClick={() => setOpen(true)}
           >
-            {loading ? (
-              "Laden..."
-            ) : selectedCustomer ? (
-              <div className="flex items-center gap-2 truncate">
-                <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="truncate">{selectedCustomer.name}</span>
-                {selectedCustomer.contact_person && (
-                  <span className="text-muted-foreground text-sm truncate">
-                    ({selectedCustomer.contact_person})
-                  </span>
-                )}
-              </div>
-            ) : (
-              "Selecteer klant"
-            )}
+            {triggerContent}
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Zoek klant..." />
-            <CommandList>
-              <CommandEmpty>Geen klant gevonden.</CommandEmpty>
-              <CommandGroup>
-                {customers.map((customer) => (
-                  <CommandItem
-                    key={customer.id}
-                    value={customer.name}
-                    onSelect={() => {
-                      onValueChange(customer.id, customer.name);
-                      setOpen(false);
-                    }}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        value === customer.id ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <span>{customer.name}</span>
-                    {customer.contact_person && (
-                      <span className="ml-2 text-muted-foreground text-sm">
-                        ({customer.contact_person})
-                      </span>
-                    )}
-                  </CommandItem>
-                ))}
-                <CommandItem
-                  value="nieuwe-klant-toevoegen"
-                  onSelect={() => {
-                    setShowNewCustomerDialog(true);
-                    setOpen(false);
-                  }}
-                  className="text-primary"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  <span>Nieuwe klant toevoegen</span>
-                </CommandItem>
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+          <Drawer open={open} onOpenChange={setOpen}>
+            <DrawerContent className="max-h-[85vh]">
+              <DrawerHeader className="text-left">
+                <DrawerTitle>Selecteer klant</DrawerTitle>
+              </DrawerHeader>
+              <div className="px-4 pb-8">
+                {commandList}
+              </div>
+            </DrawerContent>
+          </Drawer>
+        </>
+      ) : (
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-full justify-between bg-background"
+            >
+              {triggerContent}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+            {commandList}
+          </PopoverContent>
+        </Popover>
+      )}
 
       <Dialog open={showNewCustomerDialog} onOpenChange={setShowNewCustomerDialog}>
         <DialogContent className="sm:max-w-[400px]">
