@@ -33,6 +33,8 @@ export const GAS_COLOR_MAPPING: Record<string, string> = {
     "Mixed Gas": "#00e94ee2",
     "Sagox": "#00ea33ff",
     "Weldar": "#00ea33ff",
+    "ARGOMET": "#166534", // Argon-based → dark green
+    "Mag OC": "#8B5CF6", // Menggas → purple
 
     // === Formeer (H2/N2) ===
     "Formeer": "#F59E0B", // Amber
@@ -52,6 +54,10 @@ export const GAS_COLOR_MAPPING: Record<string, string> = {
 
     // === Neon ===
     "Neon": "#F472B6", // Pink
+    "NEON": "#F472B6",
+
+    // === Helium mengsel ===
+    "He-Premix": "#92400E", // Brown (helium-based)
 
     // === AliSOL varianten ===
     "AliSOL Zuurstof": "#0EA5E9",
@@ -60,10 +66,24 @@ export const GAS_COLOR_MAPPING: Record<string, string> = {
     "AliSOL": "#6366f1",
     "Alisol": "#6366f1",
 
-    // === Overig ===
+    // === SOL producten ===
+    "Gasv. SOL": "#166534", // Gasvormig SOL → default dark green (argon-like)
     "BIOSOL": "#22C55E",
     "SOLCAS": "#8B5CF6",
+
+    // === Enermix ===
     "Enermix": "#F59E0B",
+
+    // === Medicinaal ===
+    "Medicinaal": "#0EA5E9", // Medical gas → light blue (often O2-based)
+    "Medical": "#0EA5E9",
+
+    // === Specifieke menggas-composities ===
+    "O2": "#0EA5E9", // Zuurstof
+    "N2": "#1F2937", // Stikstof
+    "H2": "#DC2626", // Waterstof
+    "Ar": "#166534", // Argon
+    "He": "#92400E", // Helium
 
     // English fallback
     "Oxygen": "#0EA5E9",
