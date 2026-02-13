@@ -29,10 +29,13 @@ interface GasCriticalProps {
 }
 
 const CRITICAL_PROPS: Record<string, GasCriticalProps> = {
-  n2:  { Tc: 126.2,  Pc: 33.98, omega: 0.0377 },
-  co2: { Tc: 304.21, Pc: 73.83, omega: 0.2236 },
-  ar:  { Tc: 150.86, Pc: 48.98, omega: 0.0000 },
-  o2:  { Tc: 154.58, Pc: 50.43, omega: 0.0222 },
+  n2:   { Tc: 126.2,  Pc: 33.98, omega: 0.0377 },
+  co2:  { Tc: 304.21, Pc: 73.83, omega: 0.2236 },
+  ar:   { Tc: 150.86, Pc: 48.98, omega: 0.0000 },
+  o2:   { Tc: 154.58, Pc: 50.43, omega: 0.0222 },
+  he:   { Tc: 5.19,   Pc: 2.27,  omega: -0.3900 },
+  c2h2: { Tc: 308.30, Pc: 61.14, omega: 0.1890 },
+  h2:   { Tc: 33.19,  Pc: 13.13, omega: -0.2160 },
 };
 
 // Peng-Robinson EOS: solve for compressibility factor Z
@@ -96,6 +99,9 @@ const GASES = [
   { id: "co2", name: "CO₂", formula: "CO₂", molarMass: 44.01, colorKey: "CO2" },
   { id: "ar", name: "Argon", formula: "Ar", molarMass: 39.948, colorKey: "Argon" },
   { id: "o2", name: "Zuurstof", formula: "O₂", molarMass: 31.998, colorKey: "Zuurstof" },
+  { id: "he", name: "Helium", formula: "He", molarMass: 4.003, colorKey: "Helium" },
+  { id: "c2h2", name: "Acetyleen", formula: "C₂H₂", molarMass: 26.038, colorKey: "Acetyleen" },
+  { id: "h2", name: "Waterstof", formula: "H₂", molarMass: 2.016, colorKey: "Waterstof" },
 ] as const;
 
 const R = 8.314; // J/(mol·K)
@@ -116,12 +122,15 @@ interface SavedRecipe {
   co2_percentage: number;
   ar_percentage: number;
   o2_percentage: number;
+  he_percentage: number;
+  c2h2_percentage: number;
+  h2_percentage: number;
   created_at: string;
 }
 
 export function GasMixtureRecipemaker() {
   const [percentages, setPercentages] = useState<GasPercentages>({
-    n2: 0, co2: 0, ar: 0, o2: 0,
+    n2: 0, co2: 0, ar: 0, o2: 0, he: 0, c2h2: 0, h2: 0,
   });
   const [targetPressure, setTargetPressure] = useState(210);
   const [cylinderVolume, setCylinderVolume] = useState(50);
@@ -189,7 +198,7 @@ export function GasMixtureRecipemaker() {
   }, [percentages, targetPressure, cylinderVolume]);
 
   const handleReset = () => {
-    setPercentages({ n2: 0, co2: 0, ar: 0, o2: 0 });
+    setPercentages({ n2: 0, co2: 0, ar: 0, o2: 0, he: 0, c2h2: 0, h2: 0 });
     setActiveRecipeId(null);
   };
 
@@ -219,6 +228,9 @@ export function GasMixtureRecipemaker() {
       co2_percentage: percentages.co2,
       ar_percentage: percentages.ar,
       o2_percentage: percentages.o2,
+      he_percentage: percentages.he,
+      c2h2_percentage: percentages.c2h2,
+      h2_percentage: percentages.h2,
       created_by: user.id,
     };
 
@@ -250,6 +262,9 @@ export function GasMixtureRecipemaker() {
       co2: Number(recipe.co2_percentage),
       ar: Number(recipe.ar_percentage),
       o2: Number(recipe.o2_percentage),
+      he: Number(recipe.he_percentage ?? 0),
+      c2h2: Number(recipe.c2h2_percentage ?? 0),
+      h2: Number(recipe.h2_percentage ?? 0),
     });
     setTargetPressure(recipe.target_pressure);
     setCylinderVolume(recipe.cylinder_volume);
@@ -295,6 +310,9 @@ export function GasMixtureRecipemaker() {
     if (Number(r.co2_percentage) > 0) parts.push(`CO₂ ${r.co2_percentage}%`);
     if (Number(r.ar_percentage) > 0) parts.push(`Ar ${r.ar_percentage}%`);
     if (Number(r.o2_percentage) > 0) parts.push(`O₂ ${r.o2_percentage}%`);
+    if (Number(r.he_percentage) > 0) parts.push(`He ${r.he_percentage}%`);
+    if (Number(r.c2h2_percentage) > 0) parts.push(`C₂H₂ ${r.c2h2_percentage}%`);
+    if (Number(r.h2_percentage) > 0) parts.push(`H₂ ${r.h2_percentage}%`);
     return parts.join(" / ");
   };
 
