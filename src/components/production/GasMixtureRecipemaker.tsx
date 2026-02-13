@@ -122,9 +122,9 @@ interface SavedRecipe {
   co2_percentage: number;
   ar_percentage: number;
   o2_percentage: number;
-  he_percentage: number;
-  c2h2_percentage: number;
-  h2_percentage: number;
+  he_percentage?: number;
+  c2h2_percentage?: number;
+  h2_percentage?: number;
   created_at: string;
 }
 
