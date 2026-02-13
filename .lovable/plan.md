@@ -1,43 +1,51 @@
 
 
-## Fix: Restore Database - Memory Limit Exceeded
+## Fix: Excel Import for Tilburg Cylinder Orders
 
 ### Problem
-The restore edge function crashes with "Memory limit exceeded" because the entire backup JSON (all 11 tables) is sent as a single HTTP request body and parsed into memory at once. Large tables like `gas_cylinder_orders` can contain thousands of rows, making the payload too big.
+The uploaded Excel file ("Tilburg.xlsx") has a different column structure than the current import dialog expects:
 
-### Solution
-Split the restore into a **chunked, table-by-table approach**:
+| Excel Column | Contains | Current Import Expects |
+|---|---|---|
+| **Datum** | Date | "datum" -- already matched |
+| **Product** | Gas type name (e.g., "Zuurstof Medicinaal Gasv. SOL") | "gassoort" or "gastype" -- NOT matched |
+| **Capaciteit** | Cylinder size as raw number (e.g., 800, 50, 2) | "cilinderinhoud", "formaat", etc. -- NOT matched |
+| **Aantal** | Count | "aantal" -- already matched |
+| **Branche** | Location (e.g., "SOL Nederland-Tilburg") | "locatie", "vestiging" -- NOT matched |
+| **Klant** | Customer name | "klant" -- already matched |
 
-1. **Client-side chunking** -- The frontend reads the backup file, then sends one table at a time to the edge function in separate requests
-2. **Edge function accepts single-table restores** -- Each call processes only one table, keeping memory usage low
-3. **Two-phase approach**: first a "clear" call to delete all data, then individual table inserts
+Additionally:
+- There is **no M/T column** for grade -- grade must be inferred from the product name (e.g., "Medicinaal" = medical)
+- Capaciteit is a plain number (e.g., `800`), not formatted as "800L"
+- "Branche" contains values like "SOL Nederland-Tilburg" which need to map to `sol_tilburg`
 
 ### Changes
 
-**File: `supabase/functions/restore-database/index.ts`**
-- Accept a new request format: `{ action: "clear" }` to delete all tables, or `{ action: "insert", table: "gas_cylinder_orders", rows: [...] }` to insert rows for one table
-- Each call handles only one table's data, staying well within memory limits
-- Keep the same auth/admin checks
+**File: `src/components/production/ExcelImportDialog.tsx`**
 
-**File: `src/components/admin/DatabaseBackupRestore.tsx`**
-- Update `handleRestore` to:
-  1. Parse the backup JSON client-side
-  2. First call the edge function with `{ action: "clear" }` to delete existing data
-  3. Then loop through each table in dependency order, sending rows in batches (e.g., 500 rows per request)
-  4. Show progress as each table is restored
-- Add a progress indicator showing which table is being restored
+1. **Header detection** -- Add "product" as alias for the gas type column, "capaciteit" as alias for the size column, and "branche" as alias for the location column in the header-matching logic
+
+2. **Grade inference from product name** -- When no dedicated M/T or grade column is found, detect "medicinaal" in the product name to set grade to "medical", otherwise default to "technical"
+
+3. **Cylinder size parsing** -- Handle raw numeric values from the "Capaciteit" column (e.g., `800` becomes `"800L"`, `2` becomes `"2L"`) with database matching
+
+4. **Location parsing** -- Add support for "SOL Nederland-Tilburg" and "SOL Nederland-Emmen" patterns in the `parseLocation` function
 
 ### Technical Details
 
-The edge function will support two actions:
-
+**Header detection additions** (in the second header detection block around line 366-401):
 ```
-POST { action: "clear" }
-  -> Deletes all rows from all 11 tables in reverse dependency order
-
-POST { action: "insert", table: "customers", rows: [...up to 500 rows...] }
-  -> Inserts the provided rows into the specified table
+"product" -> columnMap.gasType
+"capaciteit" -> columnMap.size  
+"branche" -> columnMap.location
 ```
 
-The client iterates through tables in the correct dependency order (parents first) and sends batches of up to 500 rows per request. A progress bar shows completion percentage based on total tables/batches processed.
+**Grade inference** (around line 462):
+- If no grade column was mapped, check if the gas type string contains "medicinaal" to set grade to "medical"
+- Otherwise default to "technical"
 
+**parseCylinderSize enhancement**:
+- Before all pattern matching, check if the input is purely numeric (e.g., "800", "50", "2") and convert to "XL" format (e.g., "800L") with database matching
+
+**parseLocation enhancement**:
+- Add pattern matching for "nederland-tilburg" and "nederland-emmen" to handle the "SOL Nederland-Tilburg" format from this Excel
