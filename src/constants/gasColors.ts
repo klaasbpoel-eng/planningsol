@@ -4,6 +4,7 @@ export const GAS_COLOR_MAPPING: Record<string, string> = {
     "Stikstof": "#1F2937", // Black (Standard: Black) - using Dark Gray for UI
     "Koolzuur": "#9CA3AF", // Grey (Standard: Grey)
     "CO2": "#9CA3AF", // CO2 (Same as Koolzuur)
+    "Kooldioxide": "#9CA3AF", // Kooldioxide (Same as Koolzuur)
     "Argon": "#166534", // Dark Green (Standard: Dark Green)
     "Acetyleen": "#991B1B", // Maroon (Standard: Maroon)
     "Helium": "#92400E", // Brown (Standard: Brown)
