@@ -32,6 +32,7 @@ interface CustomerSegmentationProps {
   location: ProductionLocation;
   refreshKey?: number;
   year?: number;
+  dateRange?: { from: Date; to: Date };
 }
 
 interface CustomerSegment {
@@ -47,17 +48,21 @@ interface CustomerSegment {
   trend: "new" | "growing" | "stable" | "declining";
 }
 
-export function CustomerSegmentation({ location, refreshKey = 0, year }: CustomerSegmentationProps) {
+export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange }: CustomerSegmentationProps) {
   const [customers, setCustomers] = useState<CustomerSegment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const currentYear = year ?? new Date().getFullYear();
+  const currentYear = year ?? dateRange?.from.getFullYear() ?? new Date().getFullYear();
+
+  // Format dates for the RPC call
+  const fromDateStr = dateRange ? format(dateRange.from, "yyyy-MM-dd") : undefined;
+  const toDateStr = dateRange ? format(dateRange.to, "yyyy-MM-dd") : undefined;
 
   useEffect(() => {
     fetchCustomerSegments();
-  }, [location, refreshKey, currentYear]);
+  }, [location, refreshKey, currentYear, fromDateStr, toDateStr]);
 
   const fetchCustomerSegments = async () => {
     setLoading(true);
@@ -65,7 +70,7 @@ export function CustomerSegmentation({ location, refreshKey = 0, year }: Custome
     const locationParam = location === "all" ? null : location;
 
     try {
-      const data = await api.reports.getCustomerSegments(currentYear, locationParam);
+      const data = await api.reports.getCustomerSegments(currentYear, locationParam, fromDateStr, toDateStr);
       if (data) {
         setCustomers(data as CustomerSegment[]);
       }
