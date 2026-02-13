@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
@@ -6,9 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Printer, RotateCcw, FlaskConical, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Printer, RotateCcw, FlaskConical, AlertTriangle, CheckCircle2, Save, FolderOpen, Trash2, Loader2 } from "lucide-react";
 import { getGasColor } from "@/constants/gasColors";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Gas constants
 const GASES = [
@@ -26,16 +36,56 @@ const PRESSURES = [200, 300];
 
 type GasPercentages = Record<string, number>;
 
+interface SavedRecipe {
+  id: string;
+  name: string;
+  description: string | null;
+  target_pressure: number;
+  cylinder_volume: number;
+  n2_percentage: number;
+  co2_percentage: number;
+  ar_percentage: number;
+  o2_percentage: number;
+  created_at: string;
+}
+
 export function GasMixtureRecipemaker() {
   const [percentages, setPercentages] = useState<GasPercentages>({
     n2: 0, co2: 0, ar: 0, o2: 0,
   });
   const [targetPressure, setTargetPressure] = useState(200);
   const [cylinderVolume, setCylinderVolume] = useState(50);
-  const printRef = useRef<HTMLDivElement>(null);
+
+  // Save/load state
+  const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
+  const [recipeName, setRecipeName] = useState("");
+  const [recipeDescription, setRecipeDescription] = useState("");
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showLoadDialog, setShowLoadDialog] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [activeRecipeId, setActiveRecipeId] = useState<string | null>(null);
 
   const totalPercentage = Object.values(percentages).reduce((sum, v) => sum + v, 0);
   const isValid = Math.abs(totalPercentage - 100) < 0.01;
+
+  const fetchRecipes = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("gas_mixture_recipes")
+      .select("*")
+      .order("name");
+    if (error) {
+      console.error("Error fetching recipes:", error);
+    } else {
+      setSavedRecipes(data as SavedRecipe[]);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchRecipes();
+  }, [fetchRecipes]);
 
   const updatePercentage = (gasId: string, value: number) => {
     setPercentages(prev => ({ ...prev, [gasId]: Math.max(0, Math.min(100, value)) }));
@@ -57,7 +107,6 @@ export function GasMixtureRecipemaker() {
           massGrams,
         };
       })
-      // Sort heaviest first (filling order)
       .sort((a, b) => b.massGrams - a.massGrams);
 
     let cumulative = 0;
@@ -69,10 +118,98 @@ export function GasMixtureRecipemaker() {
 
   const handleReset = () => {
     setPercentages({ n2: 0, co2: 0, ar: 0, o2: 0 });
+    setActiveRecipeId(null);
   };
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleSave = async () => {
+    if (!recipeName.trim()) {
+      toast.error("Geef het recept een naam");
+      return;
+    }
+    setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Je moet ingelogd zijn");
+      setSaving(false);
+      return;
+    }
+
+    const recipeData = {
+      name: recipeName.trim(),
+      description: recipeDescription.trim() || null,
+      target_pressure: targetPressure,
+      cylinder_volume: cylinderVolume,
+      n2_percentage: percentages.n2,
+      co2_percentage: percentages.co2,
+      ar_percentage: percentages.ar,
+      o2_percentage: percentages.o2,
+      created_by: user.id,
+    };
+
+    let error;
+    if (activeRecipeId) {
+      ({ error } = await supabase
+        .from("gas_mixture_recipes")
+        .update(recipeData)
+        .eq("id", activeRecipeId));
+    } else {
+      ({ error } = await supabase
+        .from("gas_mixture_recipes")
+        .insert(recipeData));
+    }
+
+    if (error) {
+      toast.error("Fout bij opslaan: " + error.message);
+    } else {
+      toast.success(activeRecipeId ? "Recept bijgewerkt" : "Recept opgeslagen");
+      setShowSaveDialog(false);
+      fetchRecipes();
+    }
+    setSaving(false);
+  };
+
+  const handleLoad = (recipe: SavedRecipe) => {
+    setPercentages({
+      n2: Number(recipe.n2_percentage),
+      co2: Number(recipe.co2_percentage),
+      ar: Number(recipe.ar_percentage),
+      o2: Number(recipe.o2_percentage),
+    });
+    setTargetPressure(recipe.target_pressure);
+    setCylinderVolume(recipe.cylinder_volume);
+    setActiveRecipeId(recipe.id);
+    setRecipeName(recipe.name);
+    setRecipeDescription(recipe.description || "");
+    setShowLoadDialog(false);
+    toast.success(`Recept "${recipe.name}" geladen`);
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    const { error } = await supabase
+      .from("gas_mixture_recipes")
+      .delete()
+      .eq("id", id);
+    if (error) {
+      toast.error("Fout bij verwijderen: " + error.message);
+    } else {
+      toast.success(`Recept "${name}" verwijderd`);
+      if (activeRecipeId === id) {
+        setActiveRecipeId(null);
+      }
+      fetchRecipes();
+    }
+  };
+
+  const openSaveDialog = () => {
+    if (!activeRecipeId) {
+      setRecipeName("");
+      setRecipeDescription("");
+    }
+    setShowSaveDialog(true);
   };
 
   const formatWeight = (g: number) => {
@@ -80,27 +217,45 @@ export function GasMixtureRecipemaker() {
     return `${g.toFixed(1)} g`;
   };
 
+  const getRecipeSummary = (r: SavedRecipe) => {
+    const parts: string[] = [];
+    if (Number(r.n2_percentage) > 0) parts.push(`N₂ ${r.n2_percentage}%`);
+    if (Number(r.co2_percentage) > 0) parts.push(`CO₂ ${r.co2_percentage}%`);
+    if (Number(r.ar_percentage) > 0) parts.push(`Ar ${r.ar_percentage}%`);
+    if (Number(r.o2_percentage) > 0) parts.push(`O₂ ${r.o2_percentage}%`);
+    return parts.join(" / ");
+  };
+
   return (
     <div className="space-y-6 print:space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between print:hidden">
+      <div className="flex items-center justify-between flex-wrap gap-2 print:hidden">
         <div className="flex items-center gap-2">
           <FlaskConical className="h-5 w-5 text-primary" />
           <h2 className="text-xl font-semibold">Receptenmaker Gasmengsels</h2>
+          {activeRecipeId && (
+            <Badge variant="secondary" className="text-xs">{recipeName}</Badge>
+          )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={() => { fetchRecipes(); setShowLoadDialog(true); }}>
+            <FolderOpen className="h-4 w-4 mr-1" /> Laden
+          </Button>
+          <Button variant="outline" size="sm" onClick={openSaveDialog} disabled={!isValid || fillingSteps.length === 0}>
+            <Save className="h-4 w-4 mr-1" /> Opslaan
+          </Button>
           <Button variant="outline" size="sm" onClick={handleReset}>
             <RotateCcw className="h-4 w-4 mr-1" /> Reset
           </Button>
           <Button variant="outline" size="sm" onClick={handlePrint} disabled={!isValid || fillingSteps.length === 0}>
-            <Printer className="h-4 w-4 mr-1" /> Print recept
+            <Printer className="h-4 w-4 mr-1" /> Print
           </Button>
         </div>
       </div>
 
       {/* Print header */}
       <div className="hidden print:block">
-        <h1 className="text-2xl font-bold">Vulrecept Gasmengsel</h1>
+        <h1 className="text-2xl font-bold">Vulrecept Gasmengsel{recipeName ? `: ${recipeName}` : ""}</h1>
         <p className="text-sm text-muted-foreground">
           Doeldruk: {targetPressure} bar bij 15°C | Cilinderinhoud: {cylinderVolume}L
         </p>
@@ -288,6 +443,102 @@ export function GasMixtureRecipemaker() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Save Dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{activeRecipeId ? "Recept bijwerken" : "Recept opslaan"}</DialogTitle>
+            <DialogDescription>Geef het recept een naam om het later terug te laden.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Naam *</label>
+              <Input
+                value={recipeName}
+                onChange={e => setRecipeName(e.target.value)}
+                placeholder="Bijv. Lasgas 82/18"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Beschrijving</label>
+              <Input
+                value={recipeDescription}
+                onChange={e => setRecipeDescription(e.target.value)}
+                placeholder="Optionele omschrijving"
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {getRecipeSummary({
+                n2_percentage: percentages.n2,
+                co2_percentage: percentages.co2,
+                ar_percentage: percentages.ar,
+                o2_percentage: percentages.o2,
+              } as SavedRecipe)} | {targetPressure} bar | {cylinderVolume}L
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveDialog(false)}>Annuleren</Button>
+            <Button onClick={handleSave} disabled={saving || !recipeName.trim()}>
+              {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              {activeRecipeId ? "Bijwerken" : "Opslaan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Load Dialog */}
+      <Dialog open={showLoadDialog} onOpenChange={setShowLoadDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Opgeslagen recepten</DialogTitle>
+            <DialogDescription>Selecteer een recept om te laden.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto space-y-2 py-2">
+            {loading && (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            {!loading && savedRecipes.length === 0 && (
+              <div className="text-sm text-muted-foreground text-center py-8">
+                Geen opgeslagen recepten gevonden.
+              </div>
+            )}
+            {!loading && savedRecipes.map(recipe => (
+              <div
+                key={recipe.id}
+                className={cn(
+                  "flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors",
+                  activeRecipeId === recipe.id && "border-primary bg-primary/5"
+                )}
+                onClick={() => handleLoad(recipe)}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-sm truncate">{recipe.name}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {getRecipeSummary(recipe)} | {recipe.target_pressure} bar | {recipe.cylinder_volume}L
+                  </div>
+                  {recipe.description && (
+                    <div className="text-xs text-muted-foreground mt-0.5 truncate">{recipe.description}</div>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 flex-shrink-0 text-destructive hover:text-destructive"
+                  onClick={e => {
+                    e.stopPropagation();
+                    handleDelete(recipe.id, recipe.name);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -554,6 +554,51 @@ export type Database = {
           },
         ]
       }
+      gas_mixture_recipes: {
+        Row: {
+          ar_percentage: number
+          co2_percentage: number
+          created_at: string
+          created_by: string
+          cylinder_volume: number
+          description: string | null
+          id: string
+          n2_percentage: number
+          name: string
+          o2_percentage: number
+          target_pressure: number
+          updated_at: string
+        }
+        Insert: {
+          ar_percentage?: number
+          co2_percentage?: number
+          created_at?: string
+          created_by: string
+          cylinder_volume?: number
+          description?: string | null
+          id?: string
+          n2_percentage?: number
+          name: string
+          o2_percentage?: number
+          target_pressure?: number
+          updated_at?: string
+        }
+        Update: {
+          ar_percentage?: number
+          co2_percentage?: number
+          created_at?: string
+          created_by?: string
+          cylinder_volume?: number
+          description?: string | null
+          id?: string
+          n2_percentage?: number
+          name?: string
+          o2_percentage?: number
+          target_pressure?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       gas_type_categories: {
         Row: {
           created_at: string
