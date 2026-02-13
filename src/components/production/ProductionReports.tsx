@@ -997,7 +997,7 @@ export function ProductionReports({
               <ProductionHeatMap location={location} refreshKey={refreshKey} dateRange={dateRange} />
             </Suspense>
             <Suspense fallback={<ChartLoadingFallback />}>
-              <CustomerSegmentation location={location} refreshKey={refreshKey} year={dateRange.from.getFullYear()} />
+              <CustomerSegmentation location={location} refreshKey={refreshKey} dateRange={dateRange} />
             </Suspense>
           </div>
         </TabsContent>

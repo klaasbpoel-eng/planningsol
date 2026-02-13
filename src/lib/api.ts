@@ -331,7 +331,7 @@ export const api = {
 
                 // Sync to Cloud/External
                 syncToCloud(async () => {
-                    await supabase.rpc('merge_customers', {
+                    await supabase.rpc('merge_customers' as any, {
                         source_id: sourceId,
                         target_id: targetId,
                         delete_source: deleteSource
@@ -391,7 +391,7 @@ export const api = {
                 });
             });
             syncToCloud(async () => {
-                await supabase.rpc('merge_customers', {
+                await supabase.rpc('merge_customers' as any, {
                     source_id: sourceId,
                     target_id: targetId,
                     delete_source: deleteSource
@@ -987,18 +987,10 @@ export const api = {
             return data?.reduce((sum, o) => sum + o.cylinder_count, 0) || 0;
         },
 
-        getCustomerSegments: async (year: number, location: string | null) => {
+        getCustomerSegments: async (year: number, location: string | null, fromDate?: string, toDate?: string) => {
             const source = getPrimarySource();
             if (source === "mysql") {
                 const params: any[] = [year]; // For trend analysis year check
-
-                // Query params construction needs to match the placeholders in the query.
-                // Queries:
-                // 1. Trend analysis (year)
-                // 2. Subquery 1 (year)
-                // 3. Subquery 1 (location - optional)
-                // 4. Subquery 2 (year)
-                // 5. Subquery 2 (location - optional)
 
                 params.push(year); // Subquery 1 year
                 if (location) params.push(location); // Subquery 1 location
@@ -1048,8 +1040,10 @@ export const api = {
             const client = getPrimarySupabaseClient();
             const { data, error } = await client.rpc("get_customer_segments", {
                 p_year: year,
-                p_location: location
-            });
+                p_location: location,
+                ...(fromDate ? { p_from_date: fromDate } : {}),
+                ...(toDate ? { p_to_date: toDate } : {})
+            } as any);
             if (error) throw error;
             return data;
         },
