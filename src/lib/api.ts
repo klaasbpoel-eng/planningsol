@@ -312,6 +312,93 @@ export const api = {
         },
         update: async (id: string, item: any) => {
             return primaryUpdate("customers", id, item);
+        },
+        merge: async (sourceId: string, targetId: string, deleteSource: boolean = false) => {
+            const source = getPrimarySource();
+
+            if (source === "mysql") {
+                // MySQL Transaction for atomicity would be ideal, but we'll do sequential updates for now
+                // 1. Update Gas Cylinder Orders
+                await executeMySQL(`UPDATE gas_cylinder_orders SET customer_id = ? WHERE customer_id = ?`, [targetId, sourceId]);
+
+                // 2. Update Dry Ice Orders
+                await executeMySQL(`UPDATE dry_ice_orders SET customer_id = ? WHERE customer_id = ?`, [targetId, sourceId]);
+
+                // 3. Delete source customer if requested
+                if (deleteSource) {
+                    await executeMySQL(`DELETE FROM customers WHERE id = ?`, [sourceId]);
+                }
+
+                // Sync to Cloud/External
+                syncToCloud(async () => {
+                    await supabase.rpc('merge_customers', {
+                        source_id: sourceId,
+                        target_id: targetId,
+                        delete_source: deleteSource
+                    });
+                });
+                syncToExternalSupabase(async (ext) => {
+                    await ext.rpc('merge_customers', {
+                        source_id: sourceId,
+                        target_id: targetId,
+                        delete_source: deleteSource
+                    });
+                });
+
+                return true;
+            }
+
+            const client = getPrimarySupabaseClient();
+            // Call RPC function on Supabase to handle the merge atomically
+            const { error } = await client.rpc('merge_customers', {
+                source_id: sourceId,
+                target_id: targetId,
+                delete_source: deleteSource
+            });
+
+            if (error) {
+                // Fallback if RPC doesn't exist yet, do it manually (less safe but works for now)
+                console.warn("RPC merge_customers not found, falling back to manual updates", error);
+
+                // 1. Update Gas Cylinder Orders
+                const { error: err1 } = await client.from('gas_cylinder_orders').update({ customer_id: targetId }).eq('customer_id', sourceId);
+                if (err1) throw err1;
+
+                // 2. Update Dry Ice Orders
+                const { error: err2 } = await client.from('dry_ice_orders').update({ customer_id: targetId }).eq('customer_id', sourceId);
+                if (err2) throw err2;
+
+                // 3. Delete source if requested
+                if (deleteSource) {
+                    const { error: err3 } = await client.from('customers').delete().eq('id', sourceId);
+                    if (err3) throw err3;
+                }
+            }
+
+            syncToMySQL(async () => {
+                await executeMySQL(`UPDATE gas_cylinder_orders SET customer_id = ? WHERE customer_id = ?`, [targetId, sourceId]);
+                await executeMySQL(`UPDATE dry_ice_orders SET customer_id = ? WHERE customer_id = ?`, [targetId, sourceId]);
+                if (deleteSource) {
+                    await executeMySQL(`DELETE FROM customers WHERE id = ?`, [sourceId]);
+                }
+            });
+
+            syncToExternalSupabase(async (ext) => {
+                await ext.rpc('merge_customers', {
+                    source_id: sourceId,
+                    target_id: targetId,
+                    delete_source: deleteSource
+                });
+            });
+            syncToCloud(async () => {
+                await supabase.rpc('merge_customers', {
+                    source_id: sourceId,
+                    target_id: targetId,
+                    delete_source: deleteSource
+                });
+            });
+
+            return true;
         }
     },
 

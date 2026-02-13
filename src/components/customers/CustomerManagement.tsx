@@ -35,6 +35,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { MergeCustomersDialog } from "./MergeCustomersDialog";
+import { Merge } from "lucide-react";
 
 interface Customer {
   id: string;
@@ -60,6 +62,7 @@ export function CustomerManagement({ isAdmin = false }: CustomerManagementProps)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
 
   const fetchCustomers = async () => {
     try {
@@ -131,10 +134,16 @@ export function CustomerManagement({ isAdmin = false }: CustomerManagementProps)
           </p>
         </div>
         {isAdmin && (
-          <Button onClick={() => { setEditingCustomer(null); setDialogOpen(true); }}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nieuwe klant
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => { setEditingCustomer(null); setDialogOpen(true); }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nieuwe klant
+            </Button>
+            <Button onClick={() => setMergeDialogOpen(true)} variant="outline">
+              <Merge className="h-4 w-4 mr-2" />
+              Samenvoegen
+            </Button>
+          </div>
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -294,6 +303,12 @@ export function CustomerManagement({ isAdmin = false }: CustomerManagementProps)
         onSaved={fetchCustomers}
       />
 
+      <MergeCustomersDialog
+        open={mergeDialogOpen}
+        onOpenChange={setMergeDialogOpen}
+        onMerged={fetchCustomers}
+      />
+
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -313,6 +328,6 @@ export function CustomerManagement({ isAdmin = false }: CustomerManagementProps)
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </div >
   );
 }
