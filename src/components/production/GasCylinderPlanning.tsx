@@ -42,6 +42,7 @@ import { ExcelImportDialog } from "./ExcelImportDialog";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileOrderCard, OrderDetail } from "./MobileOrderCard";
+import { getGasColor } from "@/constants/gasColors";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -392,20 +393,8 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
   };
 
   const getGasTypeColor = (order: GasCylinderOrder): string => {
-    // First priority: use gas_type_ref from the joined gas_types table
-    if (order.gas_type_ref?.color) {
-      return order.gas_type_ref.color;
-    }
-
-    // Fallback: Try to find matching gas type from loaded gas types using gas_type_id
-    if (order.gas_type_id) {
-      const matchingGasType = gasTypes.find(gt => gt.id === order.gas_type_id);
-      if (matchingGasType) {
-        return matchingGasType.color;
-      }
-    }
-
-    return "#6b7280"; // default gray
+    const label = getGasTypeLabel(order);
+    return getGasColor(label, order.gas_type_ref?.color || "#6b7280");
   };
 
   const statusLabels: Record<string, string> = {
