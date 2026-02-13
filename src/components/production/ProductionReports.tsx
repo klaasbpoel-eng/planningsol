@@ -633,10 +633,11 @@ export function ProductionReports({
               </CardHeader>
               <CardContent>
                 {currentDistributionData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
+                  <div className="overflow-y-auto" style={{ maxHeight: 500 }}>
+                  <ResponsiveContainer width="100%" height={Math.max(300, currentDistributionData.length * 28)}>
                     <BarChart data={currentDistributionData} layout="vertical" margin={{ left: 10, right: 10 }}>
                       <XAxis type="number" hide />
-                      <YAxis dataKey="name" type="category" width={100} className="text-[10px]" tickLine={false} axisLine={false} interval={0} />
+                      <YAxis dataKey="name" type="category" width={120} className="text-[11px]" tickLine={false} axisLine={false} interval={0} />
                       <Tooltip cursor={{ fill: 'transparent' }} />
                       <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                         {currentDistributionData.map((entry, index) => (
@@ -645,6 +646,7 @@ export function ProductionReports({
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                  </div>
                 ) : (
                   <div className="flex items-center justify-center h-[300px] text-muted-foreground">Geen data</div>
                 )}
