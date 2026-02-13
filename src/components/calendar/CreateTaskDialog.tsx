@@ -128,6 +128,9 @@ export function CreateTaskDialog({
         }
       }
 
+      // Generate series_id for recurring tasks
+      const seriesId = isRecurring ? crypto.randomUUID() : null;
+
       const tasksToCreate = taskDates.map(date => ({
         title,
         status,
@@ -136,6 +139,7 @@ export function CreateTaskDialog({
         assigned_to: assignedTo === "everyone" ? null : (assignedTo || null),
         created_by: currentUserId,
         type_id: null, // Keep type_id null as we use title now
+        series_id: seriesId,
         start_time: hasTime && startTime ? startTime : null,
         end_time: hasTime && endTime ? endTime : null,
       }));
