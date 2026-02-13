@@ -107,8 +107,8 @@ export function ResponsiveDialogContent({
 
   if (isMobile) {
     return (
-      <DrawerContent className={cn("max-h-[90vh] flex flex-col", className)}>
-        <div className="overflow-y-auto flex-1 pb-safe pb-8">
+      <DrawerContent className={cn("max-h-[90vh]", className)}>
+        <div className="overflow-y-auto pb-safe pb-8">
           {children}
         </div>
       </DrawerContent>
