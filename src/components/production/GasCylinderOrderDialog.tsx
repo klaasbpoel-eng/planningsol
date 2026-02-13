@@ -48,6 +48,7 @@ import { format, parseISO } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { getGasColor } from "@/constants/gasColors";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -318,16 +319,8 @@ export function GasCylinderOrderDialog({
   };
 
   const getGasTypeColor = (orderData: GasCylinderOrder): string => {
-    if (orderData.gas_type_ref?.color) {
-      return orderData.gas_type_ref.color;
-    }
-    if (orderData.gas_type_id) {
-      const matchingType = gasTypes.find(gt => gt.id === orderData.gas_type_id);
-      if (matchingType) {
-        return matchingType.color;
-      }
-    }
-    return "#6b7280";
+    const label = getDisplayGasType(orderData);
+    return getGasColor(label, orderData.gas_type_ref?.color || "#6b7280");
   };
 
   const gasGradeLabels: Record<string, string> = {
