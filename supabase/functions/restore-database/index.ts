@@ -7,8 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Order matters: reference tables first, then dependent tables
-const RESTORE_ORDER = [
+const VALID_TABLES = [
   "gas_type_categories",
   "gas_types",
   "cylinder_sizes",
@@ -22,7 +21,7 @@ const RESTORE_ORDER = [
   "dry_ice_orders",
 ];
 
-// Delete in reverse: dependent tables first
+// Delete in reverse dependency order
 const DELETE_ORDER = [
   "gas_cylinder_orders",
   "dry_ice_orders",
@@ -37,140 +36,108 @@ const DELETE_ORDER = [
   "gas_type_categories",
 ];
 
+async function verifyAdmin(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) throw new Error("Unauthorized");
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+
+  const { data: { user }, error } = await userClient.auth.getUser();
+  if (error || !user) throw new Error("Unauthorized");
+
+  const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+  const { data: roleData } = await serviceClient
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("role", "admin")
+    .maybeSingle();
+
+  if (!roleData) throw new Error("Alleen admins kunnen restores uitvoeren");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Verify admin role
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    await verifyAdmin(req);
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const body = await req.json();
+    const { action } = body;
+
     const dbUrl = Deno.env.get("SUPABASE_DB_URL")!;
-
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const {
-      data: { user },
-      error: userError,
-    } = await userClient.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
-    const { data: roleData } = await serviceClient
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
-      .maybeSingle();
-
-    if (!roleData) {
-      return new Response(
-        JSON.stringify({ error: "Alleen admins kunnen restores uitvoeren" }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // Parse and validate backup
-    const backup = await req.json();
-
-    if (!backup.version || !backup.tables) {
-      return new Response(
-        JSON.stringify({
-          error:
-            "Ongeldig backup-bestand: version en tables velden zijn vereist",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // Validate that all expected tables exist in backup
-    for (const table of RESTORE_ORDER) {
-      if (!Array.isArray(backup.tables[table])) {
-        return new Response(
-          JSON.stringify({
-            error: `Ongeldig backup-bestand: tabel "${table}" ontbreekt of is geen array`,
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-    }
-
-    // Use direct SQL connection for transactional restore
     const sql = postgres(dbUrl, { max: 1 });
 
     try {
-      await sql.begin(async (tx) => {
-        // Delete in dependency order (children first)
+      if (action === "clear") {
+        // Delete all data in reverse dependency order
         for (const table of DELETE_ORDER) {
-          await tx.unsafe(`DELETE FROM public.${table}`);
+          await sql.unsafe(`DELETE FROM public.${table}`);
+        }
+        return new Response(
+          JSON.stringify({ success: true, message: "Alle tabellen geleegd" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (action === "insert") {
+        const { table, rows } = body;
+
+        if (!VALID_TABLES.includes(table)) {
+          return new Response(
+            JSON.stringify({ error: `Ongeldige tabel: ${table}` }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
 
-        // Insert in dependency order (parents first)
-        for (const table of RESTORE_ORDER) {
-          const rows = backup.tables[table];
-          if (rows.length === 0) continue;
-
-          const columns = Object.keys(rows[0]);
-          const batchSize = 500;
-
-          for (let i = 0; i < rows.length; i += batchSize) {
-            const batch = rows.slice(i, i + batchSize);
-            const placeholders = batch
-              .map(
-                (_: unknown, rowIdx: number) =>
-                  `(${columns.map((_: string, colIdx: number) => `$${rowIdx * columns.length + colIdx + 1}`).join(", ")})`
-              )
-              .join(", ");
-
-            const values = batch.flatMap((row: Record<string, unknown>) =>
-              columns.map((col) => row[col] ?? null)
-            );
-
-            await tx.unsafe(
-              `INSERT INTO public.${table} (${columns.map((c) => `"${c}"`).join(", ")}) VALUES ${placeholders}`,
-              values
-            );
-          }
+        if (!Array.isArray(rows) || rows.length === 0) {
+          return new Response(
+            JSON.stringify({ success: true, inserted: 0 }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
-      });
+
+        const columns = Object.keys(rows[0]);
+        const batchSize = 500;
+
+        let totalInserted = 0;
+        for (let i = 0; i < rows.length; i += batchSize) {
+          const batch = rows.slice(i, i + batchSize);
+          const placeholders = batch
+            .map(
+              (_: unknown, rowIdx: number) =>
+                `(${columns.map((_: string, colIdx: number) => `$${rowIdx * columns.length + colIdx + 1}`).join(", ")})`
+            )
+            .join(", ");
+
+          const values = batch.flatMap((row: Record<string, unknown>) =>
+            columns.map((col) => row[col] ?? null)
+          );
+
+          await sql.unsafe(
+            `INSERT INTO public.${table} (${columns.map((c) => `"${c}"`).join(", ")}) VALUES ${placeholders}`,
+            values
+          );
+          totalInserted += batch.length;
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, inserted: totalInserted }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Database succesvol hersteld",
-          stats: Object.fromEntries(
-            RESTORE_ORDER.map((t) => [t, backup.tables[t].length])
-          ),
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        JSON.stringify({ error: "Ongeldige actie. Gebruik 'clear' of 'insert'." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } finally {
       await sql.end();
@@ -182,7 +149,7 @@ Deno.serve(async (req) => {
         error: error instanceof Error ? error.message : "Restore mislukt",
       }),
       {
-        status: 500,
+        status: error instanceof Error && error.message === "Unauthorized" ? 401 : 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );

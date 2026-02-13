@@ -7,35 +7,65 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Download, Upload, AlertTriangle, Database } from "lucide-react";
 
+const RESTORE_ORDER = [
+  "gas_type_categories",
+  "gas_types",
+  "cylinder_sizes",
+  "dry_ice_packaging",
+  "dry_ice_product_types",
+  "task_types",
+  "time_off_types",
+  "app_settings",
+  "customers",
+  "gas_cylinder_orders",
+  "dry_ice_orders",
+];
+
+const BATCH_SIZE = 500;
+
 export function DatabaseBackupRestore() {
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [restoreProgress, setRestoreProgress] = useState(0);
+  const [restoreStatus, setRestoreStatus] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const getAuthHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Niet ingelogd");
+    return {
+      Authorization: `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+    };
+  };
+
+  const callRestore = async (body: Record<string, unknown>) => {
+    const headers = await getAuthHeaders();
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/restore-database`,
+      { method: "POST", headers, body: JSON.stringify(body) }
+    );
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || "Restore mislukt");
+    }
+    return response.json();
+  };
 
   const handleBackup = async () => {
     setBackupLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Niet ingelogd");
-
+      const headers = await getAuthHeaders();
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/backup-database`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-          },
-        }
+        { method: "POST", headers }
       );
-
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.error || "Backup mislukt");
       }
-
       const data = await response.json();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -46,7 +76,6 @@ export function DatabaseBackupRestore() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-
       toast.success("Backup succesvol gedownload");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Backup mislukt");
@@ -64,7 +93,6 @@ export function DatabaseBackupRestore() {
     }
     setSelectedFile(file);
     setConfirmOpen(true);
-    // Reset input so same file can be selected again
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -72,37 +100,64 @@ export function DatabaseBackupRestore() {
     if (!selectedFile) return;
     setConfirmOpen(false);
     setRestoreLoading(true);
+    setRestoreProgress(0);
+    setRestoreStatus("Backup bestand lezen...");
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Niet ingelogd");
-
       const text = await selectedFile.text();
       const backup = JSON.parse(text);
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/restore-database`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(backup),
-        }
-      );
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Restore mislukt");
+      if (!backup.version || !backup.tables) {
+        throw new Error("Ongeldig backup-bestand: version en tables velden zijn vereist");
       }
 
-      const result = await response.json();
-      toast.success(result.message || "Database succesvol hersteld");
+      // Validate all tables exist
+      for (const table of RESTORE_ORDER) {
+        if (!Array.isArray(backup.tables[table])) {
+          throw new Error(`Ongeldig backup-bestand: tabel "${table}" ontbreekt`);
+        }
+      }
+
+      // Calculate total batches for progress
+      let totalBatches = 1; // 1 for clear
+      for (const table of RESTORE_ORDER) {
+        const rows = backup.tables[table];
+        totalBatches += Math.max(1, Math.ceil(rows.length / BATCH_SIZE));
+      }
+      let completedBatches = 0;
+
+      // Phase 1: Clear all tables
+      setRestoreStatus("Bestaande data verwijderen...");
+      await callRestore({ action: "clear" });
+      completedBatches++;
+      setRestoreProgress(Math.round((completedBatches / totalBatches) * 100));
+
+      // Phase 2: Insert table by table
+      for (const table of RESTORE_ORDER) {
+        const rows = backup.tables[table];
+        if (rows.length === 0) {
+          completedBatches++;
+          setRestoreProgress(Math.round((completedBatches / totalBatches) * 100));
+          continue;
+        }
+
+        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+          const batch = rows.slice(i, i + BATCH_SIZE);
+          setRestoreStatus(`${table} herstellen... (${Math.min(i + BATCH_SIZE, rows.length)}/${rows.length})`);
+          await callRestore({ action: "insert", table, rows: batch });
+          completedBatches++;
+          setRestoreProgress(Math.round((completedBatches / totalBatches) * 100));
+        }
+      }
+
+      setRestoreStatus("");
+      toast.success("Database succesvol hersteld");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Restore mislukt");
     } finally {
       setRestoreLoading(false);
+      setRestoreProgress(0);
+      setRestoreStatus("");
       setSelectedFile(null);
     }
   };
@@ -143,7 +198,14 @@ export function DatabaseBackupRestore() {
             />
           </div>
 
-          {(backupLoading || restoreLoading) && (
+          {restoreLoading && (
+            <div className="space-y-2">
+              <Progress value={restoreProgress} className="h-2" />
+              <p className="text-sm text-muted-foreground">{restoreStatus} ({restoreProgress}%)</p>
+            </div>
+          )}
+
+          {backupLoading && (
             <Progress value={undefined} className="h-2" />
           )}
         </CardContent>
