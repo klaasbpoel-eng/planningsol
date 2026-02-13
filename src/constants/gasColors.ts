@@ -1,34 +1,80 @@
 // Standard NEN-EN 1089-3 color coding + extras
 export const GAS_COLOR_MAPPING: Record<string, string> = {
-    "Zuurstof": "#0EA5E9", // Light Blue (Standard: White/Blue)
-    "Stikstof": "#1F2937", // Black (Standard: Black) - using Dark Gray for UI
-    "Koolzuur": "#9CA3AF", // Grey (Standard: Grey)
-    "CO2": "#9CA3AF", // CO2 (Same as Koolzuur)
-    "Kooldioxide": "#9CA3AF", // Kooldioxide (Same as Koolzuur)
-    "Argon": "#166534", // Dark Green (Standard: Dark Green)
-    "Acetyleen": "#991B1B", // Maroon (Standard: Maroon)
-    "Helium": "#92400E", // Brown (Standard: Brown)
-    "Lachgas": "#2563EB", // Blue (Standard: Blue)
-    "Perslucht": "#22C55E", // Green (Standard: Bright Green)
-    "Waterstof": "#DC2626", // Red (Standard: Red)
-    "Menggas": "#8B5CF6", // Purple (Generic)
+    // === Pure gassen (NEN-EN 1089-3) ===
+    "Zuurstof": "#0EA5E9", // Light Blue
+    "Stikstof": "#1F2937", // Dark Gray/Black
+    "Koolzuur": "#9CA3AF", // Grey
+    "CO2": "#9CA3AF",
+    "Kooldioxide": "#9CA3AF",
+    "Argon": "#166534", // Dark Green
+    "Acetyleen": "#991B1B", // Maroon
+    "Helium": "#92400E", // Brown
+    "Lachgas": "#1e3a8a", // Dark Blue
+    "Distikstofoxide": "#1e3a8a", // N2O = Lachgas
+    "Distikstoffmonoxide": "#1e3a8a", // German variant
+    "Nitrous Oxide": "#1e3a8a",
+    "Perslucht": "#22C55E", // Green
+    "Waterstof": "#DC2626", // Red
     "Propaan": "#F97316", // Orange
     "Koolmonoxide": "#EAB308", // Yellow
+
+    // === Lucht / Air (NEN: zwart-wit schouder) ===
+    "Lucht": "#4B5563", // Gray-600 (zwart-wit representatie)
+    "Adem Lucht": "#4B5563",
+    "Ademlucht": "#4B5563",
+    "Lucht Droog": "#4B5563",
+    "Lucht Synth": "#4B5563",
+    "Technische Lucht": "#4B5563",
+    "Air Medical": "#4B5563",
+
+    // === Menggas / Weldmix ===
+    "Menggas": "#8B5CF6", // Purple
+    "Weldmix": "#00ea33ff", // Bright Green
+    "Mixed Gas": "#00e94ee2",
+    "Sagox": "#00ea33ff",
+    "Weldar": "#00ea33ff",
+
+    // === Formeer (H2/N2) ===
+    "Formeer": "#F59E0B", // Amber
+
+    // === Carbogeen (CO2/O2) ===
+    "Carbogeen": "#9CA3AF", // Grey (CO2-based)
+
+    // === Lasermix ===
+    "Lasermix": "#8B5CF6",
+    "Lasersol": "#8B5CF6",
+
+    // === Brandbare gassen ===
+    "Etheen": "#F97316", // Orange
+    "Ethaan": "#F97316",
+    "Methaan": "#F97316",
+    "Propyleen": "#F97316",
+
+    // === Neon ===
+    "Neon": "#F472B6", // Pink
+
+    // === AliSOL varianten ===
+    "AliSOL Zuurstof": "#0EA5E9",
+    "AliSOL Stikstof": "#1F2937",
+    "AliSOL Kooldioxide": "#9CA3AF",
+    "AliSOL": "#6366f1",
+    "Alisol": "#6366f1",
+
+    // === Overig ===
+    "BIOSOL": "#22C55E",
+    "SOLCAS": "#8B5CF6",
+    "Enermix": "#F59E0B",
+
     // English fallback
     "Oxygen": "#0EA5E9",
     "Nitrogen": "#030304ff",
     "Carbon Dioxide": "#9CA3AF",
-    // Argon is same in NL/EN
     "Acetylene": "#991B1B",
-    // Helium is same in NL/EN
-    "Nitrous Oxide": "#2563EB",
-    "Compressed Air": "#22C55E",
+    "Compressed Air": "#4B5563",
     "Hydrogen": "#DC2626",
-    "Mixed Gas": "#00e94ee2",
     "Propane": "#F97316",
     "Carbon Monoxide": "#EAB308",
-    "Weldmix": "#00ea33ff",
-
+    "Medical grade Oxygen": "#0EA5E9",
 };
 
 export const getGasColor = (name: string, defaultColor: string = "#8b5cf6"): string => {
