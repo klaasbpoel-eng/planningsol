@@ -131,6 +131,18 @@ export function ExcelImportDialog({
     // Extract pressure from string
     if (str.includes("300 bar") || str.includes("300bar")) pressure = 300;
     if (str.includes("4 bar") || str.includes("4bar")) pressure = 4; // Voor Dewars
+
+    // Pure numeric value (e.g., "800", "50", "2" from Capaciteit column)
+    const pureNumeric = str.match(/^(\d+[,.]?\d*)$/);
+    if (pureNumeric) {
+      const num = parseFloat(pureNumeric[1].replace(',', '.'));
+      const candidateSize = `${Math.round(num)}L`;
+      const dbMatch = cylinderSizes.find(s => {
+        const sLiters = parseFloat(s.replace(/[^\d.,]/g, '').replace(',', '.'));
+        return Math.abs(sLiters - num) < 0.1;
+      });
+      return { size: dbMatch || candidateSize, pressure };
+    }
     
     // Dewar patterns (uitgebreid) - check eerst voor specifieke capaciteit
     if (str.includes("dewar")) {
@@ -362,18 +374,19 @@ export function ExcelImportDialog({
             break;
           }
           
-          // Detect original Excel format: "datum" + "gassoort"/"gastype"
-          if (rowStr.includes("datum") && (rowStr.includes("gassoort") || rowStr.includes("gastype"))) {
+          // Detect original Excel format: "datum" + "gassoort"/"gastype"/"product"
+          if (rowStr.includes("datum") && (rowStr.includes("gassoort") || rowStr.includes("gastype") || rowStr.includes("product"))) {
             headerRowIndex = i;
             row.forEach((cell, idx) => {
               const cellStr = String(cell || "").toLowerCase().trim();
               if (cellStr.includes("datum")) columnMap.date = idx;
-              if (cellStr.includes("gassoort") || cellStr.includes("gastype")) columnMap.gasType = idx;
+              if (cellStr.includes("gassoort") || cellStr.includes("gastype") || cellStr === "product") columnMap.gasType = idx;
               if (columnMap.size === undefined) {
                 if (cellStr.includes("type vulling") || cellStr.includes("vulling type") || 
                     cellStr.includes("cilinderinhoud") || cellStr.includes("cilinder inhoud") ||
                     cellStr.includes("formaat") || cellStr.includes("size") || 
-                    cellStr.includes("grootte") || cellStr === "inhoud") {
+                    cellStr.includes("grootte") || cellStr === "inhoud" ||
+                    cellStr === "capaciteit") {
                   columnMap.size = idx;
                 }
               }
@@ -381,7 +394,7 @@ export function ExcelImportDialog({
               if (cellStr === "m/t") columnMap.grade = idx;
               if (cellStr.includes("locatie") || cellStr.includes("location") || 
                   cellStr.includes("productielocatie") || cellStr.includes("site") || 
-                  cellStr.includes("vestiging")) {
+                  cellStr.includes("vestiging") || cellStr === "branche") {
                 columnMap.location = idx;
               }
               if (cellStr.includes("vulling tbv") || cellStr.includes("tbv") || 
@@ -454,12 +467,17 @@ export function ExcelImportDialog({
           const { size } = parseCylinderSize(sizeStr, cylinderSizes);
           const location = parseLocation(locationStr);
           
+          // Grade: use dedicated column if mapped, otherwise infer from gas type name
+          const grade = columnMap.grade !== undefined
+            ? parseGrade(gradeStr)
+            : (gasType.toLowerCase().includes("medicinaal") ? "medical" as const : "technical" as const);
+
           orders.push({
             date: dateValue,
             gasType,
             cylinderSize: size,
             count,
-            grade: parseGrade(gradeStr),
+            grade,
             customer: customer || "Onbekend",
             notes,
             pressure,
