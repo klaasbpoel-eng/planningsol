@@ -20,6 +20,76 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+// Critical properties for Peng-Robinson EOS
+// Tc (K), Pc (bar), acentric factor ω, molar mass (g/mol)
+interface GasCriticalProps {
+  Tc: number;
+  Pc: number;
+  omega: number;
+}
+
+const CRITICAL_PROPS: Record<string, GasCriticalProps> = {
+  n2:  { Tc: 126.2,  Pc: 33.98, omega: 0.0377 },
+  co2: { Tc: 304.21, Pc: 73.83, omega: 0.2236 },
+  ar:  { Tc: 150.86, Pc: 48.98, omega: 0.0000 },
+  o2:  { Tc: 154.58, Pc: 50.43, omega: 0.0222 },
+};
+
+// Peng-Robinson EOS: solve for compressibility factor Z
+// P = RT/(Vm-b) - a(T)/(Vm(Vm+b)+b(Vm-b))
+// Cubic in Z: Z³ - (1-B)Z² + (A-3B²-2B)Z - (AB-B²-B³) = 0
+// where A = aP/(R²T²), B = bP/(RT)
+function calculateZFactor(T_K: number, P_bar: number, gasId: string): number {
+  const props = CRITICAL_PROPS[gasId];
+  if (!props || P_bar <= 0) return 1.0;
+
+  const R_bar = 83.145; // cm³·bar/(mol·K)
+  const { Tc, Pc, omega } = props;
+
+  // Peng-Robinson parameters
+  const kappa = 0.37464 + 1.54226 * omega - 0.26992 * omega * omega;
+  const Tr = T_K / Tc;
+  const alpha = Math.pow(1 + kappa * (1 - Math.sqrt(Tr)), 2);
+
+  const a = 0.45724 * R_bar * R_bar * Tc * Tc / Pc * alpha;
+  const b = 0.07780 * R_bar * Tc / Pc;
+
+  const A = a * P_bar / (R_bar * R_bar * T_K * T_K);
+  const B = b * P_bar / (R_bar * T_K);
+
+  // Solve cubic: Z³ + c2·Z² + c1·Z + c0 = 0
+  const c2 = -(1 - B);
+  const c1 = A - 3 * B * B - 2 * B;
+  const c0 = -(A * B - B * B - B * B * B);
+
+  // Cardano's method for depressed cubic t³ + pt + q = 0
+  const p = c1 - c2 * c2 / 3;
+  const q = (2 * c2 * c2 * c2) / 27 - (c2 * c1) / 3 + c0;
+  const discriminant = q * q / 4 + p * p * p / 27;
+
+  let Z: number;
+
+  if (discriminant > 0) {
+    // One real root
+    const sqrtD = Math.sqrt(discriminant);
+    const u = Math.cbrt(-q / 2 + sqrtD);
+    const v = Math.cbrt(-q / 2 - sqrtD);
+    Z = u + v - c2 / 3;
+  } else {
+    // Three real roots - pick the largest (gas phase)
+    const r = Math.sqrt(-p * p * p / 27);
+    const theta = Math.acos(-q / (2 * r));
+    const m = 2 * Math.cbrt(r);
+    const z1 = m * Math.cos(theta / 3) - c2 / 3;
+    const z2 = m * Math.cos((theta + 2 * Math.PI) / 3) - c2 / 3;
+    const z3 = m * Math.cos((theta + 4 * Math.PI) / 3) - c2 / 3;
+    // Gas phase: largest positive root
+    Z = Math.max(z1, z2, z3);
+  }
+
+  return Math.max(Z, 0.01); // Safety floor
+}
+
 // Gas constants
 const GASES = [
   { id: "n2", name: "Stikstof", formula: "N₂", molarMass: 28.014, colorKey: "Stikstof" },
@@ -99,12 +169,14 @@ export function GasMixtureRecipemaker() {
         const partialPressureBar = (pct / 100) * targetPressure;
         const pressurePa = partialPressureBar * 1e5;
         const volumeM3 = cylinderVolume / 1000;
-        const massGrams = (pressurePa * volumeM3 * g.molarMass) / (R * T);
+        const Z = calculateZFactor(T, partialPressureBar, g.id);
+        const massGrams = (pressurePa * volumeM3 * g.molarMass) / (Z * R * T);
         return {
           ...g,
           percentage: pct,
           partialPressureBar,
           massGrams,
+          zFactor: Z,
         };
       })
       .sort((a, b) => b.massGrams - a.massGrams);
@@ -387,12 +459,13 @@ export function GasMixtureRecipemaker() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>Component</TableHead>
-                    <TableHead className="text-right">%</TableHead>
-                    <TableHead className="text-right">Partiaaldruk</TableHead>
-                    <TableHead className="text-right">Gewicht</TableHead>
-                    <TableHead className="text-right font-semibold">Weegschaal</TableHead>
+                     <TableHead className="w-12">#</TableHead>
+                     <TableHead>Component</TableHead>
+                     <TableHead className="text-right">%</TableHead>
+                     <TableHead className="text-right">Partiaaldruk</TableHead>
+                     <TableHead className="text-right">Z</TableHead>
+                     <TableHead className="text-right">Gewicht</TableHead>
+                     <TableHead className="text-right font-semibold">Weegschaal</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -411,9 +484,10 @@ export function GasMixtureRecipemaker() {
                             <span className="text-xs text-muted-foreground">{step.formula}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">{step.percentage.toFixed(1)}%</TableCell>
-                        <TableCell className="text-right">{step.partialPressureBar.toFixed(1)} bar</TableCell>
-                        <TableCell className="text-right">{formatWeight(step.massGrams)}</TableCell>
+                         <TableCell className="text-right">{step.percentage.toFixed(1)}%</TableCell>
+                         <TableCell className="text-right">{step.partialPressureBar.toFixed(1)} bar</TableCell>
+                         <TableCell className="text-right font-mono text-xs">{step.zFactor.toFixed(4)}</TableCell>
+                         <TableCell className="text-right">{formatWeight(step.massGrams)}</TableCell>
                         <TableCell className="text-right font-semibold">{formatWeight(step.cumulativeGrams)}</TableCell>
                       </TableRow>
                     );
@@ -421,7 +495,7 @@ export function GasMixtureRecipemaker() {
                 </TableBody>
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={3} className="font-semibold">Totaal</TableCell>
+                    <TableCell colSpan={4} className="font-semibold">Totaal</TableCell>
                     <TableCell className="text-right font-semibold">{targetPressure} bar</TableCell>
                     <TableCell className="text-right font-semibold">
                       {formatWeight(fillingSteps.reduce((s, f) => s + f.massGrams, 0))}
@@ -435,11 +509,11 @@ export function GasMixtureRecipemaker() {
             )}
 
             {/* Info box */}
-            <div className="mt-4 p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground space-y-1 print:bg-gray-50">
-              <p><strong>Methode:</strong> Gravimetrisch vullen met referentiecilinder op weegschaal</p>
-              <p><strong>Formule:</strong> m = (P × V × M) / (R × T) met T = 288,15 K (15°C)</p>
-              <p><strong>Vulvolgorde:</strong> Zwaarste component eerst, cumulatief gewicht aflezen op weegschaal</p>
-            </div>
+             <div className="mt-4 p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground space-y-1 print:bg-gray-50">
+               <p><strong>Methode:</strong> Gravimetrisch vullen met referentiecilinder op weegschaal</p>
+               <p><strong>Formule:</strong> m = (P × V × M) / (Z × R × T) — Peng-Robinson toestandsvergelijking</p>
+               <p><strong>Vulvolgorde:</strong> Zwaarste component eerst, cumulatief gewicht aflezen op weegschaal</p>
+             </div>
           </CardContent>
         </Card>
       </div>
