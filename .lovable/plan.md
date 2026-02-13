@@ -1,18 +1,35 @@
 
 
-## Fix: Disable Floating/Sticky Footer in Gas Cylinder Order Dialog
+## Fix: Remove Excess Whitespace in Mobile Cylinder Order Dialog
 
 ### Problem
-The "Order aanmaken" and "Annuleren" buttons in the Gas Cylinder Order dialog appear as a floating sticky footer on mobile. This is because `ResponsiveDialogFooter` applies `sticky bottom-0` styling on mobile via the Drawer component.
+The `ResponsiveDialogContent` component on mobile uses `max-h-[90vh] flex flex-col` on the DrawerContent and `flex-1` on the inner scrollable div. This forces the drawer to always take up 90% of the viewport height, even when the form content is shorter -- resulting in a large empty white area below the last field.
 
 ### Solution
-Replace `ResponsiveDialogFooter` with a regular `div` (or a non-sticky footer) so the buttons scroll naturally with the form content instead of floating at the bottom.
+Update the `ResponsiveDialogContent` in `src/components/ui/responsive-dialog.tsx` to use `h-auto` sizing instead of forcing the drawer to stretch. Remove `flex-1` from the inner div so the drawer naturally fits its content.
 
 ### Changes
 
-**File: `src/components/production/CreateGasCylinderOrderDialog.tsx`**
-- Replace `<ResponsiveDialogFooter>` with a plain `<div>` styled with appropriate flex layout and spacing, removing the sticky/floating behavior
-- Remove `ResponsiveDialogFooter` from the imports if no longer used
+**File: `src/components/ui/responsive-dialog.tsx`**
 
-This is a minimal change -- only the footer wrapper element changes; the buttons themselves remain identical.
+In the `ResponsiveDialogContent` function, change the mobile branch:
 
+Before:
+```tsx
+<DrawerContent className={cn("max-h-[90vh] flex flex-col", className)}>
+  <div className="overflow-y-auto flex-1 pb-safe pb-8">
+    {children}
+  </div>
+</DrawerContent>
+```
+
+After:
+```tsx
+<DrawerContent className={cn("max-h-[90vh]", className)}>
+  <div className="overflow-y-auto pb-safe pb-8">
+    {children}
+  </div>
+</DrawerContent>
+```
+
+This removes `flex flex-col` from the outer container and `flex-1` from the inner div, so the drawer height is determined by content size (up to the 90vh max). The form will no longer have empty whitespace below it.
