@@ -32,7 +32,6 @@ import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
-type TaskType = Database["public"]["Tables"]["task_types"]["Row"];
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -56,10 +55,7 @@ export function CreateTaskDialog({
   const [priority, setPriority] = useState("medium");
   const [dueDate, setDueDate] = useState<Date | undefined>(initialDate);
   const [assignedTo, setAssignedTo] = useState(currentUserId || "");
-  const [categoryId, setCategoryId] = useState<string>("");
-  const [subcategoryId, setSubcategoryId] = useState<string>("");
-  const [description, setDescription] = useState("");
-  const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
+  const [title, setTitle] = useState("");
   const [hasTime, setHasTime] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -70,34 +66,12 @@ export function CreateTaskDialog({
   const [isInfiniteRecurrence, setIsInfiniteRecurrence] = useState(false);
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>(undefined);
 
-  useEffect(() => {
-    if (open) {
-      fetchTaskTypes();
-    }
-  }, [open]);
-
-  const fetchTaskTypes = async () => {
-    const { data, error } = await supabase
-      .from("task_types")
-      .select("*")
-      .eq("is_active", true)
-      .order("sort_order");
-
-    if (!error && data) {
-      setTaskTypes(data);
-    }
-  };
-
-  const mainCategories = taskTypes.filter((t) => !t.parent_id);
-  const subcategories = taskTypes.filter((t) => t.parent_id === categoryId);
-
   const resetForm = () => {
     setStatus("pending");
     setPriority("medium");
     setDueDate(initialDate);
     setAssignedTo(currentUserId || "");
-    setCategoryId("");
-    setSubcategoryId("");
+    setTitle("");
     setHasTime(false);
     setStartTime("");
     setEndTime("");
@@ -118,7 +92,7 @@ export function CreateTaskDialog({
   };
 
   const handleCreate = async () => {
-    if (!dueDate || !currentUserId) {
+    if (!dueDate || !currentUserId || !title) {
       toast.error("Vul alle verplichte velden in");
       return;
     }
@@ -136,9 +110,6 @@ export function CreateTaskDialog({
     setSaving(true);
 
     try {
-      // Use subcategory if selected, otherwise main category
-      const typeId = subcategoryId || categoryId || null;
-
       // Generate dates for recurring tasks
       const taskDates: Date[] = [dueDate];
 
@@ -158,12 +129,13 @@ export function CreateTaskDialog({
       }
 
       const tasksToCreate = taskDates.map(date => ({
+        title,
         status,
         priority,
         due_date: format(date, "yyyy-MM-dd"),
         assigned_to: assignedTo === "everyone" ? null : (assignedTo || null),
         created_by: currentUserId,
-        type_id: typeId,
+        type_id: null, // Keep type_id null as we use title now
         start_time: hasTime && startTime ? startTime : null,
         end_time: hasTime && endTime ? endTime : null,
       }));
@@ -196,12 +168,6 @@ export function CreateTaskDialog({
     setDueDate(initialDate);
   }
 
-  // Reset subcategory when main category changes
-  const handleCategoryChange = (value: string) => {
-    setCategoryId(value);
-    setSubcategoryId("");
-  };
-
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px]">
@@ -221,55 +187,14 @@ export function CreateTaskDialog({
 
         <div className="space-y-4 py-4">
 
-          {/* Category selectors */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Hoofdcategorie</Label>
-              <Select value={categoryId} onValueChange={handleCategoryChange}>
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Selecteer categorie" />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  {mainCategories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: cat.color }}
-                        />
-                        {cat.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Subcategorie</Label>
-              <Select
-                value={subcategoryId}
-                onValueChange={setSubcategoryId}
-                disabled={!categoryId || subcategories.length === 0}
-              >
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder={subcategories.length === 0 ? "Geen subcategorieën" : "Selecteer subcategorie"} />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  {subcategories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: cat.color }}
-                        />
-                        {cat.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label>Algemene omschrijving</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Beschrijf de taak..."
+              className="bg-background"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

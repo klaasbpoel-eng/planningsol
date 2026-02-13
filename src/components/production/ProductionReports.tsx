@@ -81,7 +81,7 @@ const CustomerSegmentation = lazy(() => import("./CustomerSegmentation").then(m 
 const ChartLoadingFallback = () => (
   <ChartSkeleton height={300} showLegend={false} />
 );
-import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, differenceInDays, subDays, startOfYear, endOfYear, subYears } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, differenceInDays, subDays, startOfYear, endOfYear, subYears, isSameDay, isSameMonth, isSameYear } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn, formatNumber } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -327,6 +327,24 @@ export function ProductionReports({
     }
   };
 
+  const getActivePreset = (): string => {
+    const now = new Date();
+    const { from, to } = dateRange;
+
+    if (isSameDay(from, startOfWeek(now, { weekStartsOn: 1 })) && isSameDay(to, endOfWeek(now, { weekStartsOn: 1 }))) return "week";
+    if (isSameDay(from, startOfMonth(now)) && isSameDay(to, endOfMonth(now))) return "month";
+    if (isSameDay(from, subMonths(startOfMonth(now), 2)) && isSameDay(to, endOfMonth(now))) return "quarter";
+
+    // Last year
+    const lastYear = subYears(now, 1);
+    if (isSameDay(from, startOfYear(lastYear)) && isSameDay(to, endOfYear(lastYear))) return "last-year";
+
+    // This year
+    if (isSameDay(from, startOfYear(now)) && isSameDay(to, endOfYear(now))) return "this-year";
+
+    return "";
+  };
+
   // Calculate statistics from RPC data
   const cylinderStats = useMemo(() => ({
     total: cylinderEfficiency?.total_orders || 0,
@@ -400,12 +418,12 @@ export function ProductionReports({
       {/* Compact Toolbar */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-card/60 backdrop-blur-md border rounded-lg p-2 shadow-sm sticky top-0 z-10">
         <div className="flex flex-wrap items-center gap-2">
-          <ToggleGroup type="single" variant="outline" size="sm" defaultValue="month" className="hidden lg:flex">
-            <ToggleGroupItem value="week" onClick={() => setPresetRange("week")}>Deze week</ToggleGroupItem>
-            <ToggleGroupItem value="month" onClick={() => setPresetRange("month")}>Deze maand</ToggleGroupItem>
-            <ToggleGroupItem value="quarter" onClick={() => setPresetRange("quarter")}>Kwartaal</ToggleGroupItem>
-            <ToggleGroupItem value="last-year" onClick={() => setPresetRange("last-year")}>Vorig jaar</ToggleGroupItem>
-            <ToggleGroupItem value="year" onClick={() => setPresetRange("this-year")}>Jaar</ToggleGroupItem>
+          <ToggleGroup type="single" variant="outline" size="sm" value={getActivePreset()} onValueChange={(val) => val && setPresetRange(val)} className="hidden lg:flex">
+            <ToggleGroupItem value="week">Deze week</ToggleGroupItem>
+            <ToggleGroupItem value="month">Deze maand</ToggleGroupItem>
+            <ToggleGroupItem value="quarter">Kwartaal</ToggleGroupItem>
+            <ToggleGroupItem value="last-year">Vorig jaar</ToggleGroupItem>
+            <ToggleGroupItem value="this-year">Jaar</ToggleGroupItem>
           </ToggleGroup>
 
           <div className="flex items-center gap-2 bg-background border rounded-md px-2 py-1 h-9">
