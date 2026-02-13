@@ -399,6 +399,54 @@ export const api = {
             });
 
             return true;
+        },
+        getOrphans: async () => {
+            const source = getPrimarySource();
+            if (source === "mysql") {
+                const query = `
+                    SELECT DISTINCT gco.customer_id, gco.customer_name
+                    FROM gas_cylinder_orders gco
+                    LEFT JOIN customers c ON gco.customer_id = c.id
+                    WHERE c.id IS NULL
+                    UNION
+                    SELECT DISTINCT dio.customer_id, dio.customer_name
+                    FROM dry_ice_orders dio
+                    LEFT JOIN customers c ON dio.customer_id = c.id
+                    WHERE c.id IS NULL
+                `;
+                return executeMySQL(query);
+            }
+
+            const client = getPrimarySupabaseClient();
+            // Using a raw query via rpc or just checking against customers
+            // Since we can't easily do a cross-table join with missing parents in simple Supabase client query without relation
+            // We'll use a specific RPC for this if possible, or fetch all and diff (less efficient but works for small datasets)
+
+            const { data: orphans, error } = await client.rpc('get_orphaned_customers');
+            if (error) {
+                console.warn("RPC get_orphaned_customers not found, falling back to manual diff (may be slow)");
+                // Fallback: Fetch all order customer_ids and all customer ids, and diff
+                const { data: customers } = await client.from('customers').select('id');
+                const existingIds = new Set(customers?.map(c => c.id));
+
+                const { data: orders } = await client.from('gas_cylinder_orders').select('customer_id, customer_name');
+                const { data: dryIce } = await client.from('dry_ice_orders').select('customer_id, customer_name');
+
+                const orphans = new Map<string, string>();
+                orders?.forEach(o => {
+                    if (o.customer_id && !existingIds.has(o.customer_id)) orphans.set(o.customer_id, o.customer_name);
+                });
+                dryIce?.forEach(o => {
+                    if (o.customer_id && !existingIds.has(o.customer_id)) orphans.set(o.customer_id, o.customer_name);
+                });
+
+                return Array.from(orphans.entries()).map(([id, name]) => ({ customer_id: id, customer_name: name }));
+            }
+            return orphans;
+        },
+        reviveOrphan: async (id: string, name: string) => {
+            // Create a customer with the specific ID
+            return primaryCreate("customers", { id, name, is_active: true });
         }
     },
 

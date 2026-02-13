@@ -36,7 +36,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { MergeCustomersDialog } from "./MergeCustomersDialog";
-import { Merge } from "lucide-react";
+import { OrphanedCustomersDialog } from "./OrphanedCustomersDialog";
+import { Merge, ShieldCheck } from "lucide-react";
 
 interface Customer {
   id: string;
@@ -63,6 +64,7 @@ export function CustomerManagement({ isAdmin = false }: CustomerManagementProps)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [orphansDialogOpen, setOrphansDialogOpen] = useState(false);
 
   const fetchCustomers = async () => {
     try {
@@ -142,6 +144,9 @@ export function CustomerManagement({ isAdmin = false }: CustomerManagementProps)
             <Button onClick={() => setMergeDialogOpen(true)} variant="outline">
               <Merge className="h-4 w-4 mr-2" />
               Samenvoegen
+            </Button>
+            <Button onClick={() => setOrphansDialogOpen(true)} variant="outline" title="Controleer op verweesde data">
+              <ShieldCheck className="h-4 w-4" />
             </Button>
           </div>
         )}
@@ -307,6 +312,12 @@ export function CustomerManagement({ isAdmin = false }: CustomerManagementProps)
         open={mergeDialogOpen}
         onOpenChange={setMergeDialogOpen}
         onMerged={fetchCustomers}
+      />
+
+      <OrphanedCustomersDialog
+        open={orphansDialogOpen}
+        onOpenChange={setOrphansDialogOpen}
+        onResolved={fetchCustomers}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
