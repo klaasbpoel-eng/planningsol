@@ -3,7 +3,7 @@ import {
   ResponsiveDialog,
   ResponsiveDialogContent,
   ResponsiveDialogDescription,
-  ResponsiveDialogFooter,
+  
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
@@ -530,7 +530,7 @@ export function CreateGasCylinderOrderDialog({
           </div>
         </div>
 
-        <ResponsiveDialogFooter>
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-3 px-4 sm:px-0 pb-4">
           <Button variant="outline" onClick={handleClose} disabled={saving} className="h-11 sm:h-10 w-full sm:w-auto">
             Annuleren
           </Button>
@@ -543,7 +543,7 @@ export function CreateGasCylinderOrderDialog({
             <Plus className="h-4 w-4 mr-2" />
             {saving ? "Aanmaken..." : "Order aanmaken"}
           </Button>
-        </ResponsiveDialogFooter>
+        </div>
       </ResponsiveDialogContent>
     </ResponsiveDialog>
   );
