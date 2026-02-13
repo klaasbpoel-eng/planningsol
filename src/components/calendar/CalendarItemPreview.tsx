@@ -1,19 +1,19 @@
 import { ReactNode } from "react";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { nl } from "date-fns/locale";
-import { 
+import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Palmtree, 
-  ClipboardList, 
-  User, 
-  Calendar, 
-  Clock, 
-  Sun, 
+import {
+  Palmtree,
+  ClipboardList,
+  User,
+  Calendar,
+  Clock,
+  Sun,
   Sunset,
   AlertCircle,
   CheckCircle2,
@@ -45,16 +45,16 @@ interface CalendarItemPreviewProps {
   align?: "start" | "center" | "end";
 }
 
-export function CalendarItemPreview({ 
-  children, 
-  item, 
+export function CalendarItemPreview({
+  children,
+  item,
   type,
   side = "right",
   align = "center"
 }: CalendarItemPreviewProps) {
   const getEmployeeName = (profile?: Profile | null) => {
-    if (!profile) return "Onbekend";
-    return profile.full_name || profile.email?.split("@")[0] || "Onbekend";
+    if (!profile) return "Iedereen";
+    return profile.full_name || profile.email?.split("@")[0] || "Iedereen";
   };
 
   const getTypeLabel = (leaveType: string) => {
@@ -127,8 +127,8 @@ export function CalendarItemPreview({
         <HoverCardTrigger asChild>
           {children}
         </HoverCardTrigger>
-        <HoverCardContent 
-          side={side} 
+        <HoverCardContent
+          side={side}
           align={align}
           className="w-72 p-0 overflow-hidden border-border/50 bg-popover shadow-xl z-50"
         >
@@ -219,15 +219,15 @@ export function CalendarItemPreview({
       <HoverCardTrigger asChild>
         {children}
       </HoverCardTrigger>
-      <HoverCardContent 
-        side={side} 
+      <HoverCardContent
+        side={side}
         align={align}
         className="w-72 p-0 overflow-hidden border-border/50 bg-popover shadow-xl z-50"
       >
         {/* Header with task type color */}
-        <div 
+        <div
           className="px-4 py-3 border-b border-border/30"
-          style={{ 
+          style={{
             backgroundColor: task.task_type?.color ? `${task.task_type.color}20` : undefined,
             borderLeftWidth: 4,
             borderLeftColor: task.task_type?.color || "hsl(var(--muted))"
@@ -289,8 +289,8 @@ export function CalendarItemPreview({
 
           {/* Priority */}
           <div className="flex items-center gap-2 pt-2 border-t border-border/30">
-            <Badge 
-              variant="outline" 
+            <Badge
+              variant="outline"
               className={cn("text-xs", getPriorityColor(task.priority))}
             >
               {getPriorityLabel(task.priority)}

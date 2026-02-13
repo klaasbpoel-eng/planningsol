@@ -108,6 +108,8 @@ export function CalendarItemDialog({
   const [timeOffStartDate, setTimeOffStartDate] = useState<Date | undefined>();
   const [timeOffEndDate, setTimeOffEndDate] = useState<Date | undefined>();
 
+
+
   const startEditing = () => {
     if (item?.type === "task") {
       const task = item.data as TaskWithProfile;
@@ -310,6 +312,10 @@ export function CalendarItemDialog({
   };
 
   const getEmployeeName = (itemData: RequestWithProfile | TaskWithProfile) => {
+    // Check if it's a task and unassigned (assigned to everyone)
+    if ('assigned_to' in itemData && !itemData.assigned_to) {
+      return "Iedereen";
+    }
     return itemData.profile?.full_name || itemData.profile?.email?.split("@")[0] || "Onbekend";
   };
 
