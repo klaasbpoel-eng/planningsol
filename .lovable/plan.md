@@ -1,17 +1,18 @@
 
 
-# Fix: Tooltip popover cut off in Customer Segmentation
+## Fix: Disable Floating/Sticky Footer in Gas Cylinder Order Dialog
 
-## Problem
-The customer detail tooltip in "Klant Segmentatie" uses `side="right"`, but the card is already positioned on the right side of the page. This causes the tooltip to overflow outside the viewport and be partially hidden.
+### Problem
+The "Order aanmaken" and "Annuleren" buttons in the Gas Cylinder Order dialog appear as a floating sticky footer on mobile. This is because `ResponsiveDialogFooter` applies `sticky bottom-0` styling on mobile via the Drawer component.
 
-## Solution
-Change the tooltip to use `side="left"` so it appears on the left side of the customer row, where there is more available space. Additionally, add `collisionPadding` to ensure Radix automatically repositions the tooltip if it would still overflow.
+### Solution
+Replace `ResponsiveDialogFooter` with a regular `div` (or a non-sticky footer) so the buttons scroll naturally with the form content instead of floating at the bottom.
 
-## Changes
+### Changes
 
-### File: `src/components/production/CustomerSegmentation.tsx`
-- **Line 325**: Change `<TooltipContent side="right" className="max-w-xs">` to `<TooltipContent side="left" collisionPadding={16} className="max-w-xs">`
+**File: `src/components/production/CreateGasCylinderOrderDialog.tsx`**
+- Replace `<ResponsiveDialogFooter>` with a plain `<div>` styled with appropriate flex layout and spacing, removing the sticky/floating behavior
+- Remove `ResponsiveDialogFooter` from the imports if no longer used
 
-This is a single-line change. The `collisionPadding` prop ensures a 16px buffer from the viewport edge, and Radix will automatically flip the tooltip to another side if there still isn't enough room.
+This is a minimal change -- only the footer wrapper element changes; the buttons themselves remain identical.
 
