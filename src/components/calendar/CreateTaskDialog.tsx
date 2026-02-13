@@ -131,18 +131,22 @@ export function CreateTaskDialog({
       // Generate series_id for recurring tasks
       const seriesId = isRecurring ? crypto.randomUUID() : null;
 
+
       const tasksToCreate = taskDates.map(date => ({
         title,
         status,
         priority,
         due_date: format(date, "yyyy-MM-dd"),
-        assigned_to: assignedTo === "everyone" ? null : (assignedTo || null),
+        assigned_to: (assignedTo === "everyone" || !assignedTo) ? null : assignedTo,
         created_by: currentUserId,
         type_id: null, // Keep type_id null as we use title now
         series_id: seriesId,
         start_time: hasTime && startTime ? startTime : null,
         end_time: hasTime && endTime ? endTime : null,
       }));
+
+      console.log('Creating tasks with assignment:', assignedTo, 'Mapped to:', tasksToCreate[0].assigned_to);
+
 
       // Use api.tasks.create in parallel to ensure correct DB routing (and syncing)
       // Direct supabase insert bypasses the api layer which might cause issues if primary source is not cloud
@@ -151,7 +155,7 @@ export function CreateTaskDialog({
       toast.success(
         tasksToCreate.length > 1
           ? `${tasksToCreate.length} taken aangemaakt`
-          : "Taak aangemaakt"
+          : `Taak aangemaakt (Toegewezen aan: ${tasksToCreate[0].assigned_to ? "Specifieke medewerker" : "Iedereen"})`
       );
 
       resetForm();
