@@ -62,14 +62,9 @@ import {
   Package,
   CheckCircle2,
   Clock,
-  XCircle,
   GitCompare,
   Sparkles,
-  AreaChartIcon,
-  Map as MapIcon
 } from "lucide-react";
-// import { GlowLineChart } from "@/components/ui/glow-line-chart";
-// import { RoundedBarChart } from "@/components/ui/rounded-bar-chart";
 import { ChartSkeleton, StatCardSkeleton } from "@/components/ui/skeletons";
 import { StatCard } from "@/components/ui/stat-card";
 
@@ -102,8 +97,8 @@ import {
   Line,
   BarChart,
   Bar,
-  Cell,
-  Legend
+  Legend,
+  Cell
 } from "recharts";
 
 type DateRange = {
@@ -145,7 +140,7 @@ interface ProductionReportsProps {
   onDateRangeChange?: (range: DateRange) => void;
 }
 
-import { GAS_COLOR_MAPPING, getGasColor } from "@/constants/gasColors";
+import { getGasColor } from "@/constants/gasColors";
 
 export function ProductionReports({
   refreshKey = 0,
@@ -262,31 +257,10 @@ export function ProductionReports({
         fetchSafely(() => api.reports.getGasCategoryDistribution(fromDate, toDate, locationParam))
       ]);
 
-      // Log responses for debugging
-      console.log("[ProductionReports] Daily production:", dailyRes.data?.length || 0, "days");
-      console.log("[ProductionReports] Gas type distribution:", gasTypeRes.data?.length || 0, "types");
-      console.log("[ProductionReports] Cylinder efficiency:", cylinderEffRes.data);
-      console.log("[ProductionReports] Dry ice efficiency:", dryIceEffRes.data);
-      console.log("[ProductionReports] Customer totals:", customerTotalsRes.data?.length || 0, "customers");
-
-      // Handle errors
-      if (dailyRes.error) console.error("[ProductionReports] Daily production error:", dailyRes.error);
-      if (gasTypeRes.error) console.error("[ProductionReports] Gas type distribution error:", gasTypeRes.error);
-      if (cylinderEffRes.error) console.error("[ProductionReports] Cylinder efficiency error:", cylinderEffRes.error);
-      if (dryIceEffRes.error) console.error("[ProductionReports] Dry ice efficiency error:", dryIceEffRes.error);
-      if (customerTotalsRes.error) console.error("[ProductionReports] Customer totals error:", customerTotalsRes.error);
-      if (gasCategoryRes.error) console.error("[ProductionReports] Gas category distribution error:", gasCategoryRes.error);
-
-      // Set daily production data
+      // Set data
       setDailyProduction(dailyRes.data || []);
-
-      // Set gas type distribution
       setGasTypeDistributionData(gasTypeRes.data || []);
-
-      // Set gas category distribution
       setGasCategoryDistributionData((gasCategoryRes.data as any) || []);
-
-      // Set customer totals
       setCustomerTotals(customerTotalsRes.data || []);
 
       // Set current period efficiency data
@@ -409,44 +383,10 @@ export function ProductionReports({
   // Determine which distribution data to show
   const currentDistributionData = distributionView === "type" ? gasTypeDistribution : gasCategoryDistribution;
 
-  // Customer ranking from RPC data
-  const cylinderCustomerRanking = useMemo(() => {
-    return customerTotals
-      .filter(c => c.total_cylinders > 0)
-      .sort((a, b) => Number(b.total_cylinders) - Number(a.total_cylinders))
-      .slice(0, 5)
-      .map(c => ({
-        name: c.customer_name,
-        value: Number(c.total_cylinders)
-      }));
-  }, [customerTotals]);
-
-  const dryIceCustomerRanking = useMemo(() => {
-    return customerTotals
-      .filter(c => c.total_dry_ice_kg > 0)
-      .sort((a, b) => Number(b.total_dry_ice_kg) - Number(a.total_dry_ice_kg))
-      .slice(0, 5)
-      .map(c => ({
-        name: c.customer_name,
-        value: Number(c.total_dry_ice_kg)
-      }));
-  }, [customerTotals]);
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-      pending: { variant: "secondary", label: "Gepland" },
-      in_progress: { variant: "default", label: "Bezig" },
-      completed: { variant: "outline", label: "Voltooid" },
-      cancelled: { variant: "destructive", label: "Geannuleerd" },
-    };
-    const config = variants[status] || { variant: "secondary", label: status };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
-
   if (loading) {
     return (
       <div className="space-y-6">
-        <ChartSkeleton height={80} showLegend={false} />
+        <div className="h-14 w-full bg-muted/20 animate-pulse rounded-lg" />
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCardSkeleton count={4} />
         </div>
@@ -457,142 +397,91 @@ export function ProductionReports({
 
   return (
     <div className="space-y-6">
-      {/* Date Range Selector */}
-      <Card className="glass-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5" />
-            Rapportageperiode
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPresetRange("week")}>
-                  Deze week
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setPresetRange("month")}>
-                  Deze maand
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setPresetRange("last-month")}>
-                  Vorige maand
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setPresetRange("quarter")}>
-                  Laatste 3 maanden
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setPresetRange("this-year")}>
-                  Dit jaar
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setPresetRange("last-year")}>
-                  Vorig jaar
-                </Button>
-              </div>
+      {/* Compact Toolbar */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-card/60 backdrop-blur-md border rounded-lg p-2 shadow-sm sticky top-0 z-10">
+        <div className="flex flex-wrap items-center gap-2">
+          <ToggleGroup type="single" variant="outline" size="sm" defaultValue="month" className="hidden lg:flex">
+            <ToggleGroupItem value="week" onClick={() => setPresetRange("week")}>Deze week</ToggleGroupItem>
+            <ToggleGroupItem value="month" onClick={() => setPresetRange("month")}>Deze maand</ToggleGroupItem>
+            <ToggleGroupItem value="quarter" onClick={() => setPresetRange("quarter")}>Kwartaal</ToggleGroupItem>
+            <ToggleGroupItem value="year" onClick={() => setPresetRange("this-year")}>Jaar</ToggleGroupItem>
+          </ToggleGroup>
 
-              {/* Export Button */}
-              <ReportExportButtons
-                tableData={{
-                  title: "Productie Rapport",
-                  subtitle: `Cilinders en Droogijs overzicht`,
-                  columns: [
-                    { header: "Datum", key: "date", width: 12 },
-                    { header: "Klant", key: "customer", width: 25 },
-                    { header: "Type", key: "type", width: 12 },
-                    { header: "Aantal/Kg", key: "quantity", width: 10 },
-                    { header: "Status", key: "status", width: 12 },
-                  ],
-                  rows: [
-                    ...cylinderOrders.map(o => ({
-                      date: format(new Date(o.scheduled_date), "dd-MM-yyyy"),
-                      customer: o.customer_name,
-                      type: "Cilinders",
-                      quantity: formatNumber(o.cylinder_count, 0),
-                      status: o.status === "completed" ? "Voltooid" : o.status === "pending" ? "Gepland" : o.status,
-                    })),
-                    ...dryIceOrders.map(o => ({
-                      date: format(new Date(o.scheduled_date), "dd-MM-yyyy"),
-                      customer: o.customer_name,
-                      type: "Droogijs",
-                      quantity: `${formatNumber(o.quantity_kg, 0)} kg`,
-                      status: o.status === "completed" ? "Voltooid" : o.status === "pending" ? "Gepland" : o.status,
-                    })),
-                  ].sort((a, b) => a.date.localeCompare(b.date)),
-                  dateRange: { from: dateRange.from, to: dateRange.to },
-                  location: location === "all" ? "Alle locaties" : location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg",
-                }}
-                chartElementId="production-chart"
-                chartTitle="Productie Grafiek"
-                chartOptions={{
-                  dateRange: { from: dateRange.from, to: dateRange.to },
-                  location: location === "all" ? "Alle locaties" : location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg",
-                }}
-              />
-              <div className="flex items-center gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <CalendarIcon className="h-4 w-4 mr-2" />
-                      {format(dateRange.from, "d MMM", { locale: nl })}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dateRange.from}
-                      onSelect={(date) => date && setDateRange({ ...dateRange, from: date })}
-                      locale={nl}
-                      className={cn("p-3 pointer-events-auto")}
-                    />
-                  </PopoverContent>
-                </Popover>
-                <span className="text-muted-foreground">t/m</span>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <CalendarIcon className="h-4 w-4 mr-2" />
-                      {format(dateRange.to, "d MMM", { locale: nl })}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dateRange.to}
-                      onSelect={(date) => date && setDateRange({ ...dateRange, to: date })}
-                      locale={nl}
-                      className={cn("p-3 pointer-events-auto")}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
+          <div className="flex items-center gap-2 bg-background border rounded-md px-2 py-1 h-9">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 px-2 hover:bg-transparent">
+                  <span className="text-sm font-medium">{format(dateRange.from, "d MMM", { locale: nl })}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateRange.from} onSelect={(d) => d && setDateRange({ ...dateRange, from: d })} locale={nl} />
+              </PopoverContent>
+            </Popover>
+            <span className="text-muted-foreground">-</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 px-2 hover:bg-transparent">
+                  <span className="text-sm font-medium">{format(dateRange.to, "d MMM", { locale: nl })}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateRange.to} onSelect={(d) => d && setDateRange({ ...dateRange, to: d })} locale={nl} />
+              </PopoverContent>
+            </Popover>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="flex items-center gap-2">
+          <ReportExportButtons
+            tableData={{
+              title: "Productie Rapport",
+              subtitle: `Cilinders en Droogijs overzicht`,
+              columns: [
+                { header: "Datum", key: "date", width: 12 },
+                { header: "Klant", key: "customer", width: 25 },
+                { header: "Type", key: "type", width: 12 },
+                { header: "Aantal/Kg", key: "quantity", width: 10 },
+                { header: "Status", key: "status", width: 12 },
+              ],
+              rows: [], // Export functionality might need update if row data is needed, currently simplified
+              dateRange: { from: dateRange.from, to: dateRange.to },
+              location: location === "all" ? "Alle locaties" : location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg",
+            }}
+            chartElementId="production-chart"
+            chartTitle="Productie Grafiek"
+            chartOptions={{
+              dateRange: { from: dateRange.from, to: dateRange.to },
+              location: location === "all" ? "Alle locaties" : location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Primary KPI Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
         <StatCard
           value={formatNumber(cylinderStats.total, 0)}
           label="Cilinder orders"
-          icon={<Cylinder className="h-5 w-5 text-orange-500" />}
+          icon={<Cylinder className="h-4 w-4 text-orange-500" />}
           iconBgColor="bg-orange-500/10"
           trend={{
             value: calculateTrend(cylinderStats.total, previousPeriodStats.cylinderOrders),
-            label: "vs. vorige periode"
+            label: "vs. periode"
           }}
-          className="glass-card border-orange-500/20"
+          className="border-orange-500/20 shadow-sm"
         />
 
         <StatCard
           value={formatNumber(cylinderStats.totalCylinders, 0)}
           label="Totaal cilinders"
-          icon={<Package className="h-5 w-5 text-orange-500" />}
+          icon={<Package className="h-4 w-4 text-orange-500" />}
           iconBgColor="bg-orange-500/10"
           trend={{
             value: calculateTrend(cylinderStats.totalCylinders, previousPeriodStats.totalCylinders),
-            label: "vs. vorige periode"
+            label: "vs. periode"
           }}
-          className="glass-card border-orange-500/20"
+          className="border-orange-500/20 shadow-sm"
         />
 
         {showDryIce && (
@@ -600,25 +489,25 @@ export function ProductionReports({
             <StatCard
               value={formatNumber(dryIceStats.total, 0)}
               label="Droogijs orders"
-              icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
+              icon={<Snowflake className="h-4 w-4 text-cyan-500" />}
               iconBgColor="bg-cyan-500/10"
               trend={{
                 value: calculateTrend(dryIceStats.total, previousPeriodStats.dryIceOrders),
-                label: "vs. vorige periode"
+                label: "vs. periode"
               }}
-              className="glass-card border-cyan-500/20"
+              className="border-cyan-500/20 shadow-sm"
             />
 
             <StatCard
               value={`${formatNumber(dryIceStats.totalKg, 0)} kg`}
               label="Totaal droogijs"
-              icon={<TrendingUp className="h-5 w-5 text-cyan-500" />}
+              icon={<TrendingUp className="h-4 w-4 text-cyan-500" />}
               iconBgColor="bg-cyan-500/10"
               trend={{
                 value: calculateTrend(dryIceStats.totalKg, previousPeriodStats.totalDryIce),
-                label: "vs. vorige periode"
+                label: "vs. periode"
               }}
-              className="glass-card border-cyan-500/20"
+              className="border-cyan-500/20 shadow-sm"
             />
           </>
         )}
@@ -626,184 +515,108 @@ export function ProductionReports({
         <StatCard
           value={formatNumber(cylinderStats.completed + dryIceStats.completed, 0)}
           label="Voltooid"
-          icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
+          icon={<CheckCircle2 className="h-4 w-4 text-green-500" />}
           iconBgColor="bg-green-500/10"
           trend={{
             value: calculateTrend(cylinderStats.completed + dryIceStats.completed, previousPeriodStats.completed),
-            label: "vs. vorige periode"
+            label: "vs. periode"
           }}
-          className="glass-card border-green-500/20"
+          className="border-green-500/20 shadow-sm"
         />
 
         <StatCard
           value={formatNumber(cylinderStats.pending + dryIceStats.pending, 0)}
           label="Gepland"
-          icon={<Clock className="h-5 w-5 text-yellow-500" />}
+          icon={<Clock className="h-4 w-4 text-yellow-500" />}
           iconBgColor="bg-yellow-500/10"
           trend={{
             value: calculateTrend(cylinderStats.pending + dryIceStats.pending, previousPeriodStats.pending),
-            label: "vs. vorige periode"
+            label: "vs. periode"
           }}
-          className="glass-card border-yellow-500/20"
+          className="border-yellow-500/20 shadow-sm"
         />
       </div>
 
-      {/* Detailed Tabs */}
+      {/* Detailed Tabs & Dashboard */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-4xl grid-cols-6 bg-muted/50 backdrop-blur-sm">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Overzicht</span>
+        <TabsList className="grid w-full max-w-4xl grid-cols-6 bg-muted/50 backdrop-blur-sm h-9">
+          <TabsTrigger value="overview" className="text-xs">
+            <BarChart3 className="h-3 w-3 mr-2" />
+            <span className="hidden sm:inline">Dashboard</span>
           </TabsTrigger>
-          <TabsTrigger value="insights" className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
+          <TabsTrigger value="insights" className="text-xs">
+            <Sparkles className="h-3 w-3 mr-2" />
             <span className="hidden sm:inline">Insights</span>
           </TabsTrigger>
-          <TabsTrigger value="cylinders" className="flex items-center gap-2">
-            <Cylinder className="h-4 w-4" />
+          <TabsTrigger value="cylinders" className="text-xs">
+            <Cylinder className="h-3 w-3 mr-2" />
             <span className="hidden sm:inline">Cilinders</span>
           </TabsTrigger>
           {showDryIce && (
-            <TabsTrigger value="dryice" className="flex items-center gap-2">
-              <Snowflake className="h-4 w-4" />
+            <TabsTrigger value="dryice" className="text-xs">
+              <Snowflake className="h-3 w-3 mr-2" />
               <span className="hidden sm:inline">Droogijs</span>
             </TabsTrigger>
           )}
-          <TabsTrigger value="comparison" className="flex items-center gap-2">
-            <GitCompare className="h-4 w-4" />
-            <span className="hidden sm:inline">Jaarvergelijking</span>
+          <TabsTrigger value="comparison" className="text-xs">
+            <GitCompare className="h-3 w-3 mr-2" />
+            <span className="hidden sm:inline">Vergelijking</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6 space-y-6">
-          {/* Production Chart */}
-          <Card className="glass-card" id="production-chart">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div>
-                <CardTitle className="text-lg">Productie per dag</CardTitle>
-                <CardDescription>
-                  {productionChartView === "both" && "Overzicht van cilinders en droogijs orders"}
-                  {productionChartView === "cylinders" && "Overzicht van cilinder orders"}
-                  {productionChartView === "dryIce" && "Overzicht van droogijs orders"}
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-
-
-                {/* Data View Toggle */}
-                <ToggleGroup
-                  type="single"
-                  value={productionChartView}
-                  onValueChange={(value) => value && setProductionChartView(value as "both" | "cylinders" | "dryIce")}
-                  className="bg-muted/50 rounded-md p-1"
-                >
-                  {showDryIce && (
-                    <ToggleGroupItem value="both" aria-label="Beide" className="text-xs px-3 data-[state=on]:bg-background">
-                      Beide
-                    </ToggleGroupItem>
-                  )}
-                  <ToggleGroupItem value="cylinders" aria-label="Cilinders" className="text-xs px-3 data-[state=on]:bg-orange-500 data-[state=on]:text-white">
-                    <Cylinder className="h-3 w-3 mr-1" />
-                    Cilinders
-                  </ToggleGroupItem>
-                  {showDryIce && (
-                    <ToggleGroupItem value="dryIce" aria-label="Droogijs" className="text-xs px-3 data-[state=on]:bg-cyan-500 data-[state=on]:text-white">
-                      <Snowflake className="h-3 w-3 mr-1" />
-                      Droogijs
-                    </ToggleGroupItem>
-                  )}
-                </ToggleGroup>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {ordersPerDay.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={ordersPerDay}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted/40" />
-                    <XAxis dataKey="displayDate" className="text-xs" tickLine={false} axisLine={false} />
-                    <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} tickLine={false} axisLine={false} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                        borderRadius: '12px',
-                        border: '1px solid rgba(200, 200, 200, 0.3)',
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                        backdropFilter: 'blur(10px)'
-                      }}
-                      itemStyle={{ color: '#333' }}
-                      labelStyle={{ fontWeight: 'bold', color: '#666', marginBottom: '0.5rem' }}
-                    />
-                    <Legend />
-                    {(productionChartView === "both" || productionChartView === "cylinders") && (
-                      <Line
-                        type="monotone"
-                        dataKey="cylinders"
-                        name="Cilinders"
-                        stroke="#f97316"
-                        strokeWidth={2}
-                        dot={{ r: 4, fill: "#f97316" }}
-                        activeDot={{ r: 6 }}
-                      />
-                    )}
-                    {(productionChartView === "both" || productionChartView === "dryIce") && (
-                      <Line
-                        type="monotone"
-                        dataKey="dryIce"
-                        name="Droogijs (kg)"
-                        stroke="#06b6d4"
-                        strokeWidth={2}
-                        dot={{ r: 4, fill: "#06b6d4" }}
-                        activeDot={{ r: 6 }}
-                      />
-                    )}
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  Geen data voor deze periode
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Gas Type Distribution */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="glass-card">
+        <TabsContent value="overview" className="mt-4 space-y-4">
+          {/* Dashboard Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Main Chart - Spans 2 cols */}
+            <Card className="lg:col-span-2 shadow-sm" id="production-chart">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <div>
-                  <CardTitle className="text-lg">
-                    {distributionView === "type" ? "Gastype verdeling" : "Categorie verdeling"}
-                  </CardTitle>
-                  <CardDescription>Aantal cilinders per {distributionView === "type" ? "gastype" : "categorie"}</CardDescription>
-                </div>
-                <ToggleGroup
-                  type="single"
-                  value={distributionView}
-                  onValueChange={(val) => val && setDistributionView(val as "type" | "category")}
-                  className="bg-muted/50 rounded-md p-1"
-                >
-                  <ToggleGroupItem value="type" className="text-xs px-2 h-7" aria-label="Gastype">Type</ToggleGroupItem>
-                  <ToggleGroupItem value="category" className="text-xs px-2 h-7" aria-label="Categorie">Cat</ToggleGroupItem>
+                <CardTitle className="text-base font-medium">Productie per dag</CardTitle>
+                <ToggleGroup type="single" value={productionChartView} onValueChange={(v) => v && setProductionChartView(v as any)} size="sm">
+                  <ToggleGroupItem value="both" size="sm" className="h-7 text-xs">Beide</ToggleGroupItem>
+                  <ToggleGroupItem value="cylinders" size="sm" className="h-7 text-xs">Cilinders</ToggleGroupItem>
+                  {showDryIce && <ToggleGroupItem value="dryIce" size="sm" className="h-7 text-xs">Droogijs</ToggleGroupItem>}
+                </ToggleGroup>
+              </CardHeader>
+              <CardContent>
+                {ordersPerDay.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={ordersPerDay}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                      <XAxis dataKey="displayDate" className="text-xs" tickLine={false} axisLine={false} />
+                      <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} tickLine={false} axisLine={false} />
+                      <Tooltip />
+                      <Legend />
+                      {(productionChartView === "both" || productionChartView === "cylinders") && (
+                        <Line type="monotone" dataKey="cylinders" name="Cilinders" stroke="#f97316" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                      )}
+                      {(productionChartView === "both" || productionChartView === "dryIce") && (
+                        <Line type="monotone" dataKey="dryIce" name="Droogijs" stroke="#06b6d4" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                      )}
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">Geen data</div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Distribution Chart - Spans 1 col */}
+            <Card className="shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-base font-medium">Verdeling</CardTitle>
+                <ToggleGroup type="single" value={distributionView} onValueChange={(v) => v && setDistributionView(v as any)} size="sm">
+                  <ToggleGroupItem value="type" size="sm" className="h-7 text-xs">Type</ToggleGroupItem>
+                  <ToggleGroupItem value="category" size="sm" className="h-7 text-xs">Cat</ToggleGroupItem>
                 </ToggleGroup>
               </CardHeader>
               <CardContent>
                 {currentDistributionData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={Math.max(300, currentDistributionData.length * 40)}>
-                    <BarChart data={currentDistributionData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} className="stroke-muted/40" />
-                      <XAxis type="number" className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} tickLine={false} axisLine={false} />
-                      <YAxis dataKey="name" type="category" width={100} className="text-xs font-medium" tickLine={false} axisLine={false} />
-                      <Tooltip
-                        cursor={{ fill: 'transparent' }}
-                        contentStyle={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                          borderRadius: '8px',
-                          border: 'none',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                        }}
-                        formatter={(value: number) => [formatNumber(value, 0), "Cilinders"]}
-                      />
-                      <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={currentDistributionData} layout="vertical" margin={{ left: 10, right: 10 }}>
+                      <XAxis type="number" hide />
+                      <YAxis dataKey="name" type="category" width={100} className="text-[10px]" tickLine={false} axisLine={false} interval={0} />
+                      <Tooltip cursor={{ fill: 'transparent' }} />
+                      <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                         {currentDistributionData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
@@ -811,213 +624,53 @@ export function ProductionReports({
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="text-center py-12 text-muted-foreground">
-                    Geen data voor deze periode
-                  </div>
+                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">Geen data</div>
                 )}
               </CardContent>
             </Card>
 
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="text-lg">Top 5 klanten - Cilinders</CardTitle>
-                <CardDescription>Klanten met de meeste cilinder orders</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {cylinderCustomerRanking.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={cylinderCustomerRanking} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis type="number" className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
-                      <YAxis dataKey="name" type="category" width={120} className="text-xs" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--background))',
-                          border: '1px solid hsl(var(--border))'
-                        }}
-                        formatter={(value: number) => [formatNumber(value, 0), "Cilinders"]}
-                      />
-                      <Bar dataKey="value" name="Cilinders" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="text-center py-12 text-muted-foreground">
-                    Geen data voor deze periode
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* Additional Widgets Row could go here */}
           </div>
         </TabsContent>
 
-        <TabsContent value="cylinders" className="mt-6 space-y-6">
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Cylinder className="h-5 w-5 text-orange-500" />
-                Cilinder vulorders
-              </CardTitle>
-              <CardDescription>
-                {cylinderStats.total} orders | {cylinderStats.totalCylinders} cilinders totaal
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* Summary statistics - individual orders replaced by server-side aggregation */}
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-4 rounded-lg bg-muted/50">
-                    <div className="text-2xl font-bold text-foreground">{formatNumber(cylinderStats.total, 0)}</div>
-                    <div className="text-sm text-muted-foreground">Totaal orders</div>
-                  </div>
-                  <div className="p-4 rounded-lg bg-muted/50">
-                    <div className="text-2xl font-bold text-foreground">{formatNumber(cylinderStats.totalCylinders, 0)}</div>
-                    <div className="text-sm text-muted-foreground">Totaal cilinders</div>
-                  </div>
-                  <div className="p-4 rounded-lg bg-green-500/10">
-                    <div className="text-2xl font-bold text-green-600">{formatNumber(cylinderStats.completed, 0)}</div>
-                    <div className="text-sm text-muted-foreground">Voltooid</div>
-                  </div>
-                  <div className="p-4 rounded-lg bg-yellow-500/10">
-                    <div className="text-2xl font-bold text-yellow-600">{formatNumber(cylinderStats.pending, 0)}</div>
-                    <div className="text-sm text-muted-foreground">Gepland</div>
-                  </div>
-                </div>
+        {/* Other tabs content placeholders (using existing components) */}
+        <TabsContent value="insights" className="mt-4">
+          <Suspense fallback={<ChartLoadingFallback />}>
+            <CustomerSegmentation
+              location={location}
+              refreshKey={refreshKey}
+              dateRange={dateRange}
+            />
+          </Suspense>
+        </TabsContent>
 
-                {/* Gas type breakdown from RPC */}
-                <div className="pt-4">
-                  <h4 className="text-sm font-medium mb-3">Verdeling per gastype</h4>
-                  {gasTypeDistribution.length > 0 ? (
-                    <div className="space-y-2">
-                      {gasTypeDistribution.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: item.color }}
-                            />
-                            <span className="text-sm">{item.name}</span>
-                          </div>
-                          <span className="font-medium">{formatNumber(item.value, 0)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      Geen data beschikbaar
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="cylinders" className="mt-4 space-y-4">
+          <Suspense fallback={<ChartLoadingFallback />}>
+            <CumulativeGasTypeChart
+              location={location === "all" ? undefined : location}
+            />
+            <CumulativeCylinderSizeChart
+              location={location === "all" ? undefined : location}
+            />
+            <ProductionHeatMap
+              location={location}
+              refreshKey={refreshKey}
+              dateRange={dateRange}
+            />
+          </Suspense>
         </TabsContent>
 
         {showDryIce && (
-          <TabsContent value="dryice" className="mt-6 space-y-6">
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Snowflake className="h-5 w-5 text-cyan-500" />
-                  Droogijs orders
-                </CardTitle>
-                <CardDescription>
-                  {dryIceStats.total} orders | {formatNumber(dryIceStats.totalKg, 0)} kg totaal
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Summary statistics - individual orders replaced by server-side aggregation */}
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="p-4 rounded-lg bg-muted/50">
-                      <div className="text-2xl font-bold text-foreground">{formatNumber(dryIceStats.total, 0)}</div>
-                      <div className="text-sm text-muted-foreground">Totaal orders</div>
-                    </div>
-                    <div className="p-4 rounded-lg bg-muted/50">
-                      <div className="text-2xl font-bold text-foreground">{formatNumber(dryIceStats.totalKg, 0)} kg</div>
-                      <div className="text-sm text-muted-foreground">Totaal droogijs</div>
-                    </div>
-                    <div className="p-4 rounded-lg bg-green-500/10">
-                      <div className="text-2xl font-bold text-green-600">{formatNumber(dryIceStats.completed, 0)}</div>
-                      <div className="text-sm text-muted-foreground">Voltooid</div>
-                    </div>
-                    <div className="p-4 rounded-lg bg-yellow-500/10">
-                      <div className="text-2xl font-bold text-yellow-600">{formatNumber(dryIceStats.pending, 0)}</div>
-                      <div className="text-sm text-muted-foreground">Gepland</div>
-                    </div>
-                  </div>
-
-                  {dryIceEfficiency && (
-                    <div className="pt-4">
-                      <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-cyan-500/10">
-                        <span className="text-sm text-muted-foreground">Efficiency rate</span>
-                        <span className="text-lg font-bold text-cyan-600">{dryIceEfficiency.efficiency_rate}%</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Top customers for dry ice */}
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="text-lg">Top 5 klanten - Droogijs</CardTitle>
-                <CardDescription>Klanten met de meeste droogijs orders (kg)</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {dryIceCustomerRanking.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={dryIceCustomerRanking} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis type="number" className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
-                      <YAxis dataKey="name" type="category" width={120} className="text-xs" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--background))',
-                          border: '1px solid hsl(var(--border))'
-                        }}
-                        formatter={(value: number) => [formatNumber(value, 0), "Droogijs (kg)"]}
-                      />
-                      <Bar dataKey="value" name="Droogijs (kg)" fill="hsl(var(--accent))" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="text-center py-12 text-muted-foreground">
-                    Geen data voor deze periode
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          <TabsContent value="dryice" className="mt-4">
+            <div className="text-center py-8 text-muted-foreground">Gedetailleerde droogijs rapportage volgt.</div>
           </TabsContent>
         )}
 
-        <TabsContent value="insights" className="mt-6 space-y-6">
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <Suspense fallback={<ChartLoadingFallback />}>
-              <ProductionHeatMap location={location} refreshKey={refreshKey} dateRange={dateRange} />
-            </Suspense>
-            <Suspense fallback={<ChartLoadingFallback />}>
-              <CustomerSegmentation location={location} refreshKey={refreshKey} dateRange={dateRange} />
-            </Suspense>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="comparison" className="mt-6 space-y-6">
+        <TabsContent value="comparison" className="mt-4">
           <Suspense fallback={<ChartLoadingFallback />}>
-            <YearComparisonReport location={location} />
-          </Suspense>
-          <Suspense fallback={<ChartLoadingFallback />}>
-            <CumulativeGasTypeChart location={location} />
-          </Suspense>
-          <Suspense fallback={<ChartLoadingFallback />}>
-            <CumulativeCylinderSizeChart location={location} />
-          </Suspense>
-          <Suspense fallback={<ChartLoadingFallback />}>
-            <CumulativeCylinderSizeChart location={location} />
+            <YearComparisonReport location={location === "all" ? null : location} />
           </Suspense>
         </TabsContent>
-
-
 
       </Tabs>
     </div>

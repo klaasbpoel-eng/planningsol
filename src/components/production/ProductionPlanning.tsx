@@ -359,110 +359,112 @@ export function ProductionPlanning({
         )}
       </div>
 
-      {/* Quick stats */}
-      <div className="space-y-2">
-        {/* Period indicator - only show report tab hint for users who can see reports */}
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="text-xs font-medium">
-            📅 {getDateRangeLabel(dateRange)}
-          </Badge>
-          {showAdvancedTabs && (
-            <span className="text-xs text-muted-foreground">
-              Wijzig periode in Rapportage tab
-            </span>
-          )}
-        </div>
-
-        <div className={cn(
-          "grid gap-4",
-          showAdvancedWidgets
-            ? selectedLocation === "sol_tilburg"
-              ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
-              : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-5"
-            : selectedLocation === "sol_tilburg"
-              ? "grid-cols-1 sm:grid-cols-2"
-              : "grid-cols-1 sm:grid-cols-3"
-        )}>
-          {selectedLocation !== "sol_tilburg" && (
-            <StatCard
-              value={`${formatNumber(dryIceToday, 0)} kg`}
-              label="Droogijs gepland"
-              icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
-              iconBgColor="bg-cyan-500/10"
-              trend={{
-                value: calculateTrend(dryIceToday, previousDryIceToday),
-                label: "vs. vorige periode"
-              }}
-              className={cn(
-                "glass-card transition-all duration-300",
-                isRefreshing && "animate-pulse ring-2 ring-primary/30"
-              )}
-            />
-          )}
-
-          <div className="relative">
-            <StatCard
-              value={formatNumber(cylindersToday, 0)}
-              label="Cilinders gepland"
-              icon={<Cylinder className="h-5 w-5 text-orange-500" />}
-              iconBgColor="bg-orange-500/10"
-              trend={{
-                value: calculateTrend(cylindersToday, previousCylindersToday),
-                label: "vs. vorige periode"
-              }}
-              className={cn(
-                "glass-card transition-all duration-300",
-                isRefreshing && "animate-pulse ring-2 ring-primary/30"
-              )}
-            />
-            {selectedLocation !== "all" && (
-              <Badge variant="outline" className="absolute top-2 right-2 text-[10px] py-0">
-                {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
-              </Badge>
+      {/* Quick stats - Only show for planning tabs, hide for reporting to give more space */}
+      {activeTab !== 'rapportage' && (
+        <div className="space-y-2">
+          {/* Period indicator - only show report tab hint for users who can see reports */}
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs font-medium">
+              📅 {getDateRangeLabel(dateRange)}
+            </Badge>
+            {showAdvancedTabs && (
+              <span className="text-xs text-muted-foreground">
+                Wijzig periode in Rapportage tab
+              </span>
             )}
           </div>
 
-          <div className="relative">
-            <StatCard
-              value={formatNumber(weekOrders, 0)}
-              label="Totaal orders"
-              icon={<Package className="h-5 w-5 text-green-500" />}
-              iconBgColor="bg-green-500/10"
-              trend={{
-                value: calculateTrend(weekOrders, previousWeekOrders),
-                label: "vs. vorige periode"
-              }}
-              className={cn(
-                "glass-card transition-all duration-300",
-                isRefreshing && "animate-pulse ring-2 ring-primary/30"
+          <div className={cn(
+            "grid gap-4",
+            showAdvancedWidgets
+              ? selectedLocation === "sol_tilburg"
+                ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+                : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-5"
+              : selectedLocation === "sol_tilburg"
+                ? "grid-cols-1 sm:grid-cols-2"
+                : "grid-cols-1 sm:grid-cols-3"
+          )}>
+            {selectedLocation !== "sol_tilburg" && (
+              <StatCard
+                value={`${formatNumber(dryIceToday, 0)} kg`}
+                label="Droogijs gepland"
+                icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
+                iconBgColor="bg-cyan-500/10"
+                trend={{
+                  value: calculateTrend(dryIceToday, previousDryIceToday),
+                  label: "vs. vorige periode"
+                }}
+                className={cn(
+                  "glass-card transition-all duration-300",
+                  isRefreshing && "animate-pulse ring-2 ring-primary/30"
+                )}
+              />
+            )}
+
+            <div className="relative">
+              <StatCard
+                value={formatNumber(cylindersToday, 0)}
+                label="Cilinders gepland"
+                icon={<Cylinder className="h-5 w-5 text-orange-500" />}
+                iconBgColor="bg-orange-500/10"
+                trend={{
+                  value: calculateTrend(cylindersToday, previousCylindersToday),
+                  label: "vs. vorige periode"
+                }}
+                className={cn(
+                  "glass-card transition-all duration-300",
+                  isRefreshing && "animate-pulse ring-2 ring-primary/30"
+                )}
+              />
+              {selectedLocation !== "all" && (
+                <Badge variant="outline" className="absolute top-2 right-2 text-[10px] py-0">
+                  {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
+                </Badge>
               )}
-            />
-            {selectedLocation !== "all" && (
-              <Badge variant="outline" className="absolute top-2 right-2 text-[10px] py-0">
-                {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
-              </Badge>
+            </div>
+
+            <div className="relative">
+              <StatCard
+                value={formatNumber(weekOrders, 0)}
+                label="Totaal orders"
+                icon={<Package className="h-5 w-5 text-green-500" />}
+                iconBgColor="bg-green-500/10"
+                trend={{
+                  value: calculateTrend(weekOrders, previousWeekOrders),
+                  label: "vs. vorige periode"
+                }}
+                className={cn(
+                  "glass-card transition-all duration-300",
+                  isRefreshing && "animate-pulse ring-2 ring-primary/30"
+                )}
+              />
+              {selectedLocation !== "all" && (
+                <Badge variant="outline" className="absolute top-2 right-2 text-[10px] py-0">
+                  {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
+                </Badge>
+              )}
+            </div>
+
+            {/* Advanced widgets - only for non-operators */}
+            {showAdvancedWidgets && (
+              <>
+                <StockSummaryWidget
+                  refreshKey={refreshKey}
+                  isRefreshing={isRefreshing}
+                  selectedLocation={selectedLocation}
+                />
+
+                <TopCustomersWidget
+                  refreshKey={refreshKey}
+                  isRefreshing={isRefreshing}
+                  location={selectedLocation}
+                  dateRange={dateRange}
+                />
+              </>
             )}
           </div>
-
-          {/* Advanced widgets - only for non-operators */}
-          {showAdvancedWidgets && (
-            <>
-              <StockSummaryWidget
-                refreshKey={refreshKey}
-                isRefreshing={isRefreshing}
-                selectedLocation={selectedLocation}
-              />
-
-              <TopCustomersWidget
-                refreshKey={refreshKey}
-                isRefreshing={isRefreshing}
-                location={selectedLocation}
-                dateRange={dateRange}
-              />
-            </>
-          )}
         </div>
-      </div>
+      )}
 
       {/* Main content tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
