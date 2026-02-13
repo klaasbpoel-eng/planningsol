@@ -32,7 +32,7 @@ const R = 8.314; // J/(mol·K)
 const T = 288.15; // K (15°C)
 
 const CYLINDER_VOLUMES = [10, 20, 40, 50];
-const PRESSURES = [200, 300];
+const PRESSURES = [210, 300];
 
 type GasPercentages = Record<string, number>;
 
@@ -53,7 +53,7 @@ export function GasMixtureRecipemaker() {
   const [percentages, setPercentages] = useState<GasPercentages>({
     n2: 0, co2: 0, ar: 0, o2: 0,
   });
-  const [targetPressure, setTargetPressure] = useState(200);
+  const [targetPressure, setTargetPressure] = useState(210);
   const [cylinderVolume, setCylinderVolume] = useState(50);
 
   // Save/load state
