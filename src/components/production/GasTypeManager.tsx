@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -96,6 +97,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
   const [saving, setSaving] = useState(false);
   const [draggedTypeId, setDraggedTypeId] = useState<string | null>(null);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const fetchCategories = async () => {
     try {
@@ -254,24 +256,65 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
     }
   };
 
-  const handleDropOnCategory = async (categoryId: string | null) => {
-    if (!draggedTypeId) return;
-    const type = gasTypes.find(t => t.id === draggedTypeId);
-    if (!type || type.category_id === categoryId) {
+  const handleDropOnCategory = async (targetCategoryId: string | null) => {
+    // Determine which IDs to move: selected items (if dragged item is in selection) or just the dragged item
+    const idsToMove = draggedTypeId && selectedIds.has(draggedTypeId) && selectedIds.size > 0
+      ? Array.from(selectedIds)
+      : draggedTypeId ? [draggedTypeId] : [];
+
+    if (idsToMove.length === 0) {
       setDraggedTypeId(null);
       setDragOverCategory(null);
       return;
     }
+
+    // Filter out items already in the target category
+    const typesToMove = idsToMove
+      .map(id => gasTypes.find(t => t.id === id))
+      .filter((t): t is GasType => !!t && t.category_id !== targetCategoryId);
+
+    if (typesToMove.length === 0) {
+      setDraggedTypeId(null);
+      setDragOverCategory(null);
+      return;
+    }
+
     try {
-      await api.gasTypes.update(draggedTypeId, { category_id: categoryId });
-      toast.success(`"${type.name}" verplaatst naar ${categoryId ? categories.find(c => c.id === categoryId)?.name : "Geen categorie"}`);
+      await Promise.all(typesToMove.map(t => api.gasTypes.update(t.id, { category_id: targetCategoryId })));
+      const catName = targetCategoryId ? categories.find(c => c.id === targetCategoryId)?.name : "Geen categorie";
+      toast.success(
+        typesToMove.length === 1
+          ? `"${typesToMove[0].name}" verplaatst naar ${catName}`
+          : `${typesToMove.length} gastypes verplaatst naar ${catName}`
+      );
       fetchGasTypes();
+      setSelectedIds(new Set());
     } catch (error) {
       console.error("Error updating category:", error);
       toast.error("Fout bij bijwerken categorie");
     }
     setDraggedTypeId(null);
     setDragOverCategory(null);
+  };
+
+  const toggleSelection = (id: string, shiftKey: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredGasTypes.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredGasTypes.map(t => t.id)));
+    }
   };
   const handleBulkDelete = async () => {
     if (gasTypes.length === 0) return;
@@ -364,10 +407,27 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
               </Button>
             </div>
 
+            {/* Selection info */}
+            {selectedIds.size > 0 && !draggedTypeId && (
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-md bg-primary/10 text-sm">
+                <span className="font-medium">{selectedIds.size} geselecteerd</span>
+                <span className="text-muted-foreground">— sleep om van categorie te wijzigen</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds(new Set())}
+                  className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Deselecteren
+                </button>
+              </div>
+            )}
+
             {/* Category drop zones */}
             {draggedTypeId && (
               <div className="flex flex-wrap gap-2 mb-4 p-3 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5">
-                <p className="w-full text-xs font-medium text-muted-foreground mb-1">Sleep naar een categorie:</p>
+                <p className="w-full text-xs font-medium text-muted-foreground mb-1">
+                  Sleep {selectedIds.size > 1 ? `${selectedIds.size} gastypes` : "naar een categorie"}:
+                </p>
                 <div
                   onDragOver={(e) => { e.preventDefault(); setDragOverCategory("__none__"); }}
                   onDragLeave={() => setDragOverCategory(null)}
@@ -411,7 +471,14 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow>
+                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={filteredGasTypes.length > 0 && selectedIds.size === filteredGasTypes.length}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Selecteer alles"
+                      />
+                    </TableHead>
                     <TableHead className="w-16">Kleur</TableHead>
                     <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
@@ -445,11 +512,18 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedGasTypes.map((type) => (
+                  {paginatedGasTypes.map((type) => {
+                    const isSelected = selectedIds.has(type.id);
+                    const isDragging = draggedTypeId === type.id || (draggedTypeId && isSelected && selectedIds.has(draggedTypeId));
+                    return (
                     <TableRow
                       key={type.id}
                       draggable
                       onDragStart={(e) => {
+                        // If dragging a selected item, drag all selected; otherwise just this one
+                        if (!isSelected) {
+                          setSelectedIds(new Set([type.id]));
+                        }
                         setDraggedTypeId(type.id);
                         e.dataTransfer.effectAllowed = "move";
                       }}
@@ -459,9 +533,17 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                       }}
                       className={cn(
                         "cursor-grab active:cursor-grabbing",
-                        draggedTypeId === type.id && "opacity-50"
+                        isDragging && "opacity-50",
+                        isSelected && !draggedTypeId && "bg-primary/5"
                       )}
                     >
+                      <TableCell>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSelection(type.id, false)}
+                          aria-label={`Selecteer ${type.name}`}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <GripVertical className="h-4 w-4 text-muted-foreground/50 flex-shrink-0" />
@@ -509,7 +591,8 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
