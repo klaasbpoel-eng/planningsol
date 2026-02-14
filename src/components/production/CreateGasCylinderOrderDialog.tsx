@@ -335,16 +335,6 @@ export function CreateGasCylinderOrderDialog({
                 {showAllGases ? "Locatie filter" : "Toon alles"}
               </button>
             </div>
-            {/* Search for gas types */}
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                value={gasSearch}
-                onChange={(e) => setGasSearch(e.target.value)}
-                placeholder="Zoek gastype..."
-                className="h-9 pl-8 text-sm bg-background"
-              />
-            </div>
             <div className="max-h-[180px] overflow-y-auto rounded-md border p-2 bg-muted/20 space-y-2">
               {groupedGasTypes.map((group) => (
                 <div key={group.categoryName}>
@@ -525,49 +515,6 @@ export function CreateGasCylinderOrderDialog({
             </div>
           </div>
 
-          {/* === DATUM === */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Datum</Label>
-            {isMobile ? (
-              <Input
-                type="date"
-                value={scheduledDate ? format(scheduledDate, "yyyy-MM-dd") : ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setScheduledDate(val ? new Date(val + "T00:00:00") : undefined);
-                }}
-                className="bg-background h-11"
-              />
-            ) : (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal h-10",
-                      !scheduledDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarDays className="mr-2 h-4 w-4" />
-                    {scheduledDate
-                      ? format(scheduledDate, "d MMMM yyyy", { locale: nl })
-                      : "Selecteer datum"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={scheduledDate}
-                    onSelect={setScheduledDate}
-                    locale={nl}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-            )}
-            <DateQuickPick value={scheduledDate} onChange={setScheduledDate} />
-          </div>
 
           {/* === UITVOERSTATUS === */}
           <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
