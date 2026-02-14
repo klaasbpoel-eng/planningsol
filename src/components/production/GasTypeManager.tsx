@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Flame, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, AlertTriangle, GripVertical } from "lucide-react";
+import { Flame, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, AlertTriangle, GripVertical, Search, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -94,6 +94,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
   const [isActive, setIsActive] = useState(true);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [draggedTypeId, setDraggedTypeId] = useState<string | null>(null);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
@@ -168,9 +169,13 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
 
   // Filtering calculations
   const filteredGasTypes = gasTypes.filter(type => {
-    if (categoryFilter === "all") return true;
-    if (categoryFilter === "none") return type.category_id === null;
-    return type.category_id === categoryFilter;
+    const matchesCategory = categoryFilter === "all" ? true :
+      categoryFilter === "none" ? type.category_id === null :
+      type.category_id === categoryFilter;
+    const matchesSearch = searchQuery.trim() === "" ? true :
+      type.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (type.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+    return matchesCategory && matchesSearch;
   });
 
   // Pagination calculations
@@ -369,7 +374,25 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
 
           <div className="py-4">
             <div className="flex flex-col sm:flex-row justify-between mb-4 gap-4">
-              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Zoek gastype..."
+                    value={searchQuery}
+                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                    className="pl-9 pr-8 w-[200px] h-9"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => { setSearchQuery(""); setCurrentPage(1); }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Filter op categorie" />
@@ -391,8 +414,8 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    onOpenChange(false); // Close main dialog first
-                    setTimeout(() => setBulkDeleteDialogOpen(true), 100); // Then open confirm dialog
+                    onOpenChange(false);
+                    setTimeout(() => setBulkDeleteDialogOpen(true), 100);
                   }}
                   disabled={gasTypes.length === 0}
                 >
