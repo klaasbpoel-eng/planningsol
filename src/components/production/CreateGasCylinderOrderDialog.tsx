@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays, Minus, Plus, ChevronDown, ChevronUp, Search } from "lucide-react";
+import { DateQuickPick } from "./DateQuickPick";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { nl } from "date-fns/locale";
@@ -534,6 +535,7 @@ export function CreateGasCylinderOrderDialog({
                 </PopoverContent>
               </Popover>
             )}
+            <DateQuickPick value={scheduledDate} onChange={setScheduledDate} />
           </div>
 
           {/* === UITVOERSTATUS === */}
