@@ -110,7 +110,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
 
   const fetchGasTypes = async () => {
     try {
-      const data = await api.gasTypes.getAll();
+      const data = await api.gasTypes.getAllIncludingInactive();
       // Client-side sort because API doesn't support dynamic sort params yet
       if (data) {
         const sorted = [...data].sort((a: any, b: any) => {
