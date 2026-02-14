@@ -3,7 +3,6 @@ import {
   ResponsiveDialog,
   ResponsiveDialogContent,
   ResponsiveDialogDescription,
-  ResponsiveDialogFooter,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
@@ -11,19 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays, Snowflake, Plus, Repeat } from "lucide-react";
+import { CalendarDays, Minus, Plus, ChevronDown, ChevronUp, Repeat } from "lucide-react";
 import { format, addWeeks, addYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -31,7 +22,7 @@ import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CustomerSelect } from "./CustomerSelect";
-import { SearchableSelect } from "@/components/ui/searchable-select";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface CreateDryIceOrderDialogProps {
   open: boolean;
@@ -44,13 +35,14 @@ export function CreateDryIceOrderDialog({
   onOpenChange,
   onCreated,
 }: CreateDryIceOrderDialogProps) {
+  const isMobile = useIsMobile();
   const [saving, setSaving] = useState(false);
   const [customerId, setCustomerId] = useState("");
   const [customerName, setCustomerName] = useState("");
-  const [quantityKg, setQuantityKg] = useState("");
+  const [quantityKg, setQuantityKg] = useState(10);
   const [productTypeId, setProductTypeId] = useState("");
   const [packagingId, setPackagingId] = useState("");
-  const [boxCount, setBoxCount] = useState("");
+  const [boxCount, setBoxCount] = useState(1);
   const [containerHasWheels, setContainerHasWheels] = useState<boolean | null>(null);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [isRecurring, setIsRecurring] = useState(false);
@@ -63,11 +55,11 @@ export function CreateDryIceOrderDialog({
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   const [userProductionLocation, setUserProductionLocation] = useState<"sol_emmen" | "sol_tilburg" | null>(null);
   const [canSelectLocation, setCanSelectLocation] = useState(true);
+  const [showDetails, setShowDetails] = useState(false);
 
   const [productTypes, setProductTypes] = useState<{ id: string; name: string }[]>([]);
   const [packagingOptions, setPackagingOptions] = useState<{ id: string; name: string }[]>([]);
 
-  // Check if selected packaging is EPS type or Kunststof container
   const selectedPackaging = packagingOptions.find(p => p.id === packagingId);
   const isEpsPackaging = selectedPackaging?.name.toLowerCase().includes("eps");
   const isKunststofContainer = selectedPackaging?.name.toLowerCase().includes("kunststof");
@@ -76,24 +68,18 @@ export function CreateDryIceOrderDialog({
     const fetchProfileAndPermissions = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // Fetch profile with production_location
         const profile = await api.profiles.getByUserId(user.id);
-
         if (profile) {
           setCurrentProfileId(profile.id);
-
-          // Check user role
           const roleData = await api.userRoles.get(user.id);
           const userRole = roleData?.role || "user";
           const isAdmin = userRole === "admin";
 
-          // If user has assigned location and is not admin, restrict to that location
           if (profile.production_location && !isAdmin) {
             setUserProductionLocation(profile.production_location);
             setLocation(profile.production_location);
             setCanSelectLocation(false);
           } else if (profile.production_location) {
-            // Admin with location - set as default but allow selection
             setLocation(profile.production_location);
             setCanSelectLocation(true);
           } else {
@@ -109,13 +95,10 @@ export function CreateDryIceOrderDialog({
 
   const fetchProductTypes = async () => {
     const data = await api.dryIceProductTypes.getAll();
-
-    // Fetch default product type setting
     const defaultSetting = await api.appSettings.getByKey("dry_ice_default_product_type_id");
 
     if (data && data.length > 0) {
       setProductTypes(data);
-      // Use configured default, or fallback to "9mm", or first item
       if (defaultSetting?.value && data.find(pt => pt.id === defaultSetting.value)) {
         setProductTypeId(defaultSetting.value);
       } else {
@@ -135,11 +118,9 @@ export function CreateDryIceOrderDialog({
   const resetForm = async () => {
     setCustomerId("");
     setCustomerName("");
-    setQuantityKg("");
+    setQuantityKg(10);
 
-    // Fetch default product type setting for reset
     const defaultSetting = await api.appSettings.getByKey("dry_ice_default_product_type_id");
-
     if (productTypes.length > 0) {
       if (defaultSetting?.value && productTypes.find(pt => pt.id === defaultSetting.value)) {
         setProductTypeId(defaultSetting.value);
@@ -149,7 +130,7 @@ export function CreateDryIceOrderDialog({
       }
     }
     setPackagingId("");
-    setBoxCount("");
+    setBoxCount(1);
     setContainerHasWheels(null);
     setScheduledDate(new Date());
     setIsRecurring(false);
@@ -158,7 +139,7 @@ export function CreateDryIceOrderDialog({
     setRecurrenceEndDate(undefined);
     setNotes("");
     setAlreadyCompleted(true);
-    // Reset location to user's assigned location or default
+    setShowDetails(false);
     if (userProductionLocation) {
       setLocation(userProductionLocation);
     }
@@ -180,46 +161,33 @@ export function CreateDryIceOrderDialog({
       toast.error("Kon je gebruikersprofiel niet vinden. Probeer opnieuw in te loggen.");
       return;
     }
-
     if (!customerName.trim()) {
       toast.error("Selecteer een klant");
       return;
     }
-
-    if (!quantityKg) {
-      toast.error("Vul de hoeveelheid in");
+    if (!quantityKg || quantityKg <= 0) {
+      toast.error("Vul een geldige hoeveelheid in");
       return;
     }
-
     if (!scheduledDate) {
       toast.error("Selecteer een datum");
       return;
     }
-
     if (!productTypeId) {
       toast.error("Selecteer een producttype");
       return;
     }
-
     if (isRecurring && !isInfiniteRecurrence && !recurrenceEndDate) {
       toast.error("Selecteer een einddatum voor de herhaling");
-      return;
-    }
-
-    const quantity = parseFloat(quantityKg);
-    if (isNaN(quantity) || quantity <= 0) {
-      toast.error("Voer een geldige hoeveelheid in");
       return;
     }
 
     setSaving(true);
 
     try {
-      // Generate dates for recurring orders
       const orderDates: Date[] = [scheduledDate];
 
       if (isRecurring) {
-        // For infinite recurrence, create orders for 1 year ahead
         const endDate = isInfiniteRecurrence
           ? addYears(scheduledDate, 1)
           : recurrenceEndDate;
@@ -233,15 +201,14 @@ export function CreateDryIceOrderDialog({
         }
       }
 
-      // Create the first order
       const baseOrderData = {
         customer_name: customerName.trim(),
         customer_id: customerId || null,
-        quantity_kg: quantity,
+        quantity_kg: quantityKg,
         product_type: "blocks" as "blocks" | "pellets" | "sticks",
         product_type_id: productTypeId,
         packaging_id: packagingId || null,
-        box_count: isEpsPackaging && boxCount ? parseInt(boxCount, 10) : null,
+        box_count: isEpsPackaging ? boxCount : null,
         container_has_wheels: isKunststofContainer ? containerHasWheels : null,
         notes: notes.trim() || null,
         created_by: currentProfileId,
@@ -253,7 +220,6 @@ export function CreateDryIceOrderDialog({
         location: location,
       };
 
-      // Insert the parent order (first date)
       const parentDate = orderDates[0];
       const parentOrderNumber = generateOrderNumber();
 
@@ -261,15 +227,12 @@ export function CreateDryIceOrderDialog({
         ...baseOrderData,
         order_number: parentOrderNumber,
         scheduled_date: format(parentDate, "yyyy-MM-dd"),
-        // Parent has no parent_order_id
         parent_order_id: null
       };
 
       const parentOrder = await api.dryIceOrders.create(parentOrderData);
-
       if (!parentOrder) throw new Error("Failed to create parent order");
 
-      // Insert child orders if any
       if (orderDates.length > 1) {
         const childOrders = orderDates.slice(1).map((date, index) => ({
           ...baseOrderData,
@@ -278,13 +241,6 @@ export function CreateDryIceOrderDialog({
           parent_order_id: parentOrder.id
         }));
 
-        // Note: api.create doesn't support bulk insert yet, loop for now or add bulk to api
-        // Since api.dryIceOrders.create calls primaryCreate which handles single item,
-        // we should either add createMany or loop.
-        // For now, let's loop to ensure compatibility.
-        // Or better: check if primaryCreate supports array? getPrimarySupabaseClient().insert(item) supports array.
-        // But buildInsert (MySQL) might not.
-        // Let's loop to be safe and consistent with current api interface.
         for (const child of childOrders) {
           await api.dryIceOrders.create(child);
         }
@@ -307,28 +263,23 @@ export function CreateDryIceOrderDialog({
     }
   };
 
+  const quickQuantities = [5, 10, 15, 20, 25, 30, 50, 100];
+  const selectedProductType = productTypes.find(pt => pt.id === productTypeId);
+
   return (
     <ResponsiveDialog open={open} onOpenChange={handleClose}>
-      <ResponsiveDialogContent>
+      <ResponsiveDialogContent className="sm:max-w-[520px]">
         <ResponsiveDialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-cyan-500/10">
-              <Snowflake className="h-5 w-5 text-cyan-500" />
-            </div>
-            <div className="flex-1">
-              <ResponsiveDialogTitle className="text-lg">Nieuwe droogijs order</ResponsiveDialogTitle>
-              <ResponsiveDialogDescription>
-                Maak een nieuwe productieorder voor droogijs
-              </ResponsiveDialogDescription>
-            </div>
-          </div>
+          <ResponsiveDialogTitle className="text-lg font-semibold">Nieuwe droogijs order</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription className="sr-only">
+            Maak een nieuwe productieorder voor droogijs
+          </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
-        <div className="space-y-4 py-4 px-4 sm:px-0">
-          <div className="space-y-2">
-            <Label>
-              Klant <span className="text-destructive">*</span>
-            </Label>
+        <div className="space-y-4 py-2 px-4 sm:px-0">
+          {/* === KLANT === */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Klant</Label>
             <CustomerSelect
               value={customerId}
               onValueChange={(id, name) => {
@@ -338,269 +289,250 @@ export function CreateDryIceOrderDialog({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="quantityKg">
-                Hoeveelheid (kg) <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="quantityKg"
-                type="number"
-                min="0"
-                step="0.1"
-                value={quantityKg}
-                onChange={(e) => setQuantityKg(e.target.value)}
-                placeholder="0"
-                className="bg-background h-11 sm:h-10"
-              />
+          {/* === HOEVEELHEID — stepper + quick select === */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Hoeveelheid (kg)</Label>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-11 w-11 shrink-0 rounded-full"
+                onClick={() => setQuantityKg(Math.max(1, quantityKg - 5))}
+                disabled={quantityKg <= 1}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <div className="relative flex-1">
+                <Input
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={quantityKg}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val) && val > 0) setQuantityKg(val);
+                  }}
+                  className="h-11 text-center text-lg font-semibold bg-background pr-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">kg</span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-11 w-11 shrink-0 rounded-full"
+                onClick={() => setQuantityKg(quantityKg + 5)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
             </div>
-
-            <div className="space-y-2">
-              <Label>Producttype <span className="text-destructive">*</span></Label>
-              <SearchableSelect
-                options={productTypes.map((pt) => ({ value: pt.id, label: pt.name }))}
-                value={productTypeId}
-                onValueChange={setProductTypeId}
-                placeholder="Selecteer type"
-                searchPlaceholder="Zoek producttype..."
-                emptyMessage="Geen producttype gevonden."
-              />
+            <div className="flex flex-wrap gap-1.5">
+              {quickQuantities.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setQuantityKg(n)}
+                  className={cn(
+                    "h-8 min-w-[2.75rem] rounded-md px-2 text-sm font-medium transition-all",
+                    "border focus:outline-none active:scale-95",
+                    quantityKg === n
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-foreground border-border hover:bg-accent"
+                  )}
+                >
+                  {n}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Verpakking</Label>
-              <SearchableSelect
-                options={packagingOptions.map((pkg) => ({ value: pkg.id, label: pkg.name }))}
-                value={packagingId}
-                onValueChange={(value) => {
-                  setPackagingId(value);
-                  const newPackaging = packagingOptions.find(p => p.id === value);
-                  if (!newPackaging?.name.toLowerCase().includes("eps")) {
-                    setBoxCount("");
-                  }
-                  if (!newPackaging?.name.toLowerCase().includes("kunststof")) {
-                    setContainerHasWheels(null);
-                  }
-                }}
-                placeholder="Selecteer verpakking (optioneel)"
-                searchPlaceholder="Zoek verpakking..."
-                emptyMessage="Geen verpakking gevonden."
-              />
+          {/* === PRODUCTTYPE — chip selector === */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Producttype</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {productTypes.map((type) => (
+                <button
+                  key={type.id}
+                  type="button"
+                  onClick={() => setProductTypeId(type.id)}
+                  className={cn(
+                    "rounded-md px-3 py-2 text-sm font-medium transition-all",
+                    "border focus:outline-none active:scale-95",
+                    productTypeId === type.id
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-foreground border-border hover:bg-accent"
+                  )}
+                >
+                  {type.name}
+                </button>
+              ))}
             </div>
+          </div>
 
-            {isEpsPackaging && (
-              <div className="space-y-2">
-                <Label htmlFor="boxCount">
-                  Aantal dozen <span className="text-destructive">*</span>
-                </Label>
+          {/* === VERPAKKING — chip selector === */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Verpakking</Label>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setPackagingId("");
+                  setBoxCount(1);
+                  setContainerHasWheels(null);
+                }}
+                className={cn(
+                  "rounded-md px-3 py-2 text-sm font-medium transition-all",
+                  "border focus:outline-none active:scale-95",
+                  !packagingId
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-foreground border-border hover:bg-accent"
+                )}
+              >
+                Geen
+              </button>
+              {packagingOptions.map((pkg) => (
+                <button
+                  key={pkg.id}
+                  type="button"
+                  onClick={() => {
+                    setPackagingId(pkg.id);
+                    if (!pkg.name.toLowerCase().includes("eps")) setBoxCount(1);
+                    if (!pkg.name.toLowerCase().includes("kunststof")) setContainerHasWheels(null);
+                  }}
+                  className={cn(
+                    "rounded-md px-3 py-2 text-sm font-medium transition-all",
+                    "border focus:outline-none active:scale-95",
+                    packagingId === pkg.id
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-foreground border-border hover:bg-accent"
+                  )}
+                >
+                  {pkg.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* === EPS: Aantal dozen === */}
+          {isEpsPackaging && (
+            <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-200">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Aantal dozen</Label>
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-11 w-11 shrink-0 rounded-full"
+                  onClick={() => setBoxCount(Math.max(1, boxCount - 1))}
+                  disabled={boxCount <= 1}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
                 <Input
-                  id="boxCount"
                   type="number"
                   min="1"
-                  step="1"
                   value={boxCount}
-                  onChange={(e) => setBoxCount(e.target.value)}
-                  placeholder="0"
-                  className="bg-background"
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    if (!isNaN(val) && val > 0) setBoxCount(val);
+                  }}
+                  className="h-11 text-center text-lg font-semibold bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-11 w-11 shrink-0 rounded-full"
+                  onClick={() => setBoxCount(boxCount + 1)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
-            )}
-          </div>
-
-          {isKunststofContainer && (
-            <div className="space-y-2">
-              <Label>
-                Type container <span className="text-destructive">*</span>
-              </Label>
-              <RadioGroup
-                value={containerHasWheels === null ? "" : containerHasWheels ? "with-wheels" : "without-wheels"}
-                onValueChange={(value) => setContainerHasWheels(value === "with-wheels")}
-                className="flex gap-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="with-wheels" id="with-wheels" />
-                  <Label htmlFor="with-wheels" className="font-normal cursor-pointer">Met wielen</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="without-wheels" id="without-wheels" />
-                  <Label htmlFor="without-wheels" className="font-normal cursor-pointer">Zonder wielen</Label>
-                </div>
-              </RadioGroup>
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>
-                Geplande datum <span className="text-destructive">*</span>
-              </Label>
+          {/* === Kunststof: container type === */}
+          {isKunststofContainer && (
+            <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-200">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Type container</Label>
+              <div className="flex rounded-lg border overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setContainerHasWheels(true)}
+                  className={cn(
+                    "flex-1 py-2.5 text-sm font-medium transition-colors",
+                    containerHasWheels === true
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background text-foreground hover:bg-accent"
+                  )}
+                >
+                  Met wielen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setContainerHasWheels(false)}
+                  className={cn(
+                    "flex-1 py-2.5 text-sm font-medium transition-colors border-l",
+                    containerHasWheels === false
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background text-foreground hover:bg-accent"
+                  )}
+                >
+                  Zonder wielen
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* === DATUM === */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Datum</Label>
+            {isMobile ? (
+              <Input
+                type="date"
+                value={scheduledDate ? format(scheduledDate, "yyyy-MM-dd") : ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setScheduledDate(val ? new Date(val + "T00:00:00") : undefined);
+                }}
+                className="bg-background h-11"
+              />
+            ) : (
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal h-11 sm:h-10",
+                      "w-full justify-start text-left font-normal h-10",
                       !scheduledDate && "text-muted-foreground"
                     )}
                   >
                     <CalendarDays className="mr-2 h-4 w-4" />
                     {scheduledDate
-                      ? format(scheduledDate, "d MMM yyyy", { locale: nl })
+                      ? format(scheduledDate, "d MMMM yyyy", { locale: nl })
                       : "Selecteer datum"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent
-                  className="w-auto p-0 bg-background border shadow-lg z-50"
-                  align="start"
-                >
+                <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
                   <Calendar
                     mode="single"
                     selected={scheduledDate}
                     onSelect={setScheduledDate}
                     locale={nl}
                     initialFocus
-                    className={cn("p-3 pointer-events-auto")}
+                    className="p-3 pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Productielocatie</Label>
-              <Select
-                value={location}
-                onValueChange={(v) => setLocation(v as "sol_emmen" | "sol_tilburg")}
-                disabled={!canSelectLocation}
-              >
-                <SelectTrigger className="bg-background h-11 sm:h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="sol_emmen">SOL Emmen</SelectItem>
-                  <SelectItem value="sol_tilburg">SOL Tilburg</SelectItem>
-                </SelectContent>
-              </Select>
-              {!canSelectLocation && (
-                <p className="text-xs text-muted-foreground">
-                  Gebaseerd op je toegewezen locatie
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Recurrence option */}
-          <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="isRecurring"
-                checked={isRecurring}
-                onCheckedChange={(checked) => {
-                  setIsRecurring(checked === true);
-                  if (!checked) {
-                    setRecurrenceEndDate(undefined);
-                    setRecurrenceInterval(1);
-                  }
-                }}
-              />
-              <Label htmlFor="isRecurring" className="flex items-center gap-2 cursor-pointer font-normal">
-                <Repeat className="h-4 w-4" />
-                Herhalen op dezelfde dag
-              </Label>
-            </div>
-
-            {isRecurring && (
-              <div className="space-y-3 pl-6">
-                <div className="space-y-2">
-                  <Label className="text-sm">Herhalingsinterval</Label>
-                  <RadioGroup
-                    value={recurrenceInterval.toString()}
-                    onValueChange={(v) => setRecurrenceInterval(parseInt(v) as 1 | 2)}
-                    className="flex gap-4"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="1" id="interval-weekly" />
-                      <Label htmlFor="interval-weekly" className="font-normal cursor-pointer text-sm">Wekelijks</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="2" id="interval-biweekly" />
-                      <Label htmlFor="interval-biweekly" className="font-normal cursor-pointer text-sm">2-wekelijks</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="isInfinite"
-                    checked={isInfiniteRecurrence}
-                    onCheckedChange={(checked) => {
-                      setIsInfiniteRecurrence(checked === true);
-                      if (checked) {
-                        setRecurrenceEndDate(undefined);
-                      }
-                    }}
-                  />
-                  <Label htmlFor="isInfinite" className="cursor-pointer font-normal text-sm">
-                    Oneindig herhalen (1 jaar vooruit aanmaken)
-                  </Label>
-                </div>
-
-                {!isInfiniteRecurrence && (
-                  <div className="space-y-2">
-                    <Label>
-                      Herhalen tot <span className="text-destructive">*</span>
-                    </Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal h-11 sm:h-10",
-                            !recurrenceEndDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarDays className="mr-2 h-4 w-4" />
-                          {recurrenceEndDate
-                            ? format(recurrenceEndDate, "d MMM yyyy", { locale: nl })
-                            : "Selecteer einddatum"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        className="w-auto p-0 bg-background border shadow-lg z-50"
-                        align="start"
-                      >
-                        <Calendar
-                          mode="single"
-                          selected={recurrenceEndDate}
-                          onSelect={setRecurrenceEndDate}
-                          locale={nl}
-                          disabled={(date) => scheduledDate ? date <= scheduledDate : false}
-                          initialFocus
-                          className={cn("p-3 pointer-events-auto")}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                )}
-
-                {scheduledDate && (isInfiniteRecurrence || recurrenceEndDate) && (
-                  <p className="text-xs text-muted-foreground">
-                    Dit maakt {isInfiniteRecurrence
-                      ? "52"
-                      : Math.floor((recurrenceEndDate!.getTime() - scheduledDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1} orders aan
-                  </p>
-                )}
-              </div>
             )}
           </div>
 
-          {/* Already completed switch */}
+          {/* === UITVOERSTATUS === */}
           <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
             <div className="space-y-0.5">
-              <Label htmlFor="alreadyCompleted" className="font-medium">Reeds uitgevoerd</Label>
-              <p className="text-xs text-muted-foreground">
-                Markeer deze order direct als voltooid
-              </p>
+              <Label htmlFor="alreadyCompleted" className="font-medium text-sm">Reeds uitgevoerd</Label>
+              <p className="text-xs text-muted-foreground">Direct markeren als voltooid</p>
             </div>
             <Switch
               id="alreadyCompleted"
@@ -609,33 +541,210 @@ export function CreateDryIceOrderDialog({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notities</Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optionele notities..."
-              className="bg-background resize-none min-h-[80px]"
-              rows={3}
-            />
-          </div>
+          {/* === MEER OPTIES (collapsible) === */}
+          <button
+            type="button"
+            onClick={() => setShowDetails(!showDetails)}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
+          >
+            {showDetails ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            <span>Meer opties</span>
+            {(notes || isRecurring || (canSelectLocation && location !== (userProductionLocation || "sol_emmen"))) && (
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            )}
+          </button>
+
+          {showDetails && (
+            <div className="space-y-3 animate-in slide-in-from-top-2 duration-200">
+              {/* Recurrence */}
+              <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="isRecurring"
+                    checked={isRecurring}
+                    onCheckedChange={(checked) => {
+                      setIsRecurring(checked === true);
+                      if (!checked) {
+                        setRecurrenceEndDate(undefined);
+                        setRecurrenceInterval(1);
+                      }
+                    }}
+                  />
+                  <Label htmlFor="isRecurring" className="flex items-center gap-2 cursor-pointer font-normal">
+                    <Repeat className="h-4 w-4" />
+                    Herhalen op dezelfde dag
+                  </Label>
+                </div>
+
+                {isRecurring && (
+                  <div className="space-y-3 pl-6">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Interval</Label>
+                      <div className="flex rounded-lg border overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setRecurrenceInterval(1)}
+                          className={cn(
+                            "flex-1 py-2.5 text-sm font-medium transition-colors",
+                            recurrenceInterval === 1
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-background text-foreground hover:bg-accent"
+                          )}
+                        >
+                          Wekelijks
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRecurrenceInterval(2)}
+                          className={cn(
+                            "flex-1 py-2.5 text-sm font-medium transition-colors border-l",
+                            recurrenceInterval === 2
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-background text-foreground hover:bg-accent"
+                          )}
+                        >
+                          2-wekelijks
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="isInfinite"
+                        checked={isInfiniteRecurrence}
+                        onCheckedChange={(checked) => {
+                          setIsInfiniteRecurrence(checked === true);
+                          if (checked) setRecurrenceEndDate(undefined);
+                        }}
+                      />
+                      <Label htmlFor="isInfinite" className="cursor-pointer font-normal text-sm">
+                        Oneindig (1 jaar vooruit)
+                      </Label>
+                    </div>
+
+                    {!isInfiniteRecurrence && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Herhalen tot</Label>
+                        {isMobile ? (
+                          <Input
+                            type="date"
+                            value={recurrenceEndDate ? format(recurrenceEndDate, "yyyy-MM-dd") : ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setRecurrenceEndDate(val ? new Date(val + "T00:00:00") : undefined);
+                            }}
+                            className="bg-background h-11"
+                          />
+                        ) : (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal h-10",
+                                  !recurrenceEndDate && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarDays className="mr-2 h-4 w-4" />
+                                {recurrenceEndDate
+                                  ? format(recurrenceEndDate, "d MMMM yyyy", { locale: nl })
+                                  : "Selecteer einddatum"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={recurrenceEndDate}
+                                onSelect={setRecurrenceEndDate}
+                                locale={nl}
+                                disabled={(date) => scheduledDate ? date <= scheduledDate : false}
+                                initialFocus
+                                className="p-3 pointer-events-auto"
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                      </div>
+                    )}
+
+                    {scheduledDate && (isInfiniteRecurrence || recurrenceEndDate) && (
+                      <p className="text-xs text-muted-foreground">
+                        Dit maakt {isInfiniteRecurrence
+                          ? "52"
+                          : Math.floor((recurrenceEndDate!.getTime() - scheduledDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1} orders aan
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Location */}
+              {canSelectLocation && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Locatie</Label>
+                  <div className="flex rounded-lg border overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setLocation("sol_emmen")}
+                      className={cn(
+                        "flex-1 py-2.5 text-sm font-medium transition-colors",
+                        location === "sol_emmen"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background text-foreground hover:bg-accent"
+                      )}
+                    >
+                      SOL Emmen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLocation("sol_tilburg")}
+                      className={cn(
+                        "flex-1 py-2.5 text-sm font-medium transition-colors border-l",
+                        location === "sol_tilburg"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background text-foreground hover:bg-accent"
+                      )}
+                    >
+                      SOL Tilburg
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Notes */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notities</Label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Optionele notities..."
+                  className="bg-background resize-none min-h-[60px]"
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
-        <ResponsiveDialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={saving} className="h-11 sm:h-10 w-full sm:w-auto">
+        {/* === FOOTER === */}
+        <div className="flex gap-2 pt-3 px-4 sm:px-0 pb-4">
+          <Button
+            variant="outline"
+            onClick={handleClose}
+            disabled={saving}
+            className="h-12 sm:h-10 flex-1 sm:flex-none"
+          >
             Annuleren
           </Button>
           <Button
             onClick={handleCreate}
             disabled={saving || !customerId || !quantityKg || !scheduledDate || !productTypeId || (isEpsPackaging && !boxCount) || (isKunststofContainer && containerHasWheels === null) || (isRecurring && !isInfiniteRecurrence && !recurrenceEndDate)}
             variant="dryice"
-            className="h-11 sm:h-10 w-full sm:w-auto"
+            className="h-12 sm:h-10 flex-[2] sm:flex-none font-semibold"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            {saving ? "Aanmaken..." : isRecurring ? "Orders aanmaken" : "Order aanmaken"}
+            {saving ? "Aanmaken..." : `${quantityKg} kg ${selectedProductType?.name || "droogijs"} aanmaken`}
           </Button>
-        </ResponsiveDialogFooter>
+        </div>
       </ResponsiveDialogContent>
     </ResponsiveDialog>
   );
