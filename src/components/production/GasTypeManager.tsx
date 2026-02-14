@@ -409,16 +409,48 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
 
             {/* Selection info */}
             {selectedIds.size > 0 && !draggedTypeId && (
-              <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-md bg-primary/10 text-sm">
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-md bg-primary/10 text-sm flex-wrap">
                 <span className="font-medium">{selectedIds.size} geselecteerd</span>
-                <span className="text-muted-foreground">— sleep om van categorie te wijzigen</span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedIds(new Set())}
-                  className="ml-auto text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Deselecteren
-                </button>
+                <span className="text-muted-foreground hidden sm:inline">— sleep of kies een categorie</span>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Select
+                    onValueChange={async (val) => {
+                      const targetCatId = val === "__none__" ? null : val;
+                      const ids = Array.from(selectedIds);
+                      const typesToMove = ids
+                        .map(id => gasTypes.find(t => t.id === id))
+                        .filter((t): t is GasType => !!t && t.category_id !== targetCatId);
+                      if (typesToMove.length === 0) return;
+                      try {
+                        await Promise.all(typesToMove.map(t => api.gasTypes.update(t.id, { category_id: targetCatId })));
+                        const catName = targetCatId ? categories.find(c => c.id === targetCatId)?.name : "Geen categorie";
+                        toast.success(`${typesToMove.length} gastype${typesToMove.length > 1 ? "s" : ""} verplaatst naar ${catName}`);
+                        fetchGasTypes();
+                        setSelectedIds(new Set());
+                      } catch (error) {
+                        console.error("Error bulk updating category:", error);
+                        toast.error("Fout bij bijwerken categorie");
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[180px] text-xs bg-background">
+                      <SelectValue placeholder="Categorie wijzigen…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Geen categorie</SelectItem>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds(new Set())}
+                    className="text-xs text-muted-foreground hover:text-foreground whitespace-nowrap"
+                  >
+                    Deselecteren
+                  </button>
+                </div>
               </div>
             )}
 
