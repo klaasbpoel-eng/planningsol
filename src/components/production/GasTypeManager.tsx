@@ -535,7 +535,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                       onClick={() => handleSort("is_active")}
                     >
                       <div className="flex items-center">
-                        Status
+                        Zichtbaar
                         <SortIcon column="is_active" />
                       </div>
                     </TableHead>
@@ -590,13 +590,11 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                         {type.description || "-"}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={type.is_active ? "default" : "secondary"}
-                          className="cursor-pointer"
-                          onClick={() => handleToggleActive(type)}
-                        >
-                          {type.is_active ? "Actief" : "Inactief"}
-                        </Badge>
+                        <Switch
+                          checked={type.is_active}
+                          onCheckedChange={() => handleToggleActive(type)}
+                          aria-label={`${type.name} zichtbaar in bestelformulieren`}
+                        />
                       </TableCell>
                       <TableCell className="text-sm">
                         {getCategoryName(type.category_id)}
