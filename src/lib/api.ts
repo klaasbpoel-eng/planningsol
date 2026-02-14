@@ -1329,6 +1329,13 @@ export const api = {
                 filters: [{ column: "is_active", op: "eq", value: true }]
             });
         },
+        getAllIncludingInactive: async () => {
+            return primaryRead("gas_types", {
+                selectQuery: "*, gas_type_categories(name)",
+                orderBy: "sort_order",
+                secondOrder: "name",
+            });
+        },
         getAllWithCategory: async () => {
             return primaryRead("gas_types", {
                 selectQuery: "*, gas_type_categories(name)",
