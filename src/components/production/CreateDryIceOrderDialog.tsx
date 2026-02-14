@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays, Minus, Plus, ChevronDown, ChevronUp, Repeat } from "lucide-react";
+import { DateQuickPick } from "./DateQuickPick";
 import { format, addWeeks, addYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -529,6 +530,7 @@ export function CreateDryIceOrderDialog({
                 </PopoverContent>
               </Popover>
             )}
+            <DateQuickPick value={scheduledDate} onChange={setScheduledDate} />
           </div>
 
           {/* === UITVOERSTATUS === */}
