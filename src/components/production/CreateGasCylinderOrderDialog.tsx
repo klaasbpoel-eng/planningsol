@@ -3,7 +3,6 @@ import {
   ResponsiveDialog,
   ResponsiveDialogContent,
   ResponsiveDialogDescription,
-  
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
@@ -12,17 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays, Cylinder, Plus } from "lucide-react";
-import { format, subYears } from "date-fns";
+import { CalendarDays, Minus, Plus, ChevronDown, ChevronUp, Search } from "lucide-react";
+import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -48,7 +40,7 @@ export function CreateGasCylinderOrderDialog({
   const [customerName, setCustomerName] = useState("");
   const [gasTypeId, setGasTypeId] = useState("");
   const [gasGrade, setGasGrade] = useState<"medical" | "technical">("technical");
-  const [cylinderCount, setCylinderCount] = useState("");
+  const [cylinderCount, setCylinderCount] = useState(1);
   const [cylinderSize, setCylinderSize] = useState("medium");
   const [pressure, setPressure] = useState<200 | 300>(200);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
@@ -70,29 +62,25 @@ export function CreateGasCylinderOrderDialog({
     capacity_liters: number | null;
   }>>([]);
   const [locationGasIds, setLocationGasIds] = useState<Set<string>>(new Set());
+  const [showDetails, setShowDetails] = useState(false);
+  const [gasSearch, setGasSearch] = useState("");
 
   useEffect(() => {
     const fetchProfileAndPermissions = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // Fetch profile with production_location
         const profile = await api.profiles.getByUserId(user.id);
-
         if (profile) {
           setCurrentProfileId(profile.id);
-
-          // Check user role
           const roleData = await api.userRoles.get(user.id);
           const userRole = roleData?.role || "user";
           const isAdmin = userRole === "admin";
 
-          // If user has assigned location and is not admin, restrict to that location
           if (profile.production_location && !isAdmin) {
             setUserProductionLocation(profile.production_location);
             setLocation(profile.production_location);
             setCanSelectLocation(false);
           } else if (profile.production_location) {
-            // Admin with location - set as default but allow selection
             setLocation(profile.production_location);
             setCanSelectLocation(true);
           } else {
@@ -107,7 +95,6 @@ export function CreateGasCylinderOrderDialog({
   useEffect(() => {
     const fetchCylinderSizes = async () => {
       const data = await api.cylinderSizes.getAll();
-
       if (data) {
         setCylinderSizes(data);
         if (data.length > 0) {
@@ -117,42 +104,31 @@ export function CreateGasCylinderOrderDialog({
     };
 
     if (open) {
-      // Fetch gas types and location-specific history
       const loadData = async () => {
         const gasTypesData = await api.gasTypes.getAll();
-
         if (gasTypesData) {
-          // Sort all types alphabetically for the dropdown display
-          // api.gasTypes.getAll sorts by sort_order then name.
-          // The UI wants alphabetical sort strictly?
-          // The previous code sorted by name.
           const sortedTypes = [...gasTypesData].sort((a, b) => a.name.localeCompare(b.name));
           setGasTypes(sortedTypes);
-
           if (sortedTypes.length > 0 && !gasTypeId) {
             setGasTypeId(sortedTypes[0].id);
           }
         }
       };
-
       loadData();
       fetchCylinderSizes();
     }
   }, [open]);
 
   // Auto-select medical quality when "Zuurstof Medicinaal" is selected
-  // Auto-select 300 bar pressure when "300 bar" is in the name
   useEffect(() => {
     const selectedGas = gasTypes.find(t => t.id === gasTypeId);
     if (selectedGas) {
       const name = selectedGas.name.toLowerCase();
-
       if (name.includes("zuurstof medicinaal") || name.includes("medisch")) {
         setGasGrade("medical");
       } else {
         setGasGrade("technical");
       }
-
       if (name.includes("300bar")) {
         setPressure(300);
       } else {
@@ -161,23 +137,18 @@ export function CreateGasCylinderOrderDialog({
     }
   }, [gasTypeId, gasTypes]);
 
-  // Fetch location-specific gas types whenever location changes
+  // Fetch location-specific gas types
   useEffect(() => {
     const fetchLocationGasTypes = async () => {
       if (!location) return;
-
-      // Use RPC to efficiently get distinct gas type IDs for this location
       const locationGasTypes = await api.gasTypes.getByLocation(location);
-
       if (locationGasTypes && locationGasTypes.length > 0) {
         const uniqueIds = new Set(locationGasTypes.map((row: { gas_type_id: string }) => row.gas_type_id).filter(Boolean)) as Set<string>;
         setLocationGasIds(uniqueIds);
       } else {
-        // No history for this location - show all gas types
         setLocationGasIds(new Set(gasTypes.map(t => t.id)));
       }
     };
-
     if (open && gasTypes.length > 0) {
       fetchLocationGasTypes();
     }
@@ -188,13 +159,14 @@ export function CreateGasCylinderOrderDialog({
     setCustomerName("");
     setGasTypeId(gasTypes.length > 0 ? gasTypes[0].id : "");
     setGasGrade("technical");
-    setCylinderCount("");
+    setCylinderCount(1);
     setCylinderSize(cylinderSizes.length > 0 ? cylinderSizes[0].name : "");
     setPressure(200);
     setScheduledDate(new Date());
     setNotes("");
     setIsCompleted(true);
-    // Reset location to user's assigned location or default
+    setShowDetails(false);
+    setGasSearch("");
     if (userProductionLocation) {
       setLocation(userProductionLocation);
     } else {
@@ -213,29 +185,18 @@ export function CreateGasCylinderOrderDialog({
     return `GC-${date}-${random}`;
   };
 
-  // Get selected gas type details
   const getSelectedGasType = () => {
     return gasTypes.find(t => t.id === gasTypeId);
   };
 
-  // Map gas type names to enum values
   const mapGasTypeToEnum = (typeName: string): "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other" => {
     const mapping: Record<string, "co2" | "nitrogen" | "argon" | "acetylene" | "oxygen" | "helium" | "other"> = {
-      "CO2": "co2",
-      "co2": "co2",
-      "Stikstof": "nitrogen",
-      "stikstof": "nitrogen",
-      "nitrogen": "nitrogen",
-      "Argon": "argon",
-      "argon": "argon",
-      "Acetyleen": "acetylene",
-      "acetyleen": "acetylene",
-      "acetylene": "acetylene",
-      "Zuurstof": "oxygen",
-      "zuurstof": "oxygen",
-      "oxygen": "oxygen",
-      "Helium": "helium",
-      "helium": "helium",
+      "CO2": "co2", "co2": "co2",
+      "Stikstof": "nitrogen", "stikstof": "nitrogen", "nitrogen": "nitrogen",
+      "Argon": "argon", "argon": "argon",
+      "Acetyleen": "acetylene", "acetyleen": "acetylene", "acetylene": "acetylene",
+      "Zuurstof": "oxygen", "zuurstof": "oxygen", "oxygen": "oxygen",
+      "Helium": "helium", "helium": "helium",
     };
     return mapping[typeName] || "other";
   };
@@ -246,8 +207,7 @@ export function CreateGasCylinderOrderDialog({
       return;
     }
 
-    const count = parseInt(cylinderCount);
-    if (isNaN(count) || count <= 0) {
+    if (cylinderCount <= 0) {
       toast.error("Voer een geldig aantal in");
       return;
     }
@@ -259,15 +219,11 @@ export function CreateGasCylinderOrderDialog({
       const mappedGasType = selectedGasType ? mapGasTypeToEnum(selectedGasType.name) : "other";
 
       let finalNotes = notes.trim();
-
-      // Auto-fill notes from cylinder size if empty
       if (!finalNotes && cylinderSize) {
-        // Check for simple formatting like "2L", "10L", "50L"
         const match = cylinderSize.match(/^(\d+)L$/i);
         if (match) {
           finalNotes = `${match[1]} liter cilinder`;
         } else {
-          // For complex types like "PP 16 x 50L" or "Dewar", use the name as is
           finalNotes = cylinderSize;
         }
       }
@@ -279,7 +235,7 @@ export function CreateGasCylinderOrderDialog({
         gas_type: mappedGasType,
         gas_type_id: gasTypeId || null,
         gas_grade: gasGrade,
-        cylinder_count: count,
+        cylinder_count: cylinderCount,
         cylinder_size: cylinderSize,
         pressure: pressure,
         scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
@@ -303,28 +259,34 @@ export function CreateGasCylinderOrderDialog({
     }
   };
 
+  const filteredGasTypes = gasTypes
+    .filter(type => {
+      if (!showAllGases && !locationGasIds.has(type.id)) return false;
+      if (gasSearch) {
+        return type.name.toLowerCase().includes(gasSearch.toLowerCase());
+      }
+      return true;
+    });
+
+  const selectedGas = gasTypes.find(t => t.id === gasTypeId);
+
+  // Quick count buttons
+  const quickCounts = [1, 2, 3, 4, 5, 6, 10, 12];
+
   return (
     <ResponsiveDialog open={open} onOpenChange={handleClose}>
-      <ResponsiveDialogContent>
+      <ResponsiveDialogContent className="sm:max-w-[520px]">
         <ResponsiveDialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-orange-500/10">
-              <Cylinder className="h-5 w-5 text-orange-500" />
-            </div>
-            <div className="flex-1">
-              <ResponsiveDialogTitle className="text-lg">Nieuwe gascilinder order</ResponsiveDialogTitle>
-              <ResponsiveDialogDescription>
-                Maak een nieuwe vulorder voor gascilinders
-              </ResponsiveDialogDescription>
-            </div>
-          </div>
+          <ResponsiveDialogTitle className="text-lg font-semibold">Nieuwe vulorder</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription className="sr-only">
+            Maak een nieuwe vulorder voor gascilinders
+          </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
-        <div className="space-y-3 sm:space-y-4 py-3 sm:py-4 px-4 sm:px-0">
-          <div className="space-y-2">
-            <Label>
-              Klant <span className="text-destructive">*</span>
-            </Label>
+        <div className="space-y-4 py-2 px-4 sm:px-0">
+          {/* === KLANT === */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Klant</Label>
             <CustomerSelect
               value={customerId}
               onValueChange={(id, name) => {
@@ -335,131 +297,203 @@ export function CreateGasCylinderOrderDialog({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label>Gastype</Label>
-                <button
-                  onClick={() => setShowAllGases(!showAllGases)}
-                  className="text-xs text-primary hover:underline focus:outline-none"
-                  type="button"
-                >
-                  {showAllGases ? `Toon alleen ${location === "sol_emmen" ? "Emmen" : "Tilburg"}` : "Toon alles"}
-                </button>
-              </div>
-              <Select value={gasTypeId} onValueChange={setGasTypeId}>
-                <SelectTrigger className="bg-background h-11 sm:h-10">
-                  <SelectValue placeholder="Selecteer gastype" />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  {gasTypes
-                    .filter(type => {
-                      if (showAllGases) return true;
-                      return locationGasIds.has(type.id);
-                    })
-                    .map((type) => (
-                      <SelectItem key={type.id} value={type.id}>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: type.color }}
-                          />
-                          {type.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+          {/* === GASTYPE — chip selector === */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Gastype</Label>
+              <button
+                onClick={() => setShowAllGases(!showAllGases)}
+                className="text-xs text-primary hover:underline focus:outline-none"
+                type="button"
+              >
+                {showAllGases ? "Locatie filter" : "Toon alles"}
+              </button>
             </div>
-
-            <div className="space-y-2">
-              <Label>Kwaliteit</Label>
-              <Select value={gasGrade} onValueChange={(v) => setGasGrade(v as "medical" | "technical")}>
-                <SelectTrigger className="bg-background h-11 sm:h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="technical">Technisch</SelectItem>
-                  <SelectItem value="medical">Medisch</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="cylinderCount">
-                Aantal cilinders <span className="text-destructive">*</span>
-              </Label>
+            {/* Search for gas types */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
-                id="cylinderCount"
-                type="number"
-                min="1"
-                value={cylinderCount}
-                onChange={(e) => setCylinderCount(e.target.value)}
-                placeholder="0"
-                className="bg-background h-11 sm:h-10"
+                value={gasSearch}
+                onChange={(e) => setGasSearch(e.target.value)}
+                placeholder="Zoek gastype..."
+                className="h-9 pl-8 text-sm bg-background"
               />
             </div>
-
-            <div className="space-y-2">
-              <Label>Cilindergrootte</Label>
-              <Select value={cylinderSize} onValueChange={setCylinderSize}>
-                <SelectTrigger className="bg-background h-11 sm:h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  {cylinderSizes.map((size) => (
-                    <SelectItem key={size.id} value={size.name}>
-                      {size.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Druk</Label>
-              <Select value={pressure.toString()} onValueChange={(v) => setPressure(parseInt(v) as 200 | 300)}>
-                <SelectTrigger className="bg-background h-11 sm:h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="200">200 bar</SelectItem>
-                  <SelectItem value="300">300 bar</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Productielocatie</Label>
-              <Select
-                value={location}
-                onValueChange={(v) => setLocation(v as "sol_emmen" | "sol_tilburg")}
-                disabled={!canSelectLocation}
-              >
-                <SelectTrigger className="bg-background h-11 sm:h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="sol_emmen">SOL Emmen</SelectItem>
-                  <SelectItem value="sol_tilburg">SOL Tilburg</SelectItem>
-                </SelectContent>
-              </Select>
-              {!canSelectLocation && (
-                <p className="text-xs text-muted-foreground">
-                  Locatie is gebaseerd op je toegewezen productielocatie
-                </p>
+            <div className="flex flex-wrap gap-1.5 max-h-[140px] overflow-y-auto rounded-md border p-2 bg-muted/20">
+              {filteredGasTypes.map((type) => (
+                <button
+                  key={type.id}
+                  type="button"
+                  onClick={() => {
+                    setGasTypeId(type.id);
+                    setGasSearch("");
+                  }}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
+                    "border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
+                    "active:scale-95",
+                    gasTypeId === type.id
+                      ? "bg-foreground text-background border-foreground shadow-sm"
+                      : "bg-background text-foreground border-border hover:bg-accent"
+                  )}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: type.color }}
+                  />
+                  <span className="truncate max-w-[120px]">{type.name}</span>
+                </button>
+              ))}
+              {filteredGasTypes.length === 0 && (
+                <p className="text-xs text-muted-foreground py-2 px-1">Geen gastypes gevonden</p>
               )}
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>
-              Geplande datum <span className="text-destructive">*</span>
-            </Label>
+          {/* === AANTAL — stepper + quick select === */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Aantal cilinders</Label>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-11 w-11 shrink-0 rounded-full"
+                onClick={() => setCylinderCount(Math.max(1, cylinderCount - 1))}
+                disabled={cylinderCount <= 1}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <Input
+                type="number"
+                min="1"
+                value={cylinderCount}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  if (!isNaN(val) && val > 0) setCylinderCount(val);
+                }}
+                className="h-11 text-center text-lg font-semibold bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-11 w-11 shrink-0 rounded-full"
+                onClick={() => setCylinderCount(cylinderCount + 1)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {/* Quick count chips */}
+            <div className="flex flex-wrap gap-1.5">
+              {quickCounts.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setCylinderCount(n)}
+                  className={cn(
+                    "h-8 min-w-[2.25rem] rounded-md px-2 text-sm font-medium transition-all",
+                    "border focus:outline-none active:scale-95",
+                    cylinderCount === n
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-foreground border-border hover:bg-accent"
+                  )}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* === CILINDERGROOTTE — pill selector === */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Cilindergrootte</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {cylinderSizes.map((size) => (
+                <button
+                  key={size.id}
+                  type="button"
+                  onClick={() => setCylinderSize(size.name)}
+                  className={cn(
+                    "rounded-md px-3 py-2 text-sm font-medium transition-all",
+                    "border focus:outline-none active:scale-95",
+                    cylinderSize === size.name
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-foreground border-border hover:bg-accent"
+                  )}
+                >
+                  {size.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* === DRUK & KWALITEIT — inline toggles === */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Druk</Label>
+              <div className="flex rounded-lg border overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setPressure(200)}
+                  className={cn(
+                    "flex-1 py-2.5 text-sm font-medium transition-colors",
+                    pressure === 200
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background text-foreground hover:bg-accent"
+                  )}
+                >
+                  200 bar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPressure(300)}
+                  className={cn(
+                    "flex-1 py-2.5 text-sm font-medium transition-colors border-l",
+                    pressure === 300
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background text-foreground hover:bg-accent"
+                  )}
+                >
+                  300 bar
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Kwaliteit</Label>
+              <div className="flex rounded-lg border overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setGasGrade("technical")}
+                  className={cn(
+                    "flex-1 py-2.5 text-sm font-medium transition-colors",
+                    gasGrade === "technical"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background text-foreground hover:bg-accent"
+                  )}
+                >
+                  Tech
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGasGrade("medical")}
+                  className={cn(
+                    "flex-1 py-2.5 text-sm font-medium transition-colors border-l",
+                    gasGrade === "medical"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background text-foreground hover:bg-accent"
+                  )}
+                >
+                  Med
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* === DATUM === */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Datum</Label>
             {isMobile ? (
               <Input
                 type="date"
@@ -482,45 +516,29 @@ export function CreateGasCylinderOrderDialog({
                   >
                     <CalendarDays className="mr-2 h-4 w-4" />
                     {scheduledDate
-                      ? format(scheduledDate, "d MMM", { locale: nl })
-                      : "Datum"}
+                      ? format(scheduledDate, "d MMMM yyyy", { locale: nl })
+                      : "Selecteer datum"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent
-                  className="w-auto p-0 bg-background border shadow-lg z-50"
-                  align="start"
-                >
+                <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
                   <Calendar
                     mode="single"
                     selected={scheduledDate}
                     onSelect={setScheduledDate}
                     locale={nl}
                     initialFocus
-                    className={cn("p-3 pointer-events-auto")}
+                    className="p-3 pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notities</Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optionele notities..."
-              className="bg-background resize-none min-h-[60px] sm:min-h-[80px]"
-              rows={2}
-            />
-          </div>
-
+          {/* === UITVOERSTATUS === */}
           <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
             <div className="space-y-0.5">
-              <Label htmlFor="isCompleted" className="font-medium">Reeds uitgevoerd</Label>
-              <p className="text-xs text-muted-foreground">
-                Markeer deze order direct als voltooid
-              </p>
+              <Label htmlFor="isCompleted" className="font-medium text-sm">Reeds uitgevoerd</Label>
+              <p className="text-xs text-muted-foreground">Direct markeren als voltooid</p>
             </div>
             <Switch
               id="isCompleted"
@@ -528,20 +546,87 @@ export function CreateGasCylinderOrderDialog({
               onCheckedChange={setIsCompleted}
             />
           </div>
+
+          {/* === MEER OPTIES (collapsible) === */}
+          <button
+            type="button"
+            onClick={() => setShowDetails(!showDetails)}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
+          >
+            {showDetails ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            <span>Meer opties</span>
+            {(notes || (canSelectLocation && location !== (userProductionLocation || "sol_emmen"))) && (
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            )}
+          </button>
+
+          {showDetails && (
+            <div className="space-y-3 animate-in slide-in-from-top-2 duration-200">
+              {/* Location */}
+              {canSelectLocation && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Locatie</Label>
+                  <div className="flex rounded-lg border overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setLocation("sol_emmen")}
+                      className={cn(
+                        "flex-1 py-2.5 text-sm font-medium transition-colors",
+                        location === "sol_emmen"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background text-foreground hover:bg-accent"
+                      )}
+                    >
+                      SOL Emmen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLocation("sol_tilburg")}
+                      className={cn(
+                        "flex-1 py-2.5 text-sm font-medium transition-colors border-l",
+                        location === "sol_tilburg"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background text-foreground hover:bg-accent"
+                      )}
+                    >
+                      SOL Tilburg
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Notes */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notities</Label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Optionele notities..."
+                  className="bg-background resize-none min-h-[60px]"
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-3 px-4 sm:px-0 pb-4">
-          <Button variant="outline" onClick={handleClose} disabled={saving} className="h-11 sm:h-10 w-full sm:w-auto">
+        {/* === FOOTER === */}
+        <div className="flex gap-2 pt-3 px-4 sm:px-0 pb-4">
+          <Button
+            variant="outline"
+            onClick={handleClose}
+            disabled={saving}
+            className="h-12 sm:h-10 flex-1 sm:flex-none"
+          >
             Annuleren
           </Button>
           <Button
             onClick={handleCreate}
             disabled={saving || !customerId || !cylinderCount || !scheduledDate}
             variant="accent"
-            className="h-11 sm:h-10 w-full sm:w-auto"
+            className="h-12 sm:h-10 flex-[2] sm:flex-none font-semibold"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            {saving ? "Aanmaken..." : "Order aanmaken"}
+            {saving ? "Aanmaken..." : `${cylinderCount}× ${selectedGas?.name || "cilinder"} aanmaken`}
           </Button>
         </div>
       </ResponsiveDialogContent>
