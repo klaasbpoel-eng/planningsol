@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { haptic } from "@/lib/haptic";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -325,6 +326,7 @@ export function CreateGasCylinderOrderDialog({
                   key={type.id}
                   type="button"
                   onClick={() => {
+                    haptic("light");
                     setGasTypeId(type.id);
                     setGasSearch("");
                   }}
@@ -359,7 +361,7 @@ export function CreateGasCylinderOrderDialog({
                 variant="outline"
                 size="icon"
                 className="h-11 w-11 shrink-0 rounded-full"
-                onClick={() => setCylinderCount(Math.max(1, cylinderCount - 1))}
+                onClick={() => { haptic("light"); setCylinderCount(Math.max(1, cylinderCount - 1)); }}
                 disabled={cylinderCount <= 1}
               >
                 <Minus className="h-4 w-4" />
@@ -379,7 +381,7 @@ export function CreateGasCylinderOrderDialog({
                 variant="outline"
                 size="icon"
                 className="h-11 w-11 shrink-0 rounded-full"
-                onClick={() => setCylinderCount(cylinderCount + 1)}
+                onClick={() => { haptic("light"); setCylinderCount(cylinderCount + 1); }}
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -390,7 +392,7 @@ export function CreateGasCylinderOrderDialog({
                 <button
                   key={n}
                   type="button"
-                  onClick={() => setCylinderCount(n)}
+                  onClick={() => { haptic("light"); setCylinderCount(n); }}
                   className={cn(
                     "h-8 min-w-[2.25rem] rounded-md px-2 text-sm font-medium transition-all",
                     "border focus:outline-none active:scale-95",
@@ -413,7 +415,7 @@ export function CreateGasCylinderOrderDialog({
                 <button
                   key={size.id}
                   type="button"
-                  onClick={() => setCylinderSize(size.name)}
+                  onClick={() => { haptic("light"); setCylinderSize(size.name); }}
                   className={cn(
                     "rounded-md px-3 py-2 text-sm font-medium transition-all",
                     "border focus:outline-none active:scale-95",
@@ -435,7 +437,7 @@ export function CreateGasCylinderOrderDialog({
               <div className="flex rounded-lg border overflow-hidden">
                 <button
                   type="button"
-                  onClick={() => setPressure(200)}
+                  onClick={() => { haptic("medium"); setPressure(200); }}
                   className={cn(
                     "flex-1 py-2.5 text-sm font-medium transition-colors",
                     pressure === 200
@@ -447,7 +449,7 @@ export function CreateGasCylinderOrderDialog({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPressure(300)}
+                  onClick={() => { haptic("medium"); setPressure(300); }}
                   className={cn(
                     "flex-1 py-2.5 text-sm font-medium transition-colors border-l",
                     pressure === 300
@@ -465,7 +467,7 @@ export function CreateGasCylinderOrderDialog({
               <div className="flex rounded-lg border overflow-hidden">
                 <button
                   type="button"
-                  onClick={() => setGasGrade("technical")}
+                  onClick={() => { haptic("medium"); setGasGrade("technical"); }}
                   className={cn(
                     "flex-1 py-2.5 text-sm font-medium transition-colors",
                     gasGrade === "technical"
@@ -477,7 +479,7 @@ export function CreateGasCylinderOrderDialog({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setGasGrade("medical")}
+                  onClick={() => { haptic("medium"); setGasGrade("medical"); }}
                   className={cn(
                     "flex-1 py-2.5 text-sm font-medium transition-colors border-l",
                     gasGrade === "medical"

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { haptic } from "@/lib/haptic";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -298,7 +299,7 @@ export function CreateDryIceOrderDialog({
                 variant="outline"
                 size="icon"
                 className="h-11 w-11 shrink-0 rounded-full"
-                onClick={() => setQuantityKg(Math.max(1, quantityKg - 5))}
+                onClick={() => { haptic("light"); setQuantityKg(Math.max(1, quantityKg - 5)); }}
                 disabled={quantityKg <= 1}
               >
                 <Minus className="h-4 w-4" />
@@ -322,7 +323,7 @@ export function CreateDryIceOrderDialog({
                 variant="outline"
                 size="icon"
                 className="h-11 w-11 shrink-0 rounded-full"
-                onClick={() => setQuantityKg(quantityKg + 5)}
+                onClick={() => { haptic("light"); setQuantityKg(quantityKg + 5); }}
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -332,7 +333,7 @@ export function CreateDryIceOrderDialog({
                 <button
                   key={n}
                   type="button"
-                  onClick={() => setQuantityKg(n)}
+                  onClick={() => { haptic("light"); setQuantityKg(n); }}
                   className={cn(
                     "h-8 min-w-[2.75rem] rounded-md px-2 text-sm font-medium transition-all",
                     "border focus:outline-none active:scale-95",
@@ -355,7 +356,7 @@ export function CreateDryIceOrderDialog({
                 <button
                   key={type.id}
                   type="button"
-                  onClick={() => setProductTypeId(type.id)}
+                  onClick={() => { haptic("light"); setProductTypeId(type.id); }}
                   className={cn(
                     "rounded-md px-3 py-2 text-sm font-medium transition-all",
                     "border focus:outline-none active:scale-95",
@@ -377,6 +378,7 @@ export function CreateDryIceOrderDialog({
               <button
                 type="button"
                 onClick={() => {
+                  haptic("light");
                   setPackagingId("");
                   setBoxCount(1);
                   setContainerHasWheels(null);
@@ -396,6 +398,7 @@ export function CreateDryIceOrderDialog({
                   key={pkg.id}
                   type="button"
                   onClick={() => {
+                    haptic("light");
                     setPackagingId(pkg.id);
                     if (!pkg.name.toLowerCase().includes("eps")) setBoxCount(1);
                     if (!pkg.name.toLowerCase().includes("kunststof")) setContainerHasWheels(null);
@@ -424,7 +427,7 @@ export function CreateDryIceOrderDialog({
                   variant="outline"
                   size="icon"
                   className="h-11 w-11 shrink-0 rounded-full"
-                  onClick={() => setBoxCount(Math.max(1, boxCount - 1))}
+                  onClick={() => { haptic("light"); setBoxCount(Math.max(1, boxCount - 1)); }}
                   disabled={boxCount <= 1}
                 >
                   <Minus className="h-4 w-4" />
@@ -444,7 +447,7 @@ export function CreateDryIceOrderDialog({
                   variant="outline"
                   size="icon"
                   className="h-11 w-11 shrink-0 rounded-full"
-                  onClick={() => setBoxCount(boxCount + 1)}
+                  onClick={() => { haptic("light"); setBoxCount(boxCount + 1); }}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -459,7 +462,7 @@ export function CreateDryIceOrderDialog({
               <div className="flex rounded-lg border overflow-hidden">
                 <button
                   type="button"
-                  onClick={() => setContainerHasWheels(true)}
+                  onClick={() => { haptic("medium"); setContainerHasWheels(true); }}
                   className={cn(
                     "flex-1 py-2.5 text-sm font-medium transition-colors",
                     containerHasWheels === true
@@ -471,7 +474,7 @@ export function CreateDryIceOrderDialog({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setContainerHasWheels(false)}
+                  onClick={() => { haptic("medium"); setContainerHasWheels(false); }}
                   className={cn(
                     "flex-1 py-2.5 text-sm font-medium transition-colors border-l",
                     containerHasWheels === false
@@ -583,7 +586,7 @@ export function CreateDryIceOrderDialog({
                       <div className="flex rounded-lg border overflow-hidden">
                         <button
                           type="button"
-                          onClick={() => setRecurrenceInterval(1)}
+                          onClick={() => { haptic("medium"); setRecurrenceInterval(1); }}
                           className={cn(
                             "flex-1 py-2.5 text-sm font-medium transition-colors",
                             recurrenceInterval === 1
@@ -595,7 +598,7 @@ export function CreateDryIceOrderDialog({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setRecurrenceInterval(2)}
+                          onClick={() => { haptic("medium"); setRecurrenceInterval(2); }}
                           className={cn(
                             "flex-1 py-2.5 text-sm font-medium transition-colors border-l",
                             recurrenceInterval === 2
