@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -28,10 +28,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Flame, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
+import { Flame, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight, AlertTriangle, GripVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -93,6 +94,8 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [saving, setSaving] = useState(false);
+  const [draggedTypeId, setDraggedTypeId] = useState<string | null>(null);
+  const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
 
   const fetchCategories = async () => {
     try {
@@ -251,6 +254,25 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
     }
   };
 
+  const handleDropOnCategory = async (categoryId: string | null) => {
+    if (!draggedTypeId) return;
+    const type = gasTypes.find(t => t.id === draggedTypeId);
+    if (!type || type.category_id === categoryId) {
+      setDraggedTypeId(null);
+      setDragOverCategory(null);
+      return;
+    }
+    try {
+      await api.gasTypes.update(draggedTypeId, { category_id: categoryId });
+      toast.success(`"${type.name}" verplaatst naar ${categoryId ? categories.find(c => c.id === categoryId)?.name : "Geen categorie"}`);
+      fetchGasTypes();
+    } catch (error) {
+      console.error("Error updating category:", error);
+      toast.error("Fout bij bijwerken categorie");
+    }
+    setDraggedTypeId(null);
+    setDragOverCategory(null);
+  };
   const handleBulkDelete = async () => {
     if (gasTypes.length === 0) return;
 
@@ -342,6 +364,42 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
               </Button>
             </div>
 
+            {/* Category drop zones */}
+            {draggedTypeId && (
+              <div className="flex flex-wrap gap-2 mb-4 p-3 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5">
+                <p className="w-full text-xs font-medium text-muted-foreground mb-1">Sleep naar een categorie:</p>
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOverCategory("__none__"); }}
+                  onDragLeave={() => setDragOverCategory(null)}
+                  onDrop={(e) => { e.preventDefault(); handleDropOnCategory(null); }}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-medium border-2 transition-all",
+                    dragOverCategory === "__none__"
+                      ? "border-primary bg-primary text-primary-foreground scale-105"
+                      : "border-border bg-muted text-muted-foreground"
+                  )}
+                >
+                  Geen categorie
+                </div>
+                {categories.map((cat) => (
+                  <div
+                    key={cat.id}
+                    onDragOver={(e) => { e.preventDefault(); setDragOverCategory(cat.id); }}
+                    onDragLeave={() => setDragOverCategory(null)}
+                    onDrop={(e) => { e.preventDefault(); handleDropOnCategory(cat.id); }}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-xs font-medium border-2 transition-all",
+                      dragOverCategory === cat.id
+                        ? "border-primary bg-primary text-primary-foreground scale-105"
+                        : "border-border bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {cat.name}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {loading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -388,12 +446,30 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                 </TableHeader>
                 <TableBody>
                   {paginatedGasTypes.map((type) => (
-                    <TableRow key={type.id}>
+                    <TableRow
+                      key={type.id}
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedTypeId(type.id);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragEnd={() => {
+                        setDraggedTypeId(null);
+                        setDragOverCategory(null);
+                      }}
+                      className={cn(
+                        "cursor-grab active:cursor-grabbing",
+                        draggedTypeId === type.id && "opacity-50"
+                      )}
+                    >
                       <TableCell>
-                        <div
-                          className="w-6 h-6 rounded-full border"
-                          style={{ backgroundColor: type.color }}
-                        />
+                        <div className="flex items-center gap-1">
+                          <GripVertical className="h-4 w-4 text-muted-foreground/50 flex-shrink-0" />
+                          <div
+                            className="w-6 h-6 rounded-full border"
+                            style={{ backgroundColor: type.color }}
+                          />
+                        </div>
                       </TableCell>
                       <TableCell className="font-medium">{type.name}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">
