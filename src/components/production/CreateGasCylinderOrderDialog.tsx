@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { haptic } from "@/lib/haptic";
 import {
   ResponsiveDialog,
@@ -56,6 +56,8 @@ export function CreateGasCylinderOrderDialog({
     id: string;
     name: string;
     color: string;
+    category_id: string | null;
+    category_name: string | null;
   }>>([]);
   const [showAllGases, setShowAllGases] = useState(false);
   const [cylinderSizes, setCylinderSizes] = useState<Array<{
@@ -107,9 +109,13 @@ export function CreateGasCylinderOrderDialog({
 
     if (open) {
       const loadData = async () => {
-        const gasTypesData = await api.gasTypes.getAll();
+        const gasTypesData = await api.gasTypes.getAllWithCategory();
         if (gasTypesData) {
-          const sortedTypes = [...gasTypesData].sort((a, b) => a.name.localeCompare(b.name));
+          const mapped = gasTypesData.map((t: any) => ({
+            ...t,
+            category_name: t.gas_type_categories?.name || null,
+          }));
+          const sortedTypes = [...mapped].sort((a: any, b: any) => a.name.localeCompare(b.name));
           setGasTypes(sortedTypes);
           if (sortedTypes.length > 0 && !gasTypeId) {
             setGasTypeId(sortedTypes[0].id);
@@ -270,6 +276,24 @@ export function CreateGasCylinderOrderDialog({
       return true;
     });
 
+  // Group filtered gas types by category
+  const groupedGasTypes = useMemo(() => {
+    const groups: Array<{ categoryName: string; types: typeof filteredGasTypes }> = [];
+    const categoryMap = new Map<string, typeof filteredGasTypes>();
+
+    for (const type of filteredGasTypes) {
+      const cat = type.category_name || "Overig";
+      if (!categoryMap.has(cat)) categoryMap.set(cat, []);
+      categoryMap.get(cat)!.push(type);
+    }
+
+    for (const [name, types] of categoryMap) {
+      groups.push({ categoryName: name, types });
+    }
+
+    return groups;
+  }, [filteredGasTypes]);
+
   const selectedGas = gasTypes.find(t => t.id === gasTypeId);
 
   // Quick count buttons
@@ -321,31 +345,38 @@ export function CreateGasCylinderOrderDialog({
                 className="h-9 pl-8 text-sm bg-background"
               />
             </div>
-            <div className="flex flex-wrap gap-1.5 max-h-[140px] overflow-y-auto rounded-md border p-2 bg-muted/20">
-              {filteredGasTypes.map((type) => (
-                <button
-                  key={type.id}
-                  type="button"
-                  onClick={() => {
-                    haptic("light");
-                    setGasTypeId(type.id);
-                    setGasSearch("");
-                  }}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
-                    "border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
-                    "active:scale-95",
-                    gasTypeId === type.id
-                      ? "bg-foreground text-background border-foreground shadow-sm"
-                      : "bg-background text-foreground border-border hover:bg-accent"
-                  )}
-                >
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: type.color }}
-                  />
-                  <span className="truncate max-w-[120px]">{type.name}</span>
-                </button>
+            <div className="max-h-[180px] overflow-y-auto rounded-md border p-2 bg-muted/20 space-y-2">
+              {groupedGasTypes.map((group) => (
+                <div key={group.categoryName}>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-0.5">{group.categoryName}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {group.types.map((type) => (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => {
+                          haptic("light");
+                          setGasTypeId(type.id);
+                          setGasSearch("");
+                        }}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
+                          "border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
+                          "active:scale-95",
+                          gasTypeId === type.id
+                            ? "bg-foreground text-background border-foreground shadow-sm"
+                            : "bg-background text-foreground border-border hover:bg-accent"
+                        )}
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: type.color }}
+                        />
+                        <span className="truncate max-w-[120px]">{type.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
               {filteredGasTypes.length === 0 && (
                 <p className="text-xs text-muted-foreground py-2 px-1">Geen gastypes gevonden</p>
