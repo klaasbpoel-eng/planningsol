@@ -1329,6 +1329,14 @@ export const api = {
                 filters: [{ column: "is_active", op: "eq", value: true }]
             });
         },
+        getAllWithCategory: async () => {
+            return primaryRead("gas_types", {
+                selectQuery: "*, gas_type_categories(name)",
+                orderBy: "sort_order",
+                secondOrder: "name",
+                filters: [{ column: "is_active", op: "eq", value: true }]
+            });
+        },
         getByLocation: async (location: string) => {
             const source = getPrimarySource();
             if (source === "mysql") {
