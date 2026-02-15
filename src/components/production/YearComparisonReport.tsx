@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users, Building2, Ruler } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users, Building2, Ruler, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -148,6 +148,21 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
     return new Set(gasTypes.filter((gt: any) => gt.is_digital).map((gt: any) => gt.id));
   }, [gasTypes]);
   const isSignificantGrowth = (percent: number) => percent > 10 || percent < -10;
+
+  const digitalPhysicalSplit = useMemo(() => {
+    const digital = gasTypeComparison
+      .filter(gt => digitalGasTypeIds.has(gt.gas_type_id))
+      .reduce((s, gt) => s + gt.currentYear, 0);
+    const physical = gasTypeComparison
+      .filter(gt => !digitalGasTypeIds.has(gt.gas_type_id))
+      .reduce((s, gt) => s + gt.currentYear, 0);
+    const total = digital + physical;
+    return {
+      digital, physical, total,
+      digitalPercent: total > 0 ? Math.round((digital / total) * 100) : 0,
+      physicalPercent: total > 0 ? Math.round((physical / total) * 100) : 0,
+    };
+  }, [gasTypeComparison, digitalGasTypeIds]);
 
   // =================== FILTERED DATA CALCULATIONS ===================
 
@@ -874,6 +889,44 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           )}
         </CardContent>
       </Card>
+
+      {/* Digital vs Physical Summary */}
+      {hasDigitalTypes && digitalPhysicalSplit.total > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Card className="shadow-sm border-orange-500/20">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Cylinder className="h-4 w-4 text-orange-500" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Fysieke cilinders ({selectedYear})</p>
+                    <p className="text-xl font-bold">{formatNumber(digitalPhysicalSplit.physical, 0)}</p>
+                  </div>
+                </div>
+                <Badge variant="secondary" className="bg-orange-500/10 text-orange-600 border-orange-500/20">
+                  {digitalPhysicalSplit.physicalPercent}%
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm border-sky-400/20">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-sky-500" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Digitale cilinders ({selectedYear})</p>
+                    <p className="text-xl font-bold">{formatNumber(digitalPhysicalSplit.digital, 0)}</p>
+                  </div>
+                </div>
+                <Badge variant="secondary" className="bg-sky-400/10 text-sky-500 border-sky-400/20">
+                  {digitalPhysicalSplit.digitalPercent}%
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
