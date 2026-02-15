@@ -5,6 +5,7 @@ import { Loader2, Building2, TrendingUp, TrendingDown, Minus, Cylinder } from "l
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { getGasColor } from "@/constants/gasColors";
 import {
   BarChart,
@@ -37,6 +38,8 @@ interface MonthlyLocationData {
 interface GasTypeLocationData {
   gas_type_name: string;
   gas_type_color: string;
+  gas_type_id?: string;
+  is_digital?: boolean;
   emmen: number;
   tilburg: number;
   total: number;
@@ -49,6 +52,9 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
   const [gasTypeData, setGasTypeData] = useState<GasTypeLocationData[]>([]);
   const [emmenTotal, setEmmenTotal] = useState(0);
   const [tilburgTotal, setTilburgTotal] = useState(0);
+  const [hideDigital, setHideDigital] = useState(false);
+  const [hasDigitalTypes, setHasDigitalTypes] = useState(false);
+  const [digitalGasTypeIds, setDigitalGasTypeIds] = useState<Set<string>>(new Set());
 
   const availableYears = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -64,11 +70,12 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [emmenMonthly, tilburgMonthly, emmenGasType, tilburgGasType] = await Promise.all([
+      const [emmenMonthly, tilburgMonthly, emmenGasType, tilburgGasType, gasTypesRes] = await Promise.all([
         api.reports.getMonthlyOrderTotals(selectedYear, "cylinder", "sol_emmen").catch(() => []),
         api.reports.getMonthlyOrderTotals(selectedYear, "cylinder", "sol_tilburg").catch(() => []),
         api.reports.getMonthlyCylinderTotalsByGasType(selectedYear, "sol_emmen").catch(() => []),
         api.reports.getMonthlyCylinderTotalsByGasType(selectedYear, "sol_tilburg").catch(() => []),
+        api.gasTypes.getAll().catch(() => ({ data: [] })),
       ]);
 
       // Process monthly data
@@ -86,6 +93,17 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
       setMonthlyData(monthly);
       setEmmenTotal(monthly.reduce((s, m) => s + m.emmen, 0));
       setTilburgTotal(monthly.reduce((s, m) => s + m.tilburg, 0));
+
+      // Build digital gas type map
+      const digitalMap = new Map<string, boolean>();
+      const gasTypesData = gasTypesRes?.data || [];
+      (gasTypesData as any[]).forEach((gt: any) => {
+        if (gt.id) digitalMap.set(gt.name || gt.id, gt.is_digital === true);
+      });
+      setDigitalGasTypeIds(new Set(
+        (gasTypesData as any[]).filter((gt: any) => gt.is_digital).map((gt: any) => gt.name)
+      ));
+      setHasDigitalTypes((gasTypesData as any[]).some((gt: any) => gt.is_digital));
 
       // Process gas type data
       const gasMap = new Map<string, { name: string; color: string; emmen: number; tilburg: number }>();
@@ -106,6 +124,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
         .map(g => ({
           gas_type_name: g.name,
           gas_type_color: getGasColor(g.name, g.color),
+          is_digital: digitalMap.get(g.name) || false,
           emmen: g.emmen,
           tilburg: g.tilburg,
           total: g.emmen + g.tilburg,
@@ -119,9 +138,26 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
     }
   };
 
-  const grandTotal = emmenTotal + tilburgTotal;
-  const emmenPercent = grandTotal > 0 ? Math.round((emmenTotal / grandTotal) * 100) : 0;
-  const tilburgPercent = grandTotal > 0 ? Math.round((tilburgTotal / grandTotal) * 100) : 0;
+  // Filtered gas type data (hide digital)
+  const filteredGasTypeData = useMemo(() => {
+    if (!hideDigital) return gasTypeData;
+    return gasTypeData.filter(gt => !gt.is_digital);
+  }, [gasTypeData, hideDigital]);
+
+  // Filtered totals (recalculate when hiding digital)
+  const filteredEmmenTotal = useMemo(() => {
+    if (!hideDigital) return emmenTotal;
+    return filteredGasTypeData.reduce((s, gt) => s + gt.emmen, 0);
+  }, [hideDigital, emmenTotal, filteredGasTypeData]);
+
+  const filteredTilburgTotal = useMemo(() => {
+    if (!hideDigital) return tilburgTotal;
+    return filteredGasTypeData.reduce((s, gt) => s + gt.tilburg, 0);
+  }, [hideDigital, tilburgTotal, filteredGasTypeData]);
+
+  const grandTotal = filteredEmmenTotal + filteredTilburgTotal;
+  const emmenPercent = grandTotal > 0 ? Math.round((filteredEmmenTotal / grandTotal) * 100) : 0;
+  const tilburgPercent = grandTotal > 0 ? Math.round((filteredTilburgTotal / grandTotal) * 100) : 0;
 
   const cumulativeData = useMemo(() => {
     let cumE = 0, cumT = 0;
@@ -165,6 +201,16 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
               ))}
             </SelectContent>
           </Select>
+          {hasDigitalTypes && (
+            <Button
+              variant={hideDigital ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs gap-1"
+              onClick={() => setHideDigital(!hideDigital)}
+            >
+              ⓓ {hideDigital ? "Toon digitaal" : "Verberg digitaal"}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -175,7 +221,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">SOL Emmen</p>
-                <p className="text-2xl font-bold">{formatNumber(emmenTotal, 0)}</p>
+                <p className="text-2xl font-bold">{formatNumber(filteredEmmenTotal, 0)}</p>
               </div>
               <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20">
                 {emmenPercent}%
@@ -189,7 +235,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">SOL Tilburg</p>
-                <p className="text-2xl font-bold">{formatNumber(tilburgTotal, 0)}</p>
+                <p className="text-2xl font-bold">{formatNumber(filteredTilburgTotal, 0)}</p>
               </div>
               <Badge variant="secondary" className="bg-sky-400/10 text-sky-500 border-sky-400/20">
                 {tilburgPercent}%
@@ -359,10 +405,10 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
           <CardDescription>Cilinders per gastype — Emmen vs Tilburg ({selectedYear})</CardDescription>
         </CardHeader>
         <CardContent>
-          {gasTypeData.length > 0 ? (
+          {filteredGasTypeData.length > 0 ? (
             <>
-              <ResponsiveContainer width="100%" height={Math.max(300, gasTypeData.length * 36)}>
-                <BarChart data={gasTypeData} layout="vertical" margin={{ left: 10, right: 60 }}>
+              <ResponsiveContainer width="100%" height={Math.max(300, filteredGasTypeData.length * 36)}>
+                <BarChart data={filteredGasTypeData} layout="vertical" margin={{ left: 10, right: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
                   <XAxis type="number" className="text-xs" tickFormatter={(v) => formatNumber(v, 0)} tickLine={false} axisLine={false} />
                   <YAxis
@@ -416,13 +462,16 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                     </tr>
                   </thead>
                   <tbody>
-                    {gasTypeData.map((gt) => {
+                    {filteredGasTypeData.map((gt) => {
                       const pctEmmen = gt.total > 0 ? Math.round((gt.emmen / gt.total) * 100) : 0;
                       return (
                         <tr key={gt.gas_type_name} className="border-b last:border-0">
                           <td className="py-2 pr-4 font-medium flex items-center gap-1.5">
                             <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: gt.gas_type_color }} />
                             {gt.gas_type_name}
+                            {gt.is_digital && (
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 border-sky-400/40 text-sky-500 bg-sky-400/10">ⓓ</Badge>
+                            )}
                           </td>
                           <td className="text-right py-2 px-3 tabular-nums">{formatNumber(gt.emmen, 0)}</td>
                           <td className="text-right py-2 px-3 tabular-nums">{formatNumber(gt.tilburg, 0)}</td>
