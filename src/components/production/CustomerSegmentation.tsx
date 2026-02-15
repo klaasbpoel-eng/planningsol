@@ -64,7 +64,7 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
 
   useEffect(() => {
     fetchCustomerSegments();
-  }, [location, refreshKey, currentYear, fromDateStr, toDateStr]);
+  }, [location, refreshKey, currentYear, fromDateStr, toDateStr, hideDigital]);
 
   const fetchCustomerSegments = async () => {
     setLoading(true);
@@ -72,7 +72,7 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
     const locationParam = location === "all" ? null : location;
 
     try {
-      const data = await api.reports.getCustomerSegments(currentYear, locationParam, fromDateStr, toDateStr);
+      const data = await api.reports.getCustomerSegments(currentYear, locationParam, fromDateStr, toDateStr, hideDigital);
       if (data) {
         setCustomers(data as CustomerSegment[]);
       }

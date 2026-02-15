@@ -52,7 +52,7 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
 
   useEffect(() => {
     fetchHeatMapData();
-  }, [currentDate, location, refreshKey]);
+  }, [currentDate, location, refreshKey, hideDigital]);
 
   const fetchHeatMapData = async () => {
     setLoading(true);
@@ -62,7 +62,7 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
     const toDate = format(endOfMonth(currentDate), "yyyy-MM-dd");
 
     try {
-      const data = await api.reports.getDailyProductionByPeriod(fromDate, toDate, locationParam);
+      const data = await api.reports.getDailyProductionByPeriod(fromDate, toDate, locationParam, hideDigital);
 
       if (data) {
         const dataMap = new Map<string, DailyData>();

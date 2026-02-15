@@ -1431,6 +1431,27 @@ export type Database = {
               trend: string
             }[]
           }
+        | {
+            Args: {
+              p_exclude_digital?: boolean
+              p_from_date?: string
+              p_location?: string
+              p_to_date?: string
+              p_year: number
+            }
+            Returns: {
+              avg_order_size: number
+              customer_id: string
+              customer_name: string
+              first_order_date: string
+              last_order_date: string
+              order_count: number
+              tier: string
+              total_cylinders: number
+              total_dry_ice_kg: number
+              trend: string
+            }[]
+          }
       get_customer_totals_by_period: {
         Args: { p_from_date: string; p_location?: string; p_to_date: string }
         Returns: {
@@ -1440,14 +1461,32 @@ export type Database = {
           total_dry_ice_kg: number
         }[]
       }
-      get_daily_production_by_period: {
-        Args: { p_from_date: string; p_location?: string; p_to_date: string }
-        Returns: {
-          cylinder_count: number
-          dry_ice_kg: number
-          production_date: string
-        }[]
-      }
+      get_daily_production_by_period:
+        | {
+            Args: {
+              p_from_date: string
+              p_location?: string
+              p_to_date: string
+            }
+            Returns: {
+              cylinder_count: number
+              dry_ice_kg: number
+              production_date: string
+            }[]
+          }
+        | {
+            Args: {
+              p_exclude_digital?: boolean
+              p_from_date: string
+              p_location?: string
+              p_to_date: string
+            }
+            Returns: {
+              cylinder_count: number
+              dry_ice_kg: number
+              production_date: string
+            }[]
+          }
       get_daily_production_totals: {
         Args: { p_location?: string; p_month?: number; p_year: number }
         Returns: {
