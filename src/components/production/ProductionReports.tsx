@@ -600,7 +600,7 @@ export function ProductionReports({
 
         <StatCard
           value={formatNumber(hideDigital ? cylinderStats.totalCylinders - digitalPhysicalSplit.digital : cylinderStats.totalCylinders, 0)}
-          label={hideDigital ? "Fysieke cilinders" : "Totaal cilinders"}
+          label={hideDigital && hasDigitalTypes ? "Fysieke cilinders ⓕ" : hideDigital ? "Fysieke cilinders" : "Totaal cilinders"}
           icon={<Package className="h-4 w-4 text-orange-500" />}
           iconBgColor="bg-orange-500/10"
           trend={{
