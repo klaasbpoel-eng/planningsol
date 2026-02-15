@@ -1452,15 +1452,34 @@ export type Database = {
               trend: string
             }[]
           }
-      get_customer_totals_by_period: {
-        Args: { p_from_date: string; p_location?: string; p_to_date: string }
-        Returns: {
-          customer_id: string
-          customer_name: string
-          total_cylinders: number
-          total_dry_ice_kg: number
-        }[]
-      }
+      get_customer_totals_by_period:
+        | {
+            Args: {
+              p_from_date: string
+              p_location?: string
+              p_to_date: string
+            }
+            Returns: {
+              customer_id: string
+              customer_name: string
+              total_cylinders: number
+              total_dry_ice_kg: number
+            }[]
+          }
+        | {
+            Args: {
+              p_exclude_digital?: boolean
+              p_from_date: string
+              p_location?: string
+              p_to_date: string
+            }
+            Returns: {
+              customer_id: string
+              customer_name: string
+              total_cylinders: number
+              total_dry_ice_kg: number
+            }[]
+          }
       get_daily_production_by_period:
         | {
             Args: {
@@ -1487,14 +1506,28 @@ export type Database = {
               production_date: string
             }[]
           }
-      get_daily_production_totals: {
-        Args: { p_location?: string; p_month?: number; p_year: number }
-        Returns: {
-          cylinder_count: number
-          dry_ice_kg: number
-          production_date: string
-        }[]
-      }
+      get_daily_production_totals:
+        | {
+            Args: { p_location?: string; p_month?: number; p_year: number }
+            Returns: {
+              cylinder_count: number
+              dry_ice_kg: number
+              production_date: string
+            }[]
+          }
+        | {
+            Args: {
+              p_exclude_digital?: boolean
+              p_location?: string
+              p_month?: number
+              p_year: number
+            }
+            Returns: {
+              cylinder_count: number
+              dry_ice_kg: number
+              production_date: string
+            }[]
+          }
       get_distinct_gas_type_ids_by_location: {
         Args: { p_location: string }
         Returns: {
@@ -1513,14 +1546,32 @@ export type Database = {
           total_orders: number
         }[]
       }
-      get_gas_category_distribution_by_period: {
-        Args: { p_from_date: string; p_location?: string; p_to_date: string }
-        Returns: {
-          category_id: string
-          category_name: string
-          total_cylinders: number
-        }[]
-      }
+      get_gas_category_distribution_by_period:
+        | {
+            Args: {
+              p_from_date: string
+              p_location?: string
+              p_to_date: string
+            }
+            Returns: {
+              category_id: string
+              category_name: string
+              total_cylinders: number
+            }[]
+          }
+        | {
+            Args: {
+              p_exclude_digital?: boolean
+              p_from_date: string
+              p_location?: string
+              p_to_date: string
+            }
+            Returns: {
+              category_id: string
+              category_name: string
+              total_cylinders: number
+            }[]
+          }
       get_gas_type_distribution_by_period:
         | {
             Args: {
@@ -1549,40 +1600,95 @@ export type Database = {
               total_cylinders: number
             }[]
           }
-      get_monthly_cylinder_totals_by_customer: {
-        Args: { p_location?: string; p_year: number }
-        Returns: {
-          customer_id: string
-          customer_name: string
-          month: number
-          total_cylinders: number
-        }[]
-      }
-      get_monthly_cylinder_totals_by_gas_type: {
-        Args: { p_location?: string; p_year: number }
-        Returns: {
-          gas_type_color: string
-          gas_type_id: string
-          gas_type_name: string
-          month: number
-          total_cylinders: number
-        }[]
-      }
-      get_monthly_cylinder_totals_by_size: {
-        Args: { p_location?: string; p_year: number }
-        Returns: {
-          cylinder_size: string
-          month: number
-          total_cylinders: number
-        }[]
-      }
-      get_monthly_order_totals: {
-        Args: { p_location?: string; p_order_type: string; p_year: number }
-        Returns: {
-          month: number
-          total_value: number
-        }[]
-      }
+      get_monthly_cylinder_totals_by_customer:
+        | {
+            Args: { p_location?: string; p_year: number }
+            Returns: {
+              customer_id: string
+              customer_name: string
+              month: number
+              total_cylinders: number
+            }[]
+          }
+        | {
+            Args: {
+              p_exclude_digital?: boolean
+              p_location?: string
+              p_year: number
+            }
+            Returns: {
+              customer_id: string
+              customer_name: string
+              month: number
+              total_cylinders: number
+            }[]
+          }
+      get_monthly_cylinder_totals_by_gas_type:
+        | {
+            Args: { p_location?: string; p_year: number }
+            Returns: {
+              gas_type_color: string
+              gas_type_id: string
+              gas_type_name: string
+              month: number
+              total_cylinders: number
+            }[]
+          }
+        | {
+            Args: {
+              p_exclude_digital?: boolean
+              p_location?: string
+              p_year: number
+            }
+            Returns: {
+              gas_type_color: string
+              gas_type_id: string
+              gas_type_name: string
+              month: number
+              total_cylinders: number
+            }[]
+          }
+      get_monthly_cylinder_totals_by_size:
+        | {
+            Args: { p_location?: string; p_year: number }
+            Returns: {
+              cylinder_size: string
+              month: number
+              total_cylinders: number
+            }[]
+          }
+        | {
+            Args: {
+              p_exclude_digital?: boolean
+              p_location?: string
+              p_year: number
+            }
+            Returns: {
+              cylinder_size: string
+              month: number
+              total_cylinders: number
+            }[]
+          }
+      get_monthly_order_totals:
+        | {
+            Args: { p_location?: string; p_order_type: string; p_year: number }
+            Returns: {
+              month: number
+              total_value: number
+            }[]
+          }
+        | {
+            Args: {
+              p_exclude_digital?: boolean
+              p_location?: string
+              p_order_type: string
+              p_year: number
+            }
+            Returns: {
+              month: number
+              total_value: number
+            }[]
+          }
       get_production_efficiency:
         | {
             Args: { p_location?: string; p_year: number }
@@ -1651,15 +1757,29 @@ export type Database = {
         Returns: Database["public"]["Enums"]["production_location"]
       }
       get_user_role: { Args: { _user_id: string }; Returns: string }
-      get_yearly_totals_by_customer: {
-        Args: { p_location?: string; p_year: number }
-        Returns: {
-          customer_id: string
-          customer_name: string
-          total_cylinders: number
-          total_dry_ice_kg: number
-        }[]
-      }
+      get_yearly_totals_by_customer:
+        | {
+            Args: { p_location?: string; p_year: number }
+            Returns: {
+              customer_id: string
+              customer_name: string
+              total_cylinders: number
+              total_dry_ice_kg: number
+            }[]
+          }
+        | {
+            Args: {
+              p_exclude_digital?: boolean
+              p_location?: string
+              p_year: number
+            }
+            Returns: {
+              customer_id: string
+              customer_name: string
+              total_cylinders: number
+              total_dry_ice_kg: number
+            }[]
+          }
       has_elevated_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
