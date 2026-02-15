@@ -784,7 +784,7 @@ export const api = {
     },
 
     reports: {
-        getDailyProductionByPeriod: async (fromDate: string, toDate: string, location: string | null) => {
+        getDailyProductionByPeriod: async (fromDate: string, toDate: string, location: string | null, excludeDigital: boolean = false) => {
             const source = getPrimarySource();
             if (source === "mysql") {
                 const locClause = location ? " AND location = ?" : "";
@@ -819,8 +819,9 @@ export const api = {
             const { data, error } = await client.rpc("get_daily_production_by_period", {
                 p_from_date: fromDate,
                 p_to_date: toDate,
-                p_location: location
-            });
+                p_location: location,
+                p_exclude_digital: excludeDigital
+            } as any);
             if (error) throw error;
             return data;
         },
@@ -987,7 +988,7 @@ export const api = {
             return data?.reduce((sum, o) => sum + o.cylinder_count, 0) || 0;
         },
 
-        getCustomerSegments: async (year: number, location: string | null, fromDate?: string, toDate?: string) => {
+        getCustomerSegments: async (year: number, location: string | null, fromDate?: string, toDate?: string, excludeDigital: boolean = false) => {
             const source = getPrimarySource();
             if (source === "mysql") {
                 const params: any[] = [year]; // For trend analysis year check
@@ -1042,7 +1043,8 @@ export const api = {
                 p_year: year,
                 p_location: location,
                 ...(fromDate ? { p_from_date: fromDate } : {}),
-                ...(toDate ? { p_to_date: toDate } : {})
+                ...(toDate ? { p_to_date: toDate } : {}),
+                p_exclude_digital: excludeDigital
             } as any);
             if (error) throw error;
             return data;
