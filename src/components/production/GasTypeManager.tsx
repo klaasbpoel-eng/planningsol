@@ -651,10 +651,10 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
             )}
 
             {/* Pagination */}
-            {!loading && gasTypes.length > itemsPerPage && (
+            {!loading && filteredGasTypes.length > itemsPerPage && (
               <div className="flex items-center justify-between mt-4 pt-4 border-t">
                 <span className="text-sm text-muted-foreground">
-                  {startIndex + 1}-{Math.min(endIndex, gasTypes.length)} van {gasTypes.length} items
+                  {startIndex + 1}-{Math.min(endIndex, filteredGasTypes.length)} van {filteredGasTypes.length} items
                 </span>
                 <div className="flex items-center gap-2">
                   <Button

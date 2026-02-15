@@ -209,6 +209,11 @@ export const InternalOrderForm = ({
             >
                 {isSubmitting ? "Bezig..." : submitLabel}
             </Button>
+            {createItems.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                    Voeg minimaal 1 artikel toe om een bestelling te plaatsen
+                </p>
+            )}
         </div>
     );
 };

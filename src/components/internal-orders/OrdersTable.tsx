@@ -104,14 +104,15 @@ export const OrdersTable = ({ orders, type, productionLocation, onUpdateStatus, 
 
     return (
         <>
+            <div className="overflow-x-auto -mx-2 px-2">
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Order #</TableHead>
-                        <TableHead>Datum</TableHead>
-                        <TableHead>{type === "incoming" ? "Van" : "Naar"}</TableHead>
+                        <TableHead className="whitespace-nowrap">Order #</TableHead>
+                        <TableHead className="whitespace-nowrap">Datum</TableHead>
+                        <TableHead className="whitespace-nowrap">{type === "incoming" ? "Van" : "Naar"}</TableHead>
                         <TableHead>Artikelen</TableHead>
-                        <TableHead>Notities</TableHead>
+                        <TableHead className="hidden md:table-cell">Notities</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Acties</TableHead>
                     </TableRow>
@@ -149,9 +150,9 @@ export const OrdersTable = ({ orders, type, productionLocation, onUpdateStatus, 
                                     )}
                                 </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="hidden md:table-cell">
                                 {order.notes ? (
-                                    <span className="text-xs text-muted-foreground line-clamp-2">{order.notes}</span>
+                                    <span className="text-xs text-muted-foreground line-clamp-2 max-w-[200px]">{order.notes}</span>
                                 ) : (
                                     <span className="text-xs text-muted-foreground/50">—</span>
                                 )}
@@ -234,6 +235,7 @@ export const OrdersTable = ({ orders, type, productionLocation, onUpdateStatus, 
                     ))}
                 </TableBody>
             </Table>
+            </div>
 
             <OrderDetailDialog
                 order={selectedOrder}

@@ -1371,7 +1371,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       start: weekStart,
       end: weekEnd
     });
-    return <div className="flex-1 flex flex-col gap-2 animate-fade-in">
+    return <div className="flex flex-col gap-2 animate-fade-in">
       <div className="grid grid-cols-7 gap-2 flex-shrink-0">
         {weekDays.map((day, index) => {
           const isWeekendDay = index >= 5;
@@ -1380,7 +1380,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
           </div>;
         })}
       </div>
-      <div className="grid grid-cols-7 gap-2 flex-1">
+      <div className="grid grid-cols-7 gap-2">
         {days.map((day, index) => {
           const dayRequests = getRequestsForDay(day);
           const dayTasks = getTasksForDay(day);
@@ -1402,7 +1402,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
           const isCurrentDay = isToday(day);
           const isDragOver = dragOverDate && isSameDay(dragOverDate, day);
           const isWeekendDay = isWeekend(day);
-          return <div key={day.toISOString()} onClick={e => handleDayClick(day, e)} className={cn("p-3 rounded-xl border transition-all duration-300 hover:shadow-md flex flex-col", isWeekendDay ? "bg-primary/5 backdrop-blur-sm border-primary/20 hover:bg-primary/10" : "bg-card/80 backdrop-blur-sm border-border/50", isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/10 to-transparent shadow-lg shadow-primary/5", isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]", isAdmin && "cursor-pointer")} style={{
+          return <div key={day.toISOString()} onClick={e => handleDayClick(day, e)} className={cn("p-3 rounded-xl border transition-all duration-300 hover:shadow-md flex flex-col min-h-[180px]", isWeekendDay ? "bg-primary/5 backdrop-blur-sm border-primary/20 hover:bg-primary/10" : "bg-card/80 backdrop-blur-sm border-border/50", isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/10 to-transparent shadow-lg shadow-primary/5", isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]", isAdmin && "cursor-pointer")} style={{
             animationDelay: `${index * 30}ms`
           }} onDragOver={e => handleDragOver(e, day)} onDragLeave={handleDragLeave} onDrop={e => handleDrop(e, day)}>
             <div className={cn("text-sm font-bold mb-3 flex items-center justify-center w-7 h-7 rounded-full", isCurrentDay ? "bg-primary text-primary-foreground" : "text-foreground")}>

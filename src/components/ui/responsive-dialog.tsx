@@ -143,7 +143,7 @@ export function ResponsiveDialogFooter({
 
   if (isMobile) {
     return (
-      <DrawerFooter className={cn("flex-col-reverse gap-2 pt-3 pb-safe border-t bg-background sticky bottom-0 z-10", className)}>
+      <DrawerFooter className={cn("flex-col-reverse gap-2 pt-3 pb-4 pb-safe border-t bg-background sticky bottom-0 z-10 mt-auto", className)}>
         {children}
       </DrawerFooter>
     );

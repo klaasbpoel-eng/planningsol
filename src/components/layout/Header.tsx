@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck, BookOpen } from "lucide-react";
+import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck, BookOpen, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -99,6 +99,20 @@ export function Header({
           Interne Bestellingen
         </Button>
       </Link>
+      <Link to="/verlof" onClick={mobile ? closeMobileMenu : undefined}>
+        <Button
+          variant={mobile ? "ghost" : "ghost"}
+          size={mobile ? "lg" : "sm"}
+          className={`${mobile ? "w-full justify-start text-base h-12" : ""
+            } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/verlof"
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
+              : ""
+            }`}
+        >
+          <Clock className="h-4 w-4 mr-2" />
+          Verlof
+        </Button>
+      </Link>
       <Link to="/toolbox" onClick={mobile ? closeMobileMenu : undefined}>
         <Button
           variant={mobile ? "ghost" : "ghost"}
@@ -133,7 +147,7 @@ export function Header({
 
   return (
     <header className="sticky top-0 z-50 w-full bg-primary-foreground shadow-md border-b border-border/50">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="container mx-auto px-4 h-16 flex items-center justify-between overflow-x-hidden">
         {/* Left side - Logo and branding */}
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-3">
@@ -155,7 +169,7 @@ export function Header({
         </div>
 
         {/* Right side - Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {/* Theme toggle - always visible */}
           <ThemeToggle variant="header" />
 
@@ -167,19 +181,19 @@ export function Header({
             <>
               <NavLinks />
               {userEmail && (
-                <div className="hidden md:flex items-center gap-2 text-primary/80 text-sm">
-                  <User className="h-4 w-4" />
-                  <span className="max-w-[150px] truncate">{userEmail}</span>
+                <div className="hidden lg:flex items-center gap-2 text-primary/80 text-sm ml-1">
+                  <User className="h-4 w-4 shrink-0" />
+                  <span className="max-w-[120px] truncate">{userEmail}</span>
                 </div>
               )}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleLogout}
-                className="text-primary hover:bg-primary/10 hover:text-primary"
+                className="text-primary hover:bg-primary/10 hover:text-primary shrink-0"
               >
                 <LogOut className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Uitloggen</span>
+                <span className="hidden lg:inline">Uitloggen</span>
               </Button>
             </>
           )}

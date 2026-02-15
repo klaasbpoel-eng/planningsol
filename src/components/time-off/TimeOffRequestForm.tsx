@@ -228,7 +228,7 @@ export function TimeOffRequestForm({ onSuccess }: TimeOffRequestFormProps) {
 
           <Button
             type="submit"
-            className="w-full h-11 bg-accent hover:bg-accent/90 text-accent-foreground"
+            className="w-full h-11"
             disabled={loading || !typeId}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

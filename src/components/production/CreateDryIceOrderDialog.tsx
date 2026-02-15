@@ -330,14 +330,14 @@ export function CreateDryIceOrderDialog({
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 overflow-x-auto scrollbar-none -mx-1 px-1">
               {quickQuantities.map((n) => (
                 <button
                   key={n}
                   type="button"
                   onClick={() => { haptic("light"); setQuantityKg(n); }}
                   className={cn(
-                    "h-8 min-w-[2.75rem] rounded-md px-2 text-sm font-medium transition-all",
+                    "h-8 min-w-[2.75rem] rounded-md px-2 text-sm font-medium transition-all shrink-0",
                     "border focus:outline-none active:scale-95",
                     quantityKg === n
                       ? "bg-primary text-primary-foreground border-primary"

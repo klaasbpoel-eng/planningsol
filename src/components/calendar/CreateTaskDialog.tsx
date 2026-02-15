@@ -150,12 +150,12 @@ export function CreateTaskDialog({
 
       // Use api.tasks.create in parallel to ensure correct DB routing (and syncing)
       // Direct supabase insert bypasses the api layer which might cause issues if primary source is not cloud
-      await Promise.all(tasksToCreate.map(task => api.tasks.create(task)));
+      const createdTasks = await Promise.all(tasksToCreate.map(task => api.tasks.create(task)));
 
       toast.success(
-        tasksToCreate.length > 1
-          ? `${tasksToCreate.length} taken aangemaakt`
-          : `Taak aangemaakt (Toegewezen aan: ${tasksToCreate[0].assigned_to ? "Specifieke medewerker" : "Iedereen"})`
+        createdTasks.length > 1
+          ? `${createdTasks.length} taken aangemaakt`
+          : `Taak aangemaakt (DB Resultaat: ${createdTasks[0].assigned_to ? "Specifieke medewerker" : "Iedereen/Null"})`
       );
 
       resetForm();

@@ -5,6 +5,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays, Sparkles } from "lucide-react";
 import { parseISO } from "date-fns";
+import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -89,6 +90,8 @@ export function TimeOffCalendar({ requests }: TimeOffCalendarProps) {
               selected={[...modifiers.approved, ...modifiers.pending]}
               modifiers={modifiers}
               modifiersStyles={modifiersStyles}
+              locale={nl}
+              weekStartsOn={1}
               className="rounded-xl border-0 p-2"
               numberOfMonths={1}
               classNames={{

@@ -66,7 +66,9 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
 
             <main className="flex-1 container mx-auto px-4 py-8">
                 <div className="mb-8 space-y-2">
-                    <h1 className="text-3xl font-bold tracking-tight">Welkom terug</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">
+                        Welkom terug{userEmail ? `, ${userEmail.split("@")[0]}` : ""}
+                    </h1>
                     <p className="text-muted-foreground">
                         Kies een module om aan de slag te gaan.
                     </p>
@@ -76,7 +78,7 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
                     {/* Admin Card - Special Case */}
                     {isAdmin && (
                         <Card
-                            className="group cursor-pointer border-l-4 border-l-destructive hover:shadow-lg transition-all duration-300"
+                            className="group cursor-pointer border-l-4 border-l-destructive hover:shadow-lg hover:scale-[1.02] transition-all duration-300"
                             onClick={onSwitchToAdmin}
                         >
                             <CardHeader>
@@ -101,7 +103,7 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
                     {features.map((feature, index) => feature.enabled && (
                         <Card
                             key={index}
-                            className={`group cursor-pointer border-l-4 border-l-transparent hover:shadow-lg transition-all duration-300 hover:border-l-primary`}
+                            className={`group cursor-pointer border-l-4 border-l-transparent hover:shadow-lg hover:scale-[1.02] transition-all duration-300 hover:border-l-primary`}
                             onClick={() => navigate(feature.path)}
                         >
                             <CardHeader>

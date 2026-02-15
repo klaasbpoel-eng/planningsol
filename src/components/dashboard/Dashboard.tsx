@@ -137,38 +137,49 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
 
       <FadeIn show={!loading}>
         <main className="w-full px-[1%] md:px-[10%] py-8">
-          {/* Role-based action buttons */}
-          <div className="flex flex-wrap gap-3 mb-6">
-            {isAdmin && onSwitchToAdmin && (
-              <Button
-                onClick={onSwitchToAdmin}
-                className="bg-accent hover:bg-accent/90 text-accent-foreground"
-              >
-                <Shield className="h-4 w-4 mr-2" />
-                Naar Beheerderspaneel
-              </Button>
-            )}
-
-            {permissions?.canViewOrders && (
-              <Button
-                onClick={() => navigate("/productie")}
-                variant="outline"
-              >
-                <Factory className="h-4 w-4 mr-2" />
-                Productieplanning
-              </Button>
-            )}
-
-            {role === "admin" && (
-              <Button
-                onClick={() => navigate("/klanten")}
-                variant="outline"
-              >
-                <Users2 className="h-4 w-4 mr-2" />
-                Klanten
-              </Button>
-            )}
+          {/* Page heading */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold tracking-tight">Verlof & Aanvragen</h1>
+            <p className="text-muted-foreground text-sm mt-1">Beheer uw verlofaanvragen en bekijk uw saldo</p>
           </div>
+
+          {/* Quick navigation */}
+          {(isAdmin || permissions?.canViewOrders || role === "admin") && (
+            <div className="flex flex-wrap gap-2 mb-6">
+              {isAdmin && onSwitchToAdmin && (
+                <Button
+                  onClick={onSwitchToAdmin}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Shield className="h-4 w-4 mr-2" />
+                  Beheerderspaneel
+                </Button>
+              )}
+
+              {permissions?.canViewOrders && (
+                <Button
+                  onClick={() => navigate("/productie")}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Factory className="h-4 w-4 mr-2" />
+                  Productieplanning
+                </Button>
+              )}
+
+              {role === "admin" && (
+                <Button
+                  onClick={() => navigate("/klanten")}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Users2 className="h-4 w-4 mr-2" />
+                  Klanten
+                </Button>
+              )}
+            </div>
+          )}
 
           {/* Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">

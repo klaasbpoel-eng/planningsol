@@ -6,11 +6,13 @@ import { PageTransition } from "@/components/ui/page-transition";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { User } from "@supabase/supabase-js";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 
 const CalendarPage = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { role } = useUserPermissions(user?.id);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -49,7 +51,7 @@ const CalendarPage = () => {
   return (
     <PageTransition>
       <div className="min-h-screen flex flex-col gradient-mesh overflow-x-hidden">
-        <Header userEmail={user.email} />
+        <Header userEmail={user.email} role={role} />
 
         <main className="flex-1 flex flex-col w-full px-[1%] md:px-[10%]">
           <CalendarOverview currentUser={user} />

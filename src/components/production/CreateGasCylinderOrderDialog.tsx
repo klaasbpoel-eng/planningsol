@@ -336,6 +336,16 @@ export function CreateGasCylinderOrderDialog({
                 {showAllGases ? "Locatie filter" : "Toon alles"}
               </button>
             </div>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Zoek gastype..."
+                value={gasSearch}
+                onChange={(e) => setGasSearch(e.target.value)}
+                className="h-8 pl-8 text-xs bg-background"
+              />
+            </div>
             <div className="max-h-[180px] overflow-y-auto rounded-md border p-2 bg-muted/20 space-y-2">
               {groupedGasTypes.map((group) => (
                 <div key={group.categoryName}>
@@ -410,14 +420,14 @@ export function CreateGasCylinderOrderDialog({
               </Button>
             </div>
             {/* Quick count chips */}
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 overflow-x-auto scrollbar-none -mx-1 px-1">
               {quickCounts.map((n) => (
                 <button
                   key={n}
                   type="button"
                   onClick={() => { haptic("light"); setCylinderCount(n); }}
                   className={cn(
-                    "h-8 min-w-[2.25rem] rounded-md px-2 text-sm font-medium transition-all",
+                    "h-8 min-w-[2.25rem] rounded-md px-2 text-sm font-medium transition-all shrink-0",
                     "border focus:outline-none active:scale-95",
                     cylinderCount === n
                       ? "bg-primary text-primary-foreground border-primary"
