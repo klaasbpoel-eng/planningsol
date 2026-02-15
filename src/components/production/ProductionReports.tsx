@@ -419,6 +419,20 @@ export function ProductionReports({
     });
   }, [gasTypeDistributionData, hideDigital]);
 
+  // Digital vs physical cylinder totals
+  const digitalPhysicalSplit = useMemo(() => {
+    const digital = gasTypeDistributionData
+      .filter(item => item.is_digital)
+      .reduce((sum, item) => sum + (Number(item.total_cylinders) || 0), 0);
+    const physical = gasTypeDistributionData
+      .filter(item => !item.is_digital)
+      .reduce((sum, item) => sum + (Number(item.total_cylinders) || 0), 0);
+    const total = digital + physical;
+    const digitalPercent = total > 0 ? Math.round((digital / total) * 100) : 0;
+    const physicalPercent = total > 0 ? Math.round((physical / total) * 100) : 0;
+    return { digital, physical, total, digitalPercent, physicalPercent };
+  }, [gasTypeDistributionData]);
+
   // Gas category distribution from RPC (already aggregated)
   const gasCategoryDistribution = useMemo(() => {
     return gasCategoryDistributionData.map(item => ({
@@ -544,6 +558,26 @@ export function ProductionReports({
           />
         </div>
       </div>
+
+      {/* Digital vs Physical split */}
+      {hasDigitalTypes && digitalPhysicalSplit.total > 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard
+            value={formatNumber(digitalPhysicalSplit.physical, 0)}
+            label={`Fysieke cilinders (${digitalPhysicalSplit.physicalPercent}%)`}
+            icon={<Cylinder className="h-4 w-4 text-orange-500" />}
+            iconBgColor="bg-orange-500/10"
+            className="border-orange-500/20 shadow-sm"
+          />
+          <StatCard
+            value={formatNumber(digitalPhysicalSplit.digital, 0)}
+            label={`Digitale cilinders (${digitalPhysicalSplit.digitalPercent}%)`}
+            icon={<Sparkles className="h-4 w-4 text-sky-500" />}
+            iconBgColor="bg-sky-500/10"
+            className="border-sky-500/20 shadow-sm"
+          />
+        </div>
+      )}
 
       {/* Primary KPI Stats */}
       <div className="flex overflow-x-auto scrollbar-none gap-3 pb-1 sm:grid sm:grid-cols-3 lg:grid-cols-6 sm:overflow-visible">
