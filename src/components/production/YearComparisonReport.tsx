@@ -102,6 +102,8 @@ type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 
 interface YearComparisonReportProps {
   location?: ProductionLocation;
+  hideDigital?: boolean;
+  onHideDigitalChange?: (value: boolean) => void;
 }
 
 interface MonthlyCustomerCylinderData {
@@ -111,7 +113,7 @@ interface MonthlyCustomerCylinderData {
   total_cylinders: number;
 }
 
-export const YearComparisonReport = React.memo(function YearComparisonReport({ location = "all" }: YearComparisonReportProps) {
+export const YearComparisonReport = React.memo(function YearComparisonReport({ location = "all", hideDigital: externalHideDigital, onHideDigitalChange }: YearComparisonReportProps) {
   const showDryIce = location !== "sol_tilburg";
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -138,7 +140,8 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   const [cylinderSizes, setCylinderSizes] = useState<{ id: string; name: string; capacity_liters: number | null }[]>([]);
   const [selectedCylinderSizes, setSelectedCylinderSizes] = useState<string[]>([]);
   const [cylinderSizeComparison, setCylinderSizeComparison] = useState<CylinderSizeComparison[]>([]);
-  const [hideDigital, setHideDigital] = useState(false);
+  const hideDigital = externalHideDigital ?? false;
+  const setHideDigital = (val: boolean) => onHideDigitalChange?.(val);
 
   const hasDigitalTypes = useMemo(() => {
     return gasTypes.some((gt: any) => gt.is_digital);
