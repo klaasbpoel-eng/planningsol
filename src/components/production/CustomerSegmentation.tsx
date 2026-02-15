@@ -105,6 +105,10 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
     return stats;
   }, [customers]);
 
+  const totalCylinders = useMemo(() => {
+    return customers.reduce((sum, c) => sum + c.total_cylinders, 0);
+  }, [customers]);
+
   const getTierIcon = (tier: string) => {
     switch (tier) {
       case "gold": return <Trophy className="h-4 w-4 text-yellow-500" />;
@@ -222,30 +226,30 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
             <FadeIn show={true}>
               {/* Summary Cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                {/* Tier Distribution */}
-                <div className="p-3 rounded-lg bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border border-yellow-500/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Trophy className="h-4 w-4 text-yellow-500" />
-                    <span className="text-xs font-medium">Gold</span>
-                  </div>
-                  <p className="text-2xl font-bold text-yellow-500">{tierStats.gold}</p>
-                </div>
-
-                <div className="p-3 rounded-lg bg-gradient-to-br from-slate-400/10 to-slate-400/5 border border-slate-400/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Medal className="h-4 w-4 text-slate-400" />
-                    <span className="text-xs font-medium">Silver</span>
-                  </div>
-                  <p className="text-2xl font-bold text-slate-400">{tierStats.silver}</p>
-                </div>
-
-                <div className="p-3 rounded-lg bg-gradient-to-br from-amber-600/10 to-amber-600/5 border border-amber-600/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Award className="h-4 w-4 text-amber-600" />
-                    <span className="text-xs font-medium">Bronze</span>
-                  </div>
-                  <p className="text-2xl font-bold text-amber-600">{tierStats.bronze}</p>
-                </div>
+                {/* Tier Distribution with proportion bars */}
+                {([
+                  { key: "gold" as const, label: "Gold", icon: <Trophy className="h-4 w-4 text-yellow-500" />, cardClass: "bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border border-yellow-500/20", textClass: "text-yellow-500", barClass: "bg-yellow-500" },
+                  { key: "silver" as const, label: "Silver", icon: <Medal className="h-4 w-4 text-slate-400" />, cardClass: "bg-gradient-to-br from-slate-400/10 to-slate-400/5 border border-slate-400/20", textClass: "text-slate-400", barClass: "bg-slate-400" },
+                  { key: "bronze" as const, label: "Bronze", icon: <Award className="h-4 w-4 text-amber-600" />, cardClass: "bg-gradient-to-br from-amber-600/10 to-amber-600/5 border border-amber-600/20", textClass: "text-amber-600", barClass: "bg-amber-600" },
+                ]).map((tier) => {
+                  const count = tierStats[tier.key];
+                  const pct = customers.length > 0 ? Math.round((count / customers.length) * 100) : 0;
+                  return (
+                    <div key={tier.key} className={`p-3 rounded-lg ${tier.cardClass}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          {tier.icon}
+                          <span className="text-xs font-medium">{tier.label}</span>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground">{pct}%</span>
+                      </div>
+                      <p className={`text-2xl font-bold ${tier.textClass}`}>{count}</p>
+                      <div className="mt-2 h-1.5 rounded-full bg-muted/50 overflow-hidden">
+                        <div className={`h-full rounded-full ${tier.barClass} transition-all duration-500`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
 
                 {/* Risk Alert */}
                 <div className={cn(
@@ -317,6 +321,11 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
                                 </div>
                                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                   <span>{formatNumber(customer.total_cylinders, 0)} cilinders</span>
+                                  {totalCylinders > 0 && (
+                                    <span className="text-xs font-medium text-primary/70">
+                                      {((customer.total_cylinders / totalCylinders) * 100).toFixed(1)}%
+                                    </span>
+                                  )}
                                   <span>•</span>
                                   <span>{customer.order_count} orders</span>
                                   <span>•</span>

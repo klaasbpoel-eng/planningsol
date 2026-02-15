@@ -487,9 +487,12 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px'
+                  borderRadius: "10px",
+                  border: "1px solid hsl(var(--border))",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                  backgroundColor: "hsl(var(--background))",
+                  padding: "10px 14px",
+                  fontSize: "13px"
                 }}
                 formatter={(value: number, name: string) => {
                   const [gasTypeId, year] = name.split('_');

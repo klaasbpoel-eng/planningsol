@@ -984,7 +984,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                           </p>
                         </>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Geen data</p>
+                        <p className="text-sm text-muted-foreground italic">Geen data beschikbaar</p>
                       )}
                     </div>
                     {/* Worst Month */}
@@ -1004,7 +1004,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                           </p>
                         </>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Geen data</p>
+                        <p className="text-sm text-muted-foreground italic">Geen data beschikbaar</p>
                       )}
                     </div>
                   </div>
@@ -1041,7 +1041,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                             </p>
                           </>
                         ) : (
-                          <p className="text-sm text-muted-foreground">Geen data</p>
+                          <p className="text-sm text-muted-foreground italic">Geen data beschikbaar</p>
                         )}
                       </div>
                       {/* Worst Month */}
@@ -1061,7 +1061,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                             </p>
                           </>
                         ) : (
-                          <p className="text-sm text-muted-foreground">Geen data</p>
+                          <p className="text-sm text-muted-foreground italic">Geen data beschikbaar</p>
                         )}
                       </div>
                     </div>
@@ -1099,8 +1099,9 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
 
               if (filteredGasTypeComparison.length === 0) {
                 return (
-                  <div className="flex items-center justify-center py-8 text-muted-foreground">
-                    Geen data voor geselecteerde gastypes
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <Cylinder className="h-8 w-8 mb-2 opacity-40" />
+                    <p className="text-sm">Geen data voor geselecteerde gastypes</p>
                   </div>
                 );
               }
@@ -1125,8 +1126,12 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                         />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: 'hsl(var(--background))',
-                            border: '1px solid hsl(var(--border))'
+                            borderRadius: "10px",
+                            border: "1px solid hsl(var(--border))",
+                            boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                            backgroundColor: "hsl(var(--background))",
+                            padding: "10px 14px",
+                            fontSize: "13px"
                           }}
                           formatter={(value: number, name: string) => [
                             formatNumber(value, 0),
@@ -1213,8 +1218,9 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
             {(() => {
               if (filteredCylinderSizeComparison.length === 0) {
                 return (
-                  <div className="flex items-center justify-center py-8 text-muted-foreground">
-                    Geen data voor geselecteerde cilindergroottes
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <Ruler className="h-8 w-8 mb-2 opacity-40" />
+                    <p className="text-sm">Geen data voor geselecteerde cilindergroottes</p>
                   </div>
                 );
               }
@@ -1239,8 +1245,12 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                         />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: 'hsl(var(--background))',
-                            border: '1px solid hsl(var(--border))'
+                            borderRadius: "10px",
+                            border: "1px solid hsl(var(--border))",
+                            boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                            backgroundColor: "hsl(var(--background))",
+                            padding: "10px 14px",
+                            fontSize: "13px"
                           }}
                           formatter={(value: number, name: string) => [
                             formatNumber(value, 0),
@@ -1325,8 +1335,9 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
 
               if (displayGasTypes.length === 0) {
                 return (
-                  <div className="flex items-center justify-center py-8 text-muted-foreground">
-                    Geen data voor geselecteerde gastypes
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <Cylinder className="h-8 w-8 mb-2 opacity-40" />
+                    <p className="text-sm">Geen data voor geselecteerde gastypes</p>
                   </div>
                 );
               }
@@ -1357,8 +1368,12 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                       <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'hsl(var(--background))',
-                          border: '1px solid hsl(var(--border))'
+                          borderRadius: "10px",
+                          border: "1px solid hsl(var(--border))",
+                          boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                          backgroundColor: "hsl(var(--background))",
+                          padding: "10px 14px",
+                          fontSize: "13px"
                         }}
                         formatter={(value: number, name: string) => [
                           formatNumber(value, 0),
@@ -1445,8 +1460,9 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
 
               if (displayGasTypes.length === 0) {
                 return (
-                  <div className="flex items-center justify-center py-8 text-muted-foreground">
-                    Geen data voor geselecteerde gastypes
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <Cylinder className="h-8 w-8 mb-2 opacity-40" />
+                    <p className="text-sm">Geen data voor geselecteerde gastypes</p>
                   </div>
                 );
               }
@@ -1463,8 +1479,12 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                         <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: 'hsl(var(--background))',
-                            border: '1px solid hsl(var(--border))'
+                            borderRadius: "10px",
+                            border: "1px solid hsl(var(--border))",
+                            boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                            backgroundColor: "hsl(var(--background))",
+                            padding: "10px 14px",
+                            fontSize: "13px"
                           }}
                           formatter={(value: number, name: string) => {
                             const info = gasTypeInfo.get(name);
@@ -1500,8 +1520,12 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                         <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: 'hsl(var(--background))',
-                            border: '1px solid hsl(var(--border))'
+                            borderRadius: "10px",
+                            border: "1px solid hsl(var(--border))",
+                            boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                            backgroundColor: "hsl(var(--background))",
+                            padding: "10px 14px",
+                            fontSize: "13px"
                           }}
                           formatter={(value: number, name: string) => {
                             const info = gasTypeInfo.get(name);
@@ -1559,8 +1583,12 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                 <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))'
+                    borderRadius: "10px",
+                    border: "1px solid hsl(var(--border))",
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                    backgroundColor: "hsl(var(--background))",
+                    padding: "10px 14px",
+                    fontSize: "13px"
                   }}
                   formatter={(value: number, name: string) => [
                     formatNumber(value, 0),
@@ -1662,9 +1690,12 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
               <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px'
+                  borderRadius: "10px",
+                  border: "1px solid hsl(var(--border))",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                  backgroundColor: "hsl(var(--background))",
+                  padding: "10px 14px",
+                  fontSize: "13px"
                 }}
                 formatter={(value: number, name: string) => [
                   `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`,
@@ -1721,8 +1752,12 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                 <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))'
+                    borderRadius: "10px",
+                    border: "1px solid hsl(var(--border))",
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                    backgroundColor: "hsl(var(--background))",
+                    padding: "10px 14px",
+                    fontSize: "13px"
                   }}
                   formatter={(value: number) => [`${value >= 0 ? '+' : ''}${value.toFixed(1)}%`, 'Groei']}
                 />
@@ -1838,11 +1873,11 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                   return (
                     <tr
                       key={cylinder.month}
-                      className={`border-b hover:bg-muted/50 ${rowHighlight
+                      className={`border-b hover:bg-muted/50 transition-colors ${rowHighlight
                         ? cylinderSignificant && cylinder.changePercent > 10 || (showDryIce && dryIceSignificant && (dryIce?.changePercent || 0) > 10)
                           ? "bg-green-500/10"
                           : "bg-red-500/10"
-                        : ""
+                        : i % 2 === 1 ? "bg-muted/20" : ""
                         }`}
                     >
                       <td className="py-3 px-2 font-medium">
@@ -1976,8 +2011,12 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                       />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'hsl(var(--background))',
-                          border: '1px solid hsl(var(--border))'
+                          borderRadius: "10px",
+                          border: "1px solid hsl(var(--border))",
+                          boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                          backgroundColor: "hsl(var(--background))",
+                          padding: "10px 14px",
+                          fontSize: "13px"
                         }}
                         formatter={(value: number, name: string) => {
                           const label = name === "currentCylinders" ? `Cilinders ${selectedYear}` :
@@ -2035,14 +2074,14 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedCustomers.map((customer) => {
+                        {sortedCustomers.map((customer, idx) => {
                           const cylinderSignificant = isSignificantGrowth(customer.cylinderChangePercent);
                           const dryIceSignificant = isSignificantGrowth(customer.dryIceChangePercent);
 
                           return (
                             <tr
                               key={customer.customer_id || customer.customer_name}
-                              className="border-b hover:bg-muted/50"
+                              className={`border-b hover:bg-muted/50 transition-colors ${idx % 2 === 1 ? "bg-muted/20" : ""}`}
                             >
                               <td className="py-3 px-2 font-medium max-w-[200px] truncate">
                                 {customer.customer_name}

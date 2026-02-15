@@ -377,6 +377,11 @@ export function ProductionReports({
     }));
   }, [dailyProduction]);
 
+  // Check if dry ice data is all zeros (hide from chart when irrelevant)
+  const hasDryIceData = useMemo(() => {
+    return ordersPerDay.some(d => d.dryIce > 0);
+  }, [ordersPerDay]);
+
   // Gas type distribution from RPC (already aggregated)
   const gasTypeDistribution = useMemo(() => {
     return gasTypeDistributionData.map(item => {
@@ -519,7 +524,7 @@ export function ProductionReports({
       </div>
 
       {/* Primary KPI Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="flex overflow-x-auto scrollbar-none gap-3 pb-1 sm:grid sm:grid-cols-3 lg:grid-cols-6 sm:overflow-visible">
         <StatCard
           value={formatNumber(cylinderStats.total, 0)}
           label="Cilinder orders"
@@ -529,7 +534,7 @@ export function ProductionReports({
             value: calculateTrend(cylinderStats.total, previousPeriodStats.cylinderOrders),
             label: "vs. vorige periode"
           }}
-          className="border-orange-500/20 shadow-sm"
+          className="border-orange-500/20 shadow-sm min-w-[160px] sm:min-w-0"
         />
 
         <StatCard
@@ -541,7 +546,7 @@ export function ProductionReports({
             value: calculateTrend(cylinderStats.totalCylinders, previousPeriodStats.totalCylinders),
             label: "vs. vorige periode"
           }}
-          className="border-orange-500/20 shadow-sm"
+          className="border-orange-500/20 shadow-sm min-w-[160px] sm:min-w-0"
         />
 
         {showDryIce && (
@@ -555,7 +560,7 @@ export function ProductionReports({
                 value: calculateTrend(dryIceStats.total, previousPeriodStats.dryIceOrders),
                 label: "vs. vorige periode"
               }}
-              className="border-cyan-500/20 shadow-sm"
+              className="border-cyan-500/20 shadow-sm min-w-[160px] sm:min-w-0"
             />
 
             <StatCard
@@ -567,7 +572,7 @@ export function ProductionReports({
                 value: calculateTrend(dryIceStats.totalKg, previousPeriodStats.totalDryIce),
                 label: "vs. vorige periode"
               }}
-              className="border-cyan-500/20 shadow-sm"
+              className="border-cyan-500/20 shadow-sm min-w-[160px] sm:min-w-0"
             />
           </>
         )}
@@ -581,7 +586,7 @@ export function ProductionReports({
             value: calculateTrend(cylinderStats.completed + dryIceStats.completed, previousPeriodStats.completed),
             label: "vs. vorige periode"
           }}
-          className="border-green-500/20 shadow-sm"
+          className="border-green-500/20 shadow-sm min-w-[160px] sm:min-w-0"
         />
 
         <StatCard
@@ -593,7 +598,7 @@ export function ProductionReports({
             value: calculateTrend(cylinderStats.pending + dryIceStats.pending, previousPeriodStats.pending),
             label: "vs. vorige periode"
           }}
-          className="border-yellow-500/20 shadow-sm"
+          className="border-yellow-500/20 shadow-sm min-w-[160px] sm:min-w-0"
         />
       </div>
 
@@ -656,14 +661,15 @@ export function ProductionReports({
                       <XAxis dataKey="displayDate" className="text-xs" tickLine={false} axisLine={false} />
                       <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} tickLine={false} axisLine={false} />
                       <Tooltip
-                        contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
-                        labelStyle={{ fontWeight: 600, marginBottom: 4 }}
+                        contentStyle={{ borderRadius: "10px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", backgroundColor: "hsl(var(--background))", padding: "10px 14px", fontSize: "13px" }}
+                        labelStyle={{ fontWeight: 600, marginBottom: 4, color: "hsl(var(--foreground))" }}
+                        itemStyle={{ padding: "2px 0" }}
                       />
                       <Legend />
                       {(productionChartView === "both" || productionChartView === "cylinders") && (
                         <Area type="monotone" dataKey="cylinders" name="Cilinders" stroke="#f97316" strokeWidth={2} fill="url(#gradientCylinders)" dot={false} activeDot={{ r: 4, strokeWidth: 2 }} />
                       )}
-                      {(productionChartView === "both" || productionChartView === "dryIce") && (
+                      {(productionChartView === "both" || productionChartView === "dryIce") && hasDryIceData && (
                         <Area type="monotone" dataKey="dryIce" name="Droogijs" stroke="#06b6d4" strokeWidth={2} fill="url(#gradientDryIce)" dot={false} activeDot={{ r: 4, strokeWidth: 2 }} />
                       )}
                     </AreaChart>
@@ -695,7 +701,7 @@ export function ProductionReports({
                     <BarChart data={currentDistributionData} layout="vertical" margin={{ left: 10, right: 50 }}>
                       <XAxis type="number" hide />
                       <YAxis dataKey="name" type="category" width={110} className="text-[11px]" tickLine={false} axisLine={false} interval={0} />
-                      <Tooltip cursor={{ fill: 'transparent' }} />
+                      <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: "10px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", backgroundColor: "hsl(var(--background))", padding: "10px 14px", fontSize: "13px" }} />
                       <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={18}>
                         {currentDistributionData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
@@ -715,7 +721,10 @@ export function ProductionReports({
                   )}
                   </>
                 ) : (
-                  <div className="flex items-center justify-center h-[280px] text-muted-foreground text-sm">Geen data</div>
+                  <div className="flex flex-col items-center justify-center h-[280px] text-muted-foreground text-sm">
+                    <Cylinder className="h-8 w-8 mb-2 text-muted-foreground/40" />
+                    <p>Geen verdelingsdata voor deze periode</p>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -753,7 +762,11 @@ export function ProductionReports({
 
         {showDryIce && (
           <TabsContent value="dryice" className="mt-4">
-            <div className="text-center py-8 text-muted-foreground">Gedetailleerde droogijs rapportage volgt.</div>
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <Snowflake className="h-10 w-10 mb-3 text-cyan-400/40" />
+              <p className="text-sm font-medium">Gedetailleerde droogijs rapportage</p>
+              <p className="text-xs mt-1">Binnenkort beschikbaar</p>
+            </div>
           </TabsContent>
         )}
 

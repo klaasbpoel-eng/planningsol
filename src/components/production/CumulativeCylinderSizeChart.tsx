@@ -532,9 +532,12 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
               <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: 'hsl(var(--background))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px'
+                  borderRadius: "10px",
+                  border: "1px solid hsl(var(--border))",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                  backgroundColor: "hsl(var(--background))",
+                  padding: "10px 14px",
+                  fontSize: "13px"
                 }}
                 formatter={(value: number, name: string) => {
                   const [sizeName, year] = name.split('_');
