@@ -42,6 +42,8 @@ interface KPIDashboardProps {
   location: ProductionLocation;
   refreshKey?: number;
   dateRange?: DateRange;
+  hideDigital?: boolean;
+  onHideDigitalChange?: (value: boolean) => void;
 }
 
 interface EfficiencyData {
@@ -59,7 +61,7 @@ interface SparklineData {
   value: number;
 }
 
-export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboardProps) {
+export function KPIDashboard({ location, refreshKey = 0, dateRange, hideDigital: externalHideDigital, onHideDigitalChange }: KPIDashboardProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [currentYearData, setCurrentYearData] = useState<EfficiencyData | null>(null);
   const [previousYearData, setPreviousYearData] = useState<EfficiencyData | null>(null);
@@ -67,7 +69,8 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
   const [weeklyData, setWeeklyData] = useState<SparklineData[]>([]);
   const [historicalWeeklyData, setHistoricalWeeklyData] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hideDigital, setHideDigital] = useState(false);
+  const hideDigital = externalHideDigital ?? false;
+  const setHideDigital = (val: boolean) => onHideDigitalChange?.(val);
   const [digitalCylinders, setDigitalCylinders] = useState(0);
   const [physicalCylinders, setPhysicalCylinders] = useState(0);
   const [hasDigitalTypes, setHasDigitalTypes] = useState(false);
