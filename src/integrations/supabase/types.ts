@@ -41,6 +41,42 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_locations: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          location: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          location: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          location?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_locations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_locations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_limited"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_products: {
         Row: {
           created_at: string
