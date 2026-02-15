@@ -123,6 +123,15 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
   const emmenPercent = grandTotal > 0 ? Math.round((emmenTotal / grandTotal) * 100) : 0;
   const tilburgPercent = grandTotal > 0 ? Math.round((tilburgTotal / grandTotal) * 100) : 0;
 
+  const cumulativeData = useMemo(() => {
+    let cumE = 0, cumT = 0;
+    return monthlyData.map(m => {
+      cumE += m.emmen;
+      cumT += m.tilburg;
+      return { monthName: m.monthName, cumEmmen: cumE, cumTilburg: cumT, cumTotal: cumE + cumT };
+    });
+  }, [monthlyData]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -303,6 +312,43 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
               </tbody>
             </table>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Cumulative Line Chart */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-medium">Cumulatief verloop</CardTitle>
+          <CardDescription>Lopend totaal cilinders per locatie — {selectedYear}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={cumulativeData} margin={{ left: 10, right: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+              <XAxis dataKey="monthName" className="text-xs" tickLine={false} axisLine={false} />
+              <YAxis className="text-xs" tickFormatter={(v) => formatNumber(v, 0)} tickLine={false} axisLine={false} />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: "10px",
+                  border: "1px solid hsl(var(--border))",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                  backgroundColor: "hsl(var(--background))",
+                  padding: "10px 14px",
+                  fontSize: "13px",
+                }}
+                formatter={(value: number, name: string) => [
+                  formatNumber(value, 0),
+                  name === "cumEmmen" ? "SOL Emmen" : name === "cumTilburg" ? "SOL Tilburg" : "Totaal"
+                ]}
+              />
+              <Legend
+                formatter={(value: string) => value === "cumEmmen" ? "SOL Emmen" : value === "cumTilburg" ? "SOL Tilburg" : "Totaal"}
+              />
+              <Line type="monotone" dataKey="cumEmmen" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3.5 }} activeDot={{ r: 5 }} />
+              <Line type="monotone" dataKey="cumTilburg" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3.5 }} activeDot={{ r: 5 }} />
+              <Line type="monotone" dataKey="cumTotal" stroke="hsl(var(--foreground))" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
         </CardContent>
       </Card>
 
