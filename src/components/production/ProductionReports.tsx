@@ -253,8 +253,8 @@ export function ProductionReports({
       ] = await Promise.all([
         // Daily production data for charts (with digital filter)
         fetchSafely(() => api.reports.getDailyProductionByPeriod(fromDate, toDate, locationParam, hideDigital)),
-        // Gas type distribution
-        fetchSafely(() => api.reports.getGasTypeDistribution(fromDate, toDate, locationParam)),
+        // Gas type distribution (with digital filter)
+        fetchSafely(() => api.reports.getGasTypeDistribution(fromDate, toDate, locationParam, hideDigital)),
         // Current period efficiency stats (cylinders, with digital filter)
         fetchSafely(() => api.reports.getProductionEfficiency(fromDate, toDate, locationParam, hideDigital)),
         // Current period efficiency stats (dry ice)
