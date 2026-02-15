@@ -465,7 +465,7 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
                     style={{ backgroundColor: item.color }}
                   />
                   <div className="flex flex-col">
-                    <span className="font-medium text-sm truncate max-w-[120px]">{item.name}</span>
+                    <span className="font-medium text-sm">{item.name}</span>
                     {item.capacityLiters && (
                       <span className="text-[10px] text-muted-foreground">{item.capacityLiters}L</span>
                     )}

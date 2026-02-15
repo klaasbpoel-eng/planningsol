@@ -419,7 +419,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: item.color }}
                   />
-                  <span className="font-medium text-sm truncate max-w-[120px]">{item.name}</span>
+                  <span className="font-medium text-sm">{item.name}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="text-right text-xs text-muted-foreground">
