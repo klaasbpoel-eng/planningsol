@@ -66,6 +66,7 @@ export function ProductionPlanning({
   const [previousWeekOrders, setPreviousWeekOrders] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hideDigital, setHideDigital] = useState(false);
 
   // Date range state for dashboard sync with reports
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -253,7 +254,7 @@ export function ProductionPlanning({
     <div className="space-y-6">
       {/* KPI Dashboard - only for non-operators */}
       {showKPIDashboard && (
-        <KPIDashboard location={selectedLocation} refreshKey={refreshKey} dateRange={dateRange} />
+        <KPIDashboard location={selectedLocation} refreshKey={refreshKey} dateRange={dateRange} hideDigital={hideDigital} onHideDigitalChange={setHideDigital} />
       )}
 
       {/* Location Filter */}
@@ -551,6 +552,8 @@ export function ProductionPlanning({
                   location={selectedLocation}
                   dateRange={dateRange}
                   onDateRangeChange={handleDateRangeChange}
+                  hideDigital={hideDigital}
+                  onHideDigitalChange={setHideDigital}
                 />
               </Suspense>
             </TabsContent>

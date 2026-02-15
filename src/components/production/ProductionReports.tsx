@@ -142,6 +142,8 @@ interface ProductionReportsProps {
   location?: ProductionLocation;
   dateRange?: DateRange;
   onDateRangeChange?: (range: DateRange) => void;
+  hideDigital?: boolean;
+  onHideDigitalChange?: (value: boolean) => void;
 }
 
 import { getGasColor } from "@/constants/gasColors";
@@ -151,7 +153,9 @@ export function ProductionReports({
   onDataChanged,
   location = "all",
   dateRange: externalDateRange,
-  onDateRangeChange
+  onDateRangeChange,
+  hideDigital: externalHideDigital,
+  onHideDigitalChange
 }: ProductionReportsProps) {
   const [loading, setLoading] = useState(true);
 
@@ -159,7 +163,8 @@ export function ProductionReports({
   const [dailyProduction, setDailyProduction] = useState<DailyProductionData[]>([]);
   const [gasTypeDistributionData, setGasTypeDistributionData] = useState<GasTypeDistributionData[]>([]);
   const [gasCategoryDistributionData, setGasCategoryDistributionData] = useState<GasCategoryDistributionData[]>([]);
-  const [hideDigital, setHideDigital] = useState(false);
+  const hideDigital = externalHideDigital ?? false;
+  const setHideDigital = (val: boolean) => onHideDigitalChange?.(val);
   const [hasDigitalTypes, setHasDigitalTypes] = useState(false);
   const [cylinderEfficiency, setCylinderEfficiency] = useState<EfficiencyData | null>(null);
   const [dryIceEfficiency, setDryIceEfficiency] = useState<DryIceEfficiencyData | null>(null);
