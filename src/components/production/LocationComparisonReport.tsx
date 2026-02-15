@@ -45,14 +45,20 @@ interface GasTypeLocationData {
   total: number;
 }
 
-export const LocationComparisonReport = React.memo(function LocationComparisonReport() {
+interface LocationComparisonReportProps {
+  hideDigital?: boolean;
+  onHideDigitalChange?: (value: boolean) => void;
+}
+
+export const LocationComparisonReport = React.memo(function LocationComparisonReport({ hideDigital: externalHideDigital, onHideDigitalChange }: LocationComparisonReportProps) {
+  const hideDigital = externalHideDigital ?? false;
+  const setHideDigital = (val: boolean) => onHideDigitalChange?.(val);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [monthlyData, setMonthlyData] = useState<MonthlyLocationData[]>([]);
   const [gasTypeData, setGasTypeData] = useState<GasTypeLocationData[]>([]);
   const [emmenTotal, setEmmenTotal] = useState(0);
   const [tilburgTotal, setTilburgTotal] = useState(0);
-  const [hideDigital, setHideDigital] = useState(false);
   const [hasDigitalTypes, setHasDigitalTypes] = useState(false);
   const [digitalGasTypeIds, setDigitalGasTypeIds] = useState<Set<string>>(new Set());
 

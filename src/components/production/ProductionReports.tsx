@@ -853,13 +853,13 @@ export function ProductionReports({
 
         <TabsContent value="locations" className="mt-4">
           <Suspense fallback={<ChartLoadingFallback />}>
-            <LocationComparisonReport />
+            <LocationComparisonReport hideDigital={hideDigital} onHideDigitalChange={setHideDigital} />
           </Suspense>
         </TabsContent>
 
         <TabsContent value="comparison" className="mt-4">
           <Suspense fallback={<ChartLoadingFallback />}>
-            <YearComparisonReport location={location === "all" ? null : location} />
+            <YearComparisonReport location={location === "all" ? null : location} hideDigital={hideDigital} onHideDigitalChange={setHideDigital} />
           </Suspense>
         </TabsContent>
 
