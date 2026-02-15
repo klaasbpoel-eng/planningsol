@@ -13,6 +13,7 @@ interface GasTypeDistributionData {
   gas_type_name: string;
   gas_type_color: string;
   total_cylinders: number;
+  is_digital?: boolean;
 }
 
 interface GasCategoryDistributionData {
@@ -158,6 +159,8 @@ export function ProductionReports({
   const [dailyProduction, setDailyProduction] = useState<DailyProductionData[]>([]);
   const [gasTypeDistributionData, setGasTypeDistributionData] = useState<GasTypeDistributionData[]>([]);
   const [gasCategoryDistributionData, setGasCategoryDistributionData] = useState<GasCategoryDistributionData[]>([]);
+  const [hideDigital, setHideDigital] = useState(false);
+  const [hasDigitalTypes, setHasDigitalTypes] = useState(false);
   const [cylinderEfficiency, setCylinderEfficiency] = useState<EfficiencyData | null>(null);
   const [dryIceEfficiency, setDryIceEfficiency] = useState<DryIceEfficiencyData | null>(null);
   const [prevCylinderEfficiency, setPrevCylinderEfficiency] = useState<EfficiencyData | null>(null);
@@ -240,7 +243,8 @@ export function ProductionReports({
         prevCylinderEffRes,
         prevDryIceEffRes,
         customerTotalsRes,
-        gasCategoryRes
+        gasCategoryRes,
+        gasTypesRes
       ] = await Promise.all([
         // Daily production data for charts
         fetchSafely(() => api.reports.getDailyProductionByPeriod(fromDate, toDate, locationParam)),
@@ -257,12 +261,25 @@ export function ProductionReports({
         // Customer totals for ranking
         fetchSafely(() => api.reports.getCustomerTotals(fromDate, toDate, locationParam)),
         // Gas category distribution
-        fetchSafely(() => api.reports.getGasCategoryDistribution(fromDate, toDate, locationParam))
+        fetchSafely(() => api.reports.getGasCategoryDistribution(fromDate, toDate, locationParam)),
+        // Gas types (for digital flag)
+        fetchSafely(() => api.gasTypes.getAllIncludingInactive())
       ]);
 
-      // Set data
+      // Build digital lookup from gas types
+      const digitalMap = new Map<string, boolean>();
+      (gasTypesRes.data || []).forEach((gt: any) => {
+        if (gt.id) digitalMap.set(gt.id, gt.is_digital === true);
+      });
+      setHasDigitalTypes(Array.from(digitalMap.values()).some(v => v));
+
+      // Set data, enriching gas type distribution with digital flag
       setDailyProduction(dailyRes.data || []);
-      setGasTypeDistributionData(gasTypeRes.data || []);
+      const enrichedGasTypes = (gasTypeRes.data || []).map((item: any) => ({
+        ...item,
+        is_digital: item.gas_type_id ? digitalMap.get(item.gas_type_id) || false : false,
+      }));
+      setGasTypeDistributionData(enrichedGasTypes);
       setGasCategoryDistributionData((gasCategoryRes.data as any) || []);
       setCustomerTotals(customerTotalsRes.data || []);
 
@@ -386,18 +403,21 @@ export function ProductionReports({
 
   // Gas type distribution from RPC (already aggregated)
   const gasTypeDistribution = useMemo(() => {
-    return gasTypeDistributionData.map(item => {
-      // Robust lookup: fast exact match, then case-insensitive
+    const filtered = hideDigital
+      ? gasTypeDistributionData.filter(item => !item.is_digital)
+      : gasTypeDistributionData;
+    return filtered.map(item => {
       const name = item.gas_type_name || "";
       const color = getGasColor(name, item.gas_type_color || "#8b5cf6");
 
       return {
-        name: item.gas_type_name,
+        name: item.is_digital ? `${item.gas_type_name} ⓓ` : item.gas_type_name,
         value: Number(item.total_cylinders) || 0,
-        color
+        color,
+        is_digital: item.is_digital,
       };
     });
-  }, [gasTypeDistributionData]);
+  }, [gasTypeDistributionData, hideDigital]);
 
   // Gas category distribution from RPC (already aggregated)
   const gasCategoryDistribution = useMemo(() => {
@@ -696,10 +716,22 @@ export function ProductionReports({
             <Card className="shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-base font-medium">Verdeling</CardTitle>
-                <ToggleGroup type="single" value={distributionView} onValueChange={(v) => v && setDistributionView(v as any)} size="sm">
-                  <ToggleGroupItem value="type" size="sm" className="h-7 text-xs">Type</ToggleGroupItem>
-                  <ToggleGroupItem value="category" size="sm" className="h-7 text-xs">Cat</ToggleGroupItem>
-                </ToggleGroup>
+                <div className="flex items-center gap-2">
+                  {hasDigitalTypes && distributionView === "type" && (
+                    <Button
+                      variant={hideDigital ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 text-xs gap-1"
+                      onClick={() => setHideDigital(!hideDigital)}
+                    >
+                      ⓓ {hideDigital ? "Toon digitaal" : "Verberg digitaal"}
+                    </Button>
+                  )}
+                  <ToggleGroup type="single" value={distributionView} onValueChange={(v) => v && setDistributionView(v as any)} size="sm">
+                    <ToggleGroupItem value="type" size="sm" className="h-7 text-xs">Type</ToggleGroupItem>
+                    <ToggleGroupItem value="category" size="sm" className="h-7 text-xs">Cat</ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
               </CardHeader>
               <CardContent>
                 {currentDistributionData.length > 0 ? (
