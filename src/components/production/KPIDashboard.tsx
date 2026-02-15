@@ -351,6 +351,11 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange, hideDigital:
               <CardTitle className="text-lg flex items-center gap-2 flex-wrap">
                 <Activity className="h-5 w-5 text-primary" />
                 KPI Dashboard
+                {hideDigital && hasDigitalTypes && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal">
+                    Alleen fysiek
+                  </Badge>
+                )}
                 <Badge variant="outline" className="ml-2 text-xs">
                   {isCustomPeriod && dateRange
                     ? `${dateRange.from.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} - ${dateRange.to.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}`
@@ -433,7 +438,10 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange, hideDigital:
                     <div className="flex items-center gap-2">
                       <BarChart3 className="h-4 w-4 text-orange-500" />
                       <span className="text-xs font-medium text-muted-foreground">Volume YTD</span>
-                      {isCustomPeriod && (
+                      {hideDigital && hasDigitalTypes && (
+                        <Badge variant="outline" className="text-[10px] py-0 h-4 border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal">Fysiek</Badge>
+                      )}
+                      {isCustomPeriod && !hideDigital && (
                         <Badge variant="outline" className="text-[10px] py-0 h-4">Periode</Badge>
                       )}
                     </div>
