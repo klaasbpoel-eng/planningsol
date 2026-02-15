@@ -1564,18 +1564,35 @@ export type Database = {
           total_value: number
         }[]
       }
-      get_production_efficiency: {
-        Args: { p_location?: string; p_year: number }
-        Returns: {
-          cancelled_orders: number
-          completed_cylinders: number
-          completed_orders: number
-          efficiency_rate: number
-          pending_orders: number
-          total_cylinders: number
-          total_orders: number
-        }[]
-      }
+      get_production_efficiency:
+        | {
+            Args: { p_location?: string; p_year: number }
+            Returns: {
+              cancelled_orders: number
+              completed_cylinders: number
+              completed_orders: number
+              efficiency_rate: number
+              pending_orders: number
+              total_cylinders: number
+              total_orders: number
+            }[]
+          }
+        | {
+            Args: {
+              p_exclude_digital?: boolean
+              p_location?: string
+              p_year: number
+            }
+            Returns: {
+              cancelled_orders: number
+              completed_cylinders: number
+              completed_orders: number
+              efficiency_rate: number
+              pending_orders: number
+              total_cylinders: number
+              total_orders: number
+            }[]
+          }
       get_production_efficiency_by_period:
         | {
             Args: {

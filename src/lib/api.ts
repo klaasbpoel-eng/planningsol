@@ -926,7 +926,7 @@ export const api = {
             return data;
         },
 
-        getProductionEfficiencyYearly: async (year: number, location: string | null) => {
+        getProductionEfficiencyYearly: async (year: number, location: string | null, excludeDigital: boolean = false) => {
             const source = getPrimarySource();
             if (source === "mysql") {
                 const params: any[] = [year];
@@ -954,8 +954,9 @@ export const api = {
             const client = getPrimarySupabaseClient();
             const { data, error } = await client.rpc("get_production_efficiency", {
                 p_year: year,
-                p_location: location
-            });
+                p_location: location,
+                p_exclude_digital: excludeDigital
+            } as any);
             if (error) throw error;
             return data;
         },

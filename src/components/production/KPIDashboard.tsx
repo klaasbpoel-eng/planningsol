@@ -166,8 +166,8 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange, hideDigital:
         console.log("[KPIDashboard] Calling year-based RPC:", { currentYear, locationParam });
 
         const [currentResult, previousResult] = await Promise.all([
-          api.reports.getProductionEfficiencyYearly(currentYear, locationParam).then(data => ({ data, error: null })).catch(error => ({ data: null, error })),
-          api.reports.getProductionEfficiencyYearly(currentYear - 1, locationParam).then(data => ({ data, error: null })).catch(error => ({ data: null, error }))
+          api.reports.getProductionEfficiencyYearly(currentYear, locationParam, hideDigital).then(data => ({ data, error: null })).catch(error => ({ data: null, error })),
+          api.reports.getProductionEfficiencyYearly(currentYear - 1, locationParam, hideDigital).then(data => ({ data, error: null })).catch(error => ({ data: null, error }))
         ]);
 
         // Log errors if any
