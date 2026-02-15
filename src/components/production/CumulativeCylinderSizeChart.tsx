@@ -170,7 +170,18 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
       { year: selectedYear2, cylinderSizes: year2Data }
     ]);
 
-    // No default selection - start with empty selection
+    // Pre-select top 5 cylinder sizes by volume for immediate useful view
+    if (selectedSizes.length === 0) {
+      const topFive = year1Data
+        .map(cs => ({ name: cs.name, total: cs.months.reduce((a, b) => a + b, 0) }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5)
+        .map(cs => cs.name);
+      if (topFive.length > 0) {
+        setSelectedSizes(topFive);
+      }
+    }
+
     setLoading(false);
   };
 

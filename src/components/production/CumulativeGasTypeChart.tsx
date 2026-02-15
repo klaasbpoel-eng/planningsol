@@ -129,7 +129,17 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
       { year: selectedYear2, gasTypes: year2Data }
     ]);
 
-    // No default selection - start with empty selection
+    // Pre-select top 5 gas types by volume (year 1) for immediate useful view
+    if (selectedGasTypes.length === 0) {
+      const topFive = year1Data
+        .map(gt => ({ id: gt.id, total: gt.months.reduce((a, b) => a + b, 0) }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5)
+        .map(gt => gt.id);
+      if (topFive.length > 0) {
+        setSelectedGasTypes(topFive);
+      }
+    }
 
     setLoading(false);
   };

@@ -964,18 +964,19 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
               </h4>
               {(() => {
                 const highlights = getGrowthHighlights(filteredCylinderDataByCustomer);
+                const bestIsNegative = highlights.best && highlights.best.changePercent < 0;
                 return (
                   <div className="grid grid-cols-2 gap-3">
                     {/* Best Month */}
-                    <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                      <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 mb-1">
+                    <div className={`p-3 rounded-lg ${bestIsNegative ? "bg-yellow-500/10 border border-yellow-500/20" : "bg-green-500/10 border border-green-500/20"}`}>
+                      <div className={`flex items-center gap-1.5 mb-1 ${bestIsNegative ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
                         <TrendingUp className="h-4 w-4" />
-                        <span className="text-xs font-medium">Beste maand</span>
+                        <span className="text-xs font-medium">{bestIsNegative ? "Kleinste daling" : "Beste maand"}</span>
                       </div>
                       {highlights.best ? (
                         <>
                           <p className="text-lg font-bold">{highlights.best.monthName}</p>
-                          <p className="text-sm text-green-600 dark:text-green-400">
+                          <p className={`text-sm ${bestIsNegative ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
                             {highlights.best.changePercent >= 0 ? "+" : ""}{highlights.best.changePercent.toFixed(1)}%
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
@@ -990,7 +991,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                     <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
                       <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400 mb-1">
                         <TrendingDown className="h-4 w-4" />
-                        <span className="text-xs font-medium">Slechtste maand</span>
+                        <span className="text-xs font-medium">Grootste daling</span>
                       </div>
                       {highlights.worst ? (
                         <>
@@ -1020,18 +1021,19 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                 </h4>
                 {(() => {
                   const highlights = getGrowthHighlights(dryIceData);
+                  const bestIsNegative = highlights.best && highlights.best.changePercent < 0;
                   return (
                     <div className="grid grid-cols-2 gap-3">
                       {/* Best Month */}
-                      <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                        <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 mb-1">
+                      <div className={`p-3 rounded-lg ${bestIsNegative ? "bg-yellow-500/10 border border-yellow-500/20" : "bg-green-500/10 border border-green-500/20"}`}>
+                        <div className={`flex items-center gap-1.5 mb-1 ${bestIsNegative ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
                           <TrendingUp className="h-4 w-4" />
-                          <span className="text-xs font-medium">Beste maand</span>
+                          <span className="text-xs font-medium">{bestIsNegative ? "Kleinste daling" : "Beste maand"}</span>
                         </div>
                         {highlights.best ? (
                           <>
                             <p className="text-lg font-bold">{highlights.best.monthName}</p>
-                            <p className="text-sm text-green-600 dark:text-green-400">
+                            <p className={`text-sm ${bestIsNegative ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
                               {highlights.best.changePercent >= 0 ? "+" : ""}{highlights.best.changePercent.toFixed(1)}%
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
@@ -1046,7 +1048,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                       <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
                         <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400 mb-1">
                           <TrendingDown className="h-4 w-4" />
-                          <span className="text-xs font-medium">Slechtste maand</span>
+                          <span className="text-xs font-medium">Grootste daling</span>
                         </div>
                         {highlights.worst ? (
                           <>

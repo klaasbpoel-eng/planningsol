@@ -267,12 +267,17 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange }: Produ
                     <TooltipTrigger asChild>
                       <div
                         className={cn(
-                          "aspect-square rounded-md flex items-center justify-center text-xs font-medium cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-primary/50 hover:scale-105",
+                          "aspect-square rounded-md flex flex-col items-center justify-center cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-primary/50 hover:scale-105",
                           getIntensityClass(value),
                           value > 0 && "text-foreground"
                         )}
                       >
-                        {format(day, "d")}
+                        <span className="text-xs font-medium leading-tight">{format(day, "d")}</span>
+                        {value > 0 && (
+                          <span className="text-[9px] leading-tight opacity-75 font-medium">
+                            {value >= 1000 ? `${Math.round(value / 1000)}k` : value}
+                          </span>
+                        )}
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="text-sm">

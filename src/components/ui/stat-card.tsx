@@ -49,18 +49,18 @@ export function StatCard({
   };
 
   return (
-    <Card className={cn("shadow-md border-0 hover-lift", cardBgColor, className)}>
-      <CardContent className="pt-6 flex items-center gap-4">
-        <div className={cn("p-3 rounded-xl", iconBgColor)}>
+    <Card className={cn("shadow-md border-0 hover-lift overflow-hidden", cardBgColor, className)}>
+      <CardContent className="pt-5 pb-4 px-4 flex items-start gap-3">
+        <div className={cn("p-2.5 rounded-xl shrink-0", iconBgColor)}>
           {icon}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2">
-            <p className="text-2xl font-bold text-foreground">{value}</p>
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <p className="text-2xl font-bold text-foreground leading-tight">{value}</p>
             {trend && (
               <div
                 className={cn(
-                  "flex items-center gap-0.5 text-xs font-medium transition-all duration-200",
+                  "flex items-center gap-0.5 text-[11px] font-medium whitespace-nowrap",
                   getTrendColor()
                 )}
               >
@@ -69,9 +69,9 @@ export function StatCard({
               </div>
             )}
           </div>
-          <p className="text-sm text-muted-foreground truncate">{label}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
           {trend?.label && (
-            <p className="text-xs text-muted-foreground/70 mt-0.5">{trend.label}</p>
+            <p className="text-[11px] text-muted-foreground/70 mt-0.5">{trend.label}</p>
           )}
         </div>
       </CardContent>

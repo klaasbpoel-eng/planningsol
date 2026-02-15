@@ -93,12 +93,13 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   BarChart,
   Bar,
   Legend,
-  Cell
+  Cell,
+  LabelList
 } from "recharts";
 
 type DateRange = {
@@ -400,8 +401,24 @@ export function ProductionReports({
     }));
   }, [gasCategoryDistributionData]);
 
-  // Determine which distribution data to show
-  const currentDistributionData = distributionView === "type" ? gasTypeDistribution : gasCategoryDistribution;
+  // Determine which distribution data to show, limiting to top items
+  const [showAllDistribution, setShowAllDistribution] = useState(false);
+  const MAX_DISTRIBUTION_ITEMS = 8;
+
+  const currentDistributionData = useMemo(() => {
+    const raw = distributionView === "type" ? gasTypeDistribution : gasCategoryDistribution;
+    const sorted = [...raw].sort((a, b) => b.value - a.value);
+
+    if (showAllDistribution || sorted.length <= MAX_DISTRIBUTION_ITEMS) return sorted;
+
+    const top = sorted.slice(0, MAX_DISTRIBUTION_ITEMS);
+    const rest = sorted.slice(MAX_DISTRIBUTION_ITEMS);
+    const otherValue = rest.reduce((sum, item) => sum + item.value, 0);
+    if (otherValue > 0) {
+      top.push({ name: `Overige (${rest.length})`, value: otherValue, color: "#9ca3af" });
+    }
+    return top;
+  }, [distributionView, gasTypeDistribution, gasCategoryDistribution, showAllDistribution]);
 
   if (loading) {
     return (
@@ -428,6 +445,27 @@ export function ProductionReports({
             <ToggleGroupItem value="last-year">Vorig jaar</ToggleGroupItem>
             <ToggleGroupItem value="this-year">Jaar</ToggleGroupItem>
           </ToggleGroup>
+
+          {/* Mobile date presets - horizontal scroll */}
+          <div className="flex lg:hidden overflow-x-auto scrollbar-none -mx-1 px-1 gap-1.5">
+            {[
+              { value: "week", label: "Week" },
+              { value: "month", label: "Maand" },
+              { value: "last-month", label: "Vorige" },
+              { value: "quarter", label: "Kwartaal" },
+              { value: "this-year", label: "Jaar" },
+            ].map((preset) => (
+              <Button
+                key={preset.value}
+                variant={getActivePreset() === preset.value ? "default" : "outline"}
+                size="sm"
+                className="h-7 text-xs shrink-0 px-2.5"
+                onClick={() => setPresetRange(preset.value)}
+              >
+                {preset.label}
+              </Button>
+            ))}
+          </div>
 
           <div className="flex items-center gap-2 bg-background border rounded-md px-2 py-1 h-9">
             <Popover>
@@ -481,7 +519,7 @@ export function ProductionReports({
       </div>
 
       {/* Primary KPI Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard
           value={formatNumber(cylinderStats.total, 0)}
           label="Cilinder orders"
@@ -489,7 +527,7 @@ export function ProductionReports({
           iconBgColor="bg-orange-500/10"
           trend={{
             value: calculateTrend(cylinderStats.total, previousPeriodStats.cylinderOrders),
-            label: "vs. periode"
+            label: "vs. vorige periode"
           }}
           className="border-orange-500/20 shadow-sm"
         />
@@ -501,7 +539,7 @@ export function ProductionReports({
           iconBgColor="bg-orange-500/10"
           trend={{
             value: calculateTrend(cylinderStats.totalCylinders, previousPeriodStats.totalCylinders),
-            label: "vs. periode"
+            label: "vs. vorige periode"
           }}
           className="border-orange-500/20 shadow-sm"
         />
@@ -515,7 +553,7 @@ export function ProductionReports({
               iconBgColor="bg-cyan-500/10"
               trend={{
                 value: calculateTrend(dryIceStats.total, previousPeriodStats.dryIceOrders),
-                label: "vs. periode"
+                label: "vs. vorige periode"
               }}
               className="border-cyan-500/20 shadow-sm"
             />
@@ -527,7 +565,7 @@ export function ProductionReports({
               iconBgColor="bg-cyan-500/10"
               trend={{
                 value: calculateTrend(dryIceStats.totalKg, previousPeriodStats.totalDryIce),
-                label: "vs. periode"
+                label: "vs. vorige periode"
               }}
               className="border-cyan-500/20 shadow-sm"
             />
@@ -541,7 +579,7 @@ export function ProductionReports({
           iconBgColor="bg-green-500/10"
           trend={{
             value: calculateTrend(cylinderStats.completed + dryIceStats.completed, previousPeriodStats.completed),
-            label: "vs. periode"
+            label: "vs. vorige periode"
           }}
           className="border-green-500/20 shadow-sm"
         />
@@ -553,7 +591,7 @@ export function ProductionReports({
           iconBgColor="bg-yellow-500/10"
           trend={{
             value: calculateTrend(cylinderStats.pending + dryIceStats.pending, previousPeriodStats.pending),
-            label: "vs. periode"
+            label: "vs. vorige periode"
           }}
           className="border-yellow-500/20 shadow-sm"
         />
@@ -561,28 +599,29 @@ export function ProductionReports({
 
       {/* Detailed Tabs & Dashboard */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-4xl grid-cols-6 bg-muted/50 backdrop-blur-sm h-9">
-          <TabsTrigger value="overview" className="text-xs">
-            <BarChart3 className="h-3 w-3 mr-2" />
-            <span className="hidden sm:inline">Dashboard</span>
+        <TabsList className={cn("grid w-full max-w-4xl bg-muted/50 backdrop-blur-sm h-9", showDryIce ? "grid-cols-5" : "grid-cols-4")}>
+          <TabsTrigger value="overview" className="text-xs gap-1.5">
+            <BarChart3 className="h-3 w-3" />
+            <span className="hidden xs:inline">Dashboard</span>
           </TabsTrigger>
-          <TabsTrigger value="insights" className="text-xs">
-            <Sparkles className="h-3 w-3 mr-2" />
-            <span className="hidden sm:inline">Insights</span>
+          <TabsTrigger value="insights" className="text-xs gap-1.5">
+            <Sparkles className="h-3 w-3" />
+            <span className="hidden xs:inline">Insights</span>
           </TabsTrigger>
-          <TabsTrigger value="cylinders" className="text-xs">
-            <Cylinder className="h-3 w-3 mr-2" />
-            <span className="hidden sm:inline">Cilinders</span>
+          <TabsTrigger value="cylinders" className="text-xs gap-1.5">
+            <Cylinder className="h-3 w-3" />
+            <span>Cilinders</span>
           </TabsTrigger>
           {showDryIce && (
-            <TabsTrigger value="dryice" className="text-xs">
-              <Snowflake className="h-3 w-3 mr-2" />
-              <span className="hidden sm:inline">Droogijs</span>
+            <TabsTrigger value="dryice" className="text-xs gap-1.5">
+              <Snowflake className="h-3 w-3" />
+              <span>Droogijs</span>
             </TabsTrigger>
           )}
-          <TabsTrigger value="comparison" className="text-xs">
-            <GitCompare className="h-3 w-3 mr-2" />
+          <TabsTrigger value="comparison" className="text-xs gap-1.5">
+            <GitCompare className="h-3 w-3" />
             <span className="hidden sm:inline">Vergelijking</span>
+            <span className="sm:hidden">Vgl.</span>
           </TabsTrigger>
         </TabsList>
 
@@ -602,22 +641,40 @@ export function ProductionReports({
               <CardContent>
                 {ordersPerDay.length > 0 ? (
                   <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={ordersPerDay}>
+                    <AreaChart data={ordersPerDay}>
+                      <defs>
+                        <linearGradient id="gradientCylinders" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#f97316" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="#f97316" stopOpacity={0.02} />
+                        </linearGradient>
+                        <linearGradient id="gradientDryIce" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                       <XAxis dataKey="displayDate" className="text-xs" tickLine={false} axisLine={false} />
                       <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} tickLine={false} axisLine={false} />
-                      <Tooltip />
+                      <Tooltip
+                        contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
+                        labelStyle={{ fontWeight: 600, marginBottom: 4 }}
+                      />
                       <Legend />
                       {(productionChartView === "both" || productionChartView === "cylinders") && (
-                        <Line type="monotone" dataKey="cylinders" name="Cilinders" stroke="#f97316" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                        <Area type="monotone" dataKey="cylinders" name="Cilinders" stroke="#f97316" strokeWidth={2} fill="url(#gradientCylinders)" dot={false} activeDot={{ r: 4, strokeWidth: 2 }} />
                       )}
                       {(productionChartView === "both" || productionChartView === "dryIce") && (
-                        <Line type="monotone" dataKey="dryIce" name="Droogijs" stroke="#06b6d4" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                        <Area type="monotone" dataKey="dryIce" name="Droogijs" stroke="#06b6d4" strokeWidth={2} fill="url(#gradientDryIce)" dot={false} activeDot={{ r: 4, strokeWidth: 2 }} />
                       )}
-                    </LineChart>
+                    </AreaChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">Geen data</div>
+                  <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
+                    <div className="text-center">
+                      <BarChart3 className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
+                      <p>Geen productiedata voor deze periode</p>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -633,22 +690,32 @@ export function ProductionReports({
               </CardHeader>
               <CardContent>
                 {currentDistributionData.length > 0 ? (
-                  <div className="overflow-y-auto" style={{ maxHeight: 500 }}>
-                  <ResponsiveContainer width="100%" height={Math.max(300, currentDistributionData.length * 28)}>
-                    <BarChart data={currentDistributionData} layout="vertical" margin={{ left: 10, right: 10 }}>
+                  <>
+                  <ResponsiveContainer width="100%" height={Math.max(280, currentDistributionData.length * 32)}>
+                    <BarChart data={currentDistributionData} layout="vertical" margin={{ left: 10, right: 50 }}>
                       <XAxis type="number" hide />
-                      <YAxis dataKey="name" type="category" width={120} className="text-[11px]" tickLine={false} axisLine={false} interval={0} />
+                      <YAxis dataKey="name" type="category" width={110} className="text-[11px]" tickLine={false} axisLine={false} interval={0} />
                       <Tooltip cursor={{ fill: 'transparent' }} />
-                      <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                      <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={18}>
                         {currentDistributionData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
+                        <LabelList dataKey="value" position="right" className="text-[11px] font-medium fill-foreground" formatter={(v: number) => formatNumber(v, 0)} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                  </div>
+                  {(distributionView === "type" ? gasTypeDistribution : gasCategoryDistribution).length > MAX_DISTRIBUTION_ITEMS && (
+                    <button
+                      onClick={() => setShowAllDistribution(!showAllDistribution)}
+                      className="text-xs text-primary hover:underline w-full text-center pt-2"
+                      type="button"
+                    >
+                      {showAllDistribution ? "Toon minder" : `Toon alle ${(distributionView === "type" ? gasTypeDistribution : gasCategoryDistribution).length} types`}
+                    </button>
+                  )}
+                  </>
                 ) : (
-                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">Geen data</div>
+                  <div className="flex items-center justify-center h-[280px] text-muted-foreground text-sm">Geen data</div>
                 )}
               </CardContent>
             </Card>
