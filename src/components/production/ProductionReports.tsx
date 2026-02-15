@@ -594,12 +594,15 @@ export function ProductionReports({
         />
 
         <StatCard
-          value={formatNumber(cylinderStats.totalCylinders, 0)}
-          label="Totaal cilinders"
+          value={formatNumber(hideDigital ? cylinderStats.totalCylinders - digitalPhysicalSplit.digital : cylinderStats.totalCylinders, 0)}
+          label={hideDigital ? "Fysieke cilinders" : "Totaal cilinders"}
           icon={<Package className="h-4 w-4 text-orange-500" />}
           iconBgColor="bg-orange-500/10"
           trend={{
-            value: calculateTrend(cylinderStats.totalCylinders, previousPeriodStats.totalCylinders),
+            value: calculateTrend(
+              hideDigital ? cylinderStats.totalCylinders - digitalPhysicalSplit.digital : cylinderStats.totalCylinders,
+              previousPeriodStats.totalCylinders
+            ),
             label: "vs. vorige periode"
           }}
           className="border-orange-500/20 shadow-sm min-w-[160px] sm:min-w-0"

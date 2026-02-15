@@ -15,7 +15,9 @@ import {
   Zap,
   BarChart3,
   Minus,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles,
+  Cylinder
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
@@ -65,6 +67,10 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
   const [weeklyData, setWeeklyData] = useState<SparklineData[]>([]);
   const [historicalWeeklyData, setHistoricalWeeklyData] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hideDigital, setHideDigital] = useState(false);
+  const [digitalCylinders, setDigitalCylinders] = useState(0);
+  const [physicalCylinders, setPhysicalCylinders] = useState(0);
+  const [hasDigitalTypes, setHasDigitalTypes] = useState(false);
 
   const currentYear = new Date().getFullYear();
 
@@ -189,6 +195,38 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
       // Store historical values for anomaly detection (exclude current week)
       const historicalValues = weeklySparkline.slice(0, -1).map(w => w.value);
       setHistoricalWeeklyData(historicalValues);
+
+      // Fetch gas type distribution for digital/physical split
+      try {
+        const toLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const fromStr = dateRange ? toLocal(dateRange.from) : `${currentYear}-01-01`;
+        const toStr = dateRange ? toLocal(dateRange.to) : `${currentYear}-12-31`;
+
+        const [gasTypeDistRes, gasTypesRes] = await Promise.all([
+          api.reports.getGasTypeDistribution(fromStr, toStr, locationParam).catch(() => ({ data: [] })),
+          api.gasTypes.getAll().catch(() => ({ data: [] })),
+        ]);
+
+        const gasTypesData = (gasTypesRes?.data || []) as any[];
+        const digitalIds = new Set(gasTypesData.filter((gt: any) => gt.is_digital).map((gt: any) => gt.id));
+        setHasDigitalTypes(digitalIds.size > 0);
+
+        const distData = (gasTypeDistRes?.data || []) as any[];
+        let digTotal = 0;
+        let physTotal = 0;
+        distData.forEach((item: any) => {
+          const count = Number(item.total_cylinders) || 0;
+          if (item.gas_type_id && digitalIds.has(item.gas_type_id)) {
+            digTotal += count;
+          } else {
+            physTotal += count;
+          }
+        });
+        setDigitalCylinders(digTotal);
+        setPhysicalCylinders(physTotal);
+      } catch (e) {
+        console.error("[KPIDashboard] Error fetching digital split:", e);
+      }
     } catch (error) {
       console.error("[KPIDashboard] Error fetching KPI data:", error);
     } finally {
@@ -340,6 +378,31 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
         <CollapsibleContent>
           <CardContent className="pt-0">
             <FadeIn show={true}>
+              {/* Digital filter */}
+              {hasDigitalTypes && (
+                <div className="flex items-center gap-2 mb-4">
+                  <Button
+                    variant={hideDigital ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 text-xs gap-1"
+                    onClick={() => setHideDigital(!hideDigital)}
+                  >
+                    ⓓ {hideDigital ? "Toon digitaal" : "Verberg digitaal"}
+                  </Button>
+                  {(digitalCylinders > 0 || physicalCylinders > 0) && (
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Cylinder className="h-3 w-3 text-orange-500" />
+                        {formatNumber(physicalCylinders, 0)} fysiek
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="h-3 w-3 text-sky-500" />
+                        {formatNumber(digitalCylinders, 0)} digitaal
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Efficiency Rate */}
                 <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
@@ -377,10 +440,12 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange }: KPIDashboa
                     </div>
                   </div>
                   <div className="text-3xl font-bold text-orange-500">
-                    {formatNumber(currentYearData?.total_cylinders || 0, 0)}
+                    {formatNumber(hideDigital
+                      ? (currentYearData?.total_cylinders || 0) - digitalCylinders
+                      : (currentYearData?.total_cylinders || 0), 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {isCustomPeriod ? "Cilinders in periode" : "Cilinders dit jaar"}
+                    {hideDigital ? "Fysieke cilinders" : (isCustomPeriod ? "Cilinders in periode" : "Cilinders dit jaar")}
                   </p>
                 </div>
 
