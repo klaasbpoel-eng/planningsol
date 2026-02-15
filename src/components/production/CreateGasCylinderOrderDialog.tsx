@@ -363,7 +363,7 @@ export function CreateGasCylinderOrderDialog({
                           className="w-2 h-2 rounded-full flex-shrink-0"
                           style={{ backgroundColor: type.color }}
                         />
-                        <span className="truncate max-w-[120px]">{type.name}</span>
+                        <span>{type.name}</span>
                       </button>
                     ))}
                   </div>
