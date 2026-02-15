@@ -138,38 +138,62 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   const [cylinderSizes, setCylinderSizes] = useState<{ id: string; name: string; capacity_liters: number | null }[]>([]);
   const [selectedCylinderSizes, setSelectedCylinderSizes] = useState<string[]>([]);
   const [cylinderSizeComparison, setCylinderSizeComparison] = useState<CylinderSizeComparison[]>([]);
+  const [hideDigital, setHideDigital] = useState(false);
 
+  const hasDigitalTypes = useMemo(() => {
+    return gasTypes.some((gt: any) => gt.is_digital);
+  }, [gasTypes]);
+
+  const digitalGasTypeIds = useMemo(() => {
+    return new Set(gasTypes.filter((gt: any) => gt.is_digital).map((gt: any) => gt.id));
+  }, [gasTypes]);
   const isSignificantGrowth = (percent: number) => percent > 10 || percent < -10;
 
   // =================== FILTERED DATA CALCULATIONS ===================
 
   // Gefilterde gastype vergelijking data
   const filteredGasTypeData = useMemo(() => {
-    if (selectedGasTypes.length === 0) return gasTypeComparison;
-    return gasTypeComparison.filter(gt => selectedGasTypes.includes(gt.gas_type_id));
-  }, [gasTypeComparison, selectedGasTypes]);
+    let data = gasTypeComparison;
+    if (hideDigital) {
+      data = data.filter(gt => !digitalGasTypeIds.has(gt.gas_type_id));
+    }
+    if (selectedGasTypes.length > 0) {
+      data = data.filter(gt => selectedGasTypes.includes(gt.gas_type_id));
+    }
+    return data;
+  }, [gasTypeComparison, selectedGasTypes, hideDigital, digitalGasTypeIds]);
 
   // Herberekende cylinder totalen op basis van gastype filter
   const filteredCylinderTotals = useMemo(() => {
-    if (selectedGasTypes.length === 0) return cylinderTotals;
+    if (selectedGasTypes.length === 0 && !hideDigital) return cylinderTotals;
     if (!cylinderTotals) return null;
 
-    // Bereken totalen alleen voor geselecteerde gastypes
+    // Bereken totalen alleen voor gefilterde gastypes
     const currentTotal = filteredGasTypeData.reduce((sum, gt) => sum + gt.currentYear, 0);
     const previousTotal = filteredGasTypeData.reduce((sum, gt) => sum + gt.previousYear, 0);
     const change = currentTotal - previousTotal;
     const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
     return { currentYear: currentTotal, previousYear: previousTotal, change, changePercent };
-  }, [cylinderTotals, filteredGasTypeData, selectedGasTypes]);
+  }, [cylinderTotals, filteredGasTypeData, selectedGasTypes, hideDigital]);
 
   // Gefilterde maandelijkse data voor cilinders per gastype
   const filteredMonthlyGasTypeData = useMemo(() => {
-    if (selectedGasTypes.length === 0) return monthlyGasTypeData;
+    const hasGasTypeFilter = selectedGasTypes.length > 0;
+    if (!hasGasTypeFilter && !hideDigital) return monthlyGasTypeData;
+
+    const activeIds = hasGasTypeFilter
+      ? selectedGasTypes.filter(id => !hideDigital || !digitalGasTypeIds.has(id))
+      : Array.from(
+          new Set([
+            ...monthlyGasTypeData.current.flatMap(m => Object.keys(m).filter(k => k !== 'month' && k !== 'monthName')),
+            ...monthlyGasTypeData.previous.flatMap(m => Object.keys(m).filter(k => k !== 'month' && k !== 'monthName')),
+          ])
+        ).filter(id => !digitalGasTypeIds.has(id));
 
     const filterMonthData = (data: MonthlyGasTypeChartData[]) => {
       return data.map(month => {
         const filtered: MonthlyGasTypeChartData = { month: month.month, monthName: month.monthName };
-        selectedGasTypes.forEach(gtId => {
+        activeIds.forEach(gtId => {
           if (month[gtId] !== undefined) filtered[gtId] = month[gtId];
         });
         return filtered;
@@ -180,20 +204,23 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       current: filterMonthData(monthlyGasTypeData.current),
       previous: filterMonthData(monthlyGasTypeData.previous)
     };
-  }, [monthlyGasTypeData, selectedGasTypes]);
+  }, [monthlyGasTypeData, selectedGasTypes, hideDigital, digitalGasTypeIds]);
 
   // Herberekende cylinder maanddata op basis van gastype filter
   const filteredCylinderData = useMemo(() => {
-    if (selectedGasTypes.length === 0) return cylinderData;
+    if (selectedGasTypes.length === 0 && !hideDigital) return cylinderData;
+
+    // Get active gas type IDs from filtered monthly data
+    const activeIds = Object.keys(filteredMonthlyGasTypeData.current[0] || {}).filter(k => k !== 'month' && k !== 'monthName');
 
     // Bereken nieuwe maandtotalen uit gefilterde gastype data
     return cylinderData.map((month, idx) => {
       const currentMonthData = filteredMonthlyGasTypeData.current[idx];
       const previousMonthData = filteredMonthlyGasTypeData.previous[idx];
 
-      const currentTotal = selectedGasTypes.reduce((sum, gtId) =>
+      const currentTotal = activeIds.reduce((sum, gtId) =>
         sum + (Number(currentMonthData?.[gtId]) || 0), 0);
-      const previousTotal = selectedGasTypes.reduce((sum, gtId) =>
+      const previousTotal = activeIds.reduce((sum, gtId) =>
         sum + (Number(previousMonthData?.[gtId]) || 0), 0);
 
       const change = currentTotal - previousTotal;
@@ -207,7 +234,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
         changePercent
       };
     });
-  }, [cylinderData, filteredMonthlyGasTypeData, selectedGasTypes]);
+  }, [cylinderData, filteredMonthlyGasTypeData, selectedGasTypes, hideDigital]);
 
   // Gefilterde klant data
   const filteredCustomerComparison = useMemo(() => {
@@ -831,6 +858,20 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
               </div>
             )}
           </div>
+
+          {/* Digital filter */}
+          {hasDigitalTypes && (
+            <div className="flex items-center">
+              <Button
+                variant={hideDigital ? "default" : "outline"}
+                size="sm"
+                className="h-8 text-xs gap-1"
+                onClick={() => setHideDigital(!hideDigital)}
+              >
+                ⓓ {hideDigital ? "Toon digitaal" : "Verberg digitaal"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1092,10 +1133,14 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           </CardHeader>
           <CardContent>
             {(() => {
-              // Filter gas type comparison based on selected gas types
-              const filteredGasTypeComparison = selectedGasTypes.length > 0
-                ? gasTypeComparison.filter(gt => selectedGasTypes.includes(gt.gas_type_id))
-                : gasTypeComparison;
+              // Filter gas type comparison based on selected gas types and digital filter
+              let filteredGasTypeComparison = gasTypeComparison;
+              if (hideDigital) {
+                filteredGasTypeComparison = filteredGasTypeComparison.filter(gt => !digitalGasTypeIds.has(gt.gas_type_id));
+              }
+              if (selectedGasTypes.length > 0) {
+                filteredGasTypeComparison = filteredGasTypeComparison.filter(gt => selectedGasTypes.includes(gt.gas_type_id));
+              }
 
               if (filteredGasTypeComparison.length === 0) {
                 return (
@@ -1168,6 +1213,9 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                               style={{ backgroundColor: gasType.gas_type_color }}
                             />
                             <span className="font-medium">{gasType.gas_type_name}</span>
+                            {digitalGasTypeIds.has(gasType.gas_type_id) && (
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 border-sky-400/40 text-sky-500 bg-sky-400/10">ⓓ</Badge>
+                            )}
                           </div>
                           <div className="flex items-center gap-4 text-sm">
                             <div className="text-right">
