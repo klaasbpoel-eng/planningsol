@@ -288,6 +288,7 @@ export function CreateDryIceOrderDialog({
                 setCustomerId(id);
                 setCustomerName(name);
               }}
+              location={location}
             />
           </div>
 

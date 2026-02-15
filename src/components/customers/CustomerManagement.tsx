@@ -51,6 +51,7 @@ interface Customer {
   notes: string | null;
   is_active: boolean;
   created_at: string;
+  locations?: string[];
 }
 
 interface CustomerManagementProps {
@@ -71,8 +72,25 @@ export function CustomerManagement({ isAdmin = false }: CustomerManagementProps)
   const fetchCustomers = async () => {
     try {
       const data = await api.customers.getAll();
-      // Ensure date strings are compatible if needed, though JS usually handles ISO strings fine
-      setCustomers(data || []);
+      
+      // Fetch location mappings
+      const { data: locationData } = await supabase
+        .from("customer_locations")
+        .select("customer_id, location");
+      
+      const locationMap = new Map<string, string[]>();
+      (locationData || []).forEach((l: any) => {
+        const existing = locationMap.get(l.customer_id) || [];
+        existing.push(l.location);
+        locationMap.set(l.customer_id, existing);
+      });
+
+      const customersWithLocations = (data || []).map((c: any) => ({
+        ...c,
+        locations: locationMap.get(c.id) || [],
+      }));
+      
+      setCustomers(customersWithLocations);
     } catch (error) {
       console.error("Error fetching customers:", error);
       toast.error("Fout bij ophalen klanten");
@@ -112,6 +130,29 @@ export function CustomerManagement({ isAdmin = false }: CustomerManagementProps)
     } catch (error) {
       console.error("Error updating customer:", error);
       toast.error("Fout bij bijwerken klant");
+    }
+  };
+
+  const handleToggleLocation = async (customer: Customer, loc: string) => {
+    try {
+      const hasLocation = customer.locations?.includes(loc);
+      if (hasLocation) {
+        const { error } = await supabase
+          .from("customer_locations")
+          .delete()
+          .eq("customer_id", customer.id)
+          .eq("location", loc);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("customer_locations")
+          .insert({ customer_id: customer.id, location: loc });
+        if (error) throw error;
+      }
+      fetchCustomers();
+    } catch (error) {
+      console.error("Error toggling location:", error);
+      toast.error("Fout bij bijwerken locatie");
     }
   };
 
@@ -212,13 +253,14 @@ export function CustomerManagement({ isAdmin = false }: CustomerManagementProps)
           ) : (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Klant</TableHead>
-                  <TableHead>Contactpersoon</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Status</TableHead>
-                  {isAdmin && <TableHead className="text-right">Acties</TableHead>}
-                </TableRow>
+                 <TableRow>
+                   <TableHead>Klant</TableHead>
+                   <TableHead>Contactpersoon</TableHead>
+                   <TableHead>Contact</TableHead>
+                   <TableHead>Locaties</TableHead>
+                   <TableHead>Status</TableHead>
+                   {isAdmin && <TableHead className="text-right">Acties</TableHead>}
+                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredCustomers.map((customer) => (
@@ -261,6 +303,34 @@ export function CustomerManagement({ isAdmin = false }: CustomerManagementProps)
                         {!customer.email && !customer.phone && (
                           <span className="text-muted-foreground text-xs">-</span>
                         )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <Badge
+                          variant={customer.locations?.includes("sol_emmen") ? "default" : "outline"}
+                          className={cn(
+                            "cursor-pointer text-xs px-2 py-0.5",
+                            customer.locations?.includes("sol_emmen") 
+                              ? "bg-accent text-accent-foreground hover:bg-accent/80" 
+                              : "opacity-50 hover:opacity-75"
+                          )}
+                          onClick={() => handleToggleLocation(customer, "sol_emmen")}
+                        >
+                          Emmen
+                        </Badge>
+                        <Badge
+                          variant={customer.locations?.includes("sol_tilburg") ? "default" : "outline"}
+                          className={cn(
+                            "cursor-pointer text-xs px-2 py-0.5",
+                            customer.locations?.includes("sol_tilburg") 
+                              ? "bg-accent text-accent-foreground hover:bg-accent/80" 
+                              : "opacity-50 hover:opacity-75"
+                          )}
+                          onClick={() => handleToggleLocation(customer, "sol_tilburg")}
+                        >
+                          Tilburg
+                        </Badge>
                       </div>
                     </TableCell>
                     <TableCell>

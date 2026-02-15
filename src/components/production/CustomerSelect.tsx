@@ -45,9 +45,10 @@ interface CustomerSelectProps {
   value: string;
   onValueChange: (value: string, customerName: string) => void;
   defaultCustomerName?: string;
+  location?: string;
 }
 
-export function CustomerSelect({ value, onValueChange, defaultCustomerName: propDefaultCustomer }: CustomerSelectProps) {
+export function CustomerSelect({ value, onValueChange, defaultCustomerName: propDefaultCustomer, location }: CustomerSelectProps) {
   const isMobile = useIsMobile();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,11 +72,29 @@ export function CustomerSelect({ value, onValueChange, defaultCustomerName: prop
       defaultCustomerName = settingData?.value || "SOL Nederland";
     }
 
-    const { data, error } = await supabase
+    // If location is specified, filter by customer_locations
+    let customerIds: string[] | null = null;
+    if (location) {
+      const { data: locationData } = await supabase
+        .from("customer_locations")
+        .select("customer_id")
+        .eq("location", location);
+      if (locationData) {
+        customerIds = locationData.map((l: any) => l.customer_id);
+      }
+    }
+
+    let query = supabase
       .from("customers")
       .select("id, name, contact_person")
       .eq("is_active", true)
       .order("name");
+
+    if (customerIds !== null) {
+      query = query.in("id", customerIds.length > 0 ? customerIds : ["00000000-0000-0000-0000-000000000000"]);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Error fetching customers:", error);
@@ -97,7 +116,7 @@ export function CustomerSelect({ value, onValueChange, defaultCustomerName: prop
 
   useEffect(() => {
     fetchCustomers();
-  }, []);
+  }, [location]);
 
   const handleCreateCustomer = async () => {
     if (!newCustomerName.trim()) {

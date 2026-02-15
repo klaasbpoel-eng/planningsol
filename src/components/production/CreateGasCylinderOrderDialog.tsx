@@ -320,6 +320,7 @@ export function CreateGasCylinderOrderDialog({
                 setCustomerName(name);
               }}
               defaultCustomerName="SOL"
+              location={location}
             />
           </div>
 
