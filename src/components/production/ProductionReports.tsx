@@ -209,7 +209,7 @@ export function ProductionReports({
 
   useEffect(() => {
     fetchReportData();
-  }, [dateRange, refreshKey, location]);
+  }, [dateRange, refreshKey, location, hideDigital]);
 
   const fetchReportData = async () => {
     setLoading(true);
@@ -251,16 +251,16 @@ export function ProductionReports({
         gasCategoryRes,
         gasTypesRes
       ] = await Promise.all([
-        // Daily production data for charts
-        fetchSafely(() => api.reports.getDailyProductionByPeriod(fromDate, toDate, locationParam)),
+        // Daily production data for charts (with digital filter)
+        fetchSafely(() => api.reports.getDailyProductionByPeriod(fromDate, toDate, locationParam, hideDigital)),
         // Gas type distribution
         fetchSafely(() => api.reports.getGasTypeDistribution(fromDate, toDate, locationParam)),
-        // Current period efficiency stats (cylinders)
-        fetchSafely(() => api.reports.getProductionEfficiency(fromDate, toDate, locationParam)),
+        // Current period efficiency stats (cylinders, with digital filter)
+        fetchSafely(() => api.reports.getProductionEfficiency(fromDate, toDate, locationParam, hideDigital)),
         // Current period efficiency stats (dry ice)
         fetchSafely(() => api.reports.getDryIceEfficiency(fromDate, toDate, locationParam)),
-        // Previous period efficiency (cylinders)
-        fetchSafely(() => api.reports.getProductionEfficiency(prevFromDate, prevToDate, locationParam)),
+        // Previous period efficiency (cylinders, with digital filter)
+        fetchSafely(() => api.reports.getProductionEfficiency(prevFromDate, prevToDate, locationParam, hideDigital)),
         // Previous period efficiency (dry ice)
         fetchSafely(() => api.reports.getDryIceEfficiency(prevFromDate, prevToDate, locationParam)),
         // Customer totals for ranking
