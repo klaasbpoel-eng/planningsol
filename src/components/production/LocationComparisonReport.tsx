@@ -237,7 +237,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">SOL Emmen</p>
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5">SOL Emmen{hideDigital && hasDigitalTypes && (<span className="inline-flex items-center text-[9px] px-1 py-0 rounded border border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal leading-tight">Alleen fysiek</span>)}</p>
                 <p className="text-2xl font-bold">{formatNumber(filteredEmmenTotal, 0)}</p>
               </div>
               <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20">
@@ -251,7 +251,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">SOL Tilburg</p>
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5">SOL Tilburg{hideDigital && hasDigitalTypes && (<span className="inline-flex items-center text-[9px] px-1 py-0 rounded border border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal leading-tight">Alleen fysiek</span>)}</p>
                 <p className="text-2xl font-bold">{formatNumber(filteredTilburgTotal, 0)}</p>
               </div>
               <Badge variant="secondary" className="bg-sky-400/10 text-sky-500 border-sky-400/20">
@@ -265,7 +265,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Totaal</p>
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5">Totaal{hideDigital && hasDigitalTypes && (<span className="inline-flex items-center text-[9px] px-1 py-0 rounded border border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal leading-tight">Alleen fysiek</span>)}</p>
                 <p className="text-2xl font-bold">{formatNumber(grandTotal, 0)}</p>
               </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
