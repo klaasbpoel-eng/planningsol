@@ -82,7 +82,7 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange, hideDigital:
 
   useEffect(() => {
     fetchKPIData();
-  }, [location, refreshKey, dateRange]);
+  }, [location, refreshKey, dateRange, hideDigital]);
 
   const fetchKPIData = useCallback(async () => {
     console.log("[KPIDashboard] Fetching KPI data...", { location, dateRange });
@@ -118,8 +118,8 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange, hideDigital:
         // Fetch current period data
         // Use RPC function for server-side aggregation (avoids 1000 row limit)
         const [currentRes, prevRes] = await Promise.all([
-          api.reports.getProductionEfficiency(fromDate, toDate, locationParam).then(data => ({ data, error: null })).catch(error => ({ data: null, error })),
-          api.reports.getProductionEfficiency(prevFromDate, prevToDate, locationParam).then(data => ({ data, error: null })).catch(error => ({ data: null, error }))
+          api.reports.getProductionEfficiency(fromDate, toDate, locationParam, hideDigital).then(data => ({ data, error: null })).catch(error => ({ data: null, error })),
+          api.reports.getProductionEfficiency(prevFromDate, prevToDate, locationParam, hideDigital).then(data => ({ data, error: null })).catch(error => ({ data: null, error }))
         ]);
 
         // Log errors if any
@@ -235,7 +235,7 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange, hideDigital:
     } finally {
       setLoading(false);
     }
-  }, [location, dateRange, currentYear]);
+  }, [location, dateRange, currentYear, hideDigital]);
 
   const fetchWeeklySparkline = async (locationParam: string | null, dateRange?: DateRange): Promise<SparklineData[]> => {
     const weeks: SparklineData[] = [];
