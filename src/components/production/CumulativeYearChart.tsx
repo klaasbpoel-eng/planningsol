@@ -319,6 +319,11 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
           {icon}
           <LineChartIcon className="h-4 w-4" />
           {title}
+          {hideDigital && type === "cylinders" && hasDigitalTypes && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal">
+              Alleen fysiek
+            </Badge>
+          )}
         </CardTitle>
         <CardDescription>
           Cumulatieve productie per maand — vergelijk meerdere jaren
