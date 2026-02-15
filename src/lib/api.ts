@@ -826,7 +826,7 @@ export const api = {
             return data;
         },
 
-        getGasTypeDistribution: async (fromDate: string, toDate: string, location: string | null) => {
+        getGasTypeDistribution: async (fromDate: string, toDate: string, location: string | null, excludeDigital: boolean = false) => {
             const source = getPrimarySource();
             if (source === "mysql") {
                 const params = [fromDate, toDate];
@@ -852,8 +852,9 @@ export const api = {
             const { data, error } = await client.rpc("get_gas_type_distribution_by_period", {
                 p_from_date: fromDate,
                 p_to_date: toDate,
-                p_location: location
-            });
+                p_location: location,
+                p_exclude_digital: excludeDigital
+            } as any);
             if (error) throw error;
             return data;
         },

@@ -1521,15 +1521,34 @@ export type Database = {
           total_cylinders: number
         }[]
       }
-      get_gas_type_distribution_by_period: {
-        Args: { p_from_date: string; p_location?: string; p_to_date: string }
-        Returns: {
-          gas_type_color: string
-          gas_type_id: string
-          gas_type_name: string
-          total_cylinders: number
-        }[]
-      }
+      get_gas_type_distribution_by_period:
+        | {
+            Args: {
+              p_from_date: string
+              p_location?: string
+              p_to_date: string
+            }
+            Returns: {
+              gas_type_color: string
+              gas_type_id: string
+              gas_type_name: string
+              total_cylinders: number
+            }[]
+          }
+        | {
+            Args: {
+              p_exclude_digital?: boolean
+              p_from_date: string
+              p_location?: string
+              p_to_date: string
+            }
+            Returns: {
+              gas_type_color: string
+              gas_type_id: string
+              gas_type_name: string
+              total_cylinders: number
+            }[]
+          }
       get_monthly_cylinder_totals_by_customer: {
         Args: { p_location?: string; p_year: number }
         Returns: {
