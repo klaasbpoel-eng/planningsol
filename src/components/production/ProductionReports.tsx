@@ -539,6 +539,17 @@ export function ProductionReports({
         </div>
 
         <div className="flex items-center gap-2">
+          {hasDigitalTypes && (
+            <Button
+              variant={hideDigital ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs gap-1"
+              onClick={() => setHideDigital(!hideDigital)}
+            >
+              <Sparkles className="h-3 w-3" />
+              {hideDigital ? "Toon digitaal" : "Verberg digitaal"}
+            </Button>
+          )}
           <ReportExportButtons
             tableData={{
               title: "Productie Rapport",
