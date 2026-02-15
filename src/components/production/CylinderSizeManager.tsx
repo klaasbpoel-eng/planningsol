@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Cylinder, Plus, Pencil, Trash2, Save, ArrowUp, ArrowDown, ArrowUpDown, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -341,13 +342,16 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
                         {size.description || "-"}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={size.is_active ? "default" : "secondary"}
-                          className="cursor-pointer"
-                          onClick={() => handleToggleActive(size)}
-                        >
-                          {size.is_active ? "Actief" : "Inactief"}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={size.is_active}
+                            onCheckedChange={() => handleToggleActive(size)}
+                            className="data-[state=checked]:bg-primary"
+                          />
+                          <span className={cn("text-xs", size.is_active ? "text-foreground" : "text-muted-foreground")}>
+                            {size.is_active ? "Actief" : "Inactief"}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
