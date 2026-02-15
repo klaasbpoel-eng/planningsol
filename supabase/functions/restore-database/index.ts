@@ -118,13 +118,13 @@ Deno.serve(async (req) => {
             )
             .join(", ");
 
-          const values = batch.flatMap((row: Record<string, unknown>) =>
+          const values: unknown[] = batch.flatMap((row: Record<string, unknown>) =>
             columns.map((col) => row[col] ?? null)
           );
 
           await sql.unsafe(
             `INSERT INTO public.${table} (${columns.map((c) => `"${c}"`).join(", ")}) VALUES ${placeholders}`,
-            values
+            values as any[]
           );
           totalInserted += batch.length;
         }

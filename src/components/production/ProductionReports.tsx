@@ -55,6 +55,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   BarChart3,
+  Building2,
   Cylinder,
   Snowflake,
   CalendarIcon,
@@ -74,6 +75,7 @@ const CumulativeGasTypeChart = lazy(() => import("./CumulativeGasTypeChart").the
 const CumulativeCylinderSizeChart = lazy(() => import("./CumulativeCylinderSizeChart").then(m => ({ default: m.CumulativeCylinderSizeChart })));
 const ProductionHeatMap = lazy(() => import("./ProductionHeatMap").then(m => ({ default: m.ProductionHeatMap })));
 const CustomerSegmentation = lazy(() => import("./CustomerSegmentation").then(m => ({ default: m.CustomerSegmentation })));
+const LocationComparisonReport = lazy(() => import("./LocationComparisonReport").then(m => ({ default: m.LocationComparisonReport })));
 
 
 
@@ -604,7 +606,7 @@ export function ProductionReports({
 
       {/* Detailed Tabs & Dashboard */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={cn("grid w-full max-w-4xl bg-muted/50 backdrop-blur-sm h-9", showDryIce ? "grid-cols-5" : "grid-cols-4")}>
+        <TabsList className={cn("grid w-full max-w-4xl bg-muted/50 backdrop-blur-sm h-9", showDryIce ? "grid-cols-6" : "grid-cols-5")}>
           <TabsTrigger value="overview" className="text-xs gap-1.5">
             <BarChart3 className="h-3 w-3" />
             <span className="hidden xs:inline">Dashboard</span>
@@ -623,6 +625,11 @@ export function ProductionReports({
               <span>Droogijs</span>
             </TabsTrigger>
           )}
+          <TabsTrigger value="locations" className="text-xs gap-1.5">
+            <Building2 className="h-3 w-3" />
+            <span className="hidden sm:inline">Locaties</span>
+            <span className="sm:hidden">Loc.</span>
+          </TabsTrigger>
           <TabsTrigger value="comparison" className="text-xs gap-1.5">
             <GitCompare className="h-3 w-3" />
             <span className="hidden sm:inline">Vergelijking</span>
@@ -769,6 +776,12 @@ export function ProductionReports({
             </div>
           </TabsContent>
         )}
+
+        <TabsContent value="locations" className="mt-4">
+          <Suspense fallback={<ChartLoadingFallback />}>
+            <LocationComparisonReport />
+          </Suspense>
+        </TabsContent>
 
         <TabsContent value="comparison" className="mt-4">
           <Suspense fallback={<ChartLoadingFallback />}>
