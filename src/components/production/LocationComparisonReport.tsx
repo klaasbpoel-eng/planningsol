@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Building2, TrendingUp, TrendingDown, Minus, Cylinder } from "lucide-react";
+import { Loader2, Building2, TrendingUp, TrendingDown, Minus, Cylinder, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -159,6 +159,17 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
   const emmenPercent = grandTotal > 0 ? Math.round((filteredEmmenTotal / grandTotal) * 100) : 0;
   const tilburgPercent = grandTotal > 0 ? Math.round((filteredTilburgTotal / grandTotal) * 100) : 0;
 
+  const digitalPhysicalSplit = useMemo(() => {
+    const digital = gasTypeData.filter(gt => gt.is_digital).reduce((s, gt) => s + gt.total, 0);
+    const physical = gasTypeData.filter(gt => !gt.is_digital).reduce((s, gt) => s + gt.total, 0);
+    const total = digital + physical;
+    return {
+      digital, physical, total,
+      digitalPercent: total > 0 ? Math.round((digital / total) * 100) : 0,
+      physicalPercent: total > 0 ? Math.round((physical / total) * 100) : 0,
+    };
+  }, [gasTypeData]);
+
   const cumulativeData = useMemo(() => {
     let cumE = 0, cumT = 0;
     return monthlyData.map(m => {
@@ -275,7 +286,45 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
         </Card>
       </div>
 
-      {/* Monthly Comparison Chart */}
+      {/* Digital vs Physical Summary */}
+      {hasDigitalTypes && digitalPhysicalSplit.total > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Card className="shadow-sm border-orange-500/20">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Cylinder className="h-4 w-4 text-orange-500" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Fysieke cilinders</p>
+                    <p className="text-xl font-bold">{formatNumber(digitalPhysicalSplit.physical, 0)}</p>
+                  </div>
+                </div>
+                <Badge variant="secondary" className="bg-orange-500/10 text-orange-600 border-orange-500/20">
+                  {digitalPhysicalSplit.physicalPercent}%
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm border-sky-400/20">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-sky-500" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Digitale cilinders</p>
+                    <p className="text-xl font-bold">{formatNumber(digitalPhysicalSplit.digital, 0)}</p>
+                  </div>
+                </div>
+                <Badge variant="secondary" className="bg-sky-400/10 text-sky-500 border-sky-400/20">
+                  {digitalPhysicalSplit.digitalPercent}%
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+
       <Card className="shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">Cilinders per maand</CardTitle>
