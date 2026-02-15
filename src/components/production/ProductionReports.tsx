@@ -836,9 +836,13 @@ export function ProductionReports({
           <Suspense fallback={<ChartLoadingFallback />}>
             <CumulativeGasTypeChart
               location={location === "all" ? undefined : location}
+              hideDigital={hideDigital}
+              hasDigitalTypes={hasDigitalTypes}
             />
             <CumulativeCylinderSizeChart
               location={location === "all" ? undefined : location}
+              hideDigital={hideDigital}
+              hasDigitalTypes={hasDigitalTypes}
             />
             <ProductionHeatMap
               location={location}

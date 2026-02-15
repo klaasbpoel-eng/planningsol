@@ -46,9 +46,11 @@ type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 
 interface CumulativeGasTypeChartProps {
   location?: ProductionLocation;
+  hideDigital?: boolean;
+  hasDigitalTypes?: boolean;
 }
 
-export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart({ location = "all" }: CumulativeGasTypeChartProps) {
+export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart({ location = "all", hideDigital = false, hasDigitalTypes = false }: CumulativeGasTypeChartProps) {
   const [loading, setLoading] = useState(true);
   const [yearData, setYearData] = useState<YearData[]>([]);
   const [selectedGasTypes, setSelectedGasTypes] = useState<string[]>([]);
@@ -286,6 +288,11 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
               <Cylinder className="h-5 w-5 text-orange-500" />
               <LineChartIcon className="h-4 w-4" />
               Cilinders per gastype — jaarvergelijking
+              {hideDigital && hasDigitalTypes && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal">
+                  Alleen fysiek
+                </Badge>
+              )}
             </CardTitle>
             <CardDescription>
               Cumulatieve productie per maand — vergelijk twee jaren
