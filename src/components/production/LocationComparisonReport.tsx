@@ -71,16 +71,16 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
 
   useEffect(() => {
     fetchData();
-  }, [selectedYear]);
+  }, [selectedYear, hideDigital]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const [emmenMonthly, tilburgMonthly, emmenGasType, tilburgGasType, gasTypesRes] = await Promise.all([
-        api.reports.getMonthlyOrderTotals(selectedYear, "cylinder", "sol_emmen").catch(() => []),
-        api.reports.getMonthlyOrderTotals(selectedYear, "cylinder", "sol_tilburg").catch(() => []),
-        api.reports.getMonthlyCylinderTotalsByGasType(selectedYear, "sol_emmen").catch(() => []),
-        api.reports.getMonthlyCylinderTotalsByGasType(selectedYear, "sol_tilburg").catch(() => []),
+        api.reports.getMonthlyOrderTotals(selectedYear, "cylinder", "sol_emmen", hideDigital).catch(() => []),
+        api.reports.getMonthlyOrderTotals(selectedYear, "cylinder", "sol_tilburg", hideDigital).catch(() => []),
+        api.reports.getMonthlyCylinderTotalsByGasType(selectedYear, "sol_emmen", hideDigital).catch(() => []),
+        api.reports.getMonthlyCylinderTotalsByGasType(selectedYear, "sol_tilburg", hideDigital).catch(() => []),
         api.gasTypes.getAll().catch(() => ({ data: [] })),
       ]);
 

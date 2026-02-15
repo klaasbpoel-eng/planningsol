@@ -108,7 +108,7 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
           Promise.all(
             years.map(async (year) => {
               try {
-                const data = await api.reports.getMonthlyOrderTotals(year, orderType, locationParam);
+                const data = await api.reports.getMonthlyOrderTotals(year, orderType, locationParam, hideDigital);
                 return { data, error: null };
               } catch (err) {
                 return { data: null, error: err };
@@ -120,7 +120,7 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
             ? Promise.all(
                 years.map(async (year) => {
                   try {
-                    const data = await api.reports.getMonthlyCylinderTotalsByGasType(year, locationParam);
+                    const data = await api.reports.getMonthlyCylinderTotalsByGasType(year, locationParam, hideDigital);
                     return { data, error: null };
                   } catch (err) {
                     return { data: null, error: err };
@@ -188,7 +188,7 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
     };
 
     fetchData();
-  }, [type, location]);
+  }, [type, location, hideDigital]);
 
   // Apply digital filter to yearly data
   const effectiveYearlyData = useMemo(() => {

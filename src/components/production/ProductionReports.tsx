@@ -264,9 +264,9 @@ export function ProductionReports({
         // Previous period efficiency (dry ice)
         fetchSafely(() => api.reports.getDryIceEfficiency(prevFromDate, prevToDate, locationParam)),
         // Customer totals for ranking
-        fetchSafely(() => api.reports.getCustomerTotals(fromDate, toDate, locationParam)),
-        // Gas category distribution
-        fetchSafely(() => api.reports.getGasCategoryDistribution(fromDate, toDate, locationParam)),
+        fetchSafely(() => api.reports.getCustomerTotals(fromDate, toDate, locationParam, hideDigital)),
+        // Gas category distribution (with digital filter)
+        fetchSafely(() => api.reports.getGasCategoryDistribution(fromDate, toDate, locationParam, hideDigital)),
         // Gas types (for digital flag)
         fetchSafely(() => api.gasTypes.getAllIncludingInactive())
       ]);
