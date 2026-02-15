@@ -3,8 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Cylinder, Snowflake, LineChart as LineChartIcon, Trophy } from "lucide-react";
+import { Cylinder, Snowflake, LineChart as LineChartIcon, Trophy, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
 import { ChartSkeleton } from "@/components/ui/skeletons/chart-skeleton";
 import {
@@ -59,12 +60,15 @@ interface CumulativeChartData {
 interface CumulativeYearChartProps {
   type: "cylinders" | "dryIce";
   location?: ProductionLocation;
+  hideDigital?: boolean;
 }
 
-export const CumulativeYearChart = React.memo(function CumulativeYearChart({ type, location = "all" }: CumulativeYearChartProps) {
+export const CumulativeYearChart = React.memo(function CumulativeYearChart({ type, location = "all", hideDigital = false }: CumulativeYearChartProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [yearlyData, setYearlyData] = useState<YearlyMonthlyData[]>([]);
+  const [yearlyDataRaw, setYearlyDataRaw] = useState<YearlyMonthlyData[]>([]);
+  const [digitalMonthlyByYear, setDigitalMonthlyByYear] = useState<Map<number, number[]>>(new Map());
+  const [hasDigitalTypes, setHasDigitalTypes] = useState(false);
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [animatingTopFive, setAnimatingTopFive] = useState(false);
@@ -88,23 +92,65 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
         const orderType = type === "cylinders" ? "cylinder" : "dry_ice";
         const locationParam = location === "all" ? null : location;
 
-        // Fetch all years in parallel using API
-        const results = await Promise.all(
-          years.map(async (year) => {
-            try {
-              const data = await api.reports.getMonthlyOrderTotals(year, orderType, locationParam);
-              return { data, error: null };
-            } catch (err) {
-              return { data: null, error: err };
-            }
-          })
-        );
+        // For cylinders, also fetch digital gas type info
+        let digitalGasTypeIds = new Set<string>();
+        if (type === "cylinders") {
+          const { data: gasTypesData } = await supabase.from("gas_types").select("id, is_digital");
+          if (gasTypesData) {
+            const digitalTypes = gasTypesData.filter((gt: any) => gt.is_digital);
+            digitalGasTypeIds = new Set(digitalTypes.map((gt: any) => gt.id));
+            setHasDigitalTypes(digitalTypes.length > 0);
+          }
+        }
 
-        console.log(`[CumulativeYearChart] Fetched ${results.length} years for ${type}`);
+        // Fetch all years in parallel using API
+        const [totalResults, gasTypeResults] = await Promise.all([
+          Promise.all(
+            years.map(async (year) => {
+              try {
+                const data = await api.reports.getMonthlyOrderTotals(year, orderType, locationParam);
+                return { data, error: null };
+              } catch (err) {
+                return { data: null, error: err };
+              }
+            })
+          ),
+          // For cylinders, also fetch per-gas-type data to compute digital monthly totals
+          type === "cylinders" && digitalGasTypeIds.size > 0
+            ? Promise.all(
+                years.map(async (year) => {
+                  try {
+                    const data = await api.reports.getMonthlyCylinderTotalsByGasType(year, locationParam);
+                    return { data, error: null };
+                  } catch (err) {
+                    return { data: null, error: err };
+                  }
+                })
+              )
+            : Promise.resolve(null),
+        ]);
+
+        // Build digital monthly map
+        const digitalMap = new Map<number, number[]>();
+        if (gasTypeResults) {
+          gasTypeResults.forEach((result: any, index: number) => {
+            const year = years[index];
+            const monthlyDigital = new Array(12).fill(0);
+            if (result?.data) {
+              result.data.forEach((item: any) => {
+                if (digitalGasTypeIds.has(item.gas_type_id)) {
+                  monthlyDigital[item.month - 1] += Number(item.total_cylinders) || 0;
+                }
+              });
+            }
+            digitalMap.set(year, monthlyDigital);
+          });
+        }
+        setDigitalMonthlyByYear(digitalMap);
 
         const allYearData: YearlyMonthlyData[] = [];
 
-        results.forEach((result, index) => {
+        totalResults.forEach((result, index) => {
           const year = years[index];
 
           if (result.error) {
@@ -120,24 +166,19 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
             });
           }
 
-          // Only include years with data
           const hasData = monthlyTotals.some(v => v > 0);
           if (hasData) {
             allYearData.push({ year, months: monthlyTotals });
           }
         });
 
-        // Sort by year descending
         allYearData.sort((a, b) => b.year - a.year);
 
-        setYearlyData(allYearData);
+        setYearlyDataRaw(allYearData);
         setAvailableYears(allYearData.map(d => d.year));
 
-        // Default: select first 4 years with data
         const defaultYears = allYearData.slice(0, 4).map(d => d.year);
         setSelectedYears(defaultYears);
-
-        console.log(`[CumulativeYearChart] Loaded ${allYearData.length} years with data`);
       } catch (err) {
         console.error("[CumulativeYearChart] Fetch error:", err);
         setError("Fout bij ophalen data");
@@ -148,6 +189,19 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
 
     fetchData();
   }, [type, location]);
+
+  // Apply digital filter to yearly data
+  const effectiveYearlyData = useMemo(() => {
+    if (!hideDigital || type !== "cylinders" || digitalMonthlyByYear.size === 0) return yearlyDataRaw;
+    return yearlyDataRaw.map(yd => {
+      const digitalMonths = digitalMonthlyByYear.get(yd.year);
+      if (!digitalMonths) return yd;
+      return {
+        ...yd,
+        months: yd.months.map((val, i) => Math.max(0, val - digitalMonths[i])),
+      };
+    });
+  }, [yearlyDataRaw, hideDigital, type, digitalMonthlyByYear]);
 
   const cumulativeChartData = useMemo(() => {
     const chartData: CumulativeChartData[] = [];
@@ -160,7 +214,7 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
 
       // Calculate cumulative values for each selected year
       selectedYears.forEach(year => {
-        const yearData = yearlyData.find(d => d.year === year);
+        const yearData = effectiveYearlyData.find(d => d.year === year);
         if (yearData) {
           let cumulative = 0;
           for (let i = 0; i <= m; i++) {
@@ -174,7 +228,7 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
     }
 
     return chartData;
-  }, [yearlyData, selectedYears]);
+  }, [effectiveYearlyData, selectedYears]);
 
   const toggleYear = useCallback((year: number) => {
     setSelectedYears(prev => {
@@ -201,11 +255,11 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
   // Calculate top 5 years by total volume (memoized for indicator display)
   // Calculate all year volumes for tooltips
   const allYearVolumes = useMemo(() => {
-    return yearlyData.map(yd => ({
+    return effectiveYearlyData.map(yd => ({
       year: yd.year,
       total: yd.months.reduce((sum, val) => sum + val, 0)
     }));
-  }, [yearlyData]);
+  }, [effectiveYearlyData]);
 
   const totalAllYearsVolume = useMemo(() => {
     return allYearVolumes.reduce((sum, yv) => sum + yv.total, 0);
@@ -422,7 +476,7 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
               </thead>
               <tbody>
                 {selectedYears.map(year => {
-                  const yearData = yearlyData.find(d => d.year === year);
+                  const yearData = effectiveYearlyData.find(d => d.year === year);
                   if (!yearData) return null;
 
                   let cumulative = 0;

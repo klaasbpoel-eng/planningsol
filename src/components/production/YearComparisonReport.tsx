@@ -1022,7 +1022,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
 
       {/* Cumulative Year Charts */}
       <div className={`grid grid-cols-1 ${showDryIce ? 'xl:grid-cols-2' : ''} gap-6`}>
-        <CumulativeYearChart type="cylinders" location={location} />
+        <CumulativeYearChart type="cylinders" location={location} hideDigital={hideDigital} />
         {showDryIce && <CumulativeYearChart type="dryIce" location={location} />}
       </div>
 
