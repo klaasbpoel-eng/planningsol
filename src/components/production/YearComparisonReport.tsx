@@ -939,6 +939,11 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
             <CardTitle className="text-lg flex items-center gap-2">
               <Cylinder className="h-5 w-5 text-orange-500" />
               Cilinders Jaartotaal
+              {hideDigital && hasDigitalTypes && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal">
+                  Alleen fysiek
+                </Badge>
+              )}
               {selectedGasTypes.length > 0 && (
                 <Badge variant="secondary" className="ml-2">
                   {selectedGasTypes.length} gastype(s) gefilterd
