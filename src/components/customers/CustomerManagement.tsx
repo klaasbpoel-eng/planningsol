@@ -21,6 +21,8 @@ import {
   Mail,
   MapPin,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -262,13 +264,16 @@ export function CustomerManagement({ isAdmin = false }: CustomerManagementProps)
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant={customer.is_active ? "default" : "secondary"}
-                        className="cursor-pointer"
-                        onClick={() => handleToggleActive(customer)}
-                      >
-                        {customer.is_active ? "Actief" : "Inactief"}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={customer.is_active}
+                          onCheckedChange={() => handleToggleActive(customer)}
+                          className="data-[state=checked]:bg-primary"
+                        />
+                        <span className={cn("text-xs", customer.is_active ? "text-foreground" : "text-muted-foreground")}>
+                          {customer.is_active ? "Actief" : "Inactief"}
+                        </span>
+                      </div>
                     </TableCell>
                     {isAdmin && (
                       <TableCell className="text-right">
