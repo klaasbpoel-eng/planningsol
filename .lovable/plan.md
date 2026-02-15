@@ -1,29 +1,20 @@
 
 
-## Duplicaten in cilindergroottes opschonen
+## Gastype chips volledig leesbaar maken
 
 ### Probleem
-Er zijn dubbele cilindergroottes in de database met inconsistente naamgeving (met en zonder spaties):
-
-| Naam (met spaties) | Orders | Naam (zonder spaties) | Orders |
-|---|---|---|---|
-| PP 12 X 40L | 1 | PP 12x40L | 0 |
-| PP 12 X 50L | 2 | PP 12x50L | 1 |
-| PP 16 X 40L | 0 | PP 16x40L | 0 |
-| PP 16 X 50L | 30 | PP 16x50L | 5 |
+De gastype-chips in het bestelformulier knippen lange namen af (bijv. "Zuurstof Medicinaal ...") door een `max-w-[120px]` beperking met `truncate`.
 
 ### Oplossing
-We standaardiseren op het compacte formaat **zonder spaties** (bijv. `PP 16x50L`) omdat deze de lagere sort_order hebben (= bewust geconfigureerd). De stappen:
-
-1. **Orders migreren**: Alle bestaande orders die de "spatie-variant" gebruiken worden bijgewerkt naar het compacte formaat
-2. **Duplicaten verwijderen**: De overbodige entries met spaties worden uit de `cylinder_sizes` tabel verwijderd
-3. **Geen code-aanpassingen nodig**: De UI haalt de namen dynamisch uit de database
+De `max-w-[120px]` en `truncate` classes worden verwijderd van de gastype chip tekst, zodat de volledige naam altijd zichtbaar is. De chips wrappen al via `flex-wrap`, dus langere namen passen automatisch in de layout.
 
 ### Technische details
 
-**Database migratie (SQL)**:
-- `UPDATE gas_cylinder_orders` om `cylinder_size` van de spatie-variant naar de compacte variant te wijzigen voor alle 4 paren
-- `DELETE FROM cylinder_sizes` voor de 4 overbodige rijen (PP 12 X 40L, PP 12 X 50L, PP 16 X 40L, PP 16 X 50L)
+**Bestand:** `src/components/production/CreateGasCylinderOrderDialog.tsx`
 
-De unieke maten zonder duplicaat (PP 6 X 50L, PP 18 X 40L, PP 18 X 50L) worden niet aangepast, tenzij je ook die wilt standaardiseren. Ze hebben momenteel geen compact-equivalent.
+**Regel 366** wordt aangepast:
+- Huidig: `<span className="truncate max-w-[120px]">{type.name}</span>`
+- Nieuw: `<span>{type.name}</span>`
+
+Dit is een wijziging van 1 regel. Geen andere bestanden betrokken.
 
