@@ -51,6 +51,7 @@ interface GasType {
   description: string | null;
   color: string;
   is_active: boolean;
+  is_digital: boolean;
   sort_order: number;
   category_id: string | null;
 }
@@ -92,6 +93,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#3b82f6");
   const [isActive, setIsActive] = useState(true);
+  const [isDigital, setIsDigital] = useState(false);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -190,12 +192,14 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
       setDescription(type.description || "");
       setColor(type.color);
       setIsActive(type.is_active);
+      setIsDigital(type.is_digital);
       setCategoryId(type.category_id);
     } else {
       setName("");
       setDescription("");
       setColor("#3b82f6");
       setIsActive(true);
+      setIsDigital(false);
       setCategoryId(null);
     }
     setEditingType(type);
@@ -214,6 +218,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
       description: description.trim() || null,
       color,
       is_active: isActive,
+      is_digital: isDigital,
       sort_order: editingType ? editingType.sort_order : gasTypes.length,
       category_id: categoryId,
     };
@@ -563,6 +568,7 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                       </div>
                     </TableHead>
                     <TableHead>Categorie</TableHead>
+                    <TableHead>Digitaal</TableHead>
                     <TableHead className="text-right">Acties</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -621,6 +627,13 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                       </TableCell>
                       <TableCell className="text-sm">
                         {getCategoryName(type.category_id)}
+                      </TableCell>
+                      <TableCell>
+                        {type.is_digital && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-sky-400/40 text-sky-500 bg-sky-400/10">
+                            Digitaal
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -758,6 +771,13 @@ export function GasTypeManager({ open, onOpenChange }: GasTypeManagerProps) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <Label>Digitaal gevuld</Label>
+                <p className="text-xs text-muted-foreground">Dit gastype wordt alleen administratief geboekt</p>
+              </div>
+              <Switch checked={isDigital} onCheckedChange={setIsDigital} />
             </div>
             <div className="flex items-center justify-between rounded-lg border p-3">
               <Label>Actief</Label>
