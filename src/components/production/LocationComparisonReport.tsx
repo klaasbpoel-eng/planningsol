@@ -184,14 +184,14 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-emerald-500/20">
+        <Card className="shadow-sm border-sky-400/20">
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">SOL Tilburg</p>
                 <p className="text-2xl font-bold">{formatNumber(tilburgTotal, 0)}</p>
               </div>
-              <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+              <Badge variant="secondary" className="bg-sky-400/10 text-sky-500 border-sky-400/20">
                 {tilburgPercent}%
               </Badge>
             </div>
@@ -217,7 +217,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                 style={{ width: `${emmenPercent}%` }}
               />
               <div
-                className="h-full bg-emerald-500 transition-all duration-500"
+                className="h-full bg-sky-400 transition-all duration-500"
                 style={{ width: `${tilburgPercent}%` }}
               />
             </div>
@@ -259,7 +259,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                 formatter={(value: string) => value === "emmen" ? "SOL Emmen" : "SOL Tilburg"}
               />
               <Bar dataKey="emmen" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={20} />
-              <Bar dataKey="tilburg" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
+              <Bar dataKey="tilburg" fill="#38bdf8" radius={[4, 4, 0, 0]} barSize={20} />
             </BarChart>
           </ResponsiveContainer>
 
@@ -290,7 +290,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                 </tr>
                 <tr className="border-b">
                   <td className="py-2 pr-4 font-medium flex items-center gap-1.5">
-                    <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-sky-400" />
                     Tilburg
                   </td>
                   {monthlyData.map(m => (
@@ -345,7 +345,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                 formatter={(value: string) => value === "cumEmmen" ? "SOL Emmen" : value === "cumTilburg" ? "SOL Tilburg" : "Totaal"}
               />
               <Line type="monotone" dataKey="cumEmmen" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3.5 }} activeDot={{ r: 5 }} />
-              <Line type="monotone" dataKey="cumTilburg" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3.5 }} activeDot={{ r: 5 }} />
+              <Line type="monotone" dataKey="cumTilburg" stroke="#38bdf8" strokeWidth={2.5} dot={{ r: 3.5 }} activeDot={{ r: 5 }} />
               <Line type="monotone" dataKey="cumTotal" stroke="hsl(var(--foreground))" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} activeDot={{ r: 5 }} />
             </LineChart>
           </ResponsiveContainer>
@@ -392,7 +392,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                     formatter={(value: string) => value === "emmen" ? "SOL Emmen" : "SOL Tilburg"}
                   />
                   <Bar dataKey="emmen" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={14} stackId="a" />
-                  <Bar dataKey="tilburg" fill="#10b981" radius={[0, 4, 4, 0]} barSize={14} stackId="a">
+                  <Bar dataKey="tilburg" fill="#38bdf8" radius={[0, 4, 4, 0]} barSize={14} stackId="a">
                     <LabelList
                       dataKey="total"
                       position="right"
@@ -431,7 +431,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                             <div className="flex items-center justify-end gap-1">
                               <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden flex">
                                 <div className="h-full bg-blue-500" style={{ width: `${pctEmmen}%` }} />
-                                <div className="h-full bg-emerald-500" style={{ width: `${100 - pctEmmen}%` }} />
+                                <div className="h-full bg-sky-400" style={{ width: `${100 - pctEmmen}%` }} />
                               </div>
                             </div>
                           </td>
