@@ -33,6 +33,8 @@ interface CustomerSegmentationProps {
   refreshKey?: number;
   year?: number;
   dateRange?: { from: Date; to: Date };
+  hideDigital?: boolean;
+  hasDigitalTypes?: boolean;
 }
 
 interface CustomerSegment {
@@ -48,7 +50,7 @@ interface CustomerSegment {
   trend: "new" | "growing" | "stable" | "declining";
 }
 
-export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange }: CustomerSegmentationProps) {
+export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange, hideDigital = false, hasDigitalTypes = false }: CustomerSegmentationProps) {
   const [customers, setCustomers] = useState<CustomerSegment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -205,6 +207,11 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
                   <Badge variant="outline" className="ml-2 text-xs">
                     {customers.length} klanten
                   </Badge>
+                  {hideDigital && hasDigitalTypes && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal">
+                      Alleen fysiek
+                    </Badge>
+                  )}
                 </CardTitle>
                 <CardDescription>
                   Klantwaarde en gedragsanalyse {currentYear}

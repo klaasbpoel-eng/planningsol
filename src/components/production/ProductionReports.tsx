@@ -828,6 +828,8 @@ export function ProductionReports({
               location={location}
               refreshKey={refreshKey}
               dateRange={dateRange}
+              hideDigital={hideDigital}
+              hasDigitalTypes={hasDigitalTypes}
             />
           </Suspense>
         </TabsContent>
@@ -848,6 +850,8 @@ export function ProductionReports({
               location={location}
               refreshKey={refreshKey}
               dateRange={dateRange}
+              hideDigital={hideDigital}
+              hasDigitalTypes={hasDigitalTypes}
             />
           </Suspense>
         </TabsContent>

@@ -24,6 +24,8 @@ interface ProductionHeatMapProps {
   location: ProductionLocation;
   refreshKey?: number;
   dateRange?: { from: Date; to: Date };
+  hideDigital?: boolean;
+  hasDigitalTypes?: boolean;
 }
 
 interface DailyData {
@@ -32,7 +34,7 @@ interface DailyData {
   dryIce: number;
 }
 
-export function ProductionHeatMap({ location, refreshKey = 0, dateRange }: ProductionHeatMapProps) {
+export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDigital = false, hasDigitalTypes = false }: ProductionHeatMapProps) {
   const [currentDate, setCurrentDate] = useState(dateRange?.from ?? new Date());
   const [viewType, setViewType] = useState<ViewType>("cylinders");
   const [dailyData, setDailyData] = useState<Map<string, DailyData>>(new Map());
@@ -157,6 +159,11 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange }: Produ
             <CardTitle className="text-lg flex items-center gap-2">
               <CalendarDays className="h-5 w-5 text-primary" />
               Productie Heatmap
+              {hideDigital && hasDigitalTypes && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal">
+                  Alleen fysiek
+                </Badge>
+              )}
             </CardTitle>
             <CardDescription>
               Volume-intensiteit per dag
