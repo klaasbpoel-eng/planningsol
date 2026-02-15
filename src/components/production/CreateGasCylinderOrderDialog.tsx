@@ -516,18 +516,6 @@ export function CreateGasCylinderOrderDialog({
           </div>
 
 
-          {/* === UITVOERSTATUS === */}
-          <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
-            <div className="space-y-0.5">
-              <Label htmlFor="isCompleted" className="font-medium text-sm">Reeds uitgevoerd</Label>
-              <p className="text-xs text-muted-foreground">Direct markeren als voltooid</p>
-            </div>
-            <Switch
-              id="isCompleted"
-              checked={isCompleted}
-              onCheckedChange={setIsCompleted}
-            />
-          </div>
 
           {/* === MEER OPTIES (collapsible) === */}
           <button
