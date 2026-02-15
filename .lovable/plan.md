@@ -1,19 +1,29 @@
 
 
-## Gastypes zichtbaar houden in beheeroverzicht
+## Duplicaten in cilindergroottes opschonen
 
 ### Probleem
-De `api.gasTypes.getAll()` functie filtert op `is_active = true`. Wanneer je de toggle uitschakelt, wordt het gastype onzichtbaar in het beheeroverzicht omdat het niet meer door het filter komt.
+Er zijn dubbele cilindergroottes in de database met inconsistente naamgeving (met en zonder spaties):
+
+| Naam (met spaties) | Orders | Naam (zonder spaties) | Orders |
+|---|---|---|---|
+| PP 12 X 40L | 1 | PP 12x40L | 0 |
+| PP 12 X 50L | 2 | PP 12x50L | 1 |
+| PP 16 X 40L | 0 | PP 16x40L | 0 |
+| PP 16 X 50L | 30 | PP 16x50L | 5 |
 
 ### Oplossing
-Een nieuwe API-methode toevoegen die alle gastypes ophaalt (inclusief inactieve) en deze gebruiken in het beheeroverzicht (GasTypeManager).
+We standaardiseren op het compacte formaat **zonder spaties** (bijv. `PP 16x50L`) omdat deze de lagere sort_order hebben (= bewust geconfigureerd). De stappen:
+
+1. **Orders migreren**: Alle bestaande orders die de "spatie-variant" gebruiken worden bijgewerkt naar het compacte formaat
+2. **Duplicaten verwijderen**: De overbodige entries met spaties worden uit de `cylinder_sizes` tabel verwijderd
+3. **Geen code-aanpassingen nodig**: De UI haalt de namen dynamisch uit de database
 
 ### Technische details
 
-**1. `src/lib/api.ts`** - Nieuwe methode toevoegen:
-- `getAllIncludingInactive()` die dezelfde query doet als `getAll()` maar zonder het `is_active = true` filter.
+**Database migratie (SQL)**:
+- `UPDATE gas_cylinder_orders` om `cylinder_size` van de spatie-variant naar de compacte variant te wijzigen voor alle 4 paren
+- `DELETE FROM cylinder_sizes` voor de 4 overbodige rijen (PP 12 X 40L, PP 12 X 50L, PP 16 X 40L, PP 16 X 50L)
 
-**2. `src/components/production/GasTypeManager.tsx`** - Aanpassen:
-- `fetchGasTypes()` wijzigen om `api.gasTypes.getAllIncludingInactive()` te gebruiken in plaats van `api.gasTypes.getAll()`.
+De unieke maten zonder duplicaat (PP 6 X 50L, PP 18 X 40L, PP 18 X 50L) worden niet aangepast, tenzij je ook die wilt standaardiseren. Ze hebben momenteel geen compact-equivalent.
 
-De bestaande `getAll()` methode met het `is_active` filter blijft ongewijzigd, zodat bestelformulieren alleen actieve gastypes tonen.
