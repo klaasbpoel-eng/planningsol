@@ -42,7 +42,7 @@ export function CreateGasCylinderOrderDialog({
   const [customerName, setCustomerName] = useState("");
   const [gasTypeId, setGasTypeId] = useState("");
   const [gasGrade, setGasGrade] = useState<"medical" | "technical">("technical");
-  const [cylinderCount, setCylinderCount] = useState(1);
+  const [cylinderCount, setCylinderCount] = useState(16);
   const [cylinderSize, setCylinderSize] = useState("medium");
   const [pressure, setPressure] = useState<200 | 300>(200);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
@@ -167,7 +167,7 @@ export function CreateGasCylinderOrderDialog({
     setCustomerName("");
     setGasTypeId(gasTypes.length > 0 ? gasTypes[0].id : "");
     setGasGrade("technical");
-    setCylinderCount(1);
+    setCylinderCount(16);
     setCylinderSize(cylinderSizes.length > 0 ? cylinderSizes[0].name : "");
     setPressure(200);
     setScheduledDate(new Date());
