@@ -1576,18 +1576,40 @@ export type Database = {
           total_orders: number
         }[]
       }
-      get_production_efficiency_by_period: {
-        Args: { p_from_date: string; p_location?: string; p_to_date: string }
-        Returns: {
-          cancelled_orders: number
-          completed_cylinders: number
-          completed_orders: number
-          efficiency_rate: number
-          pending_orders: number
-          total_cylinders: number
-          total_orders: number
-        }[]
-      }
+      get_production_efficiency_by_period:
+        | {
+            Args: {
+              p_from_date: string
+              p_location?: string
+              p_to_date: string
+            }
+            Returns: {
+              cancelled_orders: number
+              completed_cylinders: number
+              completed_orders: number
+              efficiency_rate: number
+              pending_orders: number
+              total_cylinders: number
+              total_orders: number
+            }[]
+          }
+        | {
+            Args: {
+              p_exclude_digital?: boolean
+              p_from_date: string
+              p_location?: string
+              p_to_date: string
+            }
+            Returns: {
+              cancelled_orders: number
+              completed_cylinders: number
+              completed_orders: number
+              efficiency_rate: number
+              pending_orders: number
+              total_cylinders: number
+              total_orders: number
+            }[]
+          }
       get_user_production_location: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["production_location"]
