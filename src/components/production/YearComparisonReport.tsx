@@ -360,7 +360,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
     if (selectedYear) {
       fetchYearComparisonData();
     }
-  }, [selectedYear, location]);
+  }, [selectedYear, location, hideDigital]);
 
   const fetchYearComparisonData = async () => {
     setLoading(true);
@@ -384,18 +384,18 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       currentCylinderSizeRes,
       previousCylinderSizeRes
     ] = await Promise.all([
-      api.reports.getMonthlyOrderTotals(currentYear, "cylinder", locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyOrderTotals(previousYear, "cylinder", locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyOrderTotals(currentYear, "cylinder", locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyOrderTotals(previousYear, "cylinder", locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
       api.reports.getMonthlyOrderTotals(currentYear, "dry_ice", locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
       api.reports.getMonthlyOrderTotals(previousYear, "dry_ice", locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyCylinderTotalsByGasType(currentYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyCylinderTotalsByGasType(previousYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getYearlyTotalsByCustomer(currentYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getYearlyTotalsByCustomer(previousYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyCylinderTotalsByCustomer(currentYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyCylinderTotalsByCustomer(previousYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyCylinderTotalsBySize(currentYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyCylinderTotalsBySize(previousYear, locationFilter).then(data => ({ data })).catch(error => ({ data: [], error }))
+      api.reports.getMonthlyCylinderTotalsByGasType(currentYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyCylinderTotalsByGasType(previousYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getYearlyTotalsByCustomer(currentYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getYearlyTotalsByCustomer(previousYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyCylinderTotalsByCustomer(currentYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyCylinderTotalsByCustomer(previousYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyCylinderTotalsBySize(currentYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
+      api.reports.getMonthlyCylinderTotalsBySize(previousYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error }))
     ]);
 
     // Process cylinder data from aggregated results

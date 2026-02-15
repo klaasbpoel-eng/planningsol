@@ -95,7 +95,7 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
 
   useEffect(() => {
     fetchBothYearsData();
-  }, [selectedYear1, selectedYear2, location]);
+  }, [selectedYear1, selectedYear2, location, hideDigital]);
 
   const fetchBothYearsData = async () => {
     setLoading(true);
@@ -111,10 +111,10 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
     const locationParam = location !== "all" ? location : null;
 
     const [result1, result2] = await Promise.all([
-      api.reports.getMonthlyCylinderTotalsBySize(selectedYear1, locationParam)
+      api.reports.getMonthlyCylinderTotalsBySize(selectedYear1, locationParam, hideDigital)
         .then(data => ({ data, error: null }))
         .catch(error => ({ data: null, error })),
-      api.reports.getMonthlyCylinderTotalsBySize(selectedYear2, locationParam)
+      api.reports.getMonthlyCylinderTotalsBySize(selectedYear2, locationParam, hideDigital)
         .then(data => ({ data, error: null }))
         .catch(error => ({ data: null, error }))
     ]);

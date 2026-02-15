@@ -859,7 +859,7 @@ export const api = {
             return data;
         },
 
-        getGasCategoryDistribution: async (fromDate: string, toDate: string, location: string | null) => {
+        getGasCategoryDistribution: async (fromDate: string, toDate: string, location: string | null, excludeDigital: boolean = false) => {
             const source = getPrimarySource();
             if (source === "mysql") {
                 const params = [fromDate, toDate];
@@ -885,7 +885,8 @@ export const api = {
             const { data, error } = await client.rpc("get_gas_category_distribution_by_period" as any, {
                 p_from_date: fromDate,
                 p_to_date: toDate,
-                p_location: location
+                p_location: location,
+                p_exclude_digital: excludeDigital
             });
             if (error) throw error;
             return data;
@@ -1101,7 +1102,7 @@ export const api = {
             return data;
         },
 
-        getCustomerTotals: async (fromDate: string, toDate: string, location: string | null) => {
+        getCustomerTotals: async (fromDate: string, toDate: string, location: string | null, excludeDigital: boolean = false) => {
             const source = getPrimarySource();
             if (source === "mysql") {
                 const locClauseCyl = location ? " AND location = ?" : "";
@@ -1137,13 +1138,14 @@ export const api = {
             const { data, error } = await client.rpc("get_customer_totals_by_period", {
                 p_from_date: fromDate,
                 p_to_date: toDate,
-                p_location: location
-            });
+                p_location: location,
+                p_exclude_digital: excludeDigital
+            } as any);
             if (error) throw error;
             return data;
         },
 
-        getMonthlyOrderTotals: async (year: number, orderType: 'cylinder' | 'dry_ice', location: string | null) => {
+        getMonthlyOrderTotals: async (year: number, orderType: 'cylinder' | 'dry_ice', location: string | null, excludeDigital: boolean = false) => {
             const source = getPrimarySource();
             if (source === "mysql") {
                 const table = orderType === 'cylinder' ? 'gas_cylinder_orders' : 'dry_ice_orders';
@@ -1170,13 +1172,14 @@ export const api = {
             const { data, error } = await client.rpc("get_monthly_order_totals", {
                 p_year: year,
                 p_order_type: orderType,
-                p_location: location
-            });
+                p_location: location,
+                p_exclude_digital: excludeDigital
+            } as any);
             if (error) throw error;
             return data;
         },
 
-        getMonthlyCylinderTotalsByGasType: async (year: number, location: string | null) => {
+        getMonthlyCylinderTotalsByGasType: async (year: number, location: string | null, excludeDigital: boolean = false) => {
             const source = getPrimarySource();
             if (source === "mysql") {
                 const params: any[] = [year, year];
@@ -1204,13 +1207,14 @@ export const api = {
             const client = getPrimarySupabaseClient();
             const { data, error } = await client.rpc("get_monthly_cylinder_totals_by_gas_type", {
                 p_year: year,
-                p_location: location
-            });
+                p_location: location,
+                p_exclude_digital: excludeDigital
+            } as any);
             if (error) throw error;
             return data;
         },
 
-        getMonthlyCylinderTotalsBySize: async (year: number, location: string | null) => {
+        getMonthlyCylinderTotalsBySize: async (year: number, location: string | null, excludeDigital: boolean = false) => {
             const source = getPrimarySource();
             if (source === "mysql") {
                 const params: any[] = [year, year];
@@ -1235,13 +1239,14 @@ export const api = {
             const client = getPrimarySupabaseClient();
             const { data, error } = await client.rpc("get_monthly_cylinder_totals_by_size", {
                 p_year: year,
-                p_location: location
-            });
+                p_location: location,
+                p_exclude_digital: excludeDigital
+            } as any);
             if (error) throw error;
             return data;
         },
 
-        getYearlyTotalsByCustomer: async (year: number, location: string | null) => {
+        getYearlyTotalsByCustomer: async (year: number, location: string | null, excludeDigital: boolean = false) => {
             const source = getPrimarySource();
             if (source === "mysql") {
                 const finalParams: any[] = [year, year];
@@ -1282,13 +1287,14 @@ export const api = {
             const client = getPrimarySupabaseClient();
             const { data, error } = await client.rpc("get_yearly_totals_by_customer", {
                 p_year: year,
-                p_location: location
-            });
+                p_location: location,
+                p_exclude_digital: excludeDigital
+            } as any);
             if (error) throw error;
             return data;
         },
 
-        getMonthlyCylinderTotalsByCustomer: async (year: number, location: string | null) => {
+        getMonthlyCylinderTotalsByCustomer: async (year: number, location: string | null, excludeDigital: boolean = false) => {
             const source = getPrimarySource();
             if (source === "mysql") {
                 const params: any[] = [year, year];
@@ -1314,8 +1320,9 @@ export const api = {
             const client = getPrimarySupabaseClient();
             const { data, error } = await client.rpc("get_monthly_cylinder_totals_by_customer", {
                 p_year: year,
-                p_location: location
-            });
+                p_location: location,
+                p_exclude_digital: excludeDigital
+            } as any);
             if (error) throw error;
             return data;
         }
