@@ -961,7 +961,7 @@ export const api = {
             return data;
         },
 
-        getCylinderTotal: async (fromDate: string, toDate: string, location: string | null) => {
+        getCylinderTotal: async (fromDate: string, toDate: string, location: string | null, excludeDigital: boolean = false) => {
             const source = getPrimarySource();
             if (source === "mysql") {
                 const params = [fromDate, toDate];
@@ -974,6 +974,19 @@ export const api = {
             }
 
             const client = getPrimarySupabaseClient();
+
+            if (excludeDigital) {
+                // Use getDailyProductionByPeriod RPC which supports p_exclude_digital
+                const { data, error } = await client.rpc("get_daily_production_by_period", {
+                    p_from_date: fromDate,
+                    p_to_date: toDate,
+                    p_location: location,
+                    p_exclude_digital: true
+                } as any);
+                if (error) throw error;
+                return data?.reduce((sum: number, d: any) => sum + (Number(d.cylinder_count) || 0), 0) || 0;
+            }
+
             let query = client
                 .from("gas_cylinder_orders")
                 .select("cylinder_count")

@@ -251,9 +251,7 @@ export function KPIDashboard({ location, refreshKey = 0, dateRange, hideDigital:
       const startStr = toLocal(weekStart);
       const endStr = toLocal(weekEnd);
 
-      let query = api.reports.getCylinderTotal(startStr, endStr, locationParam);
-
-      const total = await query;
+      const total = await api.reports.getCylinderTotal(startStr, endStr, locationParam, hideDigital);
 
       weeks.push({
         week: `W${8 - i}`,
