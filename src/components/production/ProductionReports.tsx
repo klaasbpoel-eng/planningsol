@@ -600,7 +600,14 @@ export function ProductionReports({
 
         <StatCard
           value={formatNumber(hideDigital ? cylinderStats.totalCylinders - digitalPhysicalSplit.digital : cylinderStats.totalCylinders, 0)}
-          label={hideDigital && hasDigitalTypes ? "Fysieke cilinders ⓕ" : hideDigital ? "Fysieke cilinders" : "Totaal cilinders"}
+          label={
+            <span className="flex items-center gap-1.5">
+              {hideDigital ? "Fysieke cilinders" : "Totaal cilinders"}
+              {hideDigital && hasDigitalTypes && (
+                <span className="inline-flex items-center text-[9px] px-1 py-0 rounded border border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal leading-tight">Alleen fysiek</span>
+              )}
+            </span>
+          }
           icon={<Package className="h-4 w-4 text-orange-500" />}
           iconBgColor="bg-orange-500/10"
           trend={{
