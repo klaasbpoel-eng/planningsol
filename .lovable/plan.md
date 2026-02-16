@@ -1,96 +1,102 @@
 
+# Aanvullende UI Verbeteringen op Basis van Best Practices
 
-# Alle Verbeteringen Implementeren
-
-## Overzicht
-Dit plan implementeert alle eerder voorgestelde verbeteringen in 5 stappen, geordend op impact en afhankelijkheden.
+Na een grondige analyse van alle pagina's en componenten zijn er nog diverse verbeteringen mogelijk. Hieronder de bevindingen, gegroepeerd per categorie.
 
 ---
 
-## 1. ProtectedRoute Component (DRY auth-logica)
+## 1. Dashboard (Verlof) gebruikt PageLayout niet
 
-Elke pagina (CalendarPage, ProductionPlanningPage, DashboardPage, InternalOrdersPage, ToolboxPage) bevat dezelfde auth-check logica: sessie ophalen, user state bijhouden, redirect naar "/" als niet ingelogd, en een laad-spinner tonen. Dit wordt gecentraliseerd in een herbruikbaar `ProtectedRoute` component.
+De `Dashboard.tsx` component (verlofpagina) is nog niet gerefactord naar het nieuwe `PageLayout` component. Het gebruikt nog een eigen `Header` import en inconsistente padding (`px-[1%] md:px-[10%]`), terwijl alle andere pagina's al `PageLayout` gebruiken met `container mx-auto px-4`.
 
 **Wat verandert:**
-- Nieuw bestand: `src/components/auth/ProtectedRoute.tsx`
-- Bevat auth state management, redirect, en loading spinner
-- Geeft `user`, `role`, `permissions`, `productionLocation`, `canViewAllLocations` door aan child-pagina's via render prop of context
-- Alle 5 pagina's worden vereenvoudigd: auth-logica wordt verwijderd
-
-**Technisch detail:**
-```text
-ProtectedRoute
-  +-- useEffect: onAuthStateChange + getSession
-  +-- useUserPermissions(user?.id)
-  +-- Loading? -> Spinner
-  +-- No user? -> Navigate to "/"
-  +-- Authenticated? -> Render children met user/permissions props
-```
+- `src/components/dashboard/Dashboard.tsx`: Vervang de eigen `Header` + padding wrapper door `PageLayout`
+- Verwijder de loading state die ook een eigen Header rendert
+- Consistent met CalendarPage, ProductionPlanningPage, etc.
 
 ---
 
-## 2. Consistente PageLayout Component
+## 2. UserLaunchpad gebruikt PageLayout niet
 
-Pagina's gebruiken inconsistente padding (`px-[1%] md:px-[10%]` vs `container mx-auto px-4`). Een gedeelde `PageLayout` component zorgt voor consistentie.
+`UserLaunchpad.tsx` rendert nog een eigen `Header` en gebruikt `container mx-auto px-4` direct in de component. Dit moet via `PageLayout` lopen voor consistentie.
 
 **Wat verandert:**
-- Nieuw bestand: `src/components/layout/PageLayout.tsx`
-- Bevat: Header, consistente padding (`container mx-auto px-4 py-8`), optionele page title/description, en breadcrumbs
-- Alle pagina's gebruiken deze layout in plaats van hun eigen Header + padding wrapper
+- `src/components/dashboard/UserLaunchpad.tsx`: Wrap inhoud in `PageLayout`
 
 ---
 
-## 3. Wachtwoord Vergeten Functie
+## 3. Login pagina mist branding (bedrijfslogo)
 
-Het loginformulier mist een "Wachtwoord vergeten" optie, wat een standaard verwachting is.
+De `AuthForm` toont een generiek Calendar-icoon, maar de rest van de app gebruikt het bedrijfslogo (`site_logo.png`). Best practice: consistente branding op de login-pagina versterkt herkenning en vertrouwen.
 
 **Wat verandert:**
-- `src/components/auth/AuthForm.tsx`: nieuwe state `isForgotPassword`
-- Bij activering: toont alleen e-mailveld + "Reset link versturen" knop
-- Gebruikt `supabase.auth.resetPasswordForEmail()` met `redirectTo: window.location.origin`
-- Terugknop naar login
+- `src/components/auth/AuthForm.tsx`: Vervang het Calendar-icoon door het bedrijfslogo
+- Voeg de app-naam "Planner" toe onder het logo, consistent met de Header
 
 ---
 
-## 4. Error Boundary Component
+## 4. 404 pagina mist navigatie en branding
 
-Onverwachte fouten geven nu een wit scherm. Een Error Boundary vangt crashes op en toont een nette foutmelding.
+De `NotFound` pagina toont een kale tekst met een simpele link. Vergelijkbare apps tonen een branded 404 pagina met duidelijke call-to-action en eventueel het logo.
 
 **Wat verandert:**
-- Nieuw bestand: `src/components/ui/error-boundary.tsx`
-- Class component met `componentDidCatch` en `getDerivedStateFromError`
-- Toont een nette foutpagina met "Opnieuw proberen" knop
-- Wordt toegevoegd in `App.tsx` rond de Routes
+- `src/pages/NotFound.tsx`: Voeg het bedrijfslogo toe, verbeter de visuele presentatie, en gebruik een `Button` component in plaats van een kale link
 
 ---
 
-## 5. Code Cleanup
+## 5. Geen bevestiging bij verwijderen van verlofaanvragen
 
-Diverse kleine fixes die de codekwaliteit verbeteren.
+In `TimeOffRequestList.tsx` wordt `handleDelete` direct aangeroepen zonder bevestigingsdialoog. Best practice is altijd een bevestiging vragen bij destructieve acties.
 
 **Wat verandert:**
-- `src/App.css`: Verwijder ongebruikte Vite boilerplate CSS (het hele bestand kan worden leeggemaakt, de relevante styling zit in `index.css`)
-- `src/components/dashboard/UserLaunchpad.tsx`: Fix incorrecte import `import Link from "react-router-dom"` (regel 6) -- wordt niet gebruikt, kan verwijderd worden
-- `src/pages/ToolboxPage.tsx`: Vervang `window.confirm()` (regel 127) door een `AlertDialog` component voor een consistente, toegankelijke bevestigingsdialoog
-- `src/components/layout/Header.tsx`: Voeg een "Skip to main content" link toe bovenaan voor WCAG-toegankelijkheid
+- `src/components/time-off/TimeOffRequestList.tsx`: Voeg een `AlertDialog` bevestiging toe voor het verwijderen, consistent met de aanpak in ToolboxPage
 
 ---
 
-## Samenvatting van nieuwe/gewijzigde bestanden
+## 6. Typo in EmptyState component
 
-| Bestand | Actie |
+In `empty-state.tsx` staat "Geen gegevens" (regel 97-98). Dit moet "Geen gegevens" -> "Geen gegevens" -- eigenlijk "gegevens" is incorrect Nederlands. Het correcte woord is "gegevens" of beter: "Geen gegevens beschikbaar" -> "Geen gegevens beschikbaar." Nee, het juiste woord is "gegevens" (dat klopt niet) - het moet zijn: "Geen **gegevens**" is fout, correct is "Geen **gegevens**". Eigenlijk: "gegevens" bestaat niet, correct Nederlands is "gegevens" (meervoud van gegeven). Laat me het checken: "gegevens" is inderdaad fout. Correct: "gegevens" -> "gegevens". Het woord in de code is "gegevens" wat correct is. Laat me opnieuw kijken...
+
+In de code staat: `defaultTitle: "Geen gegevens"` en `defaultDescription: "Er zijn nog geen gegevens beschikbaar."` -- "gegevens" is correct Nederlands (meervoud van gegeven). Dit is dus goed. Ik sla dit punt over.
+
+---
+
+## 7. Keyboard shortcut (Ctrl+K) niet zichtbaar
+
+Er bestaat een `CommandPalette` component, maar er is geen visuele hint dat Ctrl+K beschikbaar is. Best practice van apps als Notion, Linear, en GitHub: toon een subtiele "Ctrl+K" badge in de header of zoekbalk.
+
+**Wat verandert:**
+- `src/components/layout/Header.tsx`: Voeg een kleine zoekknop/badge toe met "Ctrl+K" hint naast de navigatie
+
+---
+
+## 8. Toasts hebben geen consistente positie
+
+Het project laadt zowel `Toaster` (van shadcn/ui) als `Sonner`. Het gebruik van twee toast-systemen tegelijk kan tot verwarring leiden.
+
+**Wat verandert:**
+- `src/App.tsx`: Controleer of beide nodig zijn. Als alleen Sonner wordt gebruikt (wat het geval lijkt gezien alle `toast()` calls uit sonner komen), verwijder dan de shadcn `Toaster`
+
+---
+
+## 9. Breadcrumbs toevoegen aan PageLayout
+
+Vergelijkbare enterprise dashboards (Jira, Asana, Monday.com) tonen altijd breadcrumbs voor orientatie. De `PageLayout` component ondersteunt dit nog niet.
+
+**Wat verandert:**
+- `src/components/layout/PageLayout.tsx`: Voeg optionele breadcrumbs toe boven de page title, gebaseerd op de huidige route
+
+---
+
+## Samenvatting
+
+| Bestand | Verbetering |
 |---|---|
-| `src/components/auth/ProtectedRoute.tsx` | Nieuw |
-| `src/components/layout/PageLayout.tsx` | Nieuw |
-| `src/components/ui/error-boundary.tsx` | Nieuw |
-| `src/components/auth/AuthForm.tsx` | Wachtwoord vergeten toevoegen |
-| `src/App.tsx` | Error Boundary toevoegen, routes wrappen met ProtectedRoute |
-| `src/App.css` | Boilerplate verwijderen |
-| `src/pages/CalendarPage.tsx` | Vereenvoudigen met ProtectedRoute + PageLayout |
-| `src/pages/ProductionPlanningPage.tsx` | Vereenvoudigen met ProtectedRoute + PageLayout |
-| `src/pages/DashboardPage.tsx` | Vereenvoudigen met ProtectedRoute + PageLayout |
-| `src/pages/InternalOrdersPage.tsx` | Vereenvoudigen met ProtectedRoute + PageLayout |
-| `src/pages/ToolboxPage.tsx` | Vereenvoudigen + AlertDialog i.p.v. confirm() |
-| `src/components/dashboard/UserLaunchpad.tsx` | Fix incorrecte import |
-| `src/components/layout/Header.tsx` | Skip-to-content link |
-
+| `src/components/dashboard/Dashboard.tsx` | Migreer naar PageLayout |
+| `src/components/dashboard/UserLaunchpad.tsx` | Migreer naar PageLayout |
+| `src/components/auth/AuthForm.tsx` | Bedrijfslogo + app-naam |
+| `src/pages/NotFound.tsx` | Branded 404 met logo en Button |
+| `src/components/time-off/TimeOffRequestList.tsx` | AlertDialog bij verwijderen |
+| `src/components/layout/Header.tsx` | Ctrl+K zoek-hint |
+| `src/App.tsx` | Verwijder dubbele Toaster als onnodig |
+| `src/components/layout/PageLayout.tsx` | Breadcrumbs ondersteuning |
