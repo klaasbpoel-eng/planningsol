@@ -240,8 +240,8 @@ export function CalendarItemPreview({
               <ClipboardList className="h-4 w-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-sm truncate">{task.task_type?.name || "Taak"}</h4>
-              <p className="text-xs text-muted-foreground">Taak</p>
+              <h4 className="font-semibold text-sm truncate">{task.title || task.task_type?.name || "Taak"}</h4>
+              <p className="text-xs text-muted-foreground">{task.task_type?.name || "Taak"}</p>
             </div>
             <div className="flex items-center gap-1 text-xs font-medium">
               {getStatusIcon(task.status)}
