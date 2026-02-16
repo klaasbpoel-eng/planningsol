@@ -1,64 +1,15 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Header } from "@/components/layout/Header";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { PageLayout } from "@/components/layout/PageLayout";
 import { CalendarOverview } from "@/components/calendar/CalendarOverview";
-import { PageTransition } from "@/components/ui/page-transition";
-import { Loader2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import type { User } from "@supabase/supabase-js";
-import { useUserPermissions } from "@/hooks/useUserPermissions";
 
-const CalendarPage = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
-  const { role } = useUserPermissions(user?.id);
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null);
-        setLoading(false);
-        if (!session?.user) {
-          navigate("/");
-        }
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-      if (!session?.user) {
-        navigate("/");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
-  return (
-    <PageTransition>
-      <div className="min-h-screen flex flex-col gradient-mesh overflow-x-hidden">
-        <Header userEmail={user.email} role={role} />
-
-        <main className="flex-1 flex flex-col w-full px-[1%] md:px-[10%]">
-          <CalendarOverview currentUser={user} />
-        </main>
-      </div>
-    </PageTransition>
-  );
-};
+const CalendarPage = () => (
+  <ProtectedRoute>
+    {({ user, role }) => (
+      <PageLayout userEmail={user.email} role={role}>
+        <CalendarOverview currentUser={user} />
+      </PageLayout>
+    )}
+  </ProtectedRoute>
+);
 
 export default CalendarPage;

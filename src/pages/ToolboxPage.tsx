@@ -4,16 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, BookOpen, FileText, Download, ExternalLink, Plus, Pencil, Trash2, X, Eye, Upload, Loader2 } from "lucide-react";
+import { Search, BookOpen, FileText, Download, ExternalLink, Plus, Pencil, Trash2, Eye, Upload, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Header } from "@/components/layout/Header";
-import { PageTransition } from "@/components/ui/page-transition";
+import { PageLayout } from "@/components/layout/PageLayout";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { toast } from "sonner";
 
@@ -48,6 +48,7 @@ const ToolboxPage = () => {
         file_url: ""
     });
     const [uploading, setUploading] = useState(false);
+    const [deleteId, setDeleteId] = useState<string | null>(null);
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -124,8 +125,6 @@ const ToolboxPage = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Weet je zeker dat je deze toolbox wilt verwijderen?")) return;
-
         try {
             const { error } = await supabase
                 .from("toolboxes" as any)
@@ -138,6 +137,8 @@ const ToolboxPage = () => {
         } catch (error: any) {
             console.error("Error deleting toolbox:", error);
             toast.error("Fout bij verwijderen: " + error.message);
+        } finally {
+            setDeleteId(null);
         }
     };
 
@@ -259,7 +260,7 @@ const ToolboxPage = () => {
                         <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-primary" onClick={() => openEditDialog(item as ToolboxItem)}>
                             <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(item.id as string)}>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(item.id as string)}>
                             <Trash2 className="h-4 w-4" />
                         </Button>
                     </div>
@@ -269,26 +270,18 @@ const ToolboxPage = () => {
     );
 
     return (
-        <PageTransition>
-            <div className="min-h-screen gradient-mesh overflow-x-hidden">
-                <Header userEmail={session?.user?.email} role={role} />
-
-                <main className="container mx-auto px-4 py-8">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gradient mb-2">Toolbox Meetingen</h1>
-                            <p className="text-muted-foreground">
-                                Training en instructies voor operators en medewerkers.
-                            </p>
-                        </div>
-                        {canManage && (
+        <PageLayout
+            userEmail={session?.user?.email}
+            role={role}
+            title="Toolbox Meetingen"
+            description="Training en instructies voor operators en medewerkers."
+        >
+                    {canManage && (
                             <Button onClick={openCreateDialog} className="shrink-0 gap-2 shadow-lg hover:shadow-primary/20 transition-all">
                                 <Plus className="h-4 w-4" />
                                 Nieuwe Toolbox
                             </Button>
-                        )}
-                    </div>
-
+                    )}
                     <div className="flex flex-col md:flex-row gap-4 mb-8 justify-between items-start md:items-center">
                         <div className="relative w-full md:w-96">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -335,7 +328,6 @@ const ToolboxPage = () => {
                             <p className="text-muted-foreground">Probeer een andere zoekopdracht of categorie.</p>
                         </div>
                     )}
-                </main>
 
                 {/* Management Dialog */}
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -485,8 +477,25 @@ const ToolboxPage = () => {
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
-            </div>
-        </PageTransition>
+
+                {/* Delete Confirmation Dialog */}
+                <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Toolbox verwijderen</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Weet je zeker dat je deze toolbox wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteId && handleDelete(deleteId)}>
+                                Verwijderen
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+        </PageLayout>
     );
 };
 

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Factory, Calendar, ShoppingCart, Wrench, Clock, Shield, ArrowRight, Activity } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import Link from "react-router-dom";
+
 import type { RolePermissions, AppRole } from "@/hooks/useUserPermissions";
 
 interface UserLaunchpadProps {

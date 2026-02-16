@@ -5,10 +5,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Calendar } from "lucide-react";
+import { Loader2, Calendar, ArrowLeft } from "lucide-react";
+
+type FormMode = "login" | "signup" | "forgot-password";
 
 export function AuthForm() {
-  const [isLogin, setIsLogin] = useState(true);
+  const [mode, setMode] = useState<FormMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,7 +20,14 @@ export function AuthForm() {
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (mode === "forgot-password") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin,
+        });
+        if (error) throw error;
+        toast.success("Controleer uw e-mail voor de resetlink");
+        setMode("login");
+      } else if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -43,6 +52,22 @@ export function AuthForm() {
     }
   };
 
+  const getTitle = () => {
+    switch (mode) {
+      case "login": return "Welkom terug";
+      case "signup": return "Account aanmaken";
+      case "forgot-password": return "Wachtwoord vergeten";
+    }
+  };
+
+  const getDescription = () => {
+    switch (mode) {
+      case "login": return "Log in om uw verlofaanvragen te beheren";
+      case "signup": return "Meld u aan om verlof te plannen";
+      case "forgot-password": return "Voer uw e-mailadres in om een resetlink te ontvangen";
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-xl border-0 bg-card">
@@ -53,12 +78,10 @@ export function AuthForm() {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight">
-            {isLogin ? "Welkom terug" : "Account aanmaken"}
+            {getTitle()}
           </CardTitle>
           <CardDescription className="text-muted-foreground">
-            {isLogin
-              ? "Log in om uw verlofaanvragen te beheren"
-              : "Meld u aan om verlof te plannen"}
+            {getDescription()}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -75,19 +98,21 @@ export function AuthForm() {
                 className="h-11"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Wachtwoord</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="h-11"
-              />
-            </div>
+            {mode !== "forgot-password" && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Wachtwoord</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="h-11"
+                />
+              </div>
+            )}
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <Button
@@ -96,18 +121,43 @@ export function AuthForm() {
               disabled={loading}
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLogin ? "Inloggen" : "Account Aanmaken"}
+              {mode === "login" && "Inloggen"}
+              {mode === "signup" && "Account Aanmaken"}
+              {mode === "forgot-password" && "Reset link versturen"}
             </Button>
-            <p className="text-sm text-muted-foreground text-center">
-              {isLogin ? "Nog geen account?" : "Heeft u al een account?"}{" "}
+
+            {mode === "forgot-password" ? (
               <button
                 type="button"
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-accent font-medium hover:underline"
+                onClick={() => setMode("login")}
+                className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
               >
-                {isLogin ? "Registreren" : "Inloggen"}
+                <ArrowLeft className="h-3 w-3" />
+                Terug naar inloggen
               </button>
-            </p>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                {mode === "login" && (
+                  <button
+                    type="button"
+                    onClick={() => setMode("forgot-password")}
+                    className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+                  >
+                    Wachtwoord vergeten?
+                  </button>
+                )}
+                <p className="text-sm text-muted-foreground text-center">
+                  {mode === "login" ? "Nog geen account?" : "Heeft u al een account?"}{" "}
+                  <button
+                    type="button"
+                    onClick={() => setMode(mode === "login" ? "signup" : "login")}
+                    className="text-accent font-medium hover:underline"
+                  >
+                    {mode === "login" ? "Registreren" : "Inloggen"}
+                  </button>
+                </p>
+              </div>
+            )}
           </CardFooter>
         </form>
       </Card>
