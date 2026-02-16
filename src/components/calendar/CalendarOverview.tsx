@@ -282,7 +282,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
 
       // Map profiles and task types to tasks
       const tasksWithProfiles: TaskWithProfile[] = (tasksData || []).map((task: any) => {
-        const profile = profilesData?.find((p: any) => p.user_id === task.assigned_to) || null;
+        const profile = task.assigned_to ? profilesData?.find((p: any) => p.user_id === task.assigned_to) || null : null;
         const task_type = taskTypesData?.find((t: any) => t.id === task.type_id) || null;
         return { ...task, profile, task_type };
       });
