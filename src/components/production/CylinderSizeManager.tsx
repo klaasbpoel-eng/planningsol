@@ -81,7 +81,7 @@ export function CylinderSizeManager({ open, onOpenChange }: CylinderSizeManagerP
 
   const fetchCylinderSizes = async () => {
     try {
-      const data = await api.cylinderSizes.getAll();
+      const data = await api.cylinderSizes.getAllIncludingInactive();
       if (data) {
         // Client-side sort if needed, though API has default sort
         const sorted = [...data].sort((a: any, b: any) => {

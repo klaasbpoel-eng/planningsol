@@ -1335,6 +1335,11 @@ export const api = {
                 filters: [{ column: "is_active", op: "eq", value: true }]
             });
         },
+        getAllIncludingInactive: async () => {
+            return primaryRead("cylinder_sizes", {
+                orderBy: "sort_order",
+            });
+        },
         create: async (item: any) => {
             return primaryCreate("cylinder_sizes", item);
         },
