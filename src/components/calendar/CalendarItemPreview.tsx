@@ -130,7 +130,8 @@ export function CalendarItemPreview({
         <HoverCardContent
           side={side}
           align={align}
-          className="w-72 p-0 overflow-hidden border-border/50 bg-popover shadow-xl z-50"
+          collisionPadding={16}
+          className="w-72 p-0 overflow-hidden border-border/50 bg-popover shadow-xl z-[100]"
         >
           {/* Header */}
           <div className={cn(
@@ -222,7 +223,8 @@ export function CalendarItemPreview({
       <HoverCardContent
         side={side}
         align={align}
-        className="w-72 p-0 overflow-hidden border-border/50 bg-popover shadow-xl z-50"
+        collisionPadding={16}
+        className="w-72 p-0 overflow-hidden border-border/50 bg-popover shadow-xl z-[100]"
       >
         {/* Header with task type color */}
         <div
