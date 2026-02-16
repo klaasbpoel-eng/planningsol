@@ -1432,7 +1432,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                       <ClipboardList className="w-3 h-3 shrink-0" />
                       <span className="truncate font-medium">
                         {hasTimeInfo(task.start_time, task.end_time) && <span className="opacity-80 mr-1">{formatTimeRange(task.start_time, task.end_time)}</span>}
-                        {task.task_type?.name || "Taak"}
+                        {task.task_type?.name || "Taak"}{task.title ? ` • ${task.title}` : ""}
                       </span>
                     </div>
                   </CalendarItemPreview>;
