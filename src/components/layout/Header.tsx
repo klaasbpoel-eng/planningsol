@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck, BookOpen, Clock } from "lucide-react";
+import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck, BookOpen, Clock, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -170,6 +170,22 @@ export function Header({
 
         {/* Right side - Actions */}
         <div className="flex items-center gap-1">
+          {/* Keyboard shortcut hint */}
+          {!isMobile && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden md:flex items-center gap-2 text-muted-foreground hover:text-foreground h-8 px-3 border-border/50"
+              onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+            >
+              <Search className="h-3.5 w-3.5" />
+              <span className="text-xs">Zoeken</span>
+              <kbd className="pointer-events-none ml-1 inline-flex h-5 select-none items-center gap-0.5 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </Button>
+          )}
+
           {/* Theme toggle - always visible */}
           <ThemeToggle variant="header" />
 

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 
@@ -19,6 +30,8 @@ interface TimeOffRequestListProps {
 }
 
 export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListProps) {
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
   const handleDelete = async (id: string) => {
     try {
       await api.timeOffRequests.delete(id);
@@ -133,7 +146,7 @@ export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListPro
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => handleDelete(request.id)}
+                    onClick={() => setDeleteId(request.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -143,6 +156,29 @@ export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListPro
           );
         })}
       </CardContent>
+
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aanvraag verwijderen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Weet u zeker dat u deze verlofaanvraag wilt verwijderen? Dit kan niet ongedaan worden gemaakt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteId) handleDelete(deleteId);
+                setDeleteId(null);
+              }}
+            >
+              Verwijderen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

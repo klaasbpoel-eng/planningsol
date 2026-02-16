@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { Header } from "@/components/layout/Header";
+import { PageLayout } from "@/components/layout/PageLayout";
 import { TimeOffRequestForm } from "@/components/time-off/TimeOffRequestForm";
 import { TimeOffRequestList } from "@/components/time-off/TimeOffRequestList";
 import { TimeOffCalendar } from "@/components/time-off/TimeOffCalendar";
@@ -101,47 +101,32 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header userEmail={userEmail} role={role} />
-        <main className="w-full px-[10%] py-8">
-          {/* Role buttons skeleton */}
-          <div className="flex flex-wrap gap-3 mb-6">
-            <div className="h-10 w-44 rounded-md bg-muted animate-pulse" />
-            <div className="h-10 w-36 rounded-md bg-muted animate-pulse" />
+      <PageLayout userEmail={userEmail} role={role} title="Verlof & Aanvragen" description="Beheer uw verlofaanvragen en bekijk uw saldo" titleIcon={<Clock className="h-7 w-7" />}>
+        {/* Role buttons skeleton */}
+        <div className="flex flex-wrap gap-3 mb-6">
+          <div className="h-10 w-44 rounded-md bg-muted animate-pulse" />
+          <div className="h-10 w-36 rounded-md bg-muted animate-pulse" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <TableSkeleton rows={5} columns={4} />
           </div>
-
-          {/* Stats skeleton */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <StatCardSkeleton />
-            <StatCardSkeleton />
-            <StatCardSkeleton />
+          <div className="lg:col-span-1">
+            <TimeOffCalendarSkeleton />
           </div>
-
-          {/* Main content skeleton */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <TableSkeleton rows={5} columns={4} />
-            </div>
-            <div className="lg:col-span-1">
-              <TimeOffCalendarSkeleton />
-            </div>
-          </div>
-        </main>
-      </div>
+        </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
-      <Header userEmail={userEmail} role={role} />
-
+    <PageLayout userEmail={userEmail} role={role} title="Verlof & Aanvragen" description="Beheer uw verlofaanvragen en bekijk uw saldo" titleIcon={<Clock className="h-7 w-7" />}>
       <FadeIn show={!loading}>
-        <main className="w-full px-[1%] md:px-[10%] py-8">
-          {/* Page heading */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold tracking-tight">Verlof & Aanvragen</h1>
-            <p className="text-muted-foreground text-sm mt-1">Beheer uw verlofaanvragen en bekijk uw saldo</p>
-          </div>
 
           {/* Quick navigation */}
           {(isAdmin || permissions?.canViewOrders || role === "admin") && (
@@ -222,8 +207,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
               <TimeOffCalendar requests={requests.filter((r) => r.status !== "rejected")} />
             </div>
           </div>
-        </main>
       </FadeIn>
-    </div>
+    </PageLayout>
   );
 }

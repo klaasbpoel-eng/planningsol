@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Calendar, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
+import siteLogo from "@/assets/site_logo.png";
 
 type FormMode = "login" | "signup" | "forgot-password";
 
@@ -72,10 +73,9 @@ export function AuthForm() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-xl border-0 bg-card">
         <CardHeader className="space-y-1 text-center pb-2">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="p-3 bg-primary rounded-xl">
-              <Calendar className="h-8 w-8 text-primary-foreground" />
-            </div>
+          <div className="flex flex-col items-center gap-2 mb-4">
+            <img src={siteLogo} alt="SOL Group Logo" className="h-14 w-auto" />
+            <span className="text-sm font-semibold text-primary tracking-wide">Planner</span>
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight">
             {getTitle()}
