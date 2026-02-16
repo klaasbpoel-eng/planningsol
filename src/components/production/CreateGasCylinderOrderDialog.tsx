@@ -297,7 +297,7 @@ export function CreateGasCylinderOrderDialog({
   const selectedGas = gasTypes.find(t => t.id === gasTypeId);
 
   // Quick count buttons
-  const quickCounts = [16, 12, 10, 6, 5, 4, 3, 2, 1];
+  const quickCounts = [64, 60, 40, 32, 16, 12, 10];
 
   return (
     <ResponsiveDialog open={open} onOpenChange={handleClose} handleOnly>
