@@ -379,7 +379,7 @@ export function CreateTaskDialog({
                   <SelectItem value="everyone" className="font-medium border-b mb-1">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
-                      Iedereen
+                      Algemeen
                     </div>
                   </SelectItem>
                   {profiles.map((profile) => (
