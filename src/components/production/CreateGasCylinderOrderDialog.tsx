@@ -336,16 +336,6 @@ export function CreateGasCylinderOrderDialog({
                 {showAllGases ? "Locatie filter" : "Toon alles"}
               </button>
             </div>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Zoek gastype..."
-                value={gasSearch}
-                onChange={(e) => setGasSearch(e.target.value)}
-                className="h-8 pl-8 text-xs bg-background"
-              />
-            </div>
             <div className="max-h-[180px] overflow-y-auto rounded-md border p-2 bg-muted/20 space-y-2">
               {groupedGasTypes.map((group) => (
                 <div key={group.categoryName}>
