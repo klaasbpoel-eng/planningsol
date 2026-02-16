@@ -1,6 +1,9 @@
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { PageTransition } from "@/components/ui/page-transition";
+import { Button } from "@/components/ui/button";
+import { Home } from "lucide-react";
+import siteLogo from "@/assets/site_logo.png";
 
 const NotFound = () => {
   const location = useLocation();
@@ -11,13 +14,19 @@ const NotFound = () => {
 
   return (
     <PageTransition>
-      <div className="flex min-h-screen items-center justify-center bg-muted px-[10%]">
-        <div className="text-center">
-          <h1 className="mb-4 text-4xl font-bold">404</h1>
-          <p className="mb-4 text-xl text-muted-foreground">Oeps! Pagina niet gevonden</p>
-          <a href="/" className="text-primary underline hover:text-primary/90">
-            Terug naar Home
-          </a>
+      <div className="flex min-h-screen items-center justify-center bg-muted px-4">
+        <div className="text-center space-y-6">
+          <img src={siteLogo} alt="SOL Group Logo" className="h-16 w-auto mx-auto" />
+          <div>
+            <h1 className="text-6xl font-bold text-primary mb-2">404</h1>
+            <p className="text-xl text-muted-foreground">Oeps! Pagina niet gevonden</p>
+          </div>
+          <Button asChild>
+            <a href="/">
+              <Home className="h-4 w-4 mr-2" />
+              Terug naar Home
+            </a>
+          </Button>
         </div>
       </div>
     </PageTransition>
