@@ -390,13 +390,22 @@ export function CreateGasCylinderOrderDialog({
                 <Minus className="h-4 w-4" />
               </Button>
               <Input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 min="1"
                 value={cylinderCount}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => {
-                  const val = parseInt(e.target.value);
+                  const raw = e.target.value.replace(/\D/g, '');
+                  if (raw === '') {
+                    setCylinderCount(0);
+                    return;
+                  }
+                  const val = parseInt(raw);
                   if (!isNaN(val) && val > 0) setCylinderCount(val);
                 }}
+                onBlur={() => { if (cylinderCount < 1) setCylinderCount(1); }}
                 className="h-11 text-center text-lg font-semibold bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               <Button
