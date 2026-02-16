@@ -53,8 +53,8 @@ export function CalendarItemPreview({
   align = "center"
 }: CalendarItemPreviewProps) {
   const getEmployeeName = (profile?: Profile | null) => {
-    if (!profile) return "Iedereen";
-    return profile.full_name || profile.email?.split("@")[0] || "Iedereen";
+    if (!profile) return "Algemeen";
+    return profile.full_name || profile.email?.split("@")[0] || "Algemeen";
   };
 
   const getTypeLabel = (leaveType: string) => {

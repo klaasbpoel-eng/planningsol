@@ -321,7 +321,7 @@ export function CalendarItemDialog({
   const getEmployeeName = (itemData: RequestWithProfile | TaskWithProfile) => {
     // Check if it's a task and unassigned (assigned to everyone)
     if ('assigned_to' in itemData && !itemData.assigned_to) {
-      return "Iedereen";
+      return "Algemeen";
     }
     return itemData.profile?.full_name || itemData.profile?.email?.split("@")[0] || "Onbekend";
   };
@@ -421,7 +421,7 @@ export function CalendarItemDialog({
                           <SelectItem value="everyone" className="font-medium border-b mb-1">
                             <div className="flex items-center gap-2">
                               <Users className="h-4 w-4" />
-                              Iedereen
+                              Algemeen
                             </div>
                           </SelectItem>
                           {profiles.map((profile) => (
