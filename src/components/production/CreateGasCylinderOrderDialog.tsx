@@ -300,7 +300,7 @@ export function CreateGasCylinderOrderDialog({
   const quickCounts = [16, 12, 10, 6, 5, 4, 3, 2, 1];
 
   return (
-    <ResponsiveDialog open={open} onOpenChange={handleClose}>
+    <ResponsiveDialog open={open} onOpenChange={handleClose} handleOnly>
       <ResponsiveDialogContent className="sm:max-w-[520px]">
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle className="text-lg font-semibold">Nieuwe vulorder</ResponsiveDialogTitle>

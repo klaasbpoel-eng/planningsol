@@ -269,7 +269,7 @@ export function CreateDryIceOrderDialog({
   const selectedProductType = productTypes.find(pt => pt.id === productTypeId);
 
   return (
-    <ResponsiveDialog open={open} onOpenChange={handleClose}>
+    <ResponsiveDialog open={open} onOpenChange={handleClose} handleOnly>
       <ResponsiveDialogContent className="sm:max-w-[520px]">
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle className="text-lg font-semibold">Nieuwe droogijs order</ResponsiveDialogTitle>
