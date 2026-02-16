@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { X } from "lucide-react";
 import {
   Dialog,
   DialogClose,
@@ -26,6 +27,7 @@ interface ResponsiveDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   children: React.ReactNode;
+  handleOnly?: boolean;
 }
 
 interface ResponsiveDialogContentProps {
@@ -53,22 +55,24 @@ interface ResponsiveDialogDescriptionProps {
   className?: string;
 }
 
-// Context to share mobile state
-const ResponsiveDialogContext = React.createContext<{ isMobile: boolean }>({
+// Context to share mobile state and handleOnly
+const ResponsiveDialogContext = React.createContext<{ isMobile: boolean; handleOnly: boolean }>({
   isMobile: false,
+  handleOnly: false,
 });
 
 export function ResponsiveDialog({ 
   open, 
   onOpenChange, 
-  children 
+  children,
+  handleOnly = false,
 }: ResponsiveDialogProps) {
   const isMobile = useIsMobile();
 
   if (isMobile) {
     return (
-      <ResponsiveDialogContext.Provider value={{ isMobile: true }}>
-        <Drawer open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContext.Provider value={{ isMobile: true, handleOnly }}>
+        <Drawer open={open} onOpenChange={onOpenChange} handleOnly={handleOnly}>
           {children}
         </Drawer>
       </ResponsiveDialogContext.Provider>
@@ -76,7 +80,7 @@ export function ResponsiveDialog({
   }
 
   return (
-    <ResponsiveDialogContext.Provider value={{ isMobile: false }}>
+    <ResponsiveDialogContext.Provider value={{ isMobile: false, handleOnly: false }}>
       <Dialog open={open} onOpenChange={onOpenChange}>
         {children}
       </Dialog>
@@ -126,10 +130,20 @@ export function ResponsiveDialogHeader({
   children, 
   className 
 }: ResponsiveDialogHeaderProps) {
-  const { isMobile } = React.useContext(ResponsiveDialogContext);
+  const { isMobile, handleOnly } = React.useContext(ResponsiveDialogContext);
 
   if (isMobile) {
-    return <DrawerHeader className={cn("text-left", className)}>{children}</DrawerHeader>;
+    return (
+      <DrawerHeader className={cn("text-left relative", className)}>
+        {children}
+        {handleOnly && (
+          <DrawerClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+            <X className="h-5 w-5" />
+            <span className="sr-only">Sluiten</span>
+          </DrawerClose>
+        )}
+      </DrawerHeader>
+    );
   }
 
   return <DialogHeader className={className}>{children}</DialogHeader>;
