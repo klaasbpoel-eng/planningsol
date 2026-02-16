@@ -58,9 +58,11 @@ type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Task = Database["public"]["Tables"]["tasks"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type TaskType = Database["public"]["Tables"]["task_types"]["Row"];
+type TimeOffType = Database["public"]["Tables"]["time_off_types"]["Row"];
 
 type RequestWithProfile = TimeOffRequest & {
   profile?: Profile | null;
+  leave_type?: TimeOffType | null;
 };
 
 type TaskWithProfile = Task & {
@@ -79,6 +81,7 @@ interface CalendarItemDialogProps {
   onUpdate: () => void;
   isAdmin?: boolean;
   profiles?: Profile[];
+  timeOffTypes?: TimeOffType[];
 }
 
 export function CalendarItemDialog({
@@ -87,7 +90,8 @@ export function CalendarItemDialog({
   onOpenChange,
   onUpdate,
   isAdmin = false,
-  profiles = []
+  profiles = [],
+  timeOffTypes = []
 }: CalendarItemDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -107,6 +111,7 @@ export function CalendarItemDialog({
   const [timeOffReason, setTimeOffReason] = useState("");
   const [timeOffStartDate, setTimeOffStartDate] = useState<Date | undefined>();
   const [timeOffEndDate, setTimeOffEndDate] = useState<Date | undefined>();
+  const [timeOffTypeId, setTimeOffTypeId] = useState<string | null>(null);
 
 
 
@@ -125,6 +130,7 @@ export function CalendarItemDialog({
       setTimeOffReason(request.reason || "");
       setTimeOffStartDate(parseISO(request.start_date));
       setTimeOffEndDate(parseISO(request.end_date));
+      setTimeOffTypeId(request.type_id || null);
     }
     setIsEditing(true);
   };
@@ -173,6 +179,7 @@ export function CalendarItemDialog({
             reason: timeOffReason || null,
             start_date: timeOffStartDate ? format(timeOffStartDate, "yyyy-MM-dd") : item.data.start_date,
             end_date: timeOffEndDate ? format(timeOffEndDate, "yyyy-MM-dd") : item.data.end_date,
+            type_id: timeOffTypeId || null,
           })
           .eq("id", item.data.id);
 
@@ -639,6 +646,28 @@ export function CalendarItemDialog({
                   </Select>
                 </div>
 
+                {timeOffTypes.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Categorie</Label>
+                    <Select value={timeOffTypeId || "none"} onValueChange={(val) => setTimeOffTypeId(val === "none" ? null : val)}>
+                      <SelectTrigger className="bg-background">
+                        <SelectValue placeholder="Selecteer categorie" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border shadow-lg z-50">
+                        <SelectItem value="none">Geen categorie</SelectItem>
+                        {timeOffTypes.map((type) => (
+                          <SelectItem key={type.id} value={type.id}>
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: type.color }} />
+                              {type.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Startdatum</Label>
@@ -709,10 +738,16 @@ export function CalendarItemDialog({
             ) : (
               <>
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <Badge className={cn(getTypeColor(request.type))}>
                       {getTypeLabel(request.type)}
                     </Badge>
+                    {request.leave_type && (
+                      <Badge variant="outline" className="flex items-center gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: request.leave_type.color }} />
+                        {request.leave_type.name}
+                      </Badge>
+                    )}
                     <Badge className={cn(getStatusColor(request.status))}>
                       {getStatusLabel(request.status)}
                     </Badge>
