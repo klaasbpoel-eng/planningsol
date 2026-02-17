@@ -44,7 +44,7 @@ export function CreateGasCylinderOrderDialog({
   const [gasGrade, setGasGrade] = useState<"medical" | "technical">("technical");
   const [cylinderCount, setCylinderCount] = useState(16);
   const [cylinderSize, setCylinderSize] = useState("medium");
-  const [pressure, setPressure] = useState<number>(200);
+  const [pressure, setPressure] = useState<200 | 300>(200);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [notes, setNotes] = useState("");
   const [isCompleted, setIsCompleted] = useState(true);
@@ -467,40 +467,32 @@ export function CreateGasCylinderOrderDialog({
           {/* === DRUK & KWALITEIT — inline toggles === */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Druk (bar)</Label>
-              <div className="flex items-center gap-1.5">
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={pressure}
-                  onFocus={(e) => e.target.select()}
-                  onChange={(e) => {
-                    const raw = e.target.value.replace(/\D/g, '');
-                    if (raw === '') { setPressure(0); return; }
-                    const val = parseInt(raw);
-                    if (!isNaN(val)) setPressure(val);
-                  }}
-                  onBlur={() => { if (pressure < 1) setPressure(200); }}
-                  className="h-10 text-center font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-              </div>
-              <div className="flex gap-1.5">
-                {[200, 300].map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => { haptic("medium"); setPressure(p); }}
-                    className={cn(
-                      "flex-1 rounded-md py-1.5 text-xs font-medium transition-all border active:scale-95",
-                      pressure === p
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background text-foreground border-border hover:bg-accent"
-                    )}
-                  >
-                    {p} bar
-                  </button>
-                ))}
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Druk</Label>
+              <div className="flex rounded-lg border overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => { haptic("medium"); setPressure(200); }}
+                  className={cn(
+                    "flex-1 py-2.5 text-sm font-medium transition-colors",
+                    pressure === 200
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background text-foreground hover:bg-accent"
+                  )}
+                >
+                  200 bar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { haptic("medium"); setPressure(300); }}
+                  className={cn(
+                    "flex-1 py-2.5 text-sm font-medium transition-colors border-l",
+                    pressure === 300
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background text-foreground hover:bg-accent"
+                  )}
+                >
+                  300 bar
+                </button>
               </div>
             </div>
 
