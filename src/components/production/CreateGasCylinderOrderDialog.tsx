@@ -59,13 +59,13 @@ export function CreateGasCylinderOrderDialog({
     category_id: string | null;
     category_name: string | null;
   }>>([]);
-  
+  const [showAllGases, setShowAllGases] = useState(false);
   const [cylinderSizes, setCylinderSizes] = useState<Array<{
     id: string;
     name: string;
     capacity_liters: number | null;
   }>>([]);
-  
+  const [locationGasIds, setLocationGasIds] = useState<Set<string>>(new Set());
   const [showDetails, setShowDetails] = useState(false);
   const [gasSearch, setGasSearch] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
@@ -147,6 +147,22 @@ export function CreateGasCylinderOrderDialog({
     }
   }, [gasTypeId, gasTypes]);
 
+  // Fetch location-specific gas types
+  useEffect(() => {
+    const fetchLocationGasTypes = async () => {
+      if (!location) return;
+      const locationGasTypes = await api.gasTypes.getByLocation(location);
+      if (locationGasTypes && locationGasTypes.length > 0) {
+        const uniqueIds = new Set(locationGasTypes.map((row: { gas_type_id: string }) => row.gas_type_id).filter(Boolean)) as Set<string>;
+        setLocationGasIds(uniqueIds);
+      } else {
+        setLocationGasIds(new Set(gasTypes.map(t => t.id)));
+      }
+    };
+    if (open && gasTypes.length > 0) {
+      fetchLocationGasTypes();
+    }
+  }, [location, open, gasTypes]);
 
   const resetForm = () => {
     setCustomerId("");
@@ -255,6 +271,7 @@ export function CreateGasCylinderOrderDialog({
 
   const filteredGasTypes = gasTypes
     .filter(type => {
+      if (!showAllGases && !locationGasIds.has(type.id)) return false;
       if (gasSearch) {
         return type.name.toLowerCase().includes(gasSearch.toLowerCase());
       }
@@ -313,6 +330,13 @@ export function CreateGasCylinderOrderDialog({
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Gastype</Label>
+              <button
+                onClick={() => setShowAllGases(!showAllGases)}
+                className="text-xs text-primary hover:underline focus:outline-none"
+                type="button"
+              >
+                {showAllGases ? "Locatie filter" : "Toon alles"}
+              </button>
             </div>
             <div className="max-h-[180px] overflow-y-auto rounded-md border p-2 bg-muted/20 space-y-2">
               {groupedGasTypes.map((group) => (
