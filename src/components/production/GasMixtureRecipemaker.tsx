@@ -182,7 +182,7 @@ export function GasMixtureRecipemaker() {
           zFactor: Z,
         };
       })
-      .sort((a, b) => b.massGrams - a.massGrams);
+      .sort((a, b) => a.percentage - b.percentage);
 
     let cumulative = 0;
     return activeGases.map((g, i) => {
