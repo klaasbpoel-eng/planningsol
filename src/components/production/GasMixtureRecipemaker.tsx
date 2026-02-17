@@ -104,7 +104,7 @@ const R = 8.314; // J/(mol·K)
 const T = 288.15; // K (15°C)
 
 const CYLINDER_VOLUMES = [10, 20, 40, 50];
-const PRESSURE_PRESETS = [150, 200, 210, 300];
+const PRESSURE_PRESETS = [200, 300];
 
 type GasPercentages = Record<string, number>;
 
