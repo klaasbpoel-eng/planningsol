@@ -104,7 +104,7 @@ const R = 8.314; // J/(mol·K)
 const T = 288.15; // K (15°C)
 
 const CYLINDER_VOLUMES = [10, 20, 40, 50];
-const PRESSURES = [210, 300];
+const PRESSURE_PRESETS = [150, 200, 210, 300];
 
 type GasPercentages = Record<string, number>;
 
@@ -351,14 +351,36 @@ export function GasMixtureRecipemaker() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">Doeldruk</label>
-                  <Select value={String(targetPressure)} onValueChange={v => setTargetPressure(Number(v))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {PRESSURES.map(p => (
-                        <SelectItem key={p} value={String(p)}>{p} bar</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={500}
+                      step={1}
+                      value={targetPressure}
+                      onChange={e => {
+                        const val = Number(e.target.value);
+                        if (val >= 1 && val <= 500) setTargetPressure(val);
+                        else if (e.target.value === '') setTargetPressure(1);
+                      }}
+                      className="pr-12"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">bar</span>
+                  </div>
+                  <div className="flex gap-1 mt-1.5">
+                    {PRESSURE_PRESETS.map(p => (
+                      <Button
+                        key={p}
+                        type="button"
+                        variant={targetPressure === p ? "default" : "outline"}
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={() => setTargetPressure(p)}
+                      >
+                        {p}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">Cilinderinhoud</label>
