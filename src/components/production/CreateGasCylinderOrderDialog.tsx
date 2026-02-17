@@ -16,7 +16,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays, Minus, Plus, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { DateQuickPick } from "./DateQuickPick";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -68,6 +68,7 @@ export function CreateGasCylinderOrderDialog({
   const [locationGasIds, setLocationGasIds] = useState<Set<string>>(new Set());
   const [showDetails, setShowDetails] = useState(false);
   const [gasSearch, setGasSearch] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const fetchProfileAndPermissions = async () => {
@@ -78,9 +79,10 @@ export function CreateGasCylinderOrderDialog({
           setCurrentProfileId(profile.id);
           const roleData = await api.userRoles.get(user.id);
           const userRole = roleData?.role || "user";
-          const isAdmin = userRole === "admin";
+          const adminFlag = userRole === "admin";
+          setIsAdmin(adminFlag);
 
-          if (profile.production_location && !isAdmin) {
+          if (profile.production_location && !adminFlag) {
             setUserProductionLocation(profile.production_location);
             setLocation(profile.production_location);
             setCanSelectLocation(false);
@@ -88,7 +90,7 @@ export function CreateGasCylinderOrderDialog({
             setLocation(profile.production_location);
             setCanSelectLocation(true);
           } else {
-            setCanSelectLocation(isAdmin);
+            setCanSelectLocation(adminFlag);
           }
         }
       }
@@ -526,6 +528,36 @@ export function CreateGasCylinderOrderDialog({
           </div>
 
 
+          {/* === DATUM (alleen admin) === */}
+          {isAdmin && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Geplande datum</Label>
+              <div className="flex items-center gap-2">
+                <DateQuickPick value={scheduledDate} onChange={setScheduledDate} />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-9 w-9 shrink-0">
+                      <CalendarDays className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={scheduledDate}
+                      onSelect={(d) => d && setScheduledDate(d)}
+                      locale={nl}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              {scheduledDate && !isToday(scheduledDate) && (
+                <p className="text-xs text-muted-foreground">
+                  {format(scheduledDate, "EEEE d MMMM yyyy", { locale: nl })}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* === MEER OPTIES (collapsible) === */}
           <button
