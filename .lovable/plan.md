@@ -1,24 +1,23 @@
 
 
-## Datumselectie alleen voor admin in het vulorder-dialoog
+## Vrije vuldruk invoer in de Receptenmaker
 
-### Huidige situatie
-In het "Nieuwe vulorder" dialoog (`CreateGasCylinderOrderDialog`) wordt de datum automatisch op vandaag gezet, maar er is momenteel **geen zichtbare datumselectie** in het formulier. De datum wordt intern op `new Date()` gezet.
+### Wat er verandert
+Het huidige dropdown-menu voor "Doeldruk" (beperkt tot 210 en 300 bar) wordt vervangen door een **vrij invoerveld** waarin je zelf een drukwaarde kunt typen. Alle berekeningen (massa, Z-factoren, partiaaldrukken) worden automatisch herberekend bij elke wijziging.
 
-### Wat er gaat veranderen
-- Een datumselectie (met de bestaande `DateQuickPick` snelkeuze-knoppen en een kalender-popover) wordt toegevoegd aan het "Nieuwe vulorder" dialoog
-- Deze datumselectie is **alleen zichtbaar voor admin-gebruikers**
-- Niet-admin gebruikers maken altijd orders aan voor vandaag (standaardgedrag blijft ongewijzigd)
+### Hoe het werkt
+- Het dropdown-menu wordt vervangen door een numeriek invoerveld met "bar" als eenheid-label
+- Minimale druk: 1 bar, maximale druk: 500 bar
+- De standaardwaarde blijft 210 bar
+- Snelkeuze-knoppen voor veelgebruikte drukken (150, 200, 210, 300 bar) worden als kleine knoppen onder het invoerveld geplaatst voor snel schakelen
+- Alle vulrecept-berekeningen passen zich direct aan
 
-### Technische aanpak
+### Technisch detail
 
-**Bestand: `src/components/production/CreateGasCylinderOrderDialog.tsx`**
+**Bestand: `src/components/production/GasMixtureRecipemaker.tsx`**
 
-1. De component haalt al de gebruikersrol op (regel 79-81: `isAdmin`). Dit wordt hergebruikt via een state-variabele `isAdmin`.
-2. Onder de "Druk & Kwaliteit" sectie (of boven "Meer opties") wordt een **datum-sectie** toegevoegd, gewrapt in een `{isAdmin && (...)}` conditie:
-   - `DateQuickPick` component (Vandaag / Morgen / Ma knoppen)
-   - Een kalender-popover knop om een specifieke datum te kiezen
-   - Toont de geselecteerde datum als deze afwijkt van vandaag
-3. Niet-admin gebruikers zien niets en de datum blijft `new Date()` (vandaag)
+1. De constante `PRESSURES = [210, 300]` wordt verwijderd (of omgezet naar preset-knoppen)
+2. Het `Select`-component voor doeldruk (regels 353-361) wordt vervangen door een `Input type="number"` met min/max/step attributen en een "bar" suffix
+3. Optioneel: een rij preset-knoppen (150, 200, 210, 300 bar) voor snelle selectie
+4. De bestaande `targetPressure` state en berekeningen hoeven niet te veranderen -- die werken al met elke numerieke waarde
 
-**Geschatte impact:** Alleen het bestand `CreateGasCylinderOrderDialog.tsx` wordt aangepast. Er worden geen nieuwe componenten of database-wijzigingen nodig.
