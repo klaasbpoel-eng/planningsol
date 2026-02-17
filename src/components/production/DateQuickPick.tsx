@@ -1,4 +1,4 @@
-import { addDays, nextMonday, isToday, isTomorrow, isMonday, isSameWeek, addWeeks } from "date-fns";
+import { addDays, subDays, nextMonday, isMonday, addWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptic";
 
@@ -11,13 +11,12 @@ export function DateQuickPick({ value, onChange }: DateQuickPickProps) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const yesterday = subDays(today, 1);
   const tomorrow = addDays(today, 1);
-  const monday = nextMonday(today);
-  const nextWeekMonday = isMonday(today) ? addWeeks(today, 1) : nextMonday(addWeeks(today, 0));
-  // If today is monday, "volgende week" = next monday
   const nextMon = isMonday(today) ? addWeeks(today, 1) : nextMonday(today);
 
   const options = [
+    { label: "Gisteren", date: yesterday },
     { label: "Vandaag", date: today },
     { label: "Morgen", date: tomorrow },
     { label: "Ma", date: nextMon },
