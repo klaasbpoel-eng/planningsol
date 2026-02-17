@@ -1086,7 +1086,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <ClipboardList className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                        <span className="font-medium truncate">{task.task_type?.name || "Taak"}</span>
+                        <span className="font-medium truncate">{task.title || task.task_type?.name || "Taak"}</span>
                         <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTaskStatusColor(task.status))}>
                           {task.status === "pending" ? "Te doen" : task.status === "in_progress" ? "Bezig" : "Voltooid"}
                         </Badge>
