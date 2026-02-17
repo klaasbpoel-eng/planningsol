@@ -381,6 +381,9 @@ export function GasMixtureRecipemaker() {
                       </Button>
                     ))}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    Acceptabel bereik: {Math.round(targetPressure * 0.95)} – {Math.round(targetPressure * 1.05)} bar bij 15°C (± 5%)
+                  </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">Cilinderinhoud</label>
@@ -524,7 +527,7 @@ export function GasMixtureRecipemaker() {
                 <TableFooter>
                   <TableRow>
                     <TableCell colSpan={4} className="font-semibold">Totaal</TableCell>
-                    <TableCell className="text-right font-semibold">{targetPressure} bar</TableCell>
+                    <TableCell className="text-right font-semibold">{targetPressure} bar <span className="font-normal text-muted-foreground">({Math.round(targetPressure * 0.95)}–{Math.round(targetPressure * 1.05)})</span></TableCell>
                     <TableCell className="text-right font-semibold">
                       {formatWeight(fillingSteps.reduce((s, f) => s + f.massGrams, 0))}
                     </TableCell>
@@ -540,7 +543,8 @@ export function GasMixtureRecipemaker() {
              <div className="mt-4 p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground space-y-1 print:bg-gray-50">
                <p><strong>Methode:</strong> Gravimetrisch vullen met referentiecilinder op weegschaal</p>
                <p><strong>Formule:</strong> m = (P × V × M) / (Z × R × T) — Peng-Robinson toestandsvergelijking</p>
-               <p><strong>Vulvolgorde:</strong> Zwaarste component eerst, cumulatief gewicht aflezen op weegschaal</p>
+               <p><strong>Vulvolgorde:</strong> Laagste percentage eerst, cumulatief gewicht aflezen op weegschaal</p>
+               <p><strong>Einddruk:</strong> {targetPressure} bar ± 5% ({Math.round(targetPressure * 0.95)} – {Math.round(targetPressure * 1.05)} bar bij 15°C)</p>
              </div>
           </CardContent>
         </Card>
