@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ const STATUS_CONFIG: Record<ToolboxStatus, { label: string; variant: "default" |
 };
 
 const ToolboxPage = () => {
+  const navigate = useNavigate();
   const [session, setSession] = useState<any>(null);
   const { isAdmin, role } = useUserPermissions(session?.user?.id);
   const canManage = isAdmin || role === "supervisor";
@@ -174,12 +176,13 @@ const ToolboxPage = () => {
       </div>
 
       {/* Admin Actions */}
-      {(isAdmin || role === "admin") && (
+      {/* Admin Actions */}
+      {canManage && (
         <div className="mb-6 flex gap-2">
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => window.location.href = "/?view=admin&tab=logbook"}
+            onClick={() => navigate("/?view=admin&tab=logbook")}
           >
             <BookOpen className="h-4 w-4" />
             Open Logboek
