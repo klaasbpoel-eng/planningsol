@@ -1290,33 +1290,124 @@ export type Database = {
         }
         Relationships: []
       }
+      toolbox_completions: {
+        Row: {
+          completed_at: string
+          id: string
+          score: number | null
+          toolbox_id: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string
+          id?: string
+          score?: number | null
+          toolbox_id: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string
+          id?: string
+          score?: number | null
+          toolbox_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "toolbox_completions_toolbox_id_fkey"
+            columns: ["toolbox_id"]
+            isOneToOne: false
+            referencedRelation: "toolboxes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      toolbox_sections: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          section_type: Database["public"]["Enums"]["toolbox_section_type"]
+          sort_order: number
+          title: string | null
+          toolbox_id: string
+          updated_at: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          section_type?: Database["public"]["Enums"]["toolbox_section_type"]
+          sort_order?: number
+          title?: string | null
+          toolbox_id: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          section_type?: Database["public"]["Enums"]["toolbox_section_type"]
+          sort_order?: number
+          title?: string | null
+          toolbox_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "toolbox_sections_toolbox_id_fkey"
+            columns: ["toolbox_id"]
+            isOneToOne: false
+            referencedRelation: "toolboxes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       toolboxes: {
         Row: {
           category: string
+          cover_image_url: string | null
           created_at: string
           description: string | null
+          estimated_duration_minutes: number | null
           file_url: string | null
           id: string
+          is_mandatory: boolean
+          published_at: string | null
+          sort_order: number
+          status: Database["public"]["Enums"]["toolbox_status"]
           thumbnail_url: string | null
           title: string
           updated_at: string
         }
         Insert: {
           category?: string
+          cover_image_url?: string | null
           created_at?: string
           description?: string | null
+          estimated_duration_minutes?: number | null
           file_url?: string | null
           id?: string
+          is_mandatory?: boolean
+          published_at?: string | null
+          sort_order?: number
+          status?: Database["public"]["Enums"]["toolbox_status"]
           thumbnail_url?: string | null
           title: string
           updated_at?: string
         }
         Update: {
           category?: string
+          cover_image_url?: string | null
           created_at?: string
           description?: string | null
+          estimated_duration_minutes?: number | null
           file_url?: string | null
           id?: string
+          is_mandatory?: boolean
+          published_at?: string | null
+          sort_order?: number
+          status?: Database["public"]["Enums"]["toolbox_status"]
           thumbnail_url?: string | null
           title?: string
           updated_at?: string
@@ -1811,6 +1902,14 @@ export type Database = {
         | "cancelled"
       request_status: "pending" | "approved" | "rejected"
       time_off_type: "vacation" | "sick" | "personal" | "other"
+      toolbox_section_type:
+        | "text"
+        | "image"
+        | "video"
+        | "file"
+        | "quiz"
+        | "checklist"
+      toolbox_status: "draft" | "published" | "archived"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1959,6 +2058,15 @@ export const Constants = {
       ],
       request_status: ["pending", "approved", "rejected"],
       time_off_type: ["vacation", "sick", "personal", "other"],
+      toolbox_section_type: [
+        "text",
+        "image",
+        "video",
+        "file",
+        "quiz",
+        "checklist",
+      ],
+      toolbox_status: ["draft", "published", "archived"],
     },
   },
 } as const

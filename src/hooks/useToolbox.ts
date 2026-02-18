@@ -1,0 +1,268 @@
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+export type ToolboxStatus = "draft" | "published" | "archived";
+export type SectionType = "text" | "image" | "video" | "file" | "quiz" | "checklist";
+
+export interface ToolboxItem {
+  id: string;
+  title: string;
+  description: string | null;
+  file_url: string | null;
+  thumbnail_url: string | null;
+  cover_image_url: string | null;
+  category: string;
+  status: ToolboxStatus;
+  published_at: string | null;
+  sort_order: number;
+  estimated_duration_minutes: number | null;
+  is_mandatory: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ToolboxSection {
+  id: string;
+  toolbox_id: string;
+  section_type: SectionType;
+  title: string | null;
+  content: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ToolboxCompletion {
+  id: string;
+  toolbox_id: string;
+  user_id: string;
+  completed_at: string;
+  score: number | null;
+}
+
+export function useToolboxes(includeAll = false) {
+  const [toolboxes, setToolboxes] = useState<ToolboxItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("toolboxes" as any)
+        .select("*")
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setToolboxes((data as any) || []);
+    } catch (error) {
+      console.error("Error fetching toolboxes:", error);
+      toast.error("Fout bij het laden van toolboxes");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { toolboxes, loading, refetch: fetch };
+}
+
+export function useToolboxSections(toolboxId: string | null) {
+  const [sections, setSections] = useState<ToolboxSection[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetch = useCallback(async () => {
+    if (!toolboxId) { setSections([]); return; }
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("toolbox_sections" as any)
+        .select("*")
+        .eq("toolbox_id", toolboxId)
+        .order("sort_order", { ascending: true });
+
+      if (error) throw error;
+      setSections((data as any) || []);
+    } catch (error) {
+      console.error("Error fetching sections:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [toolboxId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { sections, loading, refetch: fetch, setSections };
+}
+
+export function useToolboxCompletions(toolboxId?: string) {
+  const [completions, setCompletions] = useState<ToolboxCompletion[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetch = useCallback(async () => {
+    if (!toolboxId) { setCompletions([]); return; }
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("toolbox_completions" as any)
+        .select("*")
+        .eq("toolbox_id", toolboxId);
+
+      if (error) throw error;
+      setCompletions((data as any) || []);
+    } catch (error) {
+      console.error("Error fetching completions:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [toolboxId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  const markComplete = async (userId: string, score?: number) => {
+    try {
+      const { error } = await supabase
+        .from("toolbox_completions" as any)
+        .upsert({
+          toolbox_id: toolboxId,
+          user_id: userId,
+          completed_at: new Date().toISOString(),
+          score: score ?? null,
+        }, { onConflict: "toolbox_id,user_id" });
+
+      if (error) throw error;
+      toast.success("Toolbox als voltooid gemarkeerd!");
+      fetch();
+    } catch (error: any) {
+      console.error("Error marking complete:", error);
+      toast.error("Fout bij markeren: " + error.message);
+    }
+  };
+
+  return { completions, loading, refetch: fetch, markComplete };
+}
+
+// Helper to save sections for a toolbox
+export async function saveSections(toolboxId: string, sections: Omit<ToolboxSection, "id" | "created_at" | "updated_at">[]) {
+  // Delete existing sections
+  await supabase.from("toolbox_sections" as any).delete().eq("toolbox_id", toolboxId);
+
+  if (sections.length === 0) return;
+
+  const { error } = await supabase
+    .from("toolbox_sections" as any)
+    .insert(sections.map((s, i) => ({
+      toolbox_id: toolboxId,
+      section_type: s.section_type,
+      title: s.title,
+      content: s.content,
+      sort_order: i,
+    })));
+
+  if (error) throw error;
+}
+
+export async function saveToolbox(data: Partial<ToolboxItem>, isEditing: boolean): Promise<string> {
+  const payload: any = {
+    title: data.title,
+    description: data.description,
+    category: data.category || "Algemeen",
+    thumbnail_url: data.thumbnail_url,
+    cover_image_url: data.cover_image_url,
+    file_url: data.file_url,
+    status: data.status || "draft",
+    estimated_duration_minutes: data.estimated_duration_minutes,
+    is_mandatory: data.is_mandatory || false,
+    sort_order: data.sort_order || 0,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (data.status === "published" && !data.published_at) {
+    payload.published_at = new Date().toISOString();
+  }
+
+  if (isEditing && data.id) {
+    const { error } = await supabase
+      .from("toolboxes" as any)
+      .update(payload)
+      .eq("id", data.id);
+    if (error) throw error;
+    return data.id;
+  } else {
+    const { data: created, error } = await supabase
+      .from("toolboxes" as any)
+      .insert([payload])
+      .select("id")
+      .single();
+    if (error) throw error;
+    return (created as any).id;
+  }
+}
+
+export async function duplicateToolbox(id: string): Promise<string> {
+  // Fetch original
+  const { data: original, error } = await supabase
+    .from("toolboxes" as any)
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+
+  const o = original as any;
+  const newId = crypto.randomUUID();
+  const { error: insertError } = await supabase
+    .from("toolboxes" as any)
+    .insert([{
+      id: newId,
+      title: o.title + " (kopie)",
+      description: o.description,
+      category: o.category,
+      thumbnail_url: o.thumbnail_url,
+      cover_image_url: o.cover_image_url,
+      file_url: o.file_url,
+      status: "draft",
+      estimated_duration_minutes: o.estimated_duration_minutes,
+      is_mandatory: false,
+      sort_order: 0,
+    }]);
+  if (insertError) throw insertError;
+
+  // Copy sections
+  const { data: sections } = await supabase
+    .from("toolbox_sections" as any)
+    .select("*")
+    .eq("toolbox_id", id)
+    .order("sort_order");
+
+  if (sections && (sections as any[]).length > 0) {
+    await supabase.from("toolbox_sections" as any).insert(
+      (sections as any[]).map((s: any) => ({
+        toolbox_id: newId,
+        section_type: s.section_type,
+        title: s.title,
+        content: s.content,
+        sort_order: s.sort_order,
+      }))
+    );
+  }
+
+  return newId;
+}
+
+export async function deleteToolbox(id: string) {
+  const { error } = await supabase.from("toolboxes" as any).delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function uploadToolboxFile(file: File, folder = ""): Promise<string> {
+  const fileExt = file.name.split(".").pop();
+  const fileName = `${folder ? folder + "/" : ""}${crypto.randomUUID()}.${fileExt}`;
+
+  const { error } = await supabase.storage.from("toolbox-files").upload(fileName, file);
+  if (error) throw error;
+
+  const { data: { publicUrl } } = supabase.storage.from("toolbox-files").getPublicUrl(fileName);
+  return publicUrl;
+}
