@@ -213,7 +213,7 @@ const ToolboxPage = () => {
                       {toolbox.category}
                     </Badge>
                   </div>
-                  {canManage && toolbox.status !== "published" && (
+                  {canManage && (
                     <div className="absolute top-3 left-3">
                       <Badge variant={statusConfig.variant} className="gap-1">
                         {statusConfig.icon} {statusConfig.label}
