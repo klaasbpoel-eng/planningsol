@@ -30,7 +30,7 @@ function renderTextContent(text: string) {
   if (isHtml) {
     return (
       <div
-        className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-4 [&>h2]:text-xl [&>h2]:font-semibold [&>h2]:mt-6 [&>h2]:mb-3 [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:mt-4 [&>h3]:mb-2 [&>ul]:list-disc [&>ul]:ml-4 [&>ol]:list-decimal [&>ol]:ml-4"
+        className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-4 [&>h2]:text-xl [&>h2]:font-bold [&>h2]:text-primary [&>h2]:mt-8 [&>h2]:mb-4 [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:text-primary/90 [&>h3]:mt-6 [&>h3]:mb-3 [&>ul]:list-disc [&>ul]:ml-4 [&>ol]:list-decimal [&>ol]:ml-4"
         dangerouslySetInnerHTML={{ __html: text }}
       />
     );
@@ -40,8 +40,8 @@ function renderTextContent(text: string) {
   const lines = text.split("\n");
   return lines.map((line, i) => {
     // Headers
-    if (line.startsWith("## ")) return <h2 key={i} className="text-xl font-semibold mt-4 mb-2">{line.slice(3)}</h2>;
-    if (line.startsWith("### ")) return <h3 key={i} className="text-lg font-semibold mt-3 mb-1">{line.slice(4)}</h3>;
+    if (line.startsWith("## ")) return <h2 key={i} className="text-xl font-bold text-primary mt-6 mb-3">{line.slice(3)}</h2>;
+    if (line.startsWith("### ")) return <h3 key={i} className="text-lg font-semibold text-primary/90 mt-4 mb-2">{line.slice(4)}</h3>;
     // List items
     if (line.startsWith("- ") || line.startsWith("* ")) {
       return <li key={i} className="ml-4 list-disc text-foreground">{formatInline(line.slice(2))}</li>;
@@ -265,9 +265,9 @@ export function ToolboxSectionRenderer({ section, index, interactive = false, on
   return (
     <div className="animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
       {section.title && (
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-3 border-l-4 border-primary/40 pl-3">
           {sectionIcons[section.section_type]}
-          <h3 className="text-lg font-semibold">{section.title}</h3>
+          <h3 className="text-lg font-semibold text-foreground/90">{section.title}</h3>
         </div>
       )}
       {renderContent()}

@@ -9,13 +9,16 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Loader2, Save, Send, Eye, Pencil, Clock, Image as ImageIcon, X } from "lucide-react";
+import { Upload, Loader2, Save, Send, Eye, Pencil, Clock, Image as ImageIcon, X, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import type { ToolboxItem } from "@/hooks/useToolbox";
 import { saveToolbox, saveSections, uploadToolboxFile, useToolboxSections } from "@/hooks/useToolbox";
 import { ToolboxSectionEditor, type EditorSection } from "./ToolboxSectionEditor";
 import { ToolboxSectionRenderer } from "./ToolboxSectionRenderer";
 import { useDebounce } from "@/hooks/use-debounce";
+import siteLogo from "@/assets/site_logo.png";
+import { format } from "date-fns";
+import { nl } from "date-fns/locale";
 
 interface Props {
   open: boolean;
@@ -314,63 +317,113 @@ export function ToolboxEditorDialog({ open, onOpenChange, toolbox, onSaved, cate
             </ScrollArea>
           </div>
 
-          {/* Preview Column (Hidden on mobile unless tab selected, always distinct on XL) */}
+          {/* Preview Column (Hidden on mobile unless tab selected, always displayed on XL) */}
           <div className={`flex-1 border-l bg-muted/10 overflow-hidden flex-col ${activeTab === 'editor' ? 'hidden xl:flex' : 'flex'}`}>
-            <div className="p-3 border-b bg-background/50 backdrop-blur text-center text-sm font-medium text-muted-foreground shrink-0">
-              Live Preview
+            <div className="p-3 border-b bg-background/50 backdrop-blur text-center text-sm font-medium text-muted-foreground shrink-0 flex items-center justify-between px-6">
+              <span>Live Preview</span>
+              <Badge variant="outline" className="text-xs font-normal">Sjabloon: Standaard</Badge>
             </div>
-            <ScrollArea className="flex-1">
-              <div className="p-6 md:p-10 max-w-2xl mx-auto">
-                <div className="bg-card shadow-lg rounded-xl overflow-hidden border min-h-[500px]">
-                  {/* Preview Content */}
+
+            {/* Simulated Viewer Container */}
+            <div className="flex-1 bg-white dark:bg-zinc-950 flex flex-col overflow-hidden m-4 rounded-lg shadow-2xl border ring-1 ring-border/50">
+
+              {/* Branding Header */}
+              <div className="h-14 border-b flex items-center justify-between px-4 bg-white dark:bg-zinc-900 shrink-0">
+                <div className="flex items-center gap-2">
+                  <img src={siteLogo} alt="SOL Logo" className="h-8 w-auto" />
+                  <div className="h-6 w-px bg-border mx-2" />
                   <div>
-                    {(formData.cover_image_url || formData.thumbnail_url) && (
-                      <div className="relative h-48 w-full overflow-hidden">
-                        <img
-                          src={formData.cover_image_url || formData.thumbnail_url || ""}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                        <div className="absolute bottom-4 left-6 right-6">
-                          <Badge className="bg-primary hover:bg-primary mb-2 border-none text-white">
-                            {formData.category || "Algemeen"}
-                          </Badge>
-                          <h1 className="text-2xl font-bold text-white leading-tight">{formData.title || "Naamloze Toolbox"}</h1>
-                        </div>
-                      </div>
-                    )}
-                    {!formData.cover_image_url && !formData.thumbnail_url && (
-                      <div className="bg-primary/5 p-6 border-b">
-                        <Badge className="bg-primary hover:bg-primary mb-3 text-white">
-                          {formData.category || "Algemeen"}
-                        </Badge>
-                        <h1 className="text-2xl font-bold text-foreground">{formData.title || "Naamloze Toolbox"}</h1>
-                      </div>
-                    )}
-
-                    <div className="p-6 space-y-6">
-                      {formData.description && (
-                        <div className="text-muted-foreground leading-relaxed">
-                          {formData.description}
-                        </div>
-                      )}
-
-                      {editorSections.map((section, idx) => (
-                        <ToolboxSectionRenderer key={section.id} section={section as any} index={idx} />
-                      ))}
-
-                      {editorSections.length === 0 && (
-                        <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg bg-muted/30">
-                          <p className="text-sm">Nog geen inhoud.</p>
-                          <p className="text-xs mt-1">Voeg secties toe in de editor.</p>
-                        </div>
-                      )}
-                    </div>
+                    <h2 className="font-bold text-primary text-sm leading-tight">Toolbox Meeting</h2>
+                    <p className="text-[10px] text-muted-foreground">{format(new Date(), "d MMMM yyyy", { locale: nl })}</p>
                   </div>
                 </div>
               </div>
-            </ScrollArea>
+
+              <ScrollArea className="flex-1 bg-muted/5">
+                <div className="max-w-3xl mx-auto bg-card min-h-full shadow-sm my-6 border rounded-lg overflow-hidden">
+
+                  {/* Cover / Title Section */}
+                  <div className="relative">
+                    {(formData.cover_image_url || formData.cover_image_url) ? (
+                      <div className="h-40 w-full overflow-hidden relative">
+                        <img
+                          src={formData.cover_image_url || formData.cover_image_url || ""}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                        <div className="absolute bottom-0 left-0 right-0 p-6">
+                          <Badge className="mb-2 bg-primary text-primary-foreground border-none text-xs px-2 py-0.5">
+                            {formData.category || "Algemeen"}
+                          </Badge>
+                          <h1 className="text-2xl font-bold text-white shadow-sm leading-tight">
+                            {formData.title || "Naamloze Toolbox"}
+                          </h1>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-6 bg-gradient-to-br from-primary/5 to-primary/10 border-b">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <Badge variant="outline" className="mb-2 border-primary/20 text-primary bg-primary/5 text-xs">
+                              {formData.category || "Algemeen"}
+                            </Badge>
+                            <h1 className="text-2xl font-bold text-primary leading-tight">
+                              {formData.title || "Naamloze Toolbox"}
+                            </h1>
+                          </div>
+                          <BookOpen className="h-16 w-16 text-primary/10 -mt-2 -mr-2" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Meta Info Bar */}
+                  <div className="flex flex-wrap gap-3 px-6 py-3 bg-muted/30 border-b text-xs text-muted-foreground">
+                    {formData.is_mandatory && (
+                      <span className="flex items-center gap-1.5 text-accent-foreground font-medium">
+                        <span className="h-1.5 w-1.5 rounded-full bg-accent" /> Verplicht
+                      </span>
+                    )}
+                    {formData.estimated_duration_minutes && (
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="h-3 w-3" /> {formData.estimated_duration_minutes} min
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="p-6 space-y-6">
+                    {formData.description && (
+                      <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground leading-relaxed border-l-4 border-primary/20 pl-4 py-1">
+                        {formData.description}
+                      </div>
+                    )}
+
+                    {editorSections.length > 0 ? (
+                      <div className="space-y-8">
+                        {editorSections.map((section, idx) => (
+                          <ToolboxSectionRenderer
+                            key={section.id}
+                            section={section as any}
+                            index={idx}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground bg-muted/30 rounded-lg border border-dashed">
+                        <p className="text-sm">Nog geen inhoud.</p>
+                        <p className="text-xs mt-1 opacity-70">Voeg secties toe in de editor.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="text-center py-6 text-muted-foreground text-xs">
+                  <p className="font-semibold text-primary/40 mb-0.5">PlanningSOL</p>
+                  <p>&copy; {new Date().getFullYear()}</p>
+                </div>
+              </ScrollArea>
+            </div>
           </div>
         </div>
 
