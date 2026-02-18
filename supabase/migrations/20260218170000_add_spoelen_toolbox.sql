@@ -53,7 +53,7 @@ BEGIN
     v_toolbox_id,
     'text',
     'Wat is spoelen (purgen)?',
-    E'Spoelen is het meerdere keren vullen en legen van een cilinder met een inert gas (meestal stikstof) om restgas en verontreinigingen te verwijderen. Denk aan het uitspoelen van een fles voordat je er iets anders in doet.\n\nEr zijn twee hoofdredenen:\n1.  **Veiligheid**: voorkomen van gevaarlijke gasmengsels (bijv. zuurstof + brandbaar gas).\n2.  **Kwaliteit**: een zuiver product voor de klant.\n\n**Let op:** Bij een pakket (meerdere cilinders aan één frame) moet je **alle cilinders EN de manifold** spoelen.',
+    E'Spoelen is het meerdere keren vullen en legen van een cilinder met een inert gas (meestal stikstof) om restgas en verontreinigingen te verwijderen. Denk aan het uitspoelen van een fles voordat je er iets anders in doet.\n\nEr zijn twee hoofdredenen:\n1.  **Veiligheid**: voorkomen van gevaarlijke gasmengsels (bijv. zuurstof + brandbaar gas).\n2.  **Kwaliteit**: een zuiver product voor de klant.\n\n**Let op:** Bij een pakket (meerdere cilinders aan één frame) moet je **alle cilinders EN de verzamelbuis** spoelen.',
     v_base_order + 3
   );
 
@@ -70,7 +70,7 @@ BEGIN
       {"text": "Na een herkeuring (TÜV/periodieke keuring)"},
       {"text": "Bij nieuwe cilinders die voor het eerst in gebruik worden genomen"},
       {"text": "Bij cilinders waar vocht of vuil is aangetroffen"},
-      {"text": "Bij pakketten waarvan de manifold is losgekoppeld of vervangen"},
+      {"text": "Bij pakketten waarvan de verzamelbuis is losgekoppeld of vervangen"},
       {"text": "Bij twijfel over de inhoud of geschiedenis van de cilinder"}
     ]',
     v_base_order + 4
@@ -82,21 +82,31 @@ BEGIN
     v_toolbox_id,
     'text',
     'Stap-voor-stap: Zo spoel je een cilinder',
-    E'1.  **Controleer de cilinder:** is het ventiel in orde? Is de cilinder visueel intact?\n2.  **Sluit de cilinder aan** op de spoelinstallatie.\n3.  **Vul de cilinder** met stikstof tot de voorgeschreven druk (volgens werkvoorschrift).\n4.  **Wacht even** zodat het gas zich mengt met eventueel restgas.\n5.  **Blaas af** — laat de druk gecontroleerd ontsnappen via de afblaasleiding.\n6.  **Herhaal stap 3-5 minimaal 3 keer** (of volgens voorschrift).\n7.  **Meet** na de laatste spoeling het restgehalte met de gasanalysator (moet onder de grenswaarde liggen).\n8.  **Registreer** dat de cilinder is gespoeld in het systeem.\n\n**Bij pakketten:** spoel elke cilinder apart én de manifold. Vergeet de manifold niet!',
+    E'1.  **Controleer de cilinder:** is het ventiel in orde? Is de cilinder visueel intact?\n2.  **Sluit de cilinder aan** op de spoelinstallatie.\n3.  **Vul de cilinder** met stikstof tot de voorgeschreven druk (volgens werkvoorschrift).\n4.  **Wacht even** zodat het gas zich mengt met eventueel restgas.\n5.  **Blaas af** — laat de druk gecontroleerd ontsnappen via de afblaasleiding.\n6.  **Herhaal stap 3-5 minimaal 3 keer** (of volgens voorschrift).\n7.  **Meet** na de laatste spoeling het restgehalte met de gasanalysator (moet onder de grenswaarde liggen).\n8.  **Registreer** dat de cilinder is gespoeld in het systeem.\n\n**Bij pakketten:** spoel elke cilinder apart én de verzamelbuis. Vergeet de verzamelbuis niet!',
     v_base_order + 5
   );
 
-  -- Sectie 6: Risico''s en gevaren
+  -- Sectie 6: Geheugensteun: Spoeltabel (Nieuw)
+  INSERT INTO public.toolbox_sections (toolbox_id, section_type, title, content, sort_order)
+  VALUES (
+    v_toolbox_id,
+    'text',
+    'Geheugensteun: Hoe vaak spoelen?',
+    E'Gebruik deze tabel om te bepalen hoe vaak je minimaal moet spoelen.\n\n| Categorie | Type Gas | In gebruik | Nieuw / Herkeuren | Opm. |\n| :--- | :--- | :--- | :--- | :--- |\n| **Medisch & Lucht (RPV)** | Enkel gas (O₂, Ar) | **3x** | **3x** | Min. 5 Bar |\n| | Mengsel (Lucht, Carbogeen) | **1x** | **4x** | |\n| **AliSOL (RPV)** | Enkel gas (O₂, N₂) | **1x*** | **3x** | *Herhaal als NC |\n| | Mengsel AliSOL | **1x** | **4x** | |\n| **Technisch** | Enkel gas (O₂, Ar, N₂) | **1x** | **3x** | *Max. 20 Bar |\n| | Mengsel (WM/Enermix) | **3x** | **3x** | |',
+    v_base_order + 6
+  );
+
+  -- Sectie 7: Risico''s en gevaren
   INSERT INTO public.toolbox_sections (toolbox_id, section_type, title, content, sort_order)
   VALUES (
     v_toolbox_id,
     'text',
     '⚠️ Wat kan er misgaan?',
-    E'**Onvoldoende gespoeld:**\nRestgas mengt met het nieuwe gas → gevaarlijke reactie of onzuiver product.\n\n**Verkeerd spoelgas:**\nGebruik ALTIJD het voorgeschreven spoelgas (meestal stikstof). Nooit spoelen met het doelgas zelf.\n\n**Geen meting achteraf:**\nZonder analyse weet je niet of de cilinder echt schoon is.\n\n**Manifold vergeten bij pakketten:**\nHet restgas in de manifold contamineert alle cilinders alsnog.\n\n**Spoelen in een afgesloten ruimte:**\nStikstof verdringt zuurstof → verstikkingsgevaar! Zorg voor ventilatie.',
-    v_base_order + 6
+    E'**Onvoldoende gespoeld:**\nRestgas mengt met het nieuwe gas → gevaarlijke reactie of onzuiver product.\n\n**Verkeerd spoelgas:**\nGebruik ALTIJD het voorgeschreven spoelgas (meestal stikstof). Nooit spoelen met het doelgas zelf.\n\n**Geen meting achteraf:**\nZonder analyse weet je niet of de cilinder echt schoon is.\n\n**Verzamelbuis vergeten bij pakketten:**\nHet restgas in de verzamelbuis contamineert alle cilinders alsnog.\n\n**Spoelen in een afgesloten ruimte:**\nStikstof verdringt zuurstof → verstikkingsgevaar! Zorg voor ventilatie.',
+    v_base_order + 7
   );
 
-  -- Sectie 7: Veiligheidschecklist
+  -- Sectie 8: Veiligheidschecklist
   INSERT INTO public.toolbox_sections (toolbox_id, section_type, title, content, sort_order)
   VALUES (
     v_toolbox_id,
@@ -110,12 +120,12 @@ BEGIN
       {"text": "Ik heb de gasanalysator gebruikt om het restgehalte te meten"},
       {"text": "Het restgehalte zit onder de grenswaarde"},
       {"text": "Ik heb de spoeling geregistreerd in het systeem"},
-      {"text": "Bij een pakket: ik heb ook de manifold gespoeld"}
+      {"text": "Bij een pakket: ik heb ook de verzamelbuis gespoeld"}
     ]',
-    v_base_order + 7
+    v_base_order + 8
   );
 
-  -- Sectie 8: Quiz
+  -- Sectie 9: Quiz
   INSERT INTO public.toolbox_sections (toolbox_id, section_type, title, content, sort_order)
   VALUES (
     v_toolbox_id,
@@ -129,7 +139,7 @@ BEGIN
       },
       {
         "question": "Hoe vaak moet je minimaal spoelen?",
-        "options": ["1 keer is genoeg", "Minimaal 3 keer", "10 keer", "Maakt niet uit"],
+        "options": ["1 keer is genoeg", "Minimaal 3 keer (zie tabel)", "10 keer", "Maakt niet uit"],
         "correct": 1
       },
       {
@@ -144,21 +154,21 @@ BEGIN
       },
       {
         "question": "Wat moet je extra spoelen bij een pakket?",
-        "options": ["Alleen de buitenkant", "Niets extra''s", "De manifold", "De labels"],
+        "options": ["Alleen de buitenkant", "Niets extra''s", "De verzamelbuis", "De labels"],
         "correct": 2
       }
     ]',
-    v_base_order + 8
+    v_base_order + 9
   );
 
-  -- Sectie 9: Afsluiting
+  -- Sectie 10: Afsluiting
   INSERT INTO public.toolbox_sections (toolbox_id, section_type, title, content, sort_order)
   VALUES (
     v_toolbox_id,
     'text',
     'Tot slot',
     E'**Goed spoelen = veilig vullen.**\n\nBij twijfel altijd overleggen met je leidinggevende of de kwaliteitsafdeling. Vakmanschap betekent dat we samen zorgen voor een veilig product en een veilige werkplek.\n\nHeb je vragen? Vraag het je leidinggevende of de veiligheidscoördinator.',
-    v_base_order + 9
+    v_base_order + 10
   );
 
 END $$;
