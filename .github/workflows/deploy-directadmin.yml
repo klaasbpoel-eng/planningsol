@@ -2,6 +2,16 @@ name: Deploy to DirectAdmin
 run-name: Deploy to DirectAdmin by @${{ github.actor }}
 
 on:
+  # Auto-deploy bij elke push naar main
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'supabase/migrations/**'
+
+  # Handmatige deploy blijft ook mogelijk
   workflow_dispatch:
     inputs:
       primary_source:
@@ -14,10 +24,17 @@ on:
         - external_supabase
         - mysql
 
+# Voorkom dubbele deploys als er snel achter elkaar gepusht wordt
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
 jobs:
-  web-deploy:
-    name: 🎉 Deploy
+  build-and-deploy:
+    name: 🚀 Build & Deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
       - name: 🚚 Get latest code
         uses: actions/checkout@v4
@@ -36,9 +53,9 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_DEFAULT_PRIMARY_SOURCE: ${{ inputs.primary_source }}
+          VITE_DEFAULT_PRIMARY_SOURCE: ${{ inputs.primary_source || 'cloud' }}
 
-      - name: 📂 Sync files (FTP)
+      - name: 📂 Deploy to DirectAdmin (FTP)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -49,3 +66,7 @@ jobs:
           protocol: ftps
           port: 21
           timeout: 60000
+          dangerous-clean-slate: false
+
+      - name: ✅ Deploy complete
+        run: echo "Deployed to production at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
