@@ -31,10 +31,13 @@ interface AdminDashboardProps {
   role?: AppRole;
 }
 
+import { useSearchParams } from "react-router-dom";
+
 export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: AdminDashboardProps) {
+  const [searchParams] = useSearchParams();
   const [requests, setRequests] = useState<RequestWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("requests");
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "requests");
   const isMobile = useIsMobile();
   const [filters, setFilters] = useState<FilterState>({
     employeeId: null,
@@ -88,6 +91,11 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
   useEffect(() => {
     fetchRequests();
   }, []);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
 
   // Get unique employees from requests
   const employees = useMemo(() => {

@@ -11,10 +11,13 @@ import { Loader2 } from "lucide-react";
 import { UserLaunchpad } from "@/components/dashboard/UserLaunchpad";
 import type { User } from "@supabase/supabase-js";
 
+import { useSearchParams } from "react-router-dom";
+
 const Index = () => {
+  const [searchParams] = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showAdminView, setShowAdminView] = useState(false);
+  const [showAdminView, setShowAdminView] = useState(searchParams.get("view") === "admin");
   const { role, permissions, loading: permissionsLoading, isAdmin } = useUserPermissions(user?.id);
   const { isApproved, loading: approvalLoading } = useApprovalStatus(user?.id);
 
@@ -33,6 +36,12 @@ const Index = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get("view") === "admin") {
+      setShowAdminView(true);
+    }
+  }, [searchParams]);
 
   if (loading || permissionsLoading || approvalLoading) {
     return (

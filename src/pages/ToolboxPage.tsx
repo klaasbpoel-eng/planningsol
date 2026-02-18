@@ -173,6 +173,20 @@ const ToolboxPage = () => {
         </div>
       </div>
 
+      {/* Admin Actions */}
+      {(isAdmin || role === "admin") && (
+        <div className="mb-6 flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => window.location.href = "/?view=admin&tab=logbook"}
+          >
+            <BookOpen className="h-4 w-4" />
+            Open Logboek
+          </Button>
+        </div>
+      )}
+
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map(i => (
