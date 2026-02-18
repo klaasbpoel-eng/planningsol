@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,8 +8,29 @@ import {
   HelpCircle, ListChecks, Upload, Loader2, Plus, ChevronUp, ChevronDown
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  defaultDropAnimationSideEffects,
+  DragStartEvent,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { SectionType } from "@/hooks/useToolbox";
 import { uploadToolboxFile } from "@/hooks/useToolbox";
+import { RichTextEditor } from "./RichTextEditor";
 
 export interface EditorSection {
   id: string;
@@ -38,13 +57,121 @@ function getSectionLabel(type: SectionType) {
   return SECTION_TYPES.find(t => t.type === type)?.label || type;
 }
 
+function getEmbedUrl(url: string): string | null {
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+  return null;
+}
+
 interface Props {
   sections: EditorSection[];
   onChange: (sections: EditorSection[]) => void;
 }
 
+interface SortableSectionProps {
+  section: EditorSection;
+  updateSection: (id: string, updates: Partial<EditorSection>) => void;
+  removeSection: (id: string) => void;
+  renderSectionEditor: (section: EditorSection) => React.ReactNode;
+}
+
+function SortableSection({ section, updateSection, removeSection, renderSectionEditor }: SortableSectionProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: section.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1 : 0,
+    position: "relative" as const,
+  };
+
+  const getBorderColor = (type: SectionType) => {
+    switch (type) {
+      case "text": return "border-l-blue-500";
+      case "image": return "border-l-green-500";
+      case "video": return "border-l-purple-500";
+      case "file": return "border-l-orange-500";
+      case "quiz": return "border-l-yellow-500";
+      case "checklist": return "border-l-teal-500";
+      default: return "border-l-border";
+    }
+  };
+
+  const [expanded, setExpanded] = useState(true);
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <Card className={`border-border/60 border-l-4 ${getBorderColor(section.section_type)}`}>
+        <CardHeader className="pb-3 flex flex-row items-center gap-2 space-y-0 py-3 px-4">
+          <div {...listeners} className="cursor-grab touch-none p-1 -ml-1 hover:bg-muted/50 rounded">
+            <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
+          </div>
+          <Badge variant="secondary" className="gap-1.5 shrink-0">
+            {getSectionIcon(section.section_type)}
+            {getSectionLabel(section.section_type)}
+          </Badge>
+          <Input
+            value={section.title || ""}
+            onChange={(e) => updateSection(section.id, { title: e.target.value })}
+            placeholder="Sectietitel (optioneel)..."
+            className="flex-1 h-8 text-sm border-none shadow-none focus-visible:ring-0 px-2 bg-transparent"
+          />
+          <div className="flex gap-0.5 shrink-0">
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpanded(!expanded)}>
+              {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => removeSection(section.id)}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </CardHeader>
+        {expanded && (
+          <CardContent className="pt-0 px-4 pb-4">
+            {renderSectionEditor(section)}
+          </CardContent>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 export function ToolboxSectionEditor({ sections, onChange }: Props) {
   const [uploading, setUploading] = useState<string | null>(null);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = sections.findIndex((s) => s.id === active.id);
+      const newIndex = sections.findIndex((s) => s.id === over.id);
+
+      onChange(arrayMove(sections, oldIndex, newIndex).map((s, i) => ({ ...s, sort_order: i })));
+    }
+
+    setActiveDragId(null);
+  };
 
   const addSection = (type: SectionType) => {
     const newSection: EditorSection = {
@@ -52,7 +179,7 @@ export function ToolboxSectionEditor({ sections, onChange }: Props) {
       section_type: type,
       title: "",
       content: type === "quiz" ? JSON.stringify([{ question: "", options: ["", "", "", ""], correct: 0 }]) :
-               type === "checklist" ? JSON.stringify([{ text: "", checked: false }]) : "",
+        type === "checklist" ? JSON.stringify([{ text: "", checked: false }]) : "",
       sort_order: sections.length,
     };
     onChange([...sections, newSection]);
@@ -64,14 +191,6 @@ export function ToolboxSectionEditor({ sections, onChange }: Props) {
 
   const removeSection = (id: string) => {
     onChange(sections.filter(s => s.id !== id).map((s, i) => ({ ...s, sort_order: i })));
-  };
-
-  const moveSection = (index: number, direction: -1 | 1) => {
-    const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= sections.length) return;
-    const newSections = [...sections];
-    [newSections[index], newSections[newIndex]] = [newSections[newIndex], newSections[index]];
-    onChange(newSections.map((s, i) => ({ ...s, sort_order: i })));
   };
 
   const handleFileUpload = async (sectionId: string, file: File) => {
@@ -92,57 +211,94 @@ export function ToolboxSectionEditor({ sections, onChange }: Props) {
       case "text":
         return (
           <div className="space-y-2">
-            <Textarea
-              value={section.content}
-              onChange={(e) => updateSection(section.id, { content: e.target.value })}
-              placeholder="Schrijf hier de tekst voor deze sectie... Gebruik Markdown voor opmaak."
-              rows={6}
-              className="font-mono text-sm"
+            <RichTextEditor
+              content={section.content}
+              onChange={(content) => updateSection(section.id, { content })}
             />
-            <p className="text-xs text-muted-foreground">Ondersteunt Markdown: **vet**, *cursief*, - lijsten, ## koppen</p>
           </div>
         );
 
       case "image":
         return (
-          <div className="space-y-3">
-            <div className="flex gap-2">
-              <Input
-                value={section.content}
-                onChange={(e) => updateSection(section.id, { content: e.target.value })}
-                placeholder="Afbeelding URL..."
-                className="flex-1"
-              />
-              <label>
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileUpload(section.id, file);
-                  }}
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3">
+              <div
+                className="border-2 border-dashed border-border/50 rounded-lg p-6 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/30 transition-colors"
+                onClick={() => document.getElementById(`file-${section.id}`)?.click()}
+              >
+                <div className="p-3 bg-muted/50 rounded-full">
+                  <Image className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium">Klik om te uploaden of sleep een afbeelding</p>
+                  <p className="text-xs text-muted-foreground">JPG, PNG, WebP — max 5 MB</p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">of via URL:</span>
+                <Input
+                  value={section.content}
+                  onChange={(e) => updateSection(section.id, { content: e.target.value })}
+                  placeholder="https://..."
+                  className="flex-1 h-8 text-sm"
                 />
-                <Button type="button" variant="outline" size="icon" asChild disabled={uploading === section.id}>
-                  <span>{uploading === section.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}</span>
-                </Button>
-              </label>
+              </div>
+
+              <input
+                id={`file-${section.id}`}
+                type="file"
+                className="hidden"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileUpload(section.id, file);
+                }}
+              />
             </div>
+
             {section.content && (
-              <img src={section.content} alt="Preview" className="max-h-40 rounded-md border object-cover" />
+              <div className="relative group">
+                <img src={section.content} alt="Preview" className="max-h-64 rounded-lg border object-cover w-full bg-muted/20" />
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => updateSection(section.id, { content: "" })}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             )}
           </div>
         );
 
       case "video":
+        const embedUrl = getEmbedUrl(section.content);
         return (
-          <div className="space-y-2">
-            <Input
-              value={section.content}
-              onChange={(e) => updateSection(section.id, { content: e.target.value })}
-              placeholder="YouTube of Vimeo URL plakken..."
-            />
-            <p className="text-xs text-muted-foreground">Bijv. https://www.youtube.com/watch?v=...</p>
+          <div className="space-y-3">
+            <div className="flex gap-2 items-center">
+              <Video className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Input
+                value={section.content}
+                onChange={(e) => updateSection(section.id, { content: e.target.value })}
+                placeholder="YouTube of Vimeo URL plakken..."
+              />
+            </div>
+
+            {embedUrl && (
+              <div className="aspect-video rounded-lg overflow-hidden border bg-black shadow-sm max-w-md">
+                <iframe
+                  src={embedUrl}
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            )}
+            {!embedUrl && section.content && (
+              <p className="text-xs text-destructive">Geen geldige video URL herkend.</p>
+            )}
           </div>
         );
 
@@ -186,38 +342,43 @@ export function ToolboxSectionEditor({ sections, onChange }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Existing sections */}
-      {sections.map((section, index) => (
-        <Card key={section.id} className="border-border/60">
-          <CardHeader className="pb-3 flex flex-row items-center gap-2 space-y-0 py-3 px-4">
-            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab shrink-0" />
-            <Badge variant="secondary" className="gap-1.5 shrink-0">
-              {getSectionIcon(section.section_type)}
-              {getSectionLabel(section.section_type)}
-            </Badge>
-            <Input
-              value={section.title || ""}
-              onChange={(e) => updateSection(section.id, { title: e.target.value })}
-              placeholder="Sectietitel (optioneel)..."
-              className="flex-1 h-8 text-sm border-none shadow-none focus-visible:ring-0 px-2 bg-transparent"
-            />
-            <div className="flex gap-0.5 shrink-0">
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveSection(index, -1)} disabled={index === 0}>
-                <ChevronUp className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveSection(index, 1)} disabled={index === sections.length - 1}>
-                <ChevronDown className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => removeSection(section.id)}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={sections.map(s => s.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-4">
+            {sections.map((section) => (
+              <SortableSection
+                key={section.id}
+                section={section}
+                updateSection={updateSection}
+                removeSection={removeSection}
+                renderSectionEditor={renderSectionEditor}
+              />
+            ))}
+          </div>
+        </SortableContext>
+
+        <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: "0.5" } } }) }}>
+          {activeDragId ? (
+            <div className="opacity-80">
+              <Card className="border-border/60 border-l-4 border-l-primary">
+                <CardHeader className="pb-3 flex flex-row items-center gap-2 space-y-0 py-3 px-4">
+                  <GripVertical className="h-4 w-4 text-muted-foreground" />
+                  <Badge variant="secondary" className="gap-1.5">{getSectionLabel(sections.find(s => s.id === activeDragId)!.section_type)}</Badge>
+                  <span className="text-sm font-medium">{sections.find(s => s.id === activeDragId)?.title || "Naamloos"}</span>
+                </CardHeader>
+              </Card>
             </div>
-          </CardHeader>
-          <CardContent className="pt-0 px-4 pb-4">
-            {renderSectionEditor(section)}
-          </CardContent>
-        </Card>
-      ))}
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* Add section buttons */}
       <div className="border-2 border-dashed border-border/50 rounded-lg p-4">

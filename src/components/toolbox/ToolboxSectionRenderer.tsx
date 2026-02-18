@@ -23,7 +23,20 @@ interface Props {
 }
 
 // Simple markdown-like rendering
-function renderMarkdown(text: string) {
+function renderTextContent(text: string) {
+  // Check if content looks like HTML (starts with < and contains closing tag)
+  const isHtml = /<[a-z][\s\S]*>/i.test(text);
+
+  if (isHtml) {
+    return (
+      <div
+        className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-4 [&>h2]:text-xl [&>h2]:font-semibold [&>h2]:mt-6 [&>h2]:mb-3 [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:mt-4 [&>h3]:mb-2 [&>ul]:list-disc [&>ul]:ml-4 [&>ol]:list-decimal [&>ol]:ml-4"
+        dangerouslySetInnerHTML={{ __html: text }}
+      />
+    );
+  }
+
+  // Fallback to existing Markdown renderer
   const lines = text.split("\n");
   return lines.map((line, i) => {
     // Headers
@@ -78,7 +91,7 @@ export function ToolboxSectionRenderer({ section, index, interactive = false, on
       case "text":
         return (
           <div className="prose prose-sm dark:prose-invert max-w-none">
-            {renderMarkdown(section.content)}
+            {renderTextContent(section.content)}
           </div>
         );
 
@@ -156,10 +169,9 @@ export function ToolboxSectionRenderer({ section, index, interactive = false, on
                       <Button
                         key={oIdx}
                         variant={isSelected ? "default" : "outline"}
-                        className={`justify-start text-left h-auto py-2 px-3 ${
-                          isCorrect ? "border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300" :
+                        className={`justify-start text-left h-auto py-2 px-3 ${isCorrect ? "border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300" :
                           isWrong ? "border-destructive bg-destructive/10 text-destructive" : ""
-                        }`}
+                          }`}
                         onClick={() => {
                           if (quizSubmitted) return;
                           const newAnswers = [...quizAnswers];
