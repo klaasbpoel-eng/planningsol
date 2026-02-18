@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Loader2, Save, Send, Eye, Pencil, Clock, Image as ImageIcon, X, BookOpen } from "lucide-react";
+import { Upload, Loader2, Save, Send, Eye, Pencil, Clock, Image as ImageIcon, X, BookOpen, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
 import type { ToolboxItem } from "@/hooks/useToolbox";
 import { saveToolbox, saveSections, uploadToolboxFile, useToolboxSections } from "@/hooks/useToolbox";
@@ -41,6 +41,7 @@ export function ToolboxEditorDialog({ open, onOpenChange, toolbox, onSaved, cate
     status: "draft",
     is_mandatory: false,
     estimated_duration_minutes: null,
+    validity_months: 12,
     thumbnail_url: "",
     cover_image_url: "",
   });
@@ -69,6 +70,7 @@ export function ToolboxEditorDialog({ open, onOpenChange, toolbox, onSaved, cate
         status: "draft",
         is_mandatory: false,
         estimated_duration_minutes: null,
+        validity_months: 12,
         thumbnail_url: "",
         cover_image_url: "",
       });
@@ -283,6 +285,18 @@ export function ToolboxEditorDialog({ open, onOpenChange, toolbox, onSaved, cate
                           value={formData.estimated_duration_minutes ?? ""}
                           onChange={(e) => setFormData({ ...formData, estimated_duration_minutes: e.target.value ? parseInt(e.target.value) : null })}
                           placeholder="15"
+                          min={1}
+                        />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <CalendarDays className="h-3.5 w-3.5" /> Geldigheid (mnd)
+                        </Label>
+                        <Input
+                          type="number"
+                          value={formData.validity_months ?? 12}
+                          onChange={(e) => setFormData({ ...formData, validity_months: e.target.value ? parseInt(e.target.value) : 12 })}
+                          placeholder="12"
                           min={1}
                         />
                       </div>

@@ -18,6 +18,7 @@ export interface ToolboxItem {
   sort_order: number;
   estimated_duration_minutes: number | null;
   is_mandatory: boolean;
+  validity_months: number;
   created_at: string;
   updated_at: string;
 }
@@ -39,6 +40,14 @@ export interface ToolboxCompletion {
   user_id: string;
   completed_at: string;
   score: number | null;
+}
+
+export interface EnrichedCompletion extends ToolboxCompletion {
+  toolbox: ToolboxItem;
+  user_profile: {
+    full_name: string | null;
+    email: string | null;
+  } | null;
 }
 
 export function useToolboxes(includeAll = false) {
@@ -144,6 +153,50 @@ export function useToolboxCompletions(toolboxId?: string) {
   return { completions, loading, refetch: fetch, markComplete };
 }
 
+export function useAllToolboxCompletions() {
+  const [completions, setCompletions] = useState<EnrichedCompletion[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    try {
+      setLoading(true);
+      // Fetch completions
+      const { data: completionsData, error: completionsError } = await supabase
+        .from("toolbox_completions" as any)
+        .select("*")
+        .order("completed_at", { ascending: false });
+
+      if (completionsError) throw completionsError;
+
+      // Fetch toolboxes
+      const { data: toolboxesData } = await supabase.from("toolboxes" as any).select("*");
+      const toolboxesMap = new Map((toolboxesData as any[] || []).map(t => [t.id, t]));
+
+      // Fetch profiles
+      const { data: profilesData } = await supabase.from("profiles" as any).select("user_id, full_name, email");
+      const profilesMap = new Map((profilesData as any[] || []).map(p => [p.user_id, p]));
+
+      // Enrich data
+      const enriched = (completionsData as any[] || []).map(c => ({
+        ...c,
+        toolbox: toolboxesMap.get(c.toolbox_id) || null,
+        user_profile: profilesMap.get(c.user_id) || null,
+      })).filter(c => c.toolbox); // Filter out completions for deleted toolboxes
+
+      setCompletions(enriched);
+    } catch (error) {
+      console.error("Error fetching all completions:", error);
+      toast.error("Fout bij ophalen logboek");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { completions, loading, refetch: fetch };
+}
+
 // Helper to save sections for a toolbox
 export async function saveSections(toolboxId: string, sections: Omit<ToolboxSection, "id" | "created_at" | "updated_at">[]) {
   // Delete existing sections
@@ -175,6 +228,7 @@ export async function saveToolbox(data: Partial<ToolboxItem>, isEditing: boolean
     status: data.status || "draft",
     estimated_duration_minutes: data.estimated_duration_minutes,
     is_mandatory: data.is_mandatory || false,
+    validity_months: data.validity_months || 12,
     sort_order: data.sort_order || 0,
     updated_at: new Date().toISOString(),
   };
@@ -225,6 +279,7 @@ export async function duplicateToolbox(id: string): Promise<string> {
       status: "draft",
       estimated_duration_minutes: o.estimated_duration_minutes,
       is_mandatory: false,
+      validity_months: o.validity_months || 12,
       sort_order: 0,
     }]);
   if (insertError) throw insertError;

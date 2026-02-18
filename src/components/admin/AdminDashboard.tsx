@@ -6,11 +6,12 @@ import { EmployeeList } from "@/components/admin/EmployeeList";
 import { TaskList } from "@/components/admin/TaskList";
 import { AdminFilters, FilterState } from "@/components/admin/AdminFilters";
 import { AdminSettings } from "@/components/admin/AdminSettings";
+import { ToolboxLogbook } from "@/components/admin/ToolboxLogbook";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CalendarCheck, Clock, XCircle, Users, CalendarDays, ListChecks, UserCog, ClipboardList, Settings } from "lucide-react";
+import { Loader2, CalendarCheck, Clock, XCircle, Users, CalendarDays, ListChecks, UserCog, ClipboardList, Settings, BookOpen } from "lucide-react";
 import { parseISO, isWithinInterval, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 import type { RolePermissions, AppRole } from "@/hooks/useUserPermissions";
@@ -252,6 +253,12 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
                     Teamkalender
                   </div>
                 </SelectItem>
+                <SelectItem value="logbook">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4" />
+                    Toolbox Logboek
+                  </div>
+                </SelectItem>
                 <SelectItem value="employees">
                   <div className="flex items-center gap-2">
                     <UserCog className="h-4 w-4" />
@@ -280,6 +287,10 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
                 <CalendarDays className="h-4 w-4" />
                 Teamkalender
               </TabsTrigger>
+              <TabsTrigger value="logbook" className="gap-2">
+                <BookOpen className="h-4 w-4" />
+                Toolbox Logboek
+              </TabsTrigger>
               <TabsTrigger value="employees" className="gap-2">
                 <UserCog className="h-4 w-4" />
                 Medewerkers
@@ -301,6 +312,10 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
 
           <TabsContent value="calendar">
             <TeamCalendar requests={filteredRequests} />
+          </TabsContent>
+
+          <TabsContent value="logbook">
+            <ToolboxLogbook />
           </TabsContent>
 
           <TabsContent value="employees">
