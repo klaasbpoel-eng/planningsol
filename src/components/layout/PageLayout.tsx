@@ -11,6 +11,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "interne-bestellingen": "Interne Bestellingen",
   "verlof": "Verlof & Aanvragen",
   "toolbox": "Toolbox",
+  "barcode": "Barcode Generator",
 };
 
 interface PageLayoutProps {

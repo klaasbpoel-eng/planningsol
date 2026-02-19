@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck, BookOpen, Clock, Search } from "lucide-react";
+import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck, BookOpen, Clock, Search, ScanBarcode } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -125,6 +125,20 @@ export function Header({
         >
           <BookOpen className="h-4 w-4 mr-2" />
           Toolbox
+        </Button>
+      </Link>
+      <Link to="/barcode" onClick={mobile ? closeMobileMenu : undefined}>
+        <Button
+          variant={mobile ? "ghost" : "ghost"}
+          size={mobile ? "lg" : "sm"}
+          className={`${mobile ? "w-full justify-start text-base h-12" : ""
+            } text-primary hover:bg-primary/10 hover:text-primary ${location.pathname === "/barcode"
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
+              : ""
+            }`}
+        >
+          <ScanBarcode className="h-4 w-4 mr-2" />
+          Barcode
         </Button>
       </Link>
       {isAdmin && onSwitchView && (

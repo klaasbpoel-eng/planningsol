@@ -1,7 +1,7 @@
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Factory, Calendar, ShoppingCart, Wrench, Clock, Shield, ArrowRight, Activity } from "lucide-react";
+import { Factory, Calendar, ShoppingCart, Wrench, Clock, Shield, ArrowRight, Activity, ScanBarcode } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import type { RolePermissions, AppRole } from "@/hooks/useUserPermissions";
@@ -58,6 +58,14 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
             enabled: true,
             color: "bg-indigo-500/10 hover:bg-indigo-500/20",
         },
+        {
+            title: "Barcode Generator",
+            description: "Maak en download 6-karakter barcodes",
+            icon: <ScanBarcode className="h-8 w-8 text-slate-500" />,
+            path: "/barcode",
+            enabled: true,
+            color: "bg-slate-500/10 hover:bg-slate-500/20",
+        },
     ];
 
     return (
@@ -67,57 +75,57 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
             title={`Welkom terug${userEmail ? `, ${userEmail.split("@")[0]}` : ""}`}
             description="Kies een module om aan de slag te gaan."
         >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* Admin Card - Special Case */}
-                    {isAdmin && (
-                        <Card
-                            className="group cursor-pointer border-l-4 border-l-destructive hover:shadow-lg hover:scale-[1.02] transition-all duration-300"
-                            onClick={onSwitchToAdmin}
-                        >
-                            <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <div className="p-3 rounded-xl bg-destructive/10 group-hover:bg-destructive/20 transition-colors">
-                                        <Shield className="h-8 w-8 text-destructive" />
-                                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Admin Card - Special Case */}
+                {isAdmin && (
+                    <Card
+                        className="group cursor-pointer border-l-4 border-l-destructive hover:shadow-lg hover:scale-[1.02] transition-all duration-300"
+                        onClick={onSwitchToAdmin}
+                    >
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <div className="p-3 rounded-xl bg-destructive/10 group-hover:bg-destructive/20 transition-colors">
+                                    <Shield className="h-8 w-8 text-destructive" />
                                 </div>
-                                <CardTitle className="mt-4">Beheerpaneel</CardTitle>
-                                <CardDescription>
-                                    Beheer gebruikers, instellingen en goedkeuringen
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center text-sm font-medium text-destructive mt-2">
-                                    Open Dashboard <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
+                            </div>
+                            <CardTitle className="mt-4">Beheerpaneel</CardTitle>
+                            <CardDescription>
+                                Beheer gebruikers, instellingen en goedkeuringen
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center text-sm font-medium text-destructive mt-2">
+                                Open Dashboard <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
-                    {features.map((feature, index) => feature.enabled && (
-                        <Card
-                            key={index}
-                            className={`group cursor-pointer border-l-4 border-l-transparent hover:shadow-lg hover:scale-[1.02] transition-all duration-300 hover:border-l-primary`}
-                            onClick={() => navigate(feature.path)}
-                        >
-                            <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <div className={`p-3 rounded-xl transition-colors ${feature.color}`}>
-                                        {feature.icon}
-                                    </div>
+                {features.map((feature, index) => feature.enabled && (
+                    <Card
+                        key={index}
+                        className={`group cursor-pointer border-l-4 border-l-transparent hover:shadow-lg hover:scale-[1.02] transition-all duration-300 hover:border-l-primary`}
+                        onClick={() => navigate(feature.path)}
+                    >
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <div className={`p-3 rounded-xl transition-colors ${feature.color}`}>
+                                    {feature.icon}
                                 </div>
-                                <CardTitle className="mt-4">{feature.title}</CardTitle>
-                                <CardDescription>
-                                    {feature.description}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center text-sm font-medium text-muted-foreground group-hover:text-primary transition-colors mt-2">
-                                    Ga verder <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+                            </div>
+                            <CardTitle className="mt-4">{feature.title}</CardTitle>
+                            <CardDescription>
+                                {feature.description}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center text-sm font-medium text-muted-foreground group-hover:text-primary transition-colors mt-2">
+                                Ga verder <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
         </PageLayout>
     );
 }
