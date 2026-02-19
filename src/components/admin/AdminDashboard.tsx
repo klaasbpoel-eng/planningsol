@@ -1,21 +1,19 @@
 import { useEffect, useState, useMemo } from "react";
 import { Header } from "@/components/layout/Header";
-import { AdminRequestList } from "@/components/admin/AdminRequestList";
+import { AdminRequestsPage } from "@/components/admin/pages/AdminRequestsPage";
 import { TeamCalendar } from "@/components/admin/TeamCalendar";
 import { EmployeeList } from "@/components/admin/EmployeeList";
 import { TaskList } from "@/components/admin/TaskList";
-import { AdminFilters, FilterState } from "@/components/admin/AdminFilters";
+import { FilterState } from "@/components/admin/AdminFilters";
 import { AdminSettings } from "@/components/admin/AdminSettings";
 import { ToolboxLogbook } from "@/components/admin/ToolboxLogbook";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AdminSidebar } from "@/components/admin/layout/AdminSidebar";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CalendarCheck, Clock, XCircle, Users, CalendarDays, ListChecks, UserCog, ClipboardList, Settings, BookOpen } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { parseISO, isWithinInterval, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 import type { RolePermissions, AppRole } from "@/hooks/useUserPermissions";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useSearchParams } from "react-router-dom";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -31,20 +29,38 @@ interface AdminDashboardProps {
   role?: AppRole;
 }
 
-import { useSearchParams } from "react-router-dom";
-
 export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: AdminDashboardProps) {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [requests, setRequests] = useState<RequestWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Initialize active tab from URL or default to 'requests'
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "requests");
-  const isMobile = useIsMobile();
+
   const [filters, setFilters] = useState<FilterState>({
     employeeId: null,
     status: "all",
     startDate: undefined,
     endDate: undefined,
   });
+
+  // Update URL when tab changes
+  useEffect(() => {
+    if (activeTab) {
+      setSearchParams(prev => {
+        prev.set("tab", activeTab);
+        return prev;
+      });
+    }
+  }, [activeTab, setSearchParams]);
+
+  // Sync state if URL changes externally (e.g. back button)
+  useEffect(() => {
+    const tabFromUrl = searchParams.get("tab");
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
 
   const fetchRequests = async () => {
     try {
@@ -56,16 +72,12 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
 
       if (requestsError) throw requestsError;
 
-      // Fetch profiles - use profile_id for new schema, fall back to user_id
-      const requestsAny = requestsData as any[];
-      const profileIds = [...new Set(requestsAny.filter(r => r.profile_id).map(r => r.profile_id))];
-      const userIds = [...new Set((requestsData || []).filter(r => r.user_id).map(r => r.user_id))];
-
+      // Fetch profiles
       const { data: profilesData } = await supabase
         .from("profiles")
         .select("*");
 
-      // Map profiles to requests - try profile_id first, then user_id
+      // Map profiles to requests
       const profilesById = new Map((profilesData || []).map(p => [p.id, p]));
       const profilesByUserId = new Map((profilesData || []).map(p => [p.user_id, p]));
 
@@ -92,12 +104,7 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
     fetchRequests();
   }, []);
 
-  useEffect(() => {
-    const tab = searchParams.get("tab");
-    if (tab) setActiveTab(tab);
-  }, [searchParams]);
-
-  // Get unique employees from requests
+  // Get unique employees from requests for filter dropdown
   const employees = useMemo(() => {
     const uniqueProfiles = new Map<string, Profile>();
     requests.forEach(r => {
@@ -108,10 +115,10 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
     return Array.from(uniqueProfiles.values());
   }, [requests]);
 
-  // Filter requests
+  // Filter requests logic
   const filteredRequests = useMemo(() => {
     return requests.filter(request => {
-      // Filter by employee (using profile_id)
+      // Filter by employee
       const requestAny = request as any;
       const profileId = requestAny.profile_id || request.profiles?.id;
       if (filters.employeeId && profileId !== filters.employeeId) {
@@ -128,14 +135,12 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
       const requestEnd = parseISO(request.end_date);
 
       if (filters.startDate) {
-        // Request end date must be on or after filter start date
         if (isBefore(requestEnd, startOfDay(filters.startDate))) {
           return false;
         }
       }
 
       if (filters.endDate) {
-        // Request start date must be on or before filter end date
         if (isAfter(requestStart, endOfDay(filters.endDate))) {
           return false;
         }
@@ -144,13 +149,6 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
       return true;
     });
   }, [requests, filters]);
-
-  const stats = {
-    pending: filteredRequests.filter((r) => r.status === "pending").length,
-    approved: filteredRequests.filter((r) => r.status === "approved").length,
-    rejected: filteredRequests.filter((r) => r.status === "rejected").length,
-    total: filteredRequests.length,
-  };
 
   if (loading) {
     return (
@@ -161,180 +159,80 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
   }
 
   return (
-
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Header userEmail={userEmail} isAdmin onSwitchView={onSwitchView} role={role} />
 
-      <main className="w-full px-[1%] md:px-[10%] py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground">Beheerpaneel</h1>
-          <p className="text-muted-foreground">Beheer goedkeuringen, personeel en instellingen.</p>
-        </div>
+      <div className="flex-1 flex max-w-screen-2xl mx-auto w-full">
+        {/* Sidebar Navigation */}
+        <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-        {/* Filters and Stats - Hide when in Settings */}
-        {activeTab !== 'settings' && (
-          <>
-            {/* Filters */}
-            <AdminFilters
-              employees={employees}
-              filters={filters}
-              onFiltersChange={setFilters}
-            />
+        {/* Main Content Area */}
+        <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full">
+          {/* Mobile Header for Sidebar Trigger is handled inside AdminSidebar via SheetTrigger */}
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <Card className="shadow-md border-0 bg-primary/5">
-                <CardContent className="pt-6 flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-primary/10">
-                    <Users className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{stats.total}</p>
-                    <p className="text-sm text-muted-foreground">Totaal</p>
-                  </div>
-                </CardContent>
-              </Card>
+          <div className="max-w-6xl mx-auto w-full">
+            {activeTab === 'requests' && (
+              <AdminRequestsPage
+                requests={filteredRequests}
+                filters={filters}
+                onFiltersChange={setFilters}
+                employees={employees}
+                onUpdate={fetchRequests}
+              />
+            )}
 
-              <Card className="shadow-md border-0 bg-warning/5">
-                <CardContent className="pt-6 flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-warning/10">
-                    <Clock className="h-6 w-6 text-warning" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{stats.pending}</p>
-                    <p className="text-sm text-muted-foreground">In behandeling</p>
-                  </div>
-                </CardContent>
-              </Card>
+            {activeTab === 'tasks' && (
+              <div className="animate-fade-in space-y-6">
+                <div className="flex flex-col gap-2 mb-6">
+                  <h2 className="text-2xl font-bold tracking-tight">Taken Overzicht</h2>
+                  <p className="text-muted-foreground">Beheer openstaande taken.</p>
+                </div>
+                <TaskList />
+              </div>
+            )}
 
-              <Card className="shadow-md border-0 bg-success/5">
-                <CardContent className="pt-6 flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-success/10">
-                    <CalendarCheck className="h-6 w-6 text-success" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{stats.approved}</p>
-                    <p className="text-sm text-muted-foreground">Goedgekeurd</p>
-                  </div>
-                </CardContent>
-              </Card>
+            {activeTab === 'calendar' && (
+              <div className="animate-fade-in space-y-6">
+                <div className="flex flex-col gap-2 mb-6">
+                  <h2 className="text-2xl font-bold tracking-tight">Teamkalender</h2>
+                  <p className="text-muted-foreground">Overzicht van verlof en aanwezigheid.</p>
+                </div>
+                <TeamCalendar requests={filteredRequests} />
+              </div>
+            )}
 
-              <Card className="shadow-md border-0 bg-destructive/5">
-                <CardContent className="pt-6 flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-destructive/10">
-                    <XCircle className="h-6 w-6 text-destructive" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{stats.rejected}</p>
-                    <p className="text-sm text-muted-foreground">Afgewezen</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </>
-        )}
+            {activeTab === 'logbook' && (
+              <div className="animate-fade-in space-y-6">
+                <div className="flex flex-col gap-2 mb-6">
+                  <h2 className="text-2xl font-bold tracking-tight">Toolbox Logboek</h2>
+                  <p className="text-muted-foreground">Overzicht van voltooide toolboxen.</p>
+                </div>
+                <ToolboxLogbook />
+              </div>
+            )}
 
-        {/* Tabs for Requests and Calendar */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          {/* Mobile: Use dropdown for tab selection */}
-          {isMobile ? (
-            <Select value={activeTab} onValueChange={setActiveTab}>
-              <SelectTrigger className="w-full bg-muted/50 h-11">
-                <SelectValue placeholder="Selecteer weergave" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="requests">
-                  <div className="flex items-center gap-2">
-                    <ListChecks className="h-4 w-4" />
-                    Aanvragen
-                  </div>
-                </SelectItem>
-                <SelectItem value="tasks">
-                  <div className="flex items-center gap-2">
-                    <ClipboardList className="h-4 w-4" />
-                    Taken
-                  </div>
-                </SelectItem>
-                <SelectItem value="calendar">
-                  <div className="flex items-center gap-2">
-                    <CalendarDays className="h-4 w-4" />
-                    Teamkalender
-                  </div>
-                </SelectItem>
-                <SelectItem value="logbook">
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="h-4 w-4" />
-                    Toolbox Logboek
-                  </div>
-                </SelectItem>
-                <SelectItem value="employees">
-                  <div className="flex items-center gap-2">
-                    <UserCog className="h-4 w-4" />
-                    Medewerkers
-                  </div>
-                </SelectItem>
-                <SelectItem value="settings">
-                  <div className="flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    Instellingen
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          ) : (
-            <TabsList className="bg-muted/50">
-              <TabsTrigger value="requests" className="gap-2">
-                <ListChecks className="h-4 w-4" />
-                Aanvragen
-              </TabsTrigger>
-              <TabsTrigger value="tasks" className="gap-2">
-                <ClipboardList className="h-4 w-4" />
-                Taken
-              </TabsTrigger>
-              <TabsTrigger value="calendar" className="gap-2">
-                <CalendarDays className="h-4 w-4" />
-                Teamkalender
-              </TabsTrigger>
-              <TabsTrigger value="logbook" className="gap-2">
-                <BookOpen className="h-4 w-4" />
-                Toolbox Logboek
-              </TabsTrigger>
-              <TabsTrigger value="employees" className="gap-2">
-                <UserCog className="h-4 w-4" />
-                Medewerkers
-              </TabsTrigger>
-              <TabsTrigger value="settings" className="gap-2">
-                <Settings className="h-4 w-4" />
-                Instellingen
-              </TabsTrigger>
-            </TabsList>
-          )}
+            {activeTab === 'employees' && (
+              <div className="animate-fade-in space-y-6">
+                <div className="flex flex-col gap-2 mb-6">
+                  <h2 className="text-2xl font-bold tracking-tight">Medewerkers</h2>
+                  <p className="text-muted-foreground">Beheer profielen en gegevens.</p>
+                </div>
+                <EmployeeList />
+              </div>
+            )}
 
-          <TabsContent value="requests">
-            <AdminRequestList requests={filteredRequests} onUpdate={fetchRequests} />
-          </TabsContent>
-
-          <TabsContent value="tasks">
-            <TaskList />
-          </TabsContent>
-
-          <TabsContent value="calendar">
-            <TeamCalendar requests={filteredRequests} />
-          </TabsContent>
-
-          <TabsContent value="logbook">
-            <ToolboxLogbook />
-          </TabsContent>
-
-          <TabsContent value="employees">
-            <EmployeeList />
-          </TabsContent>
-
-          <TabsContent value="settings">
-            <AdminSettings />
-          </TabsContent>
-        </Tabs>
-      </main>
+            {activeTab === 'settings' && (
+              <div className="animate-fade-in space-y-6">
+                <div className="flex flex-col gap-2 mb-6">
+                  <h2 className="text-2xl font-bold tracking-tight">Instellingen</h2>
+                  <p className="text-muted-foreground">Pas systeemconfiguraties aan.</p>
+                </div>
+                <AdminSettings />
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
