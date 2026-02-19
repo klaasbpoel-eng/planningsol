@@ -6,11 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Cylinder, Map as MapIcon, Save, RotateCcw, Plus, Info, Pencil, Trash2, RotateCw, ZoomIn, ZoomOut, Move, Maximize2, Minimize2, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { getGasColor } from "@/constants/gasColors";
 import { LocationMap } from "./LocationMap";
+import { AerialSiteMap } from "./AerialSiteMap";
 
 interface StorageZone {
     id: string;
@@ -316,6 +318,21 @@ export function SiteMap({ location }: SiteMapProps) {
     return (
         <div className="space-y-6">
         <LocationMap location={location} />
+        <Tabs defaultValue="layout" className="w-full">
+            <TabsList className="mb-4">
+                <TabsTrigger value="layout">
+                    <MapIcon className="h-4 w-4 mr-2" />
+                    Opslag Layout
+                </TabsTrigger>
+                <TabsTrigger value="aerial">
+                    <MapIcon className="h-4 w-4 mr-2" />
+                    Luchtfoto
+                </TabsTrigger>
+            </TabsList>
+            <TabsContent value="aerial">
+                <AerialSiteMap />
+            </TabsContent>
+            <TabsContent value="layout">
         <Card className={cn(
             "glass-card w-full overflow-hidden transition-all duration-300",
             isFullscreen ? "fixed inset-0 z-50 rounded-none h-screen w-screen bg-background/95 backdrop-blur-md" : ""
@@ -694,6 +711,8 @@ export function SiteMap({ location }: SiteMapProps) {
                 </motion.div>
             </CardContent>
         </Card>
+        </TabsContent>
+        </Tabs>
         </div>
     );
 }

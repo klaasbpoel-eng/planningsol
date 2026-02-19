@@ -1379,6 +1379,7 @@ export type Database = {
           thumbnail_url: string | null
           title: string
           updated_at: string
+          validity_months: number
         }
         Insert: {
           category?: string
@@ -1395,6 +1396,7 @@ export type Database = {
           thumbnail_url?: string | null
           title: string
           updated_at?: string
+          validity_months?: number
         }
         Update: {
           category?: string
@@ -1411,6 +1413,7 @@ export type Database = {
           thumbnail_url?: string | null
           title?: string
           updated_at?: string
+          validity_months?: number
         }
         Relationships: []
       }
