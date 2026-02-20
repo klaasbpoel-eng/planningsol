@@ -200,7 +200,8 @@ export function useAllToolboxCompletions() {
 // Helper to save sections for a toolbox
 export async function saveSections(toolboxId: string, sections: Omit<ToolboxSection, "id" | "created_at" | "updated_at">[]) {
   // Delete existing sections
-  await supabase.from("toolbox_sections" as any).delete().eq("toolbox_id", toolboxId);
+  const { error: deleteError } = await supabase.from("toolbox_sections" as any).delete().eq("toolbox_id", toolboxId);
+  if (deleteError) throw deleteError;
 
   if (sections.length === 0) return;
 
