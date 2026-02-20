@@ -321,3 +321,162 @@ export async function uploadToolboxFile(file: File, folder = ""): Promise<string
   const { data: { publicUrl } } = supabase.storage.from("toolbox-files").getPublicUrl(fileName);
   return publicUrl;
 }
+
+// Session Types
+export interface ToolboxSession {
+  id: string;
+  toolbox_id: string;
+  session_date: string;
+  session_time: string | null;
+  location: string | null;
+  instructor_id: string | null;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+
+  // Joins
+  toolbox?: ToolboxItem;
+  instructor?: {
+    full_name: string | null;
+  };
+  _count?: {
+    participants: number;
+  };
+}
+
+export interface SessionParticipant {
+  id: string;
+  session_id: string;
+  profile_id: string;
+  attended: boolean;
+  signed_off: boolean;
+
+  // Joins
+  profile?: {
+    full_name: string | null;
+    email: string | null;
+    production_location: string | null;
+    department: string | null;
+  };
+}
+
+// Session Hooks
+export function useToolboxSessions() {
+  const [sessions, setSessions] = useState<ToolboxSession[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("toolbox_sessions" as any)
+        .select(`
+          *,
+          toolbox:toolboxes(title),
+          instructor:profiles!toolbox_sessions_instructor_id_fkey(full_name),
+          participants:toolbox_session_participants(count)
+        `)
+        .order("session_date", { ascending: false });
+
+      if (error) throw error;
+
+      // Transform to match interface
+      const transformed = (data as any[]).map(s => ({
+        ...s,
+        toolbox: s.toolbox,
+        instructor: s.instructor,
+        _count: { participants: s.participants?.[0]?.count || 0 }
+      }));
+
+      setSessions(transformed);
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+      toast.error("Fout bij laden van sessies");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { sessions, loading, refetch: fetch };
+}
+
+export function useToolboxSessionParticipants(sessionId: string | null) {
+  const [participants, setParticipants] = useState<SessionParticipant[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetch = useCallback(async () => {
+    if (!sessionId) { setParticipants([]); return; }
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("toolbox_session_participants" as any)
+        .select(`
+          *,
+          profile:profiles(full_name, email, production_location, department)
+        `)
+        .eq("session_id", sessionId);
+
+      if (error) throw error;
+      setParticipants((data as any) || []);
+    } catch (error) {
+      console.error("Error fetching participants:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { participants, loading, refetch: fetch };
+}
+
+export async function createToolboxSession(
+  sessionData: Partial<ToolboxSession>,
+  participants: { profileId: string; userId: string }[]
+) {
+  // 1. Create Session
+  const { data: session, error: sessionError } = await supabase
+    .from("toolbox_sessions" as any)
+    .insert([{
+      toolbox_id: sessionData.toolbox_id,
+      session_date: sessionData.session_date,
+      session_time: sessionData.session_time,
+      location: sessionData.location,
+      instructor_id: sessionData.instructor_id,
+      notes: sessionData.notes,
+      created_by: (await supabase.auth.getUser()).data.user?.id
+    }])
+    .select()
+    .single();
+
+  if (sessionError) throw sessionError;
+
+  // 2. Add Participants
+  if (participants.length > 0) {
+    const { error: partError } = await supabase
+      .from("toolbox_session_participants" as any)
+      .insert(participants.map(p => ({
+        session_id: (session as any).id,
+        profile_id: p.profileId,
+        attended: true
+      })));
+
+    if (partError) throw partError;
+
+    // 3. Mark as Completed (Upsert)
+    const { error: completeError } = await supabase
+      .from("toolbox_completions" as any)
+      .upsert(participants.map(p => ({
+        toolbox_id: sessionData.toolbox_id,
+        user_id: p.userId,
+        completed_at: sessionData.session_date, // Use session date
+        score: null
+      })), { onConflict: "toolbox_id,user_id" });
+
+    if (completeError) throw completeError;
+  }
+
+  return (session as any).id;
+}

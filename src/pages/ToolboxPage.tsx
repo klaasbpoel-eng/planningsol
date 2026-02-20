@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Search, BookOpen, FileText, Plus, Pencil, Trash2, Copy, MoreVertical, Clock, AlertTriangle, CheckCircle2, Send, Archive, Eye, Loader2 } from "lucide-react";
+import { Search, BookOpen, FileText, Plus, Pencil, Trash2, Copy, MoreVertical, Clock, AlertTriangle, CheckCircle2, Send, Archive, Eye, Loader2, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -19,6 +19,7 @@ import type { ToolboxItem, ToolboxStatus } from "@/hooks/useToolbox";
 import { useToolboxes, deleteToolbox, duplicateToolbox, saveToolbox } from "@/hooks/useToolbox";
 import { ToolboxEditorDialog } from "@/components/toolbox/ToolboxEditorDialog";
 import { ToolboxViewer } from "@/components/toolbox/ToolboxViewer";
+import { ToolboxSessionDialog } from "@/components/toolbox/ToolboxSessionDialog";
 
 const STATUS_CONFIG: Record<ToolboxStatus, { label: string; variant: "default" | "secondary" | "outline"; icon: React.ReactNode }> = {
   draft: { label: "Concept", variant: "secondary", icon: <Pencil className="h-3 w-3" /> },
@@ -46,6 +47,7 @@ const ToolboxPage = () => {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewingToolbox, setViewingToolbox] = useState<ToolboxItem | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -176,7 +178,6 @@ const ToolboxPage = () => {
       </div>
 
       {/* Admin Actions */}
-      {/* Admin Actions */}
       {canManage && (
         <div className="mb-6 flex gap-2">
           <Button
@@ -186,6 +187,14 @@ const ToolboxPage = () => {
           >
             <BookOpen className="h-4 w-4" />
             Open Logboek
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setSessionDialogOpen(true)}
+          >
+            <Users className="h-4 w-4" />
+            Sessie Registreren
           </Button>
         </div>
       )}
@@ -350,6 +359,13 @@ const ToolboxPage = () => {
         open={viewerOpen}
         onOpenChange={setViewerOpen}
         toolbox={viewingToolbox}
+      />
+
+      {/* Session Dialog */}
+      <ToolboxSessionDialog
+        open={sessionDialogOpen}
+        onOpenChange={setSessionDialogOpen}
+        onSaved={refetch}
       />
 
       {/* Delete Confirmation */}
