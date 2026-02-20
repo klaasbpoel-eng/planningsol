@@ -10,7 +10,12 @@ import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Set worker source for pdf.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// using CDN as a fallback, but trying to import if possible, usually direct import with vite ?url is best
+// However, to be safe without changing vite config, we will use a fixed version from unpkg for now which is reliable.
+// But pdfjs-dist 5.x is ES module based.
+import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 const VrijgavesPage = () => {
     const [file, setFile] = useState<File | null>(null);
@@ -77,9 +82,10 @@ const VrijgavesPage = () => {
             setStats({ totalPages, selectedPages: pagesToKeep.length });
             toast.success(`${pagesToKeep.length} pagina('s) succesvol geselecteerd!`);
 
-        } catch (err) {
+        } catch (err: any) {
             console.error("Error processing PDF:", err);
-            setError("Er is een fout opgetreden bij het verwerken van de PDF. Controleer of het bestand geldig is.");
+            // Show the actual error message
+            setError(`Fout details: ${err.message || err}`);
             toast.error("Fout bij verwerken PDF");
         } finally {
             setIsProcessing(false);
