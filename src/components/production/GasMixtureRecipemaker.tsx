@@ -391,39 +391,58 @@ export function GasMixtureRecipemaker() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">Doeldruk</label>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      min={1}
-                      max={500}
-                      step={1}
-                      value={targetPressure}
-                      onChange={e => {
-                        const val = Number(e.target.value);
-                        if (val >= 1 && val <= 500) setTargetPressure(val);
-                        else if (e.target.value === '') setTargetPressure(1);
-                      }}
-                      className="pr-12"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">bar</span>
-                  </div>
-                  <div className="flex gap-1 mt-1.5">
-                    {PRESSURE_PRESETS.map(p => (
-                      <Button
-                        key={p}
-                        type="button"
-                        variant={targetPressure === p ? "default" : "outline"}
-                        size="sm"
-                        className="h-6 px-2 text-xs"
-                        onClick={() => setTargetPressure(p)}
-                      >
-                        {p}
-                      </Button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1.5">
-                    Acceptabel bereik: {Math.round(targetPressure * 0.95)} – {Math.round(targetPressure * 1.05)} bar bij 15°C (± 5%)
-                  </p>
+                  {(() => {
+                    const maxPressure = percentages.co2 > 0 ? Math.min(500, Math.floor(6000 / percentages.co2)) : 500;
+                    return (
+                      <>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            min={1}
+                            max={maxPressure}
+                            step={1}
+                            value={targetPressure}
+                            onChange={e => {
+                              const val = Number(e.target.value);
+                              if (val >= 1 && val <= maxPressure) setTargetPressure(val);
+                              else if (e.target.value === '') setTargetPressure(1);
+                            }}
+                            className="pr-12"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">bar</span>
+                        </div>
+                        <Slider
+                          value={[targetPressure]}
+                          onValueChange={([v]) => setTargetPressure(v)}
+                          min={1}
+                          max={maxPressure}
+                          step={1}
+                          className="mt-2"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
+                          <span>1 bar</span>
+                          <span>{maxPressure} bar{maxPressure < 500 ? ' (CO₂ limiet)' : ''}</span>
+                        </div>
+                        <div className="flex gap-1 mt-1.5">
+                          {PRESSURE_PRESETS.filter(p => p <= maxPressure).map(p => (
+                            <Button
+                              key={p}
+                              type="button"
+                              variant={targetPressure === p ? "default" : "outline"}
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => setTargetPressure(p)}
+                            >
+                              {p}
+                            </Button>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1.5">
+                          Acceptabel bereik: {Math.round(targetPressure * 0.95)} – {Math.round(targetPressure * 1.05)} bar bij 15°C (± 5%)
+                        </p>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">Cilinderinhoud</label>
