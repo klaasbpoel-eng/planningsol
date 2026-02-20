@@ -162,7 +162,7 @@ export function ToolboxSessionDialog({ open, onOpenChange, onSaved }: Props) {
                 session_date: format(sessionData.session_date, "yyyy-MM-dd"), // Correct format for DB DATE
                 session_time: sessionData.session_time,
                 location: sessionData.location,
-                instructor_id: sessionData.instructor_id || null, // This references profiles.id (UUID)
+                instructor_id: sessionData.instructor_id === "none" || !sessionData.instructor_id ? null : sessionData.instructor_id,
                 notes: sessionData.notes
             }, participants);
 
@@ -255,7 +255,7 @@ export function ToolboxSessionDialog({ open, onOpenChange, onSaved }: Props) {
                                         <SelectValue placeholder="Wie gaf de training?" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">-- Geen / Onbekend --</SelectItem>
+                                        <SelectItem value="none">-- Geen / Onbekend --</SelectItem>
                                         {profiles.map(p => (
                                             <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
                                         ))}

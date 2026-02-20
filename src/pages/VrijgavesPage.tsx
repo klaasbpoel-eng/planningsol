@@ -92,7 +92,7 @@ const VrijgavesPage = () => {
 
                 if (!context) continue;
 
-                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                await page.render({ canvasContext: context, viewport: viewport, canvas: canvas }).promise;
 
                 // Define center region: middle 50% width, middle 30% height
                 const startX = Math.floor(viewport.width * 0.25);
