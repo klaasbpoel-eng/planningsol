@@ -465,10 +465,12 @@ export async function createToolboxSession(
 
     if (partError) throw partError;
 
-    // 3. Mark as Completed (Upsert)
+    // 3. Mark as Completed (Upsert) - only for participants with a valid userId
+    const participantsWithUser = participants.filter(p => p.userId);
+    if (participantsWithUser.length > 0) {
     const { error: completeError } = await supabase
       .from("toolbox_completions" as any)
-      .upsert(participants.map(p => ({
+      .upsert(participantsWithUser.map(p => ({
         toolbox_id: sessionData.toolbox_id,
         user_id: p.userId,
         completed_at: sessionData.session_date, // Use session date
@@ -476,6 +478,7 @@ export async function createToolboxSession(
       })), { onConflict: "toolbox_id,user_id" });
 
     if (completeError) throw completeError;
+    }
   }
 
   return (session as any).id;
