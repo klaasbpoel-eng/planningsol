@@ -51,6 +51,7 @@ export function ToolboxEditorDialog({ open, onOpenChange, toolbox, onSaved, cate
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState("editor");
+  const [sectionsInitialized, setSectionsInitialized] = useState(false);
 
   const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...categories])].sort();
 
@@ -78,8 +79,15 @@ export function ToolboxEditorDialog({ open, onOpenChange, toolbox, onSaved, cate
     }
   }, [toolbox]);
 
-  // Load sections
+  // Load sections - only on initial load (when sectionsLoading transitions from true to false)
   useEffect(() => {
+    if (!open) {
+      setSectionsInitialized(false);
+      return;
+    }
+    if (sectionsLoading || sectionsInitialized) return;
+    setSectionsInitialized(true);
+    
     if (existingSections.length > 0) {
       setEditorSections(existingSections.map(s => ({
         id: s.id,
@@ -88,10 +96,10 @@ export function ToolboxEditorDialog({ open, onOpenChange, toolbox, onSaved, cate
         content: s.content,
         sort_order: s.sort_order,
       })));
-    } else if (!isEditing) {
+    } else {
       setEditorSections([]);
     }
-  }, [existingSections, isEditing]);
+  }, [existingSections, sectionsLoading, open, sectionsInitialized]);
 
   const saveToDb = async (publish = false, silent = false) => {
     try {
