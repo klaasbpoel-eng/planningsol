@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Printer, RotateCcw, FlaskConical, AlertTriangle, CheckCircle2, Save, FolderOpen, Trash2, Loader2 } from "lucide-react";
 import { getGasColor } from "@/constants/gasColors";
 import { cn } from "@/lib/utils";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -495,6 +496,17 @@ export function GasMixtureRecipemaker() {
             </CardContent>
           </Card>
         </div>
+
+        {/* CO2 partial pressure warning */}
+        {percentages.co2 > 0 && (percentages.co2 / 100) * targetPressure > 60 && (
+          <Alert className="lg:col-span-2 border-amber-500/50 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-500/30 print:block">
+            <AlertTriangle className="h-4 w-4 !text-amber-600 dark:!text-amber-400" />
+            <AlertTitle>Let op: hoge CO₂ partiaaldruk</AlertTitle>
+            <AlertDescription>
+              CO₂ partiaaldruk is {((percentages.co2 / 100) * targetPressure).toFixed(1)} bar (kritische druk: 73,83 bar). Boven 60 bar is fasescheiding (vloeistofvorming) mogelijk.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Right: Results table */}
         <Card className="print:shadow-none print:border-none">
