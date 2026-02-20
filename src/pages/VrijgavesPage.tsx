@@ -144,7 +144,9 @@ const VrijgavesPage = () => {
             }
 
             // Create new PDF with selected pages
-            const srcDoc = await PDFDocument.load(arrayBuffer);
+            // Reload the buffer because pdfjs might have detached it
+            const freshArrayBuffer = await file.arrayBuffer();
+            const srcDoc = await PDFDocument.load(freshArrayBuffer);
             const newDoc = await PDFDocument.create();
 
             const copiedPages = await newDoc.copyPages(srcDoc, pagesToKeep);
