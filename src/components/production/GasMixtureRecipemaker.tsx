@@ -497,16 +497,29 @@ export function GasMixtureRecipemaker() {
           </Card>
         </div>
 
-        {/* CO2 partial pressure warning */}
-        {percentages.co2 > 0 && (percentages.co2 / 100) * targetPressure > 60 && (
-          <Alert className="lg:col-span-2 border-amber-500/50 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-500/30 print:block">
-            <AlertTriangle className="h-4 w-4 !text-amber-600 dark:!text-amber-400" />
-            <AlertTitle>Let op: hoge CO₂ partiaaldruk</AlertTitle>
-            <AlertDescription>
-              CO₂ partiaaldruk is {((percentages.co2 / 100) * targetPressure).toFixed(1)} bar (kritische druk: 73,83 bar). Boven 60 bar is fasescheiding (vloeistofvorming) mogelijk.
-            </AlertDescription>
-          </Alert>
-        )}
+        {/* CO2 partial pressure warning – auto-adjust pressure */}
+        {percentages.co2 > 0 && (percentages.co2 / 100) * targetPressure > 60 && (() => {
+          const maxSafePressure = Math.floor(6000 / percentages.co2);
+          return (
+            <Alert className="lg:col-span-2 border-amber-500/50 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-500/30 print:block">
+              <AlertTriangle className="h-4 w-4 !text-amber-600 dark:!text-amber-400" />
+              <AlertTitle>Vuldruk automatisch verlaagd</AlertTitle>
+              <AlertDescription className="space-y-2">
+                <p>
+                  Bij {percentages.co2}% CO₂ zou de partiaaldruk {((percentages.co2 / 100) * targetPressure).toFixed(1)} bar bedragen, wat boven de veilige grens van 60 bar ligt (kritische druk CO₂: 73,83 bar). Boven 60 bar is fasescheiding (vloeistofvorming) mogelijk.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-amber-500/50 bg-amber-100 hover:bg-amber-200 text-amber-900 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 dark:text-amber-200"
+                  onClick={() => setTargetPressure(maxSafePressure)}
+                >
+                  Pas vuldruk aan naar {maxSafePressure} bar
+                </Button>
+              </AlertDescription>
+            </Alert>
+          );
+        })()}
 
         {/* Right: Results table */}
         <Card className="print:shadow-none print:border-none">
