@@ -1,58 +1,28 @@
 
 
-## Luchtfoto plattegrond James Cookstraat 3, Emmen
+## Fix: Toolbox pagina crash + VrijgavesPage build error
 
-### Wat wordt er gebouwd
-Een nieuw kaartcomponent dat een satelliet-/luchtfoto toont van uitsluitend het perceel James Cookstraat 3, 7825 VR Emmen. De kaart wordt ingezoomd op het terrein en gebruikt satellietbeelden in plaats van de huidige stratenkaart.
+### Probleem 1: Toolbox pagina crash ("Er is iets misgegaan")
+De crash wordt veroorzaakt door een lege string als `value` in een Select-item in `ToolboxSessionDialog.tsx` (regel 258):
 
-### Aanpak
-
-**Nieuw component: `src/components/production/AerialSiteMap.tsx`**
-
-- Leaflet-kaart met **Esri World Imagery** satelliet-tiles (gratis, geen API key nodig)
-- Gecentreerd op het perceel (ca. 52.7616, 6.9397) met zoomniveau ~18 zodat alleen het terrein zichtbaar is
-- Optioneel: een polygoon overlay die de perceelgrens markeert
-- Scroll-zoom en pan uitgeschakeld of beperkt zodat gebruikers niet per ongeluk wegnavigeren
-- `maxBounds` ingesteld op het perceelgebied zodat de kaart niet buiten het terrein kan scrollen
-
-**Integratie**
-
-- Het component wordt beschikbaar gemaakt op de productie/site-map pagina, naast of als alternatief voor de bestaande SiteMap
-- Kan via een tab of toggle geschakeld worden tussen "Stratenkaart" en "Luchtfoto"
-
-### Technisch detail
-
-**Bestand: `src/components/production/AerialSiteMap.tsx`**
-
-```tsx
-// Esri World Imagery tile layer (gratis, geen key vereist)
-L.tileLayer(
-  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-  {
-    attribution: "Tiles &copy; Esri",
-    maxZoom: 19,
-  }
-);
-
-// Kaart gecentreerd en begrensd op het perceel
-const map = L.map(container, {
-  center: [52.7616, 6.9397],
-  zoom: 18,
-  minZoom: 17,
-  maxZoom: 19,
-  maxBounds: [[52.760, 6.937], [52.763, 6.942]],
-  maxBoundsViscosity: 1.0,
-});
+```
+<SelectItem value="">-- Geen / Onbekend --</SelectItem>
 ```
 
-**Bestand: `src/components/production/SiteMap.tsx`**
+Radix UI staat geen lege string toe als waarde voor `Select.Item`. Dit gooit een fout die door de ErrorBoundary wordt opgevangen, waardoor de hele `/toolbox` pagina crasht -- zelfs als de dialoog niet open is, omdat het component al in de DOM wordt geladen.
 
-- Import en render van het nieuwe `AerialSiteMap` component, met een toggle-knop om te wisselen tussen de bestaande layout-weergave en de luchtfoto.
+**Oplossing**: Verander de lege string naar een placeholder waarde zoals `"none"` en pas de logica aan zodat `"none"` als "geen instructeur" wordt behandeld.
 
-### Bestanden
+| Bestand | Wijziging |
+|---------|-----------|
+| `src/components/toolbox/ToolboxSessionDialog.tsx` | `value=""` wijzigen naar `value="none"`, en bij submit `"none"` omzetten naar `null` |
 
-| Bestand | Actie |
-|---------|-------|
-| `src/components/production/AerialSiteMap.tsx` | Nieuw |
-| `src/components/production/SiteMap.tsx` | Kleine aanpassing (toggle toevoegen) |
+### Probleem 2: VrijgavesPage build error
+De TypeScript fout meldt dat `canvas` ontbreekt in de `render()` parameters. Nieuwere versies van `pdfjs-dist` vereisen dat het `canvas` element expliciet wordt meegegeven.
+
+**Oplossing**: Voeg `canvas` toe aan het render-object op regel 95.
+
+| Bestand | Wijziging |
+|---------|-----------|
+| `src/pages/VrijgavesPage.tsx` | `canvas` property toevoegen aan het `page.render()` object |
 
