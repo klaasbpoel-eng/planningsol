@@ -1,40 +1,26 @@
 
 
-## Fix: Alle medewerkers tonen in Toolbox Sessie Registratie
+## Fix: UUID-fout bij sessie registratie
 
 ### Probleem
-De sessie-dialoog haalt alleen profielen op met `is_approved = true` (regel 69 in `ToolboxSessionDialog.tsx`). Van de 8 medewerkers in het systeem zijn er maar 2 goedgekeurd:
+Bij het registreren van een sessie worden completions aangemaakt voor alle deelnemers. Profielen zonder gekoppeld gebruikersaccount hebben geen `user_id`, waardoor een lege string `""` als UUID wordt ingevoegd -- dit geeft de fout "invalid input syntax for type uuid".
 
-| Medewerker | Goedgekeurd |
-|---|---|
-| kbpoel | Ja |
-| Klaas Berend Poel | Ja |
-| Bram ten Cate | Nee |
-| Gido Rechtop | Nee |
-| Jeanneau | Nee |
-| Martin Heikens | Nee |
-| Robin Stoppels | Nee |
-| Stephan van Raaij | Nee |
-
-### Twee opties
-
-**Optie A (aanbevolen): De 6 niet-goedgekeurde medewerkers goedkeuren via de database**
-De medewerkers zijn waarschijnlijk al actieve collega's die alleen nog niet formeel zijn goedgekeurd in het systeem. Door hun status bij te werken verschijnen ze overal in de app.
-
-- Eenmalige database-update: `UPDATE profiles SET is_approved = true WHERE is_approved = false`
-- Geen codewijzigingen nodig
-
-**Optie B: De filter verwijderen uit de sessie-dialoog**
-De `.eq("is_approved", true)` filter weghalen zodat alle profielen getoond worden, ongeacht goedkeuringsstatus. Dit heeft als risico dat ongewenste/onvolledige accounts ook verschijnen.
-
-- Wijziging in `src/components/toolbox/ToolboxSessionDialog.tsx` regel 69: de `.eq("is_approved", true)` verwijderen
-
-### Aanbeveling
-Optie A is de schoonste oplossing: de medewerkers zijn echte collega's en horen goedgekeurd te zijn. De `is_approved`-filter in de code is een bewuste veiligheidsmaatregel die je beter kunt behouden.
+### Oplossing
+In `src/hooks/useToolbox.ts` (regel 468-478): filter deelnemers zonder geldige `userId` uit voordat de completions worden aangemaakt. Alleen gebruikers met een echt account kunnen een completion-record krijgen.
 
 ### Technisch detail
 
 | Bestand | Wijziging |
 |---|---|
-| Database | `UPDATE profiles SET is_approved = true, approved_at = now() WHERE is_approved = false` |
+| `src/hooks/useToolbox.ts` | Bij stap 3 (regel 469-478): filter `participants` op niet-lege `userId` voordat de upsert naar `toolbox_completions` wordt gedaan |
 
+Concreet wordt de upsert-array gewijzigd van:
+```
+participants.map(p => ({ ... }))
+```
+naar:
+```
+participants.filter(p => p.userId).map(p => ({ ... }))
+```
+
+Dit zorgt ervoor dat profielen zonder gebruikersaccount wel als deelnemer worden geregistreerd (in `toolbox_session_participants`), maar geen completion-record krijgen (omdat er geen gebruiker aan gekoppeld is).
