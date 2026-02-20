@@ -1,28 +1,40 @@
 
 
-## Fix: Toolbox pagina crash + VrijgavesPage build error
+## Fix: Alle medewerkers tonen in Toolbox Sessie Registratie
 
-### Probleem 1: Toolbox pagina crash ("Er is iets misgegaan")
-De crash wordt veroorzaakt door een lege string als `value` in een Select-item in `ToolboxSessionDialog.tsx` (regel 258):
+### Probleem
+De sessie-dialoog haalt alleen profielen op met `is_approved = true` (regel 69 in `ToolboxSessionDialog.tsx`). Van de 8 medewerkers in het systeem zijn er maar 2 goedgekeurd:
 
-```
-<SelectItem value="">-- Geen / Onbekend --</SelectItem>
-```
+| Medewerker | Goedgekeurd |
+|---|---|
+| kbpoel | Ja |
+| Klaas Berend Poel | Ja |
+| Bram ten Cate | Nee |
+| Gido Rechtop | Nee |
+| Jeanneau | Nee |
+| Martin Heikens | Nee |
+| Robin Stoppels | Nee |
+| Stephan van Raaij | Nee |
 
-Radix UI staat geen lege string toe als waarde voor `Select.Item`. Dit gooit een fout die door de ErrorBoundary wordt opgevangen, waardoor de hele `/toolbox` pagina crasht -- zelfs als de dialoog niet open is, omdat het component al in de DOM wordt geladen.
+### Twee opties
 
-**Oplossing**: Verander de lege string naar een placeholder waarde zoals `"none"` en pas de logica aan zodat `"none"` als "geen instructeur" wordt behandeld.
+**Optie A (aanbevolen): De 6 niet-goedgekeurde medewerkers goedkeuren via de database**
+De medewerkers zijn waarschijnlijk al actieve collega's die alleen nog niet formeel zijn goedgekeurd in het systeem. Door hun status bij te werken verschijnen ze overal in de app.
+
+- Eenmalige database-update: `UPDATE profiles SET is_approved = true WHERE is_approved = false`
+- Geen codewijzigingen nodig
+
+**Optie B: De filter verwijderen uit de sessie-dialoog**
+De `.eq("is_approved", true)` filter weghalen zodat alle profielen getoond worden, ongeacht goedkeuringsstatus. Dit heeft als risico dat ongewenste/onvolledige accounts ook verschijnen.
+
+- Wijziging in `src/components/toolbox/ToolboxSessionDialog.tsx` regel 69: de `.eq("is_approved", true)` verwijderen
+
+### Aanbeveling
+Optie A is de schoonste oplossing: de medewerkers zijn echte collega's en horen goedgekeurd te zijn. De `is_approved`-filter in de code is een bewuste veiligheidsmaatregel die je beter kunt behouden.
+
+### Technisch detail
 
 | Bestand | Wijziging |
-|---------|-----------|
-| `src/components/toolbox/ToolboxSessionDialog.tsx` | `value=""` wijzigen naar `value="none"`, en bij submit `"none"` omzetten naar `null` |
-
-### Probleem 2: VrijgavesPage build error
-De TypeScript fout meldt dat `canvas` ontbreekt in de `render()` parameters. Nieuwere versies van `pdfjs-dist` vereisen dat het `canvas` element expliciet wordt meegegeven.
-
-**Oplossing**: Voeg `canvas` toe aan het render-object op regel 95.
-
-| Bestand | Wijziging |
-|---------|-----------|
-| `src/pages/VrijgavesPage.tsx` | `canvas` property toevoegen aan het `page.render()` object |
+|---|---|
+| Database | `UPDATE profiles SET is_approved = true, approved_at = now() WHERE is_approved = false` |
 
