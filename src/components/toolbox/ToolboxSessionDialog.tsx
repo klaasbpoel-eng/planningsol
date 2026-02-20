@@ -117,20 +117,22 @@ export function ToolboxSessionDialog({ open, onOpenChange, onSaved }: Props) {
 
     const selectAllFiltered = () => {
         const newSet = new Set(selectedProfileIds);
-        filteredProfiles.forEach(p => newSet.add(p.user_id)); // Use user_id for completion tracking
+        filteredProfiles.forEach(p => newSet.add(p.id));
         setSelectedProfileIds(newSet);
     };
 
     const deselectAllFiltered = () => {
         const newSet = new Set(selectedProfileIds);
-        filteredProfiles.forEach(p => newSet.delete(p.user_id));
+        filteredProfiles.forEach(p => newSet.delete(p.id));
         setSelectedProfileIds(newSet);
     };
 
     // Helper to check if user already completed this toolbox
-    const getCompletionStatus = (userId: string) => {
+    const getCompletionStatus = (profileId: string) => {
         if (!sessionData.toolbox_id) return null;
-        const completion = completions.find(c => c.toolbox_id === sessionData.toolbox_id && c.user_id === userId);
+        const profile = profiles.find(p => p.id === profileId);
+        if (!profile?.user_id) return null;
+        const completion = completions.find(c => c.toolbox_id === sessionData.toolbox_id && c.user_id === profile.user_id);
         return completion ? completion.completed_at : null;
     };
 
@@ -149,13 +151,13 @@ export function ToolboxSessionDialog({ open, onOpenChange, onSaved }: Props) {
         try {
             setSubmitting(true);
 
-            const participants = Array.from(selectedProfileIds).map(userId => {
-                const profile = profiles.find(p => p.user_id === userId);
+            const participants = Array.from(selectedProfileIds).map(profileId => {
+                const profile = profiles.find(p => p.id === profileId);
                 return {
-                    profileId: profile?.id || "",
-                    userId: userId
+                    profileId: profileId,
+                    userId: profile?.user_id || ""
                 };
-            }).filter(p => p.profileId !== "");
+            });
 
             await createToolboxSession({
                 toolbox_id: sessionData.toolbox_id,
@@ -307,8 +309,8 @@ export function ToolboxSessionDialog({ open, onOpenChange, onSaved }: Props) {
                             <ScrollArea className="flex-1 border rounded-md">
                                 <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-2">
                                     {filteredProfiles.map(profile => {
-                                        const isSelected = selectedProfileIds.has(profile.user_id); // Use user_id
-                                        const completedAt = getCompletionStatus(profile.user_id);
+                                        const isSelected = selectedProfileIds.has(profile.id);
+                                        const completedAt = getCompletionStatus(profile.id);
 
                                         return (
                                             <div
@@ -318,11 +320,11 @@ export function ToolboxSessionDialog({ open, onOpenChange, onSaved }: Props) {
                                                     isSelected ? "bg-primary/5 border-primary shadow-sm" : "hover:bg-muted/50",
                                                     completedAt && !isSelected && "bg-green-50/50 dark:bg-green-900/10 border-green-200/50"
                                                 )}
-                                                onClick={() => toggleProfile(profile.user_id)}
+                                                onClick={() => toggleProfile(profile.id)}
                                             >
                                                 <Checkbox
                                                     checked={isSelected}
-                                                    onCheckedChange={() => toggleProfile(profile.user_id)}
+                                                    onCheckedChange={() => toggleProfile(profile.id)}
                                                     className="mt-1"
                                                 />
                                                 <div className="flex-1">
@@ -386,11 +388,11 @@ export function ToolboxSessionDialog({ open, onOpenChange, onSaved }: Props) {
                                 </h4>
                                 <ScrollArea className="h-48 border rounded-md">
                                     <div className="p-2 space-y-1">
-                                        {Array.from(selectedProfileIds).map(userId => {
-                                            const p = profiles.find(pr => pr.user_id === userId);
+                                        {Array.from(selectedProfileIds).map(profileId => {
+                                            const p = profiles.find(pr => pr.id === profileId);
                                             if (!p) return null;
                                             return (
-                                                <div key={userId} className="text-sm py-1 px-3 bg-muted/20 rounded flex justify-between">
+                                                <div key={profileId} className="text-sm py-1 px-3 bg-muted/20 rounded flex justify-between">
                                                     <span>{p.full_name}</span>
                                                     <span className="text-xs text-muted-foreground">{p.department}</span>
                                                 </div>
