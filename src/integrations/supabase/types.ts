@@ -1363,6 +1363,116 @@ export type Database = {
           },
         ]
       }
+      toolbox_session_participants: {
+        Row: {
+          attended: boolean | null
+          created_at: string | null
+          id: string
+          profile_id: string
+          session_id: string
+          signed_off: boolean | null
+        }
+        Insert: {
+          attended?: boolean | null
+          created_at?: string | null
+          id?: string
+          profile_id: string
+          session_id: string
+          signed_off?: boolean | null
+        }
+        Update: {
+          attended?: boolean | null
+          created_at?: string | null
+          id?: string
+          profile_id?: string
+          session_id?: string
+          signed_off?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "toolbox_session_participants_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "toolbox_session_participants_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_limited"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "toolbox_session_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "toolbox_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      toolbox_sessions: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          id: string
+          instructor_id: string | null
+          location: string | null
+          notes: string | null
+          session_date: string
+          session_time: string | null
+          toolbox_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          id?: string
+          instructor_id?: string | null
+          location?: string | null
+          notes?: string | null
+          session_date?: string
+          session_time?: string | null
+          toolbox_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          instructor_id?: string | null
+          location?: string | null
+          notes?: string | null
+          session_date?: string
+          session_time?: string | null
+          toolbox_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "toolbox_sessions_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "toolbox_sessions_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_limited"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "toolbox_sessions_toolbox_id_fkey"
+            columns: ["toolbox_id"]
+            isOneToOne: false
+            referencedRelation: "toolboxes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       toolboxes: {
         Row: {
           category: string
