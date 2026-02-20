@@ -26,6 +26,12 @@ CREATE TABLE IF NOT EXISTS public.toolbox_session_participants (
 -- RLS for toolbox_sessions
 ALTER TABLE public.toolbox_sessions ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies to be idempotent
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.toolbox_sessions;
+DROP POLICY IF EXISTS "Enable insert for authenticated users (admins/supervisors managed in app)" ON public.toolbox_sessions;
+DROP POLICY IF EXISTS "Enable update for authenticated users" ON public.toolbox_sessions;
+DROP POLICY IF EXISTS "Enable delete for authenticated users" ON public.toolbox_sessions;
+
 CREATE POLICY "Enable read access for all users"
 ON public.toolbox_sessions
 FOR SELECT
@@ -48,6 +54,12 @@ USING (auth.role() = 'authenticated');
 
 -- RLS for toolbox_session_participants
 ALTER TABLE public.toolbox_session_participants ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.toolbox_session_participants;
+DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.toolbox_session_participants;
+DROP POLICY IF EXISTS "Enable update for authenticated users" ON public.toolbox_session_participants;
+DROP POLICY IF EXISTS "Enable delete for authenticated users" ON public.toolbox_session_participants;
 
 CREATE POLICY "Enable read access for all users"
 ON public.toolbox_session_participants
