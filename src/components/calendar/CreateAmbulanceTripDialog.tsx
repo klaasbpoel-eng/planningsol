@@ -13,8 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays, Ambulance, Plus, X } from "lucide-react";
-import { format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CalendarDays, Ambulance, Plus, X, Repeat } from "lucide-react";
+import { format, addDays, addWeeks, addYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,6 +46,9 @@ export function CreateAmbulanceTripDialog({
   const [cylinders5l, setCylinders5l] = useState("");
   const [customers, setCustomers] = useState<CustomerRow[]>([{ customer_number: "", customer_name: "" }]);
   const [notes, setNotes] = useState("");
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceInterval, setRecurrenceInterval] = useState<"weekly" | "biweekly">("weekly");
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>();
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -76,6 +81,9 @@ export function CreateAmbulanceTripDialog({
     setCustomers([{ customer_number: "", customer_name: "" }]);
     setScheduledDate(initialDate || new Date());
     setNotes("");
+    setIsRecurring(false);
+    setRecurrenceInterval("weekly");
+    setRecurrenceEndDate(undefined);
   };
 
   const handleClose = () => {
@@ -115,37 +123,50 @@ export function CreateAmbulanceTripDialog({
 
     setSaving(true);
     try {
-      // Create the trip
-      const { data: trip, error: tripError } = await supabase
-        .from("ambulance_trips" as any)
-        .insert({
-          scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
-          cylinders_2l_300_o2: qty2l,
-          cylinders_5l_o2_integrated: qty5l,
-          created_by: currentProfileId,
-          notes: notes.trim() || null,
-        })
-        .select()
-        .single();
-
-      if (tripError) throw tripError;
-
-      // Add customers (filter empty rows)
-      const validCustomers = customers.filter(c => c.customer_number.trim() || c.customer_name.trim());
-      if (validCustomers.length > 0 && trip) {
-        const { error: custError } = await supabase
-          .from("ambulance_trip_customers" as any)
-          .insert(
-            validCustomers.map(c => ({
-              trip_id: (trip as any).id,
-              customer_number: c.customer_number.trim(),
-              customer_name: c.customer_name.trim(),
-            }))
-          );
-        if (custError) throw custError;
+      // Generate dates (single or recurring)
+      const dates: Date[] = [scheduledDate];
+      if (isRecurring) {
+        const endDate = recurrenceEndDate || addYears(scheduledDate, 1);
+        const step = recurrenceInterval === "weekly" ? 1 : 2;
+        let next = addWeeks(scheduledDate, step);
+        while (next <= endDate) {
+          dates.push(next);
+          next = addWeeks(next, step);
+        }
       }
 
-      toast.success("Ambulance rit ingepland");
+      const validCustomers = customers.filter(c => c.customer_number.trim() || c.customer_name.trim());
+
+      for (const date of dates) {
+        const { data: trip, error: tripError } = await supabase
+          .from("ambulance_trips" as any)
+          .insert({
+            scheduled_date: format(date, "yyyy-MM-dd"),
+            cylinders_2l_300_o2: qty2l,
+            cylinders_5l_o2_integrated: qty5l,
+            created_by: currentProfileId,
+            notes: notes.trim() || null,
+          })
+          .select()
+          .single();
+
+        if (tripError) throw tripError;
+
+        if (validCustomers.length > 0 && trip) {
+          const { error: custError } = await supabase
+            .from("ambulance_trip_customers" as any)
+            .insert(
+              validCustomers.map(c => ({
+                trip_id: (trip as any).id,
+                customer_number: c.customer_number.trim(),
+                customer_name: c.customer_name.trim(),
+              }))
+            );
+          if (custError) throw custError;
+        }
+      }
+
+      toast.success(dates.length > 1 ? `${dates.length} ambulance ritten ingepland` : "Ambulance rit ingepland");
       resetForm();
       onCreate();
       onOpenChange(false);
@@ -254,6 +275,47 @@ export function CreateAmbulanceTripDialog({
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Recurrence */}
+          <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
+            <div className="flex items-center gap-2">
+              <Checkbox id="recurring" checked={isRecurring} onCheckedChange={checked => setIsRecurring(checked as boolean)} />
+              <label htmlFor="recurring" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                <Repeat className="h-3.5 w-3.5" />
+                Herhalen
+              </label>
+            </div>
+            {isRecurring && (
+              <div className="space-y-3 pl-6">
+                <div className="space-y-1">
+                  <Label className="text-xs">Interval</Label>
+                  <Select value={recurrenceInterval} onValueChange={(v) => setRecurrenceInterval(v as "weekly" | "biweekly")}>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Wekelijks</SelectItem>
+                      <SelectItem value="biweekly">Om de week</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Einddatum (optioneel, anders 1 jaar)</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn("w-full justify-start text-left font-normal text-sm", !recurrenceEndDate && "text-muted-foreground")}>
+                        <CalendarDays className="mr-2 h-4 w-4" />
+                        {recurrenceEndDate ? format(recurrenceEndDate, "d MMM yyyy", { locale: nl }) : "Geen einddatum (1 jaar)"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
+                      <Calendar mode="single" selected={recurrenceEndDate} onSelect={setRecurrenceEndDate} locale={nl} initialFocus className="p-3 pointer-events-auto" />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notes */}
