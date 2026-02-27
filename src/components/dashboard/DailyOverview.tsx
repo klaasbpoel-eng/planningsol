@@ -145,13 +145,15 @@ export function DailyOverview() {
           .select("id, customer_name, quantity_kg, status, scheduled_date")
           .gte("scheduled_date", fromStr)
           .lte("scheduled_date", toStr)
-          .neq("status", "cancelled"),
+          .neq("status", "cancelled")
+          .neq("status", "completed"),
         supabase
           .from("gas_cylinder_orders")
           .select("id, customer_name, cylinder_count, status, scheduled_date, gas_types:gas_type_id(name)")
           .gte("scheduled_date", fromStr)
           .lte("scheduled_date", toStr)
-          .neq("status", "cancelled"),
+          .neq("status", "cancelled")
+          .neq("status", "completed"),
         supabase
           .from("ambulance_trips")
           .select("id, scheduled_date, cylinders_2l_300_o2, cylinders_2l_200_o2, cylinders_5l_o2_integrated, cylinders_1l_pindex_o2, cylinders_10l_o2_integrated, cylinders_5l_air_integrated, cylinders_2l_air_integrated, model_5l, status, notes, ambulance_trip_customers(customer_number, customer_name)")
