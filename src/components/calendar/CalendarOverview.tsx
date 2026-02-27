@@ -276,7 +276,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         safeFetch<DryIceOrder[]>(api.dryIceOrders.getPending("2025-01-01"), "dryIce"),
         safeFetch<DryIceProductType[]>(api.dryIceProductTypes.getAll(), "dryIceTypes"),
         safeFetch<DryIcePackaging[]>(api.dryIcePackaging.getAll(), "dryIcePkg"),
-        safeFetch<GasCylinderOrder[]>(api.gasCylinderOrders.getPending("2025-01-01"), "gasCylinders"),
+        safeFetch<GasCylinderOrder[]>(api.gasCylinderOrders.getAll("2025-01-01", "2099-12-31"), "gasCylinders"),
         safeFetch<GasType[]>(api.gasTypes.getAll(), "gasTypes"),
         safeFetch<TimeOffType[]>(api.timeOffTypes.getAll().then(data => data as unknown as TimeOffType[]), "timeOffTypes"),
         safeFetch<any[]>(
