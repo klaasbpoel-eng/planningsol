@@ -1,6 +1,6 @@
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Factory, Calendar, ShoppingCart, Wrench, Clock, Shield, ArrowRight, ScanBarcode } from "lucide-react";
+import { Factory, Calendar, ShoppingCart, Wrench, Clock, Shield, ArrowRight, ScanBarcode, CalendarDays } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { DailyOverview } from "./DailyOverview";
 
@@ -62,10 +62,18 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
         {
             title: "Barcode Generator",
             description: "Maak en download 6-karakter barcodes",
-            icon: <ScanBarcode className="h-8 w-8 text-slate-500" />,
+            icon: <ScanBarcode className="h-8 w-8 text-muted-foreground" />,
             path: "/barcode",
             enabled: true,
-            color: "bg-slate-500/10 hover:bg-slate-500/20",
+            color: "bg-muted hover:bg-muted/80",
+        },
+        {
+            title: "Dagelijks Overzicht",
+            description: "Bekijk alle taken, orders en verlof per dag",
+            icon: <CalendarDays className="h-8 w-8 text-primary" />,
+            path: "/dagoverzicht",
+            enabled: true,
+            color: "bg-primary/10 hover:bg-primary/20",
         },
     ];
 
