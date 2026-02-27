@@ -1,0 +1,1 @@
+ALTER TABLE public.ambulance_trips ADD COLUMN series_id uuid DEFAULT NULL;
