@@ -57,7 +57,7 @@ interface DryIceOrder {
   box_count: number | null;
   status: string;
   scheduled_date: string;
-  dry_ice_packaging: { name: string } | null;
+  dry_ice_packaging: { name: string; capacity_kg: number | null } | null;
 }
 
 interface GasCylinderOrder {
@@ -146,7 +146,7 @@ export function DailyOverview() {
           .eq("status", "approved"),
         supabase
           .from("dry_ice_orders")
-          .select("id, customer_name, quantity_kg, box_count, status, scheduled_date, dry_ice_packaging:packaging_id(name)")
+          .select("id, customer_name, quantity_kg, box_count, status, scheduled_date, dry_ice_packaging:packaging_id(name, capacity_kg)")
           .gte("scheduled_date", fromStr)
           .lte("scheduled_date", toStr)
           .neq("status", "cancelled"),
@@ -426,7 +426,12 @@ export function DailyOverview() {
                             <div className="min-w-0">
                               <div className="truncate font-medium text-xs">{o.customer_name}</div>
                               <div className="text-xs text-muted-foreground">
-                                {o.quantity_kg} kg{o.dry_ice_packaging?.name ? ` · ${o.dry_ice_packaging.name}` : ""}{o.box_count ? ` · ${o.box_count}×` : ""}
+                                {o.quantity_kg} kg
+                                {o.dry_ice_packaging?.name ? ` · ${o.dry_ice_packaging.name}` : ""}
+                                {(() => {
+                                  const count = o.box_count || (o.dry_ice_packaging?.capacity_kg ? Math.ceil(o.quantity_kg / o.dry_ice_packaging.capacity_kg) : null);
+                                  return count ? ` · ${count}×` : "";
+                                })()}
                               </div>
                             </div>
                             <StatusBadge status={o.status} />
