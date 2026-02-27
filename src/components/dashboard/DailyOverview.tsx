@@ -147,8 +147,7 @@ export function DailyOverview() {
           .select("id, customer_name, quantity_kg, status, scheduled_date")
           .gte("scheduled_date", fromStr)
           .lte("scheduled_date", toStr)
-          .neq("status", "cancelled")
-          .neq("status", "completed"),
+          .neq("status", "cancelled"),
         supabase
           .from("gas_cylinder_orders")
           .select("id, customer_name, cylinder_count, cylinder_size, status, scheduled_date, gas_types:gas_type_id(name)")
