@@ -44,6 +44,7 @@ export function CreateAmbulanceTripDialog({
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(initialDate || new Date());
   const [cylinders2l, setCylinders2l] = useState("");
   const [cylinders5l, setCylinders5l] = useState("");
+  const [model5l, setModel5l] = useState<"any" | "high" | "low">("any");
   const [customers, setCustomers] = useState<CustomerRow[]>([{ customer_number: "", customer_name: "" }]);
   const [notes, setNotes] = useState("");
   const [isRecurring, setIsRecurring] = useState(false);
@@ -78,6 +79,7 @@ export function CreateAmbulanceTripDialog({
   const resetForm = () => {
     setCylinders2l("");
     setCylinders5l("");
+    setModel5l("any");
     setCustomers([{ customer_number: "", customer_name: "" }]);
     setScheduledDate(initialDate || new Date());
     setNotes("");
@@ -144,6 +146,7 @@ export function CreateAmbulanceTripDialog({
             scheduled_date: format(date, "yyyy-MM-dd"),
             cylinders_2l_300_o2: qty2l,
             cylinders_5l_o2_integrated: qty5l,
+            model_5l: model5l,
             created_by: currentProfileId,
             notes: notes.trim() || null,
           })
@@ -241,6 +244,19 @@ export function CreateAmbulanceTripDialog({
                 className="bg-background"
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>5L model</Label>
+            <Select value={model5l} onValueChange={(v) => setModel5l(v as "any" | "high" | "low")}>
+              <SelectTrigger className="bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Maakt niet uit</SelectItem>
+                <SelectItem value="high">Hoog model</SelectItem>
+                <SelectItem value="low">Laag model</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Customer list */}

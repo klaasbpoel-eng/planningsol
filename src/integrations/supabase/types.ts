@@ -53,6 +53,7 @@ export type Database = {
           cylinders_2l_300_o2: number
           cylinders_5l_o2_integrated: number
           id: string
+          model_5l: string
           notes: string | null
           scheduled_date: string
           status: string
@@ -64,6 +65,7 @@ export type Database = {
           cylinders_2l_300_o2?: number
           cylinders_5l_o2_integrated?: number
           id?: string
+          model_5l?: string
           notes?: string | null
           scheduled_date: string
           status?: string
@@ -75,6 +77,7 @@ export type Database = {
           cylinders_2l_300_o2?: number
           cylinders_5l_o2_integrated?: number
           id?: string
+          model_5l?: string
           notes?: string | null
           scheduled_date?: string
           status?: string

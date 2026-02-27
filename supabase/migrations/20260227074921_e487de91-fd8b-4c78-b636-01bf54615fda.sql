@@ -1,0 +1,1 @@
+ALTER TABLE public.ambulance_trips ADD COLUMN model_5l text NOT NULL DEFAULT 'any' CHECK (model_5l IN ('high', 'low', 'any'));
