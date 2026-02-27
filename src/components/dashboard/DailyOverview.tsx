@@ -66,6 +66,14 @@ interface GasCylinderOrder {
   gas_types: { name: string } | null;
 }
 
+interface AmbulanceTrip {
+  id: string;
+  scheduled_date: string;
+  cylinders_2l_300_o2: number;
+  cylinders_5l_o2_integrated: number;
+  status: string;
+}
+
 const statusLabels: Record<string, string> = {
   pending: "Gepland",
   in_progress: "In behandeling",
@@ -81,6 +89,7 @@ export function DailyOverview() {
   const [timeOff, setTimeOff] = useState<TimeOffItem[]>([]);
   const [dryIceOrders, setDryIceOrders] = useState<DryIceOrder[]>([]);
   const [gasOrders, setGasOrders] = useState<GasCylinderOrder[]>([]);
+  const [ambulanceTrips, setAmbulanceTrips] = useState<AmbulanceTrip[]>([]);
   const [lookaheadActive, setLookaheadActive] = useState(false);
 
   // When in day mode, extend query range by 3 extra days so we can show upcoming items if today is empty
@@ -110,7 +119,7 @@ export function DailyOverview() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const [tasksRes, timeOffRes, dryIceRes, gasRes] = await Promise.all([
+      const [tasksRes, timeOffRes, dryIceRes, gasRes, ambulanceRes] = await Promise.all([
         supabase
           .from("tasks")
           .select("id, title, due_date, start_time, end_time, status, assigned_to, task_types:type_id(name, color)")
@@ -135,6 +144,12 @@ export function DailyOverview() {
           .gte("scheduled_date", fromStr)
           .lte("scheduled_date", toStr)
           .neq("status", "cancelled"),
+        supabase
+          .from("ambulance_trips")
+          .select("id, scheduled_date, cylinders_2l_300_o2, cylinders_5l_o2_integrated, status")
+          .gte("scheduled_date", fromStr)
+          .lte("scheduled_date", toStr)
+          .neq("status", "cancelled"),
       ]);
 
       const rawTasks = (tasksRes.data as unknown as TaskItem[]) ?? [];
@@ -154,10 +169,12 @@ export function DailyOverview() {
       const allTimeOff = (timeOffRes.data as TimeOffItem[] | null) ?? [];
       const allDryIce = (dryIceRes.data as DryIceOrder[] | null) ?? [];
       const allGas = (gasRes.data as GasCylinderOrder[] | null) ?? [];
+      const allAmbulance = (ambulanceRes.data as AmbulanceTrip[] | null) ?? [];
 
       setTimeOff(allTimeOff);
       setDryIceOrders(allDryIce);
       setGasOrders(allGas);
+      setAmbulanceTrips(allAmbulance);
 
       // In day mode, check if today is empty and we need lookahead
       if (viewMode === "day") {
@@ -166,9 +183,10 @@ export function DailyOverview() {
           rawTasks.some(t => t.due_date === todayStr) ||
           allTimeOff.some(t => t.start_date <= todayStr && t.end_date >= todayStr) ||
           allDryIce.some(o => o.scheduled_date === todayStr) ||
-          allGas.some(o => o.scheduled_date === todayStr);
+          allGas.some(o => o.scheduled_date === todayStr) ||
+          allAmbulance.some(o => o.scheduled_date === todayStr);
         
-        const hasAnyUpcoming = rawTasks.length > 0 || allTimeOff.length > 0 || allDryIce.length > 0 || allGas.length > 0;
+        const hasAnyUpcoming = rawTasks.length > 0 || allTimeOff.length > 0 || allDryIce.length > 0 || allGas.length > 0 || allAmbulance.length > 0;
         setLookaheadActive(!todayHasItems && hasAnyUpcoming);
       } else {
         setLookaheadActive(false);
@@ -206,7 +224,7 @@ export function DailyOverview() {
     return eachDayOfInterval({ start: dateRange.from, end: dateRange.to });
   }, [viewMode, currentDate, dateRange, lookaheadActive]);
 
-  const isEmpty = tasks.length === 0 && timeOff.length === 0 && dryIceOrders.length === 0 && gasOrders.length === 0;
+  const isEmpty = tasks.length === 0 && timeOff.length === 0 && dryIceOrders.length === 0 && gasOrders.length === 0 && ambulanceTrips.length === 0;
 
   return (
     <Card className="mb-6">
@@ -270,7 +288,8 @@ export function DailyOverview() {
               );
               const dayDryIce = dryIceOrders.filter((o) => o.scheduled_date === dayStr);
               const dayGas = gasOrders.filter((o) => o.scheduled_date === dayStr);
-              const dayEmpty = dayTasks.length === 0 && dayTimeOff.length === 0 && dayDryIce.length === 0 && dayGas.length === 0;
+              const dayAmbulance = ambulanceTrips.filter((o) => o.scheduled_date === dayStr);
+              const dayEmpty = dayTasks.length === 0 && dayTimeOff.length === 0 && dayDryIce.length === 0 && dayGas.length === 0 && dayAmbulance.length === 0;
 
               if (dayEmpty && (viewMode === "week" || lookaheadActive)) return null;
 
@@ -371,6 +390,24 @@ export function DailyOverview() {
                           <span className="text-muted-foreground text-xs">
                             {o.gas_types?.name || "Gas"} · {o.cylinder_count} cil.
                           </span>
+                          <StatusBadge status={o.status} />
+                        </div>
+                      ))}
+                    </Section>
+                  )}
+
+                  {/* Ambulance */}
+                  {dayAmbulance.length > 0 && (
+                    <Section
+                      icon={<Ambulance className="h-4 w-4" />}
+                      label="Ambulance"
+                      count={dayAmbulance.length}
+                      color="text-red-500"
+                      badgeClass="bg-red-500/10 text-red-700 dark:text-red-400"
+                    >
+                      {dayAmbulance.map((o) => (
+                        <div key={o.id} className="flex items-center gap-2 text-sm py-0.5">
+                          <span className="truncate">{o.cylinders_2l_300_o2}x 2L O2 · {o.cylinders_5l_o2_integrated}x 5L O2</span>
                           <StatusBadge status={o.status} />
                         </div>
                       ))}
