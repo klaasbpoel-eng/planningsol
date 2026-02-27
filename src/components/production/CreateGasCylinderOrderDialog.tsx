@@ -97,8 +97,10 @@ export function CreateGasCylinderOrderDialog({
         }
       }
     };
-    fetchProfileAndPermissions();
-  }, []);
+    if (open) {
+      fetchProfileAndPermissions();
+    }
+  }, [open]);
 
   // Update scheduledDate when initialDate changes
   useEffect(() => {
