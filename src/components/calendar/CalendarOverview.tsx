@@ -20,6 +20,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { CalendarItemDialog } from "./CalendarItemDialog";
 import { DryIceOrderDialog } from "./DryIceOrderDialog";
 import { GasCylinderOrderDialog } from "@/components/production/GasCylinderOrderDialog";
+import { CreateGasCylinderOrderDialog } from "@/components/production/CreateGasCylinderOrderDialog";
 import { CreateTaskDialog } from "./CreateTaskDialog";
 import { CreateLeaveRequestDialog } from "./CreateLeaveRequestDialog";
 import { CreateDryIceOrderCalendarDialog } from "./CreateDryIceOrderCalendarDialog";
@@ -117,6 +118,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
   const [createLeaveDialogOpen, setCreateLeaveDialogOpen] = useState(false);
   const [createDryIceDialogOpen, setCreateDryIceDialogOpen] = useState(false);
+  const [createGasCylinderDialogOpen, setCreateGasCylinderDialogOpen] = useState(false);
   const [createAmbulanceDialogOpen, setCreateAmbulanceDialogOpen] = useState(false);
   const [selectedAmbulanceTrip, setSelectedAmbulanceTrip] = useState<AmbulanceTripWithCustomers | null>(null);
   const [ambulanceTripDialogOpen, setAmbulanceTripDialogOpen] = useState(false);
@@ -408,6 +410,10 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   const handleCreateAmbulance = () => {
     setShowCreateMenu(false);
     setCreateAmbulanceDialogOpen(true);
+  };
+  const handleCreateGasCylinder = () => {
+    setShowCreateMenu(false);
+    setCreateGasCylinderDialogOpen(true);
   };
   const handleTaskCreated = () => {
     fetchData();
@@ -1954,7 +1960,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
             }) : "deze dag"}?
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-4 py-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 py-4">
           <Button variant="outline" className="h-24 flex flex-col items-center justify-center gap-2 hover:bg-blue-50 hover:border-blue-300 dark:hover:bg-blue-950/30" onClick={handleCreateTask}>
             <ClipboardList className="h-8 w-8 text-blue-500" />
             <span className="font-medium">Taak</span>
@@ -1966,6 +1972,10 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
           <Button variant="outline" className="h-24 flex flex-col items-center justify-center gap-2 hover:bg-cyan-50 hover:border-cyan-300 dark:hover:bg-cyan-950/30" onClick={handleCreateDryIce}>
             <Snowflake className="h-8 w-8 text-cyan-500" />
             <span className="font-medium">Droogijs</span>
+          </Button>
+          <Button variant="outline" className="h-24 flex flex-col items-center justify-center gap-2 hover:bg-orange-50 hover:border-orange-300 dark:hover:bg-orange-950/30" onClick={handleCreateGasCylinder}>
+            <Cylinder className="h-8 w-8 text-orange-500" />
+            <span className="font-medium">Cilindervulling</span>
           </Button>
           <Button variant="outline" className="h-24 flex flex-col items-center justify-center gap-2 hover:bg-red-50 hover:border-red-300 dark:hover:bg-red-950/30" onClick={handleCreateAmbulance}>
             <Ambulance className="h-8 w-8 text-red-500" />
@@ -1983,6 +1993,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
 
     {/* Create Dry Ice Order Dialog */}
     <CreateDryIceOrderCalendarDialog open={createDryIceDialogOpen} onOpenChange={setCreateDryIceDialogOpen} onCreate={handleTaskCreated} initialDate={createDate} />
+
+    {/* Create Gas Cylinder Order Dialog */}
+    <CreateGasCylinderOrderDialog open={createGasCylinderDialogOpen} onOpenChange={setCreateGasCylinderDialogOpen} onCreated={handleTaskCreated} initialDate={createDate} />
 
     {/* Create Ambulance Trip Dialog */}
     <CreateAmbulanceTripDialog open={createAmbulanceDialogOpen} onOpenChange={setCreateAmbulanceDialogOpen} onCreate={handleTaskCreated} initialDate={createDate} />
