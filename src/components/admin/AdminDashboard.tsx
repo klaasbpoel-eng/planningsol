@@ -8,6 +8,7 @@ import { FilterState } from "@/components/admin/AdminFilters";
 import { AdminSettings } from "@/components/admin/AdminSettings";
 import { ToolboxLogbook } from "@/components/admin/ToolboxLogbook";
 import { AdminSidebar } from "@/components/admin/layout/AdminSidebar";
+import { DailyOverview } from "@/components/dashboard/DailyOverview";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import { parseISO, isWithinInterval, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
@@ -170,7 +171,9 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
         <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full">
           {/* Mobile Header for Sidebar Trigger is handled inside AdminSidebar via SheetTrigger */}
 
-          <div className="max-w-6xl mx-auto w-full">
+          <div className="max-w-6xl mx-auto w-full space-y-6">
+            <DailyOverview />
+
             {activeTab === 'requests' && (
               <AdminRequestsPage
                 requests={filteredRequests}
