@@ -362,7 +362,7 @@ export function DailyOverview() {
                                   <ul className="mt-0.5 space-y-0">
                                     {customers.map((c) => (
                                       <li key={c.customer_number} className="text-xs text-muted-foreground">
-                                        <span className="font-mono text-[10px] mr-1">{c.customer_number}</span>
+                                        <span className="font-mono text-xs mr-1">{c.customer_number}</span>
                                         {c.customer_name}
                                       </li>
                                     ))}
