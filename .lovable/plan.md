@@ -1,91 +1,44 @@
 
 
-# Dagelijks/Wekelijks Overzicht voor Medewerkers
+# Testdata aanmaken voor Dagelijks Overzicht
 
-## Concept
+## Wat wordt aangemaakt
 
-Een nieuw "Mijn Dag" overzichtspaneel dat direct op de startpagina (UserLaunchpad) wordt getoond als een prominente kaart bovenaan. Het toont in een oogopslag alles wat relevant is voor vandaag (en optioneel de komende week), gegroepeerd per categorie met kleurcodering.
+Vier testrecords voor vandaag (2026-02-27) zodat het DailyOverview component data toont:
 
-## Weergave
+1. **Taak** -- "Cilinders vullen" om 09:00-11:00, toegewezen aan Klaas Berend Poel, type "Container bij de weg"
+2. **Verlofdag** -- Martin Heikens heeft vandaag verlof (type "Verlof"), status approved
+3. **Droogijs order** -- HWTS, 500 kg, status pending
+4. **Gascilinder order** -- Adams, Argon 5.0, 12 cilinders, status pending
 
-Het overzicht toont per dag een compacte tijdlijn/lijst met:
+## Waarom een migratie
 
-- **Taken** (blauw) -- titel, toegewezen aan, tijdstip
-- **Vrije dagen** (groen) -- wie is er vrij, type verlof
-- **Droogijs orders** (cyaan) -- klant, hoeveelheid kg, status
-- **Gascilinder orders** (oranje) -- klant, gastype, aantal cilinders, status
+Alle tabellen hebben RLS-policies die alleen admins toestaan om data in te voegen. Een database-migratie draait als superuser en omzeilt RLS, waardoor de inserts slagen.
 
-Bovenaan een dag/week toggle en navigatiepijlen. Elke categorie heeft een icoon en badge met het aantal items. Lege categorieen worden verborgen.
+## Aanpassing AdminDashboard
 
-## Locatie in de app
-
-- Wordt als eerste element getoond op de UserLaunchpad (startpagina, `/`)
-- Boven de bestaande feature-kaarten grid
-- Beschikbaar voor alle ingelogde medewerkers
-
-## Dataflow
-
-Hergebruikt dezelfde database-queries als CalendarOverview:
-- `time_off_requests` met profiel-join
-- `tasks` met profiel-join
-- `dry_ice_orders`
-- `gas_cylinder_orders`
-
-Gefilterd op de geselecteerde dag of week.
+Daarnaast wordt het DailyOverview component ook toegevoegd aan het AdminDashboard, zodat je het overzicht kunt zien ongeacht welke view je bekijkt.
 
 ---
 
 ## Technische details
 
-### Nieuw bestand: `src/components/dashboard/DailyOverview.tsx`
+### Stap 1: Database migratie met testdata
 
-1. Component accepteert geen props (haalt zelf data op via Supabase client)
-2. State: `viewMode` ("day" | "week"), `currentDate`
-3. Fetcht parallel:
-   - `time_off_requests` waar `start_date <= datum <= end_date`, status "approved"
-   - `tasks` waar `due_date` binnen bereik
-   - `dry_ice_orders` waar `scheduled_date` binnen bereik
-   - `gas_cylinder_orders` waar `scheduled_date` binnen bereik
-4. Joins met `profiles` (voor namen), `task_types`, `gas_types`
-5. Groepering per dag (bij weekweergave) met datum-headers
-6. Per categorie een sectie met icoon, kleur-badge en items als compacte rijen
-7. Skeleton loading state tijdens het ophalen
+SQL migratie die 4 records invoegt:
 
-### Aanpassing: `src/components/dashboard/UserLaunchpad.tsx`
+- `tasks`: title "Cilinders vullen", due_date 2026-02-27, start_time 09:00, end_time 11:00, assigned_to = profile ID van Klaas, created_by = zelfde, type_id = "Container bij de weg"
+- `time_off_requests`: profile_id = Martin Heikens, start_date/end_date = 2026-02-27, status approved, type_id = Verlof, day_part = full_day
+- `dry_ice_orders`: customer_name "HWTS", customer_id, quantity_kg 500, scheduled_date 2026-02-27, status pending, created_by = Klaas, order_number auto-generated
+- `gas_cylinder_orders`: customer_name "Adams", customer_id, gas_type_id = Argon 5.0, cylinder_count 12, scheduled_date 2026-02-27, status pending, created_by = Klaas, order_number auto-generated
 
-- Importeer en render `<DailyOverview />` boven de feature-kaarten grid
+### Stap 2: DailyOverview toevoegen aan AdminDashboard
 
-### Aanpassing: `src/pages/Index.tsx`
+In `src/components/admin/AdminDashboard.tsx`:
+- Importeer `DailyOverview` component
+- Render het bovenaan het dashboard (voor de tabs/content)
 
-- Geen wijzigingen nodig (UserLaunchpad wordt al gerenderd)
+### Stap 3: RLS-fix voor taken
 
-### UI-structuur per dag
+De huidige tasks SELECT policy checkt `auth.uid() = assigned_to`, maar `assigned_to` bevat een **profile ID** (niet een user_id). Taken met `assigned_to` die niet matcht met `auth.uid()` worden niet getoond aan gewone gebruikers. Admins zien alles via `is_admin()`. Dit is bestaand gedrag en hoeft niet gewijzigd te worden voor deze test.
 
-```text
-+-----------------------------------------------+
-| << Vandaag, 27 februari 2026        Dag | Week |
-+-----------------------------------------------+
-| [ClipboardList] Taken (2)                      |
-|   09:00-10:00  Cilinders vullen - Guido        |
-|   14:00-15:00  Kwaliteitscontrole - Algemeen   |
-|                                                |
-| [Palmtree] Vrij (1)                            |
-|   Jan de Vries - Vakantie (hele dag)           |
-|                                                |
-| [Snowflake] Droogijs (3)                       |
-|   UMCG - 500 kg - In behandeling               |
-|   Philips - 200 kg - Gepland                   |
-|   DSM - 150 kg - Gepland                       |
-|                                                |
-| [Cylinder] Gascilinders (1)                    |
-|   Shell - CO2 - 12 cilinders - Gepland         |
-+-----------------------------------------------+
-```
-
-### Bestaande patronen die worden hergebruikt
-
-- Card/CardHeader/CardContent uit shadcn
-- Badge voor status-indicatie
-- Skeleton loading (bestaand patroon)
-- FadeIn animatie
-- Kleurcodering uit CalendarOverview (cyaan=droogijs, oranje=gas, groen=verlof, blauw=taken)
