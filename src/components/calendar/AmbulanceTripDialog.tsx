@@ -27,6 +27,7 @@ export interface AmbulanceTripWithCustomers {
   id: string;
   scheduled_date: string;
   cylinders_2l_300_o2: number;
+  cylinders_2l_200_o2: number;
   cylinders_1l_pindex_o2: number;
   cylinders_5l_o2_integrated: number;
   cylinders_10l_o2_integrated: number;
@@ -139,6 +140,12 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
                 <div className="p-3 rounded-lg border bg-muted/30">
                   <div className="text-xs text-muted-foreground">2L 300 O2</div>
                   <div className="text-2xl font-bold">{trip.cylinders_2l_300_o2}</div>
+                </div>
+              )}
+              {trip.cylinders_2l_200_o2 > 0 && (
+                <div className="p-3 rounded-lg border bg-muted/30">
+                  <div className="text-xs text-muted-foreground">2L 200 O2</div>
+                  <div className="text-2xl font-bold">{trip.cylinders_2l_200_o2}</div>
                 </div>
               )}
               {trip.cylinders_1l_pindex_o2 > 0 && (

@@ -1,0 +1,1 @@
+ALTER TABLE public.ambulance_trips ADD COLUMN cylinders_2l_200_o2 integer NOT NULL DEFAULT 0;
