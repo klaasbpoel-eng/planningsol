@@ -43,6 +43,7 @@ export function CreateAmbulanceTripDialog({
   const [saving, setSaving] = useState(false);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(initialDate || new Date());
   const [cylinders2l, setCylinders2l] = useState("");
+  const [cylinders2l200, setCylinders2l200] = useState("");
   const [cylinders1lPindex, setCylinders1lPindex] = useState("");
   const [cylinders5l, setCylinders5l] = useState("");
   const [model5l, setModel5l] = useState<"any" | "high" | "low">("any");
@@ -82,6 +83,7 @@ export function CreateAmbulanceTripDialog({
 
   const resetForm = () => {
     setCylinders2l("");
+    setCylinders2l200("");
     setCylinders1lPindex("");
     setCylinders5l("");
     setModel5l("any");
@@ -124,13 +126,14 @@ export function CreateAmbulanceTripDialog({
     }
 
     const qty2l = parseInt(cylinders2l) || 0;
+    const qty2l200 = parseInt(cylinders2l200) || 0;
     const qty1lPindex = parseInt(cylinders1lPindex) || 0;
     const qty5l = parseInt(cylinders5l) || 0;
     const qty10l = parseInt(cylinders10l) || 0;
     const qty5lAir = parseInt(cylinders5lAir) || 0;
     const qty2lAir = parseInt(cylinders2lAir) || 0;
 
-    if (qty2l === 0 && qty1lPindex === 0 && qty5l === 0 && qty10l === 0 && qty5lAir === 0 && qty2lAir === 0) {
+    if (qty2l === 0 && qty2l200 === 0 && qty1lPindex === 0 && qty5l === 0 && qty10l === 0 && qty5lAir === 0 && qty2lAir === 0) {
       toast.error("Vul minstens één cilindertype in");
       return;
     }
@@ -157,6 +160,7 @@ export function CreateAmbulanceTripDialog({
           .insert({
             scheduled_date: format(date, "yyyy-MM-dd"),
             cylinders_2l_300_o2: qty2l,
+            cylinders_2l_200_o2: qty2l200,
             cylinders_1l_pindex_o2: qty1lPindex,
             cylinders_5l_o2_integrated: qty5l,
             model_5l: model5l,
@@ -241,6 +245,10 @@ export function CreateAmbulanceTripDialog({
               <div className="space-y-1">
                 <Label htmlFor="cyl2l" className="text-xs text-muted-foreground">2L 300 O2</Label>
                 <Input id="cyl2l" type="number" min="0" value={cylinders2l} onChange={(e) => setCylinders2l(e.target.value)} placeholder="0" className="bg-background" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="cyl2l200" className="text-xs text-muted-foreground">2L 200 O2</Label>
+                <Input id="cyl2l200" type="number" min="0" value={cylinders2l200} onChange={(e) => setCylinders2l200(e.target.value)} placeholder="0" className="bg-background" />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="cyl1l" className="text-xs text-muted-foreground">1L Pindex O2</Label>
