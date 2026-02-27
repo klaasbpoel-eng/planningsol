@@ -29,12 +29,14 @@ interface CreateGasCylinderOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
+  initialDate?: Date;
 }
 
 export function CreateGasCylinderOrderDialog({
   open,
   onOpenChange,
   onCreated,
+  initialDate,
 }: CreateGasCylinderOrderDialogProps) {
   const isMobile = useIsMobile();
   const [saving, setSaving] = useState(false);
@@ -45,7 +47,7 @@ export function CreateGasCylinderOrderDialog({
   const [cylinderCount, setCylinderCount] = useState(16);
   const [cylinderSize, setCylinderSize] = useState("medium");
   const [pressure, setPressure] = useState<200 | 300>(200);
-  const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
+  const [scheduledDate, setScheduledDate] = useState<Date | undefined>(initialDate || new Date());
   const [notes, setNotes] = useState("");
   const [isCompleted, setIsCompleted] = useState(true);
   const [location, setLocation] = useState<"sol_emmen" | "sol_tilburg">("sol_emmen");
@@ -97,6 +99,14 @@ export function CreateGasCylinderOrderDialog({
     };
     fetchProfileAndPermissions();
   }, []);
+
+  // Update scheduledDate when initialDate changes
+  useEffect(() => {
+    if (initialDate) {
+      setScheduledDate(initialDate);
+    }
+  }, [initialDate]);
+
 
   useEffect(() => {
     const fetchCylinderSizes = async () => {
