@@ -312,133 +312,140 @@ export function DailyOverview() {
                     </h4>
                   )}
 
-                  {/* Taken */}
-                  {dayTasks.length > 0 && (
-                    <Section
-                      icon={<ClipboardList className="h-4 w-4" />}
-                      label="Taken"
-                      count={dayTasks.length}
-                      color="text-blue-500"
-                      badgeClass="bg-blue-500/10 text-blue-700 dark:text-blue-400"
-                    >
-                      {dayTasks.map((t) => (
-                        <div key={t.id} className="flex items-center gap-2 text-sm py-0.5">
-                          {t.start_time && (
-                            <span className="text-muted-foreground font-mono text-xs w-24 shrink-0">
-                              {t.start_time.slice(0, 5)}
-                              {t.end_time && `–${t.end_time.slice(0, 5)}`}
-                            </span>
-                          )}
-                          <span className="truncate">
-                            {t.task_types?.name || t.title || "Taak"}
-                            {t.title && t.task_types?.name ? ` — ${t.title}` : ""}
-                          </span>
-                          <span className="text-muted-foreground text-xs ml-auto shrink-0">
-                            {t.assignee_name || "Algemeen"}
-                          </span>
-                        </div>
-                      ))}
-                    </Section>
-                  )}
-
-                  {/* Vrij */}
-                  {dayTimeOff.length > 0 && (
-                    <Section
-                      icon={<Palmtree className="h-4 w-4" />}
-                      label="Vrij"
-                      count={dayTimeOff.length}
-                      color="text-green-500"
-                      badgeClass="bg-green-500/10 text-green-700 dark:text-green-400"
-                    >
-                      {dayTimeOff.map((t) => (
-                        <div key={t.id} className="flex items-center gap-2 text-sm py-0.5">
-                          <span className="truncate">
-                            {t.profiles?.full_name || "Medewerker"}
-                          </span>
-                          <span className="text-muted-foreground text-xs ml-auto shrink-0">
-                            {t.time_off_types?.name || "Verlof"}
-                            {t.day_part && t.day_part !== "full_day" && ` (${t.day_part === "morning" ? "ochtend" : "middag"})`}
-                          </span>
-                        </div>
-                      ))}
-                    </Section>
-                  )}
-
-                  {/* Droogijs */}
-                  {dayDryIce.length > 0 && (
-                    <Section
-                      icon={<Snowflake className="h-4 w-4" />}
-                      label="Droogijs"
-                      count={dayDryIce.length}
-                      color="text-cyan-500"
-                      badgeClass="bg-cyan-500/10 text-cyan-700 dark:text-cyan-400"
-                    >
-                      {dayDryIce.map((o) => (
-                        <div key={o.id} className="flex items-center gap-2 text-sm py-0.5">
-                          <span className="truncate">{o.customer_name}</span>
-                          <span className="text-muted-foreground text-xs">{o.quantity_kg} kg</span>
-                          <StatusBadge status={o.status} />
-                        </div>
-                      ))}
-                    </Section>
-                  )}
-
-                  {/* Gascilinders */}
-                  {dayGas.length > 0 && (
-                    <Section
-                      icon={<Cylinder className="h-4 w-4" />}
-                      label="Gascilinders"
-                      count={dayGas.length}
-                      color="text-orange-500"
-                      badgeClass="bg-orange-500/10 text-orange-700 dark:text-orange-400"
-                    >
-                      {dayGas.map((o) => (
-                        <div key={o.id} className="flex items-center gap-2 text-sm py-0.5">
-                          <span className="truncate">{o.customer_name}</span>
-                          <span className="text-muted-foreground text-xs">
-                            {o.gas_types?.name || "Gas"} · {o.cylinder_count} cil.
-                          </span>
-                          <StatusBadge status={o.status} />
-                        </div>
-                      ))}
-                    </Section>
-                  )}
-
-                  {/* Ambulance */}
-                  {dayAmbulance.length > 0 && (
-                    <Section
-                      icon={<Ambulance className="h-4 w-4" />}
-                      label="Ambulance"
-                      count={dayAmbulance.length}
-                      color="text-red-500"
-                      badgeClass="bg-red-500/10 text-red-700 dark:text-red-400"
-                    >
-                      {dayAmbulance.map((o) => {
-                        const cylinders: string[] = [];
-                        if (o.cylinders_2l_300_o2 > 0) cylinders.push(`${o.cylinders_2l_300_o2}x 2L 300 O2`);
-                        if (o.cylinders_2l_200_o2 > 0) cylinders.push(`${o.cylinders_2l_200_o2}x 2L 200 O2`);
-                        if (o.cylinders_5l_o2_integrated > 0) cylinders.push(`${o.cylinders_5l_o2_integrated}x 5L O2`);
-                        if (o.cylinders_1l_pindex_o2 > 0) cylinders.push(`${o.cylinders_1l_pindex_o2}x 1L Pindex`);
-                        if (o.cylinders_10l_o2_integrated > 0) cylinders.push(`${o.cylinders_10l_o2_integrated}x 10L O2`);
-                        if (o.cylinders_5l_air_integrated > 0) cylinders.push(`${o.cylinders_5l_air_integrated}x 5L Lucht`);
-                        if (o.cylinders_2l_air_integrated > 0) cylinders.push(`${o.cylinders_2l_air_integrated}x 2L Lucht`);
-                        const customerNames = o.ambulance_trip_customers?.map(c => c.customer_name).join(", ");
-                        return (
-                          <div key={o.id} className="text-sm py-0.5 space-y-0.5">
-                            <div className="flex items-center gap-2">
-                              <span className="truncate">{cylinders.join(" · ") || "Geen cilinders"}</span>
-                              <StatusBadge status={o.status} />
-                            </div>
-                            {customerNames && (
-                              <div className="text-xs text-muted-foreground pl-0">
-                                Klanten: {customerNames}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                    {/* Ambulance */}
+                    {dayAmbulance.length > 0 && (
+                      <Section
+                        icon={<Ambulance className="h-4 w-4" />}
+                        label="Ambulance"
+                        count={dayAmbulance.length}
+                        color="text-red-500"
+                        badgeClass="bg-red-500/10 text-red-700 dark:text-red-400"
+                        bgClass="bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30"
+                      >
+                        {dayAmbulance.map((o) => {
+                          const cylinders: string[] = [];
+                          if (o.cylinders_2l_300_o2 > 0) cylinders.push(`${o.cylinders_2l_300_o2}x 2L 300 O2`);
+                          if (o.cylinders_2l_200_o2 > 0) cylinders.push(`${o.cylinders_2l_200_o2}x 2L 200 O2`);
+                          if (o.cylinders_5l_o2_integrated > 0) cylinders.push(`${o.cylinders_5l_o2_integrated}x 5L O2`);
+                          if (o.cylinders_1l_pindex_o2 > 0) cylinders.push(`${o.cylinders_1l_pindex_o2}x 1L Pindex`);
+                          if (o.cylinders_10l_o2_integrated > 0) cylinders.push(`${o.cylinders_10l_o2_integrated}x 10L O2`);
+                          if (o.cylinders_5l_air_integrated > 0) cylinders.push(`${o.cylinders_5l_air_integrated}x 5L Lucht`);
+                          if (o.cylinders_2l_air_integrated > 0) cylinders.push(`${o.cylinders_2l_air_integrated}x 2L Lucht`);
+                          const customerNames = o.ambulance_trip_customers?.map(c => c.customer_name).join(", ");
+                          return (
+                            <div key={o.id} className="text-sm py-0.5 space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="truncate">{cylinders.join(" · ") || "Geen cilinders"}</span>
+                                <StatusBadge status={o.status} />
                               </div>
-                            )}
+                              {customerNames && (
+                                <div className="text-xs text-muted-foreground">
+                                  Klanten: {customerNames}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </Section>
+                    )}
+
+                    {/* Gascilinders */}
+                    {dayGas.length > 0 && (
+                      <Section
+                        icon={<Cylinder className="h-4 w-4" />}
+                        label="Gascilinders"
+                        count={dayGas.length}
+                        color="text-orange-500"
+                        badgeClass="bg-orange-500/10 text-orange-700 dark:text-orange-400"
+                        bgClass="bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900/30"
+                      >
+                        {dayGas.map((o) => (
+                          <div key={o.id} className="flex items-center gap-2 text-sm py-0.5">
+                            <span className="truncate">{o.customer_name}</span>
+                            <span className="text-muted-foreground text-xs">
+                              {o.gas_types?.name || "Gas"} · {o.cylinder_count} cil.
+                            </span>
+                            <StatusBadge status={o.status} />
                           </div>
-                        );
-                      })}
-                    </Section>
-                  )}
+                        ))}
+                      </Section>
+                    )}
+
+                    {/* Droogijs */}
+                    {dayDryIce.length > 0 && (
+                      <Section
+                        icon={<Snowflake className="h-4 w-4" />}
+                        label="Droogijs"
+                        count={dayDryIce.length}
+                        color="text-cyan-500"
+                        badgeClass="bg-cyan-500/10 text-cyan-700 dark:text-cyan-400"
+                        bgClass="bg-cyan-50 dark:bg-cyan-950/20 border-cyan-200 dark:border-cyan-900/30"
+                      >
+                        {dayDryIce.map((o) => (
+                          <div key={o.id} className="flex items-center gap-2 text-sm py-0.5">
+                            <span className="truncate">{o.customer_name}</span>
+                            <span className="text-muted-foreground text-xs">{o.quantity_kg} kg</span>
+                            <StatusBadge status={o.status} />
+                          </div>
+                        ))}
+                      </Section>
+                    )}
+
+                    {/* Taken */}
+                    {dayTasks.length > 0 && (
+                      <Section
+                        icon={<ClipboardList className="h-4 w-4" />}
+                        label="Taken"
+                        count={dayTasks.length}
+                        color="text-blue-500"
+                        badgeClass="bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                        bgClass="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/30"
+                      >
+                        {dayTasks.map((t) => (
+                          <div key={t.id} className="flex items-center gap-2 text-sm py-0.5">
+                            {t.start_time && (
+                              <span className="text-muted-foreground font-mono text-xs w-24 shrink-0">
+                                {t.start_time.slice(0, 5)}
+                                {t.end_time && `–${t.end_time.slice(0, 5)}`}
+                              </span>
+                            )}
+                            <span className="truncate">
+                              {t.task_types?.name || t.title || "Taak"}
+                              {t.title && t.task_types?.name ? ` — ${t.title}` : ""}
+                            </span>
+                            <span className="text-muted-foreground text-xs ml-auto shrink-0">
+                              {t.assignee_name || "Algemeen"}
+                            </span>
+                          </div>
+                        ))}
+                      </Section>
+                    )}
+
+                    {/* Vrij */}
+                    {dayTimeOff.length > 0 && (
+                      <Section
+                        icon={<Palmtree className="h-4 w-4" />}
+                        label="Vrij"
+                        count={dayTimeOff.length}
+                        color="text-green-500"
+                        badgeClass="bg-green-500/10 text-green-700 dark:text-green-400"
+                        bgClass="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900/30"
+                      >
+                        {dayTimeOff.map((t) => (
+                          <div key={t.id} className="flex items-center gap-2 text-sm py-0.5">
+                            <span className="truncate">
+                              {t.profiles?.full_name || "Medewerker"}
+                            </span>
+                            <span className="text-muted-foreground text-xs ml-auto shrink-0">
+                              {t.time_off_types?.name || "Verlof"}
+                              {t.day_part && t.day_part !== "full_day" && ` (${t.day_part === "morning" ? "ochtend" : "middag"})`}
+                            </span>
+                          </div>
+                        ))}
+                      </Section>
+                    )}
+                  </div>
 
                   {viewMode === "week" && <div className="border-b my-2" />}
                 </div>
@@ -457,6 +464,7 @@ function Section({
   count,
   color,
   badgeClass,
+  bgClass,
   children,
 }: {
   icon: React.ReactNode;
@@ -464,18 +472,19 @@ function Section({
   count: number;
   color: string;
   badgeClass: string;
+  bgClass?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="mb-3">
-      <div className="flex items-center gap-2 mb-1">
+    <div className={`rounded-lg border p-3 ${bgClass || ""}`}>
+      <div className="flex items-center gap-2 mb-2">
         <span className={color}>{icon}</span>
         <span className="text-sm font-medium">{label}</span>
         <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${badgeClass}`}>
           {count}
         </span>
       </div>
-      <div className="pl-6">{children}</div>
+      <div>{children}</div>
     </div>
   );
 }
