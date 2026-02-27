@@ -43,8 +43,12 @@ export function CreateAmbulanceTripDialog({
   const [saving, setSaving] = useState(false);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(initialDate || new Date());
   const [cylinders2l, setCylinders2l] = useState("");
+  const [cylinders1lPindex, setCylinders1lPindex] = useState("");
   const [cylinders5l, setCylinders5l] = useState("");
   const [model5l, setModel5l] = useState<"any" | "high" | "low">("any");
+  const [cylinders10l, setCylinders10l] = useState("");
+  const [cylinders5lAir, setCylinders5lAir] = useState("");
+  const [cylinders2lAir, setCylinders2lAir] = useState("");
   const [customers, setCustomers] = useState<CustomerRow[]>([{ customer_number: "", customer_name: "" }]);
   const [notes, setNotes] = useState("");
   const [isRecurring, setIsRecurring] = useState(false);
@@ -78,8 +82,12 @@ export function CreateAmbulanceTripDialog({
 
   const resetForm = () => {
     setCylinders2l("");
+    setCylinders1lPindex("");
     setCylinders5l("");
     setModel5l("any");
+    setCylinders10l("");
+    setCylinders5lAir("");
+    setCylinders2lAir("");
     setCustomers([{ customer_number: "", customer_name: "" }]);
     setScheduledDate(initialDate || new Date());
     setNotes("");
@@ -116,9 +124,13 @@ export function CreateAmbulanceTripDialog({
     }
 
     const qty2l = parseInt(cylinders2l) || 0;
+    const qty1lPindex = parseInt(cylinders1lPindex) || 0;
     const qty5l = parseInt(cylinders5l) || 0;
+    const qty10l = parseInt(cylinders10l) || 0;
+    const qty5lAir = parseInt(cylinders5lAir) || 0;
+    const qty2lAir = parseInt(cylinders2lAir) || 0;
 
-    if (qty2l === 0 && qty5l === 0) {
+    if (qty2l === 0 && qty1lPindex === 0 && qty5l === 0 && qty10l === 0 && qty5lAir === 0 && qty2lAir === 0) {
       toast.error("Vul minstens één cilindertype in");
       return;
     }
@@ -145,8 +157,12 @@ export function CreateAmbulanceTripDialog({
           .insert({
             scheduled_date: format(date, "yyyy-MM-dd"),
             cylinders_2l_300_o2: qty2l,
+            cylinders_1l_pindex_o2: qty1lPindex,
             cylinders_5l_o2_integrated: qty5l,
             model_5l: model5l,
+            cylinders_10l_o2_integrated: qty10l,
+            cylinders_5l_air_integrated: qty5lAir,
+            cylinders_2l_air_integrated: qty2lAir,
             created_by: currentProfileId,
             notes: notes.trim() || null,
           })
@@ -219,44 +235,53 @@ export function CreateAmbulanceTripDialog({
           </div>
 
           {/* Cylinder counts */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="cyl2l">2L 300 O2 cilinders</Label>
-              <Input
-                id="cyl2l"
-                type="number"
-                min="0"
-                value={cylinders2l}
-                onChange={(e) => setCylinders2l(e.target.value)}
-                placeholder="0"
-                className="bg-background"
-              />
+          <div className="space-y-3">
+            <Label className="text-sm font-semibold">Zuurstof (O2)</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="cyl2l" className="text-xs text-muted-foreground">2L 300 O2</Label>
+                <Input id="cyl2l" type="number" min="0" value={cylinders2l} onChange={(e) => setCylinders2l(e.target.value)} placeholder="0" className="bg-background" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="cyl1l" className="text-xs text-muted-foreground">1L Pindex O2</Label>
+                <Input id="cyl1l" type="number" min="0" value={cylinders1lPindex} onChange={(e) => setCylinders1lPindex(e.target.value)} placeholder="0" className="bg-background" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="cyl5l" className="text-xs text-muted-foreground">5L O2 Geïntegreerd</Label>
+                <Input id="cyl5l" type="number" min="0" value={cylinders5l} onChange={(e) => setCylinders5l(e.target.value)} placeholder="0" className="bg-background" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="cyl10l" className="text-xs text-muted-foreground">10L O2 Geïntegreerd</Label>
+                <Input id="cyl10l" type="number" min="0" value={cylinders10l} onChange={(e) => setCylinders10l(e.target.value)} placeholder="0" className="bg-background" />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="cyl5l">5L O2 Geïntegreerd</Label>
-              <Input
-                id="cyl5l"
-                type="number"
-                min="0"
-                value={cylinders5l}
-                onChange={(e) => setCylinders5l(e.target.value)}
-                placeholder="0"
-                className="bg-background"
-              />
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">5L model voorkeur</Label>
+              <Select value={model5l} onValueChange={(v) => setModel5l(v as "any" | "high" | "low")}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Maakt niet uit</SelectItem>
+                  <SelectItem value="high">Hoog model</SelectItem>
+                  <SelectItem value="low">Laag model</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-          <div className="space-y-2">
-            <Label>5L model</Label>
-            <Select value={model5l} onValueChange={(v) => setModel5l(v as "any" | "high" | "low")}>
-              <SelectTrigger className="bg-background">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">Maakt niet uit</SelectItem>
-                <SelectItem value="high">Hoog model</SelectItem>
-                <SelectItem value="low">Laag model</SelectItem>
-              </SelectContent>
-            </Select>
+
+          <div className="space-y-3">
+            <Label className="text-sm font-semibold">Lucht</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="cyl5lair" className="text-xs text-muted-foreground">5L Geïntegreerd</Label>
+                <Input id="cyl5lair" type="number" min="0" value={cylinders5lAir} onChange={(e) => setCylinders5lAir(e.target.value)} placeholder="0" className="bg-background" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="cyl2lair" className="text-xs text-muted-foreground">2L Geïntegreerd</Label>
+                <Input id="cyl2lair" type="number" min="0" value={cylinders2lAir} onChange={(e) => setCylinders2lAir(e.target.value)} placeholder="0" className="bg-background" />
+              </div>
+            </div>
           </div>
 
           {/* Customer list */}
