@@ -70,8 +70,16 @@ interface AmbulanceTrip {
   id: string;
   scheduled_date: string;
   cylinders_2l_300_o2: number;
+  cylinders_2l_200_o2: number;
   cylinders_5l_o2_integrated: number;
+  cylinders_1l_pindex_o2: number;
+  cylinders_10l_o2_integrated: number;
+  cylinders_5l_air_integrated: number;
+  cylinders_2l_air_integrated: number;
+  model_5l: string;
   status: string;
+  notes: string | null;
+  ambulance_trip_customers: { customer_number: string; customer_name: string }[];
 }
 
 const statusLabels: Record<string, string> = {
@@ -146,7 +154,7 @@ export function DailyOverview() {
           .neq("status", "cancelled"),
         supabase
           .from("ambulance_trips")
-          .select("id, scheduled_date, cylinders_2l_300_o2, cylinders_5l_o2_integrated, status")
+          .select("id, scheduled_date, cylinders_2l_300_o2, cylinders_2l_200_o2, cylinders_5l_o2_integrated, cylinders_1l_pindex_o2, cylinders_10l_o2_integrated, cylinders_5l_air_integrated, cylinders_2l_air_integrated, model_5l, status, notes, ambulance_trip_customers(customer_number, customer_name)")
           .gte("scheduled_date", fromStr)
           .lte("scheduled_date", toStr)
           .neq("status", "cancelled"),
@@ -405,12 +413,30 @@ export function DailyOverview() {
                       color="text-red-500"
                       badgeClass="bg-red-500/10 text-red-700 dark:text-red-400"
                     >
-                      {dayAmbulance.map((o) => (
-                        <div key={o.id} className="flex items-center gap-2 text-sm py-0.5">
-                          <span className="truncate">{o.cylinders_2l_300_o2}x 2L O2 · {o.cylinders_5l_o2_integrated}x 5L O2</span>
-                          <StatusBadge status={o.status} />
-                        </div>
-                      ))}
+                      {dayAmbulance.map((o) => {
+                        const cylinders: string[] = [];
+                        if (o.cylinders_2l_300_o2 > 0) cylinders.push(`${o.cylinders_2l_300_o2}x 2L 300 O2`);
+                        if (o.cylinders_2l_200_o2 > 0) cylinders.push(`${o.cylinders_2l_200_o2}x 2L 200 O2`);
+                        if (o.cylinders_5l_o2_integrated > 0) cylinders.push(`${o.cylinders_5l_o2_integrated}x 5L O2`);
+                        if (o.cylinders_1l_pindex_o2 > 0) cylinders.push(`${o.cylinders_1l_pindex_o2}x 1L Pindex`);
+                        if (o.cylinders_10l_o2_integrated > 0) cylinders.push(`${o.cylinders_10l_o2_integrated}x 10L O2`);
+                        if (o.cylinders_5l_air_integrated > 0) cylinders.push(`${o.cylinders_5l_air_integrated}x 5L Lucht`);
+                        if (o.cylinders_2l_air_integrated > 0) cylinders.push(`${o.cylinders_2l_air_integrated}x 2L Lucht`);
+                        const customerNames = o.ambulance_trip_customers?.map(c => c.customer_name).join(", ");
+                        return (
+                          <div key={o.id} className="text-sm py-0.5 space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate">{cylinders.join(" · ") || "Geen cilinders"}</span>
+                              <StatusBadge status={o.status} />
+                            </div>
+                            {customerNames && (
+                              <div className="text-xs text-muted-foreground pl-0">
+                                Klanten: {customerNames}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </Section>
                   )}
 
