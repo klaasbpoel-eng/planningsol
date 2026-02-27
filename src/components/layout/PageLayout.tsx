@@ -12,6 +12,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "verlof": "Verlof & Aanvragen",
   "toolbox": "Toolbox",
   "barcode": "Barcode Generator",
+  "dagoverzicht": "Dagelijks Overzicht",
 };
 
 interface PageLayoutProps {

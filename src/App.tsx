@@ -13,6 +13,7 @@ import ToolboxPage from "./pages/ToolboxPage";
 import DashboardPage from "./pages/DashboardPage";
 import { BarcodeGenerator } from "@/components/barcode/BarcodeGenerator";
 import VrijgavesPage from "./pages/VrijgavesPage";
+import DailyOverviewPage from "./pages/DailyOverviewPage";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/toolbox" element={<ToolboxPage />} />
               <Route path="/barcode" element={<BarcodeGenerator />} />
               <Route path="/vrijgaves" element={<VrijgavesPage />} />
+              <Route path="/dagoverzicht" element={<DailyOverviewPage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
