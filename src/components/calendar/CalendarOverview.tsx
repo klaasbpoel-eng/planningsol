@@ -1249,10 +1249,23 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                       </Badge>
                     </div>
                     <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
-                      <span>{trip.cylinders_2l_300_o2}x 2L O2</span>
-                      <span>• {trip.cylinders_5l_o2_integrated}x 5L O2</span>
-                      {trip.customers.length > 0 && <span>• {trip.customers.length} klanten</span>}
+                      {(() => {
+                        const parts: string[] = [];
+                        if (trip.cylinders_2l_300_o2 > 0) parts.push(`${trip.cylinders_2l_300_o2}x 2L 300 O2`);
+                        if (trip.cylinders_2l_200_o2 > 0) parts.push(`${trip.cylinders_2l_200_o2}x 2L 200 O2`);
+                        if (trip.cylinders_1l_pindex_o2 > 0) parts.push(`${trip.cylinders_1l_pindex_o2}x 1L Pindex`);
+                        if (trip.cylinders_5l_o2_integrated > 0) parts.push(`${trip.cylinders_5l_o2_integrated}x 5L O2`);
+                        if (trip.cylinders_10l_o2_integrated > 0) parts.push(`${trip.cylinders_10l_o2_integrated}x 10L O2`);
+                        if (trip.cylinders_5l_air_integrated > 0) parts.push(`${trip.cylinders_5l_air_integrated}x 5L Lucht`);
+                        if (trip.cylinders_2l_air_integrated > 0) parts.push(`${trip.cylinders_2l_air_integrated}x 2L Lucht`);
+                        return <span>{parts.join(" · ") || "Geen cilinders"}</span>;
+                      })()}
                     </div>
+                    {trip.customers.length > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        Klanten: {trip.customers.map(c => c.customer_name).join(", ")}
+                      </div>
+                    )}
                   </div>
                   <div className="w-2 h-2 rounded-full flex-shrink-0 bg-red-500" />
                 </motion.div>;
@@ -1546,9 +1559,21 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                   </div>;
                 } else if (entry.type === 'ambulance') {
                   const trip = entry.item as AmbulanceTripWithCustomers;
-                  return <div key={trip.id} onClick={e => handleAmbulanceTripClick(trip, e)} className={cn("text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/30")}>
-                    <Ambulance className="w-3 h-3 shrink-0" />
-                    <span className="truncate font-medium">{trip.cylinders_2l_300_o2}x 2L • {trip.cylinders_5l_o2_integrated}x 5L</span>
+                  const tripParts: string[] = [];
+                  if (trip.cylinders_2l_300_o2 > 0) tripParts.push(`${trip.cylinders_2l_300_o2}x 2L 300`);
+                  if (trip.cylinders_2l_200_o2 > 0) tripParts.push(`${trip.cylinders_2l_200_o2}x 2L 200`);
+                  if (trip.cylinders_1l_pindex_o2 > 0) tripParts.push(`${trip.cylinders_1l_pindex_o2}x 1L`);
+                  if (trip.cylinders_5l_o2_integrated > 0) tripParts.push(`${trip.cylinders_5l_o2_integrated}x 5L`);
+                  if (trip.cylinders_10l_o2_integrated > 0) tripParts.push(`${trip.cylinders_10l_o2_integrated}x 10L`);
+                  if (trip.cylinders_5l_air_integrated > 0) tripParts.push(`${trip.cylinders_5l_air_integrated}x 5L L`);
+                  if (trip.cylinders_2l_air_integrated > 0) tripParts.push(`${trip.cylinders_2l_air_integrated}x 2L L`);
+                  const tripCustomerNames = trip.customers.map(c => c.customer_name).join(", ");
+                  return <div key={trip.id} onClick={e => handleAmbulanceTripClick(trip, e)} className={cn("text-xs px-2 py-1.5 rounded-lg flex flex-col gap-0.5 transition-transform hover:scale-105 cursor-pointer bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/30")}>
+                    <div className="flex items-center gap-1.5">
+                      <Ambulance className="w-3 h-3 shrink-0" />
+                      <span className="truncate font-medium">{tripParts.join(" · ")}</span>
+                    </div>
+                    {tripCustomerNames && <span className="truncate text-red-600/70 dark:text-red-400/70 pl-[18px]">{tripCustomerNames}</span>}
                   </div>;
                 }
                 return null;
