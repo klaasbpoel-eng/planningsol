@@ -1,29 +1,39 @@
 
+# Dagelijks overzicht opsplitsen in kolommen
 
-# Ambulance klanten zichtbaar op homepage
+## Wat verandert er
 
-## Probleem
+Het huidige dagelijks overzicht toont alle categorieeen (Taken, Vrij, Droogijs, Gascilinders, Ambulance) onder elkaar in een verticale lijst. Dit wordt omgebouwd naar een kolom-layout zodat elke categorie zijn eigen kolom krijgt, naast elkaar.
 
-De `ambulance_trip_customers` tabel heeft geen foreign key constraint op `trip_id` naar `ambulance_trips.id`. Hierdoor werkt de geneste select (`ambulance_trip_customers(customer_name, customer_number)`) niet en worden klanten als lege array (`[]`) teruggegeven -- zowel op de homepage (DailyOverview) als in de kalender.
+## Layout
 
-## Oplossing
+Per dag worden de secties naast elkaar weergegeven in een responsive grid:
 
-### Stap 1: Database migratie -- Foreign Key toevoegen
-
-Een migratie uitvoeren die de ontbrekende FK toevoegt:
-
-```sql
-ALTER TABLE public.ambulance_trip_customers
-  ADD CONSTRAINT ambulance_trip_customers_trip_id_fkey
-  FOREIGN KEY (trip_id) REFERENCES public.ambulance_trips(id) ON DELETE CASCADE;
+```text
++------------------+------------------+------------------+------------------+------------------+
+|   Ambulance      |   Gascilinders   |    Droogijs      |     Taken        |      Vrij        |
+|   (rood)         |   (oranje)       |    (cyaan)       |     (blauw)      |     (groen)      |
+|                  |                  |                  |                  |                  |
+|  cilinder info   |  klant + gas     |  klant + kg      |  taak details    |  medewerker      |
+|  klanten         |  aantal cil.     |  status          |  tijdstip        |  type verlof     |
++------------------+------------------+------------------+------------------+------------------+
 ```
 
-### Stap 2: Verificatie
+- Op desktop: tot 5 kolommen naast elkaar (alleen kolommen die data hebben worden getoond)
+- Op tablet: 2-3 kolommen
+- Op mobiel: 1 kolom (huidige gedrag behouden)
 
-Na de migratie zullen de bestaande queries in zowel `DailyOverview.tsx` als `CalendarOverview.tsx` automatisch correct werken. Er zijn geen code-wijzigingen nodig -- de rendering-logica voor cilinders en klanten is al aanwezig.
+## Technische aanpak
 
-## Impact
+### Bestand: `src/components/dashboard/DailyOverview.tsx`
 
-- De DailyOverview op de homepage toont cilinder-details en klantnamen bij ambulanceritten
-- De kalenderweergave toont dezelfde klantinformatie
-- Het AmbulanceTripDialog kan klanten correct laden voor bewerken/verwijderen
+1. **Grid container** -- De huidige `<div>` per dag die secties verticaal stapelt wordt vervangen door een responsive CSS grid:
+   - `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4`
+   - Alleen kolommen met data worden gerenderd
+
+2. **Section component aanpassen** -- De bestaande `Section` component krijgt een card-achtige styling zodat elke kolom visueel gescheiden is:
+   - Lichte achtergrondkleur per categorie (bijv. `bg-red-50 dark:bg-red-950/20` voor ambulance)
+   - Afgeronde hoeken en padding
+   - De section header (icoon + label + count) bovenaan de kolom
+
+3. **Geen data-wijzigingen** -- Alle queries en data-structuren blijven ongewijzigd
