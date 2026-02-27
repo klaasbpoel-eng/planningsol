@@ -153,6 +153,7 @@ export function CreateAmbulanceTripDialog({
       }
 
       const validCustomers = customers.filter(c => c.customer_number.trim() || c.customer_name.trim());
+      const seriesId = dates.length > 1 ? crypto.randomUUID() : null;
 
       for (const date of dates) {
         const { data: trip, error: tripError } = await supabase
@@ -169,6 +170,7 @@ export function CreateAmbulanceTripDialog({
             cylinders_2l_air_integrated: qty2lAir,
             created_by: currentProfileId,
             notes: notes.trim() || null,
+            series_id: seriesId,
           })
           .select()
           .single();

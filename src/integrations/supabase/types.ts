@@ -61,6 +61,7 @@ export type Database = {
           model_5l: string
           notes: string | null
           scheduled_date: string
+          series_id: string | null
           status: string
           updated_at: string
         }
@@ -78,6 +79,7 @@ export type Database = {
           model_5l?: string
           notes?: string | null
           scheduled_date: string
+          series_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -95,6 +97,7 @@ export type Database = {
           model_5l?: string
           notes?: string | null
           scheduled_date?: string
+          series_id?: string | null
           status?: string
           updated_at?: string
         }
