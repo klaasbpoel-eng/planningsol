@@ -12,6 +12,7 @@ import {
   Snowflake,
   Cylinder,
   Ambulance,
+  Ruler,
 } from "lucide-react";
 import {
   format,
@@ -61,6 +62,7 @@ interface GasCylinderOrder {
   id: string;
   customer_name: string;
   cylinder_count: number;
+  cylinder_size: string;
   status: string;
   scheduled_date: string;
   gas_types: { name: string } | null;
@@ -149,7 +151,7 @@ export function DailyOverview() {
           .neq("status", "completed"),
         supabase
           .from("gas_cylinder_orders")
-          .select("id, customer_name, cylinder_count, status, scheduled_date, gas_types:gas_type_id(name)")
+          .select("id, customer_name, cylinder_count, cylinder_size, status, scheduled_date, gas_types:gas_type_id(name)")
           .gte("scheduled_date", fromStr)
           .lte("scheduled_date", toStr)
           .neq("status", "cancelled")
@@ -382,17 +384,28 @@ export function DailyOverview() {
                         badgeClass="bg-orange-500/10 text-orange-700 dark:text-orange-400"
                         bgClass="bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900/30"
                       >
-                        {dayGas.map((o) => (
+                        {dayGas.map((o) => {
+                          const sizeLabels: Record<string, string> = {
+                            small: "Klein",
+                            medium: "Middel",
+                            large: "Groot",
+                          };
+                          return (
                           <div key={o.id} className="flex items-center justify-between text-sm py-0.5 gap-2">
                             <div className="min-w-0">
                               <div className="truncate font-medium text-xs">{o.customer_name}</div>
                               <div className="text-xs text-muted-foreground">
                                 {o.gas_types?.name || "Gas"} — {o.cylinder_count} cil.
                               </div>
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Ruler className="h-3 w-3" />
+                                <span>{sizeLabels[o.cylinder_size] || o.cylinder_size}</span>
+                              </div>
                             </div>
                             <StatusBadge status={o.status} />
                           </div>
-                        ))}
+                          );
+                        })}
                       </Section>
                     )}
 
