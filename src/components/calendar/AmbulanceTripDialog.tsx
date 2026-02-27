@@ -17,6 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Ambulance, Trash2, Users, Pencil, X, Plus, CalendarDays } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format, parseISO } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -80,6 +81,7 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
   const [status, setStatus] = useState(trip?.status || "pending");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [applyToSeries, setApplyToSeries] = useState(!!trip?.series_id);
 
   // Edit state
   const [editDate, setEditDate] = useState<Date | undefined>();
@@ -142,39 +144,76 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
     }
     setSaving(true);
     try {
-      const { error: tripError } = await supabase
-        .from("ambulance_trips" as any)
-        .update({
-          scheduled_date: format(editDate, "yyyy-MM-dd"),
-          cylinders_2l_300_o2: parseInt(editCyl2l300) || 0,
-          cylinders_2l_200_o2: parseInt(editCyl2l200) || 0,
-          cylinders_1l_pindex_o2: parseInt(editCyl1lPindex) || 0,
-          cylinders_5l_o2_integrated: parseInt(editCyl5l) || 0,
-          model_5l: editModel5l,
-          cylinders_10l_o2_integrated: parseInt(editCyl10l) || 0,
-          cylinders_5l_air_integrated: parseInt(editCyl5lAir) || 0,
-          cylinders_2l_air_integrated: parseInt(editCyl2lAir) || 0,
-          notes: editNotes.trim() || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", trip.id);
-      if (tripError) throw tripError;
+      const updateData = {
+        cylinders_2l_300_o2: parseInt(editCyl2l300) || 0,
+        cylinders_2l_200_o2: parseInt(editCyl2l200) || 0,
+        cylinders_1l_pindex_o2: parseInt(editCyl1lPindex) || 0,
+        cylinders_5l_o2_integrated: parseInt(editCyl5l) || 0,
+        model_5l: editModel5l,
+        cylinders_10l_o2_integrated: parseInt(editCyl10l) || 0,
+        cylinders_5l_air_integrated: parseInt(editCyl5lAir) || 0,
+        cylinders_2l_air_integrated: parseInt(editCyl2lAir) || 0,
+        notes: editNotes.trim() || null,
+        updated_at: new Date().toISOString(),
+      };
 
-      // Update customers: delete old, insert new
-      await supabase.from("ambulance_trip_customers" as any).delete().eq("trip_id", trip.id);
-      const validCustomers = editCustomers.filter(c => c.customer_number.trim() || c.customer_name.trim());
-      if (validCustomers.length > 0) {
-        const { error: custError } = await supabase
-          .from("ambulance_trip_customers" as any)
-          .insert(validCustomers.map(c => ({
-            trip_id: trip.id,
-            customer_number: c.customer_number.trim(),
-            customer_name: c.customer_name.trim(),
-          })));
-        if (custError) throw custError;
+      if (applyToSeries && trip.series_id) {
+        // Update all trips in the series (keep their own dates)
+        const { error: tripError } = await supabase
+          .from("ambulance_trips" as any)
+          .update(updateData)
+          .eq("series_id", trip.series_id);
+        if (tripError) throw tripError;
+
+        // Update customers for all trips in the series
+        // First get all trip IDs in the series
+        const { data: seriesTrips } = await supabase
+          .from("ambulance_trips" as any)
+          .select("id")
+          .eq("series_id", trip.series_id);
+
+        if (seriesTrips) {
+          const validCustomers = editCustomers.filter(c => c.customer_number.trim() || c.customer_name.trim());
+          for (const seriesTrip of seriesTrips) {
+            await supabase.from("ambulance_trip_customers" as any).delete().eq("trip_id", (seriesTrip as any).id);
+            if (validCustomers.length > 0) {
+              await supabase
+                .from("ambulance_trip_customers" as any)
+                .insert(validCustomers.map(c => ({
+                  trip_id: (seriesTrip as any).id,
+                  customer_number: c.customer_number.trim(),
+                  customer_name: c.customer_name.trim(),
+                })));
+            }
+          }
+        }
+
+        toast.success("Gehele reeks bijgewerkt");
+      } else {
+        // Update only this trip (including date)
+        const { error: tripError } = await supabase
+          .from("ambulance_trips" as any)
+          .update({ ...updateData, scheduled_date: format(editDate, "yyyy-MM-dd") })
+          .eq("id", trip.id);
+        if (tripError) throw tripError;
+
+        // Update customers for this trip only
+        await supabase.from("ambulance_trip_customers" as any).delete().eq("trip_id", trip.id);
+        const validCustomers = editCustomers.filter(c => c.customer_number.trim() || c.customer_name.trim());
+        if (validCustomers.length > 0) {
+          const { error: custError } = await supabase
+            .from("ambulance_trip_customers" as any)
+            .insert(validCustomers.map(c => ({
+              trip_id: trip.id,
+              customer_number: c.customer_number.trim(),
+              customer_name: c.customer_name.trim(),
+            })));
+          if (custError) throw custError;
+        }
+
+        toast.success("Ambulance rit bijgewerkt");
       }
 
-      toast.success("Ambulance rit bijgewerkt");
       setEditing(false);
       onUpdate();
     } catch (error) {
@@ -443,6 +482,20 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
         <Label>Notities</Label>
         <Textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Optionele opmerkingen..." rows={2} className="bg-background" />
       </div>
+
+      {/* Apply to series checkbox */}
+      {trip.series_id && (
+        <div className="flex items-center space-x-2 p-3 rounded-lg border bg-muted/30">
+          <Checkbox
+            id="apply-to-series"
+            checked={applyToSeries}
+            onCheckedChange={(checked) => setApplyToSeries(!!checked)}
+          />
+          <Label htmlFor="apply-to-series" className="text-sm cursor-pointer">
+            Wijzigingen doorvoeren voor de gehele reeks
+          </Label>
+        </div>
+      )}
     </div>
   );
 

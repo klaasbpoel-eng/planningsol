@@ -34,8 +34,10 @@ import {
   AlertCircle,
   Trash2,
   Sun,
-  Sunset
+  Sunset,
+  Link2
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatTimeRange, getDayPartLabel, hasTimeInfo } from "@/lib/calendar-utils";
 import {
   AlertDialog,
@@ -97,6 +99,7 @@ export function CalendarItemDialog({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [applyToSeries, setApplyToSeries] = useState(false);
 
   // Task edit state
   const [taskStatus, setTaskStatus] = useState("");
@@ -124,6 +127,7 @@ export function CalendarItemDialog({
       setTaskAssignedTo(task.assigned_to || "everyone");
       setTaskStartTime(task.start_time || "");
       setTaskEndTime(task.end_time || "");
+      setApplyToSeries(!!task.series_id);
     } else if (item?.type === "timeoff") {
       const request = item.data as RequestWithProfile;
       setTimeOffStatus(request.status);
@@ -157,20 +161,35 @@ export function CalendarItemDialog({
 
     try {
       if (item.type === "task") {
-        const { error } = await supabase
-          .from("tasks")
-          .update({
-            status: taskStatus,
-            priority: taskPriority,
-            due_date: taskDueDate ? format(taskDueDate, "yyyy-MM-dd") : item.data.due_date,
-            assigned_to: taskAssignedTo === "everyone" ? null : taskAssignedTo,
-            start_time: taskStartTime || null,
-            end_time: taskEndTime || null,
-          })
-          .eq("id", item.data.id);
+        const taskData = item.data as TaskWithProfile;
+        const updatePayload: Record<string, any> = {
+          status: taskStatus,
+          priority: taskPriority,
+          assigned_to: taskAssignedTo === "everyone" ? null : taskAssignedTo,
+          start_time: taskStartTime || null,
+          end_time: taskEndTime || null,
+        };
 
-        if (error) throw error;
-        toast.success("Taak bijgewerkt");
+        if (applyToSeries && taskData.series_id) {
+          // Update all tasks in the series (keep their own dates)
+          const { error } = await supabase
+            .from("tasks")
+            .update(updatePayload)
+            .eq("series_id", taskData.series_id);
+          if (error) throw error;
+          toast.success("Gehele reeks bijgewerkt");
+        } else {
+          // Update only this task (including date)
+          const { error } = await supabase
+            .from("tasks")
+            .update({
+              ...updatePayload,
+              due_date: taskDueDate ? format(taskDueDate, "yyyy-MM-dd") : item.data.due_date,
+            })
+            .eq("id", item.data.id);
+          if (error) throw error;
+          toast.success("Taak bijgewerkt");
+        }
       } else if (item.type === "timeoff") {
         const { error } = await supabase
           .from("time_off_requests")
@@ -468,6 +487,20 @@ export function CalendarItemDialog({
                     <div className="text-sm text-destructive flex items-center gap-2">
                       <AlertCircle className="h-4 w-4" />
                       Eindtijd moet na starttijd liggen
+                    </div>
+                  )}
+
+                  {/* Apply to series checkbox */}
+                  {task.series_id && (
+                    <div className="flex items-center space-x-2 p-3 rounded-lg border bg-muted/30">
+                      <Checkbox
+                        id="apply-task-series"
+                        checked={applyToSeries}
+                        onCheckedChange={(checked) => setApplyToSeries(!!checked)}
+                      />
+                      <Label htmlFor="apply-task-series" className="text-sm cursor-pointer">
+                        Wijzigingen doorvoeren voor de gehele reeks
+                      </Label>
                     </div>
                   )}
                 </>
