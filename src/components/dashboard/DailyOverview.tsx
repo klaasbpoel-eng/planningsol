@@ -326,24 +326,41 @@ export function DailyOverview() {
                         bgClass="bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30"
                       >
                         {dayAmbulance.map((o) => {
-                          const cylinders: string[] = [];
-                          if (o.cylinders_2l_300_o2 > 0) cylinders.push(`${o.cylinders_2l_300_o2}x 2L 300 O2`);
-                          if (o.cylinders_2l_200_o2 > 0) cylinders.push(`${o.cylinders_2l_200_o2}x 2L 200 O2`);
-                          if (o.cylinders_5l_o2_integrated > 0) cylinders.push(`${o.cylinders_5l_o2_integrated}x 5L O2`);
-                          if (o.cylinders_1l_pindex_o2 > 0) cylinders.push(`${o.cylinders_1l_pindex_o2}x 1L Pindex`);
-                          if (o.cylinders_10l_o2_integrated > 0) cylinders.push(`${o.cylinders_10l_o2_integrated}x 10L O2`);
-                          if (o.cylinders_5l_air_integrated > 0) cylinders.push(`${o.cylinders_5l_air_integrated}x 5L Lucht`);
-                          if (o.cylinders_2l_air_integrated > 0) cylinders.push(`${o.cylinders_2l_air_integrated}x 2L Lucht`);
-                          const customerNames = o.ambulance_trip_customers?.map(c => c.customer_name).join(", ");
+                          const cylinderItems: { label: string; count: number }[] = [];
+                          if (o.cylinders_2l_300_o2 > 0) cylinderItems.push({ label: "2L 300 O2", count: o.cylinders_2l_300_o2 });
+                          if (o.cylinders_2l_200_o2 > 0) cylinderItems.push({ label: "2L 200 O2", count: o.cylinders_2l_200_o2 });
+                          if (o.cylinders_5l_o2_integrated > 0) cylinderItems.push({ label: `5L O2 (${o.model_5l || "std"})`, count: o.cylinders_5l_o2_integrated });
+                          if (o.cylinders_1l_pindex_o2 > 0) cylinderItems.push({ label: "1L Pindex O2", count: o.cylinders_1l_pindex_o2 });
+                          if (o.cylinders_10l_o2_integrated > 0) cylinderItems.push({ label: "10L O2", count: o.cylinders_10l_o2_integrated });
+                          if (o.cylinders_5l_air_integrated > 0) cylinderItems.push({ label: "5L Lucht", count: o.cylinders_5l_air_integrated });
+                          if (o.cylinders_2l_air_integrated > 0) cylinderItems.push({ label: "2L Lucht", count: o.cylinders_2l_air_integrated });
+                          const customers = o.ambulance_trip_customers ?? [];
                           return (
-                            <div key={o.id} className="text-sm py-0.5 space-y-0.5">
-                              <div className="flex items-center gap-2">
-                                <span className="truncate">{cylinders.join(" · ") || "Geen cilinders"}</span>
+                            <div key={o.id} className="text-sm space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Cilinders</span>
                                 <StatusBadge status={o.status} />
                               </div>
-                              {customerNames && (
-                                <div className="text-xs text-muted-foreground">
-                                  Klanten: {customerNames}
+                              {cylinderItems.length > 0 ? (
+                                <ul className="space-y-0.5">
+                                  {cylinderItems.map((c) => (
+                                    <li key={c.label} className="flex items-center justify-between text-xs">
+                                      <span>{c.label}</span>
+                                      <span className="font-semibold">{c.count}×</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="text-xs text-muted-foreground">Geen cilinders</p>
+                              )}
+                              {customers.length > 0 && (
+                                <div>
+                                  <span className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Klanten</span>
+                                  <ul className="mt-0.5 space-y-0">
+                                    {customers.map((c) => (
+                                      <li key={c.customer_number} className="text-xs text-muted-foreground">{c.customer_name}</li>
+                                    ))}
+                                  </ul>
                                 </div>
                               )}
                             </div>
@@ -363,11 +380,13 @@ export function DailyOverview() {
                         bgClass="bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900/30"
                       >
                         {dayGas.map((o) => (
-                          <div key={o.id} className="flex items-center gap-2 text-sm py-0.5">
-                            <span className="truncate">{o.customer_name}</span>
-                            <span className="text-muted-foreground text-xs">
-                              {o.gas_types?.name || "Gas"} · {o.cylinder_count} cil.
-                            </span>
+                          <div key={o.id} className="flex items-center justify-between text-sm py-0.5 gap-2">
+                            <div className="min-w-0">
+                              <div className="truncate font-medium text-xs">{o.customer_name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {o.gas_types?.name || "Gas"} — {o.cylinder_count} cil.
+                              </div>
+                            </div>
                             <StatusBadge status={o.status} />
                           </div>
                         ))}
@@ -385,9 +404,11 @@ export function DailyOverview() {
                         bgClass="bg-cyan-50 dark:bg-cyan-950/20 border-cyan-200 dark:border-cyan-900/30"
                       >
                         {dayDryIce.map((o) => (
-                          <div key={o.id} className="flex items-center gap-2 text-sm py-0.5">
-                            <span className="truncate">{o.customer_name}</span>
-                            <span className="text-muted-foreground text-xs">{o.quantity_kg} kg</span>
+                          <div key={o.id} className="flex items-center justify-between text-sm py-0.5 gap-2">
+                            <div className="min-w-0">
+                              <div className="truncate font-medium text-xs">{o.customer_name}</div>
+                              <div className="text-xs text-muted-foreground">{o.quantity_kg} kg</div>
+                            </div>
                             <StatusBadge status={o.status} />
                           </div>
                         ))}
@@ -486,7 +507,7 @@ function Section({
           {count}
         </span>
       </div>
-      <div>{children}</div>
+      <div className="divide-y divide-current/5 space-y-1.5">{children}</div>
     </div>
   );
 }
