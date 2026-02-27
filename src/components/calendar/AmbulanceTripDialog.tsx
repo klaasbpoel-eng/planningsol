@@ -28,11 +28,18 @@ export interface AmbulanceTripWithCustomers {
   scheduled_date: string;
   cylinders_2l_300_o2: number;
   cylinders_5l_o2_integrated: number;
+  model_5l: string;
   status: string;
   notes: string | null;
   created_at: string;
   customers: AmbulanceTripCustomer[];
 }
+
+const model5lLabels: Record<string, string> = {
+  any: "Maakt niet uit",
+  high: "Hoog model",
+  low: "Laag model",
+};
 
 interface AmbulanceTripDialogProps {
   trip: AmbulanceTripWithCustomers | null;
@@ -129,6 +136,7 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
             <div className="p-3 rounded-lg border bg-muted/30">
               <div className="text-xs text-muted-foreground">5L O2 Geïntegreerd</div>
               <div className="text-2xl font-bold">{trip.cylinders_5l_o2_integrated}</div>
+              <div className="text-xs text-muted-foreground mt-1">{model5lLabels[trip.model_5l] || trip.model_5l}</div>
             </div>
           </div>
 
