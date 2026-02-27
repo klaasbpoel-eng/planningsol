@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { CalendarItemDialog } from "./CalendarItemDialog";
 import { DryIceOrderDialog } from "./DryIceOrderDialog";
+import { GasCylinderOrderDialog } from "@/components/production/GasCylinderOrderDialog";
 import { CreateTaskDialog } from "./CreateTaskDialog";
 import { CreateLeaveRequestDialog } from "./CreateLeaveRequestDialog";
 import { CreateDryIceOrderCalendarDialog } from "./CreateDryIceOrderCalendarDialog";
@@ -1791,6 +1792,22 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
 
     {/* Dry Ice Order Dialog */}
     <DryIceOrderDialog order={selectedDryIceOrder} open={dryIceDialogOpen} onOpenChange={setDryIceDialogOpen} onUpdate={handleDialogUpdate} isAdmin={isAdmin} productTypes={dryIceProductTypes} packagingOptions={dryIcePackaging} />
+
+    {/* Gas Cylinder Order Dialog */}
+    <GasCylinderOrderDialog
+      order={selectedGasCylinderOrder ? {
+        ...selectedGasCylinderOrder,
+        gas_type_ref: selectedGasCylinderOrder.gas_type_info ? {
+          id: selectedGasCylinderOrder.gas_type_info.id,
+          name: selectedGasCylinderOrder.gas_type_info.name,
+          color: selectedGasCylinderOrder.gas_type_info.color,
+        } : null,
+      } : null}
+      open={gasCylinderDialogOpen}
+      onOpenChange={setGasCylinderDialogOpen}
+      onUpdate={handleDialogUpdate}
+      isAdmin={isAdmin}
+    />
 
     {/* Create Menu Dialog */}
     <Dialog open={showCreateMenu} onOpenChange={setShowCreateMenu}>
