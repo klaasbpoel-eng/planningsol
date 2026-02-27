@@ -227,7 +227,20 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
   const handleDelete = async () => {
     try {
       if (trip.series_id) {
-        // Delete all trips in the series
+        // First get all trip IDs in the series
+        const { data: seriesTrips } = await supabase
+          .from("ambulance_trips" as any)
+          .select("id")
+          .eq("series_id", trip.series_id);
+
+        if (seriesTrips && seriesTrips.length > 0) {
+          // Delete customers for all trips in the series first
+          for (const st of seriesTrips) {
+            await supabase.from("ambulance_trip_customers" as any).delete().eq("trip_id", (st as any).id);
+          }
+        }
+
+        // Now delete all trips in the series
         const { error } = await supabase
           .from("ambulance_trips" as any)
           .delete()
@@ -235,6 +248,9 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
         if (error) throw error;
         toast.success("Gehele reeks verwijderd");
       } else {
+        // Delete customers first
+        await supabase.from("ambulance_trip_customers" as any).delete().eq("trip_id", trip.id);
+
         const { error } = await supabase
           .from("ambulance_trips" as any)
           .delete()
