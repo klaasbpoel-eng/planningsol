@@ -49,7 +49,7 @@ export function CreateGasCylinderOrderDialog({
   const [pressure, setPressure] = useState<200 | 300>(200);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(initialDate || new Date());
   const [notes, setNotes] = useState("");
-  const [isCompleted, setIsCompleted] = useState(true);
+  const [isCompleted, setIsCompleted] = useState(false);
   const [location, setLocation] = useState<"sol_emmen" | "sol_tilburg">("sol_emmen");
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   const [userProductionLocation, setUserProductionLocation] = useState<"sol_emmen" | "sol_tilburg" | null>(null);
@@ -186,7 +186,7 @@ export function CreateGasCylinderOrderDialog({
     setPressure(200);
     setScheduledDate(new Date());
     setNotes("");
-    setIsCompleted(true);
+    setIsCompleted(false);
     setShowDetails(false);
     setGasSearch("");
     if (userProductionLocation) {
