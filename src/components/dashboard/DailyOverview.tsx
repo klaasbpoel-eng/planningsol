@@ -348,7 +348,7 @@ export function DailyOverview() {
                                 <ul className="space-y-0.5">
                                   {cylinderItems.map((c) => (
                                     <li key={c.label} className="flex items-center justify-between text-xs">
-                                      <span className="flex items-center gap-1"><Ruler className="h-3 w-3 text-muted-foreground" />{c.label}</span>
+                                      <span className="flex items-center gap-1">{c.label.startsWith("5L O2") && <Ruler className="h-3 w-3 text-muted-foreground" />}{c.label}</span>
                                       <span className="font-semibold">{c.count}×</span>
                                     </li>
                                   ))}
