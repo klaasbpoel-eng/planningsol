@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      ambulance_trip_customers: {
+        Row: {
+          created_at: string
+          customer_name: string
+          customer_number: string
+          id: string
+          trip_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_name: string
+          customer_number: string
+          id?: string
+          trip_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string
+          customer_number?: string
+          id?: string
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ambulance_trip_customers_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "ambulance_trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ambulance_trips: {
+        Row: {
+          created_at: string
+          created_by: string
+          cylinders_2l_300_o2: number
+          cylinders_5l_o2_integrated: number
+          id: string
+          notes: string | null
+          scheduled_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          cylinders_2l_300_o2?: number
+          cylinders_5l_o2_integrated?: number
+          id?: string
+          notes?: string | null
+          scheduled_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          cylinders_2l_300_o2?: number
+          cylinders_5l_o2_integrated?: number
+          id?: string
+          notes?: string | null
+          scheduled_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           created_at: string

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, List, Grid3X3, LayoutGrid, Users, ClipboardList, Palmtree, GripVertical, Plus, Undo2, Snowflake, Cylinder } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, List, Grid3X3, LayoutGrid, Users, ClipboardList, Palmtree, GripVertical, Plus, Undo2, Snowflake, Cylinder, Ambulance } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, eachMonthOfInterval, addDays, addWeeks, addMonths, addYears, subDays, subWeeks, subMonths, subYears, isToday, isSameMonth, isSameDay, parseISO, isWithinInterval, getWeek, isWeekend, getDay, differenceInDays } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -24,6 +24,8 @@ import { CreateTaskDialog } from "./CreateTaskDialog";
 import { CreateLeaveRequestDialog } from "./CreateLeaveRequestDialog";
 import { CreateDryIceOrderCalendarDialog } from "./CreateDryIceOrderCalendarDialog";
 import { CalendarItemPreview } from "./CalendarItemPreview";
+import { CreateAmbulanceTripDialog } from "./CreateAmbulanceTripDialog";
+import { AmbulanceTripDialog, type AmbulanceTripWithCustomers } from "./AmbulanceTripDialog";
 import { DryIceOrderPreview } from "./DryIceOrderPreview";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -69,6 +71,9 @@ type CalendarItem = {
 } | {
   type: "gascylinder";
   data: GasCylinderOrderWithDetails;
+} | {
+  type: "ambulance";
+  data: AmbulanceTripWithCustomers;
 };
 import type { User } from "@supabase/supabase-js";
 
@@ -89,6 +94,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   const [tasks, setTasks] = useState<TaskWithProfile[]>([]);
   const [dryIceOrders, setDryIceOrders] = useState<DryIceOrderWithDetails[]>([]);
   const [gasCylinderOrders, setGasCylinderOrders] = useState<GasCylinderOrderWithDetails[]>([]);
+  const [ambulanceTrips, setAmbulanceTrips] = useState<AmbulanceTripWithCustomers[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
@@ -99,6 +105,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   const [showTasks, setShowTasks] = useState(true);
   const [showDryIce, setShowDryIce] = useState(true);
   const [showGasCylinders, setShowGasCylinders] = useState(true);
+  const [showAmbulance, setShowAmbulance] = useState(true);
   const [draggedTask, setDraggedTask] = useState<TaskWithProfile | null>(null);
   const [dragOverDate, setDragOverDate] = useState<Date | null>(null);
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
@@ -110,6 +117,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
   const [createLeaveDialogOpen, setCreateLeaveDialogOpen] = useState(false);
   const [createDryIceDialogOpen, setCreateDryIceDialogOpen] = useState(false);
+  const [createAmbulanceDialogOpen, setCreateAmbulanceDialogOpen] = useState(false);
+  const [selectedAmbulanceTrip, setSelectedAmbulanceTrip] = useState<AmbulanceTripWithCustomers | null>(null);
+  const [ambulanceTripDialogOpen, setAmbulanceTripDialogOpen] = useState(false);
   const [createDate, setCreateDate] = useState<Date | undefined>();
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
@@ -254,7 +264,8 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         dryIcePackagingData,
         gasCylinderOrdersData,
         gasTypesData,
-        timeOffTypesData
+        timeOffTypesData,
+        ambulanceTripsData
       ] = await Promise.all([
         safeFetch<Profile[]>(api.profiles.getAll(), "profiles"),
         safeFetch<TimeOffRequest[]>(api.timeOffRequests.getAll(), "requests"),
@@ -265,7 +276,15 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         safeFetch<DryIcePackaging[]>(api.dryIcePackaging.getAll(), "dryIcePkg"),
         safeFetch<GasCylinderOrder[]>(api.gasCylinderOrders.getPending("2025-01-01"), "gasCylinders"),
         safeFetch<GasType[]>(api.gasTypes.getAll(), "gasTypes"),
-        safeFetch<TimeOffType[]>(api.timeOffTypes.getAll().then(data => data as unknown as TimeOffType[]), "timeOffTypes")
+        safeFetch<TimeOffType[]>(api.timeOffTypes.getAll().then(data => data as unknown as TimeOffType[]), "timeOffTypes"),
+        safeFetch<any[]>(
+          (async () => {
+            const { data, error } = await supabase.from("ambulance_trips" as any).select("*").gte("scheduled_date", "2025-01-01").order("scheduled_date");
+            if (error) throw error;
+            return data;
+          })(),
+          "ambulanceTrips"
+        )
       ]);
 
       // Map profiles and leave types to requests
@@ -300,10 +319,27 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         const gas_type_info = gasTypesData?.find((t: any) => t.id === order.gas_type_id) || null;
         return { ...order, gas_type_info };
       });
+
+      // Fetch ambulance trip customers for all trips
+      const tripsRaw = ambulanceTripsData || [];
+      let ambulanceTripsWithCustomers: AmbulanceTripWithCustomers[] = [];
+      if (tripsRaw.length > 0) {
+        const tripIds = tripsRaw.map((t: any) => t.id);
+        const { data: tripCustomers } = await supabase
+          .from("ambulance_trip_customers" as any)
+          .select("*")
+          .in("trip_id", tripIds);
+        ambulanceTripsWithCustomers = tripsRaw.map((t: any) => ({
+          ...t,
+          customers: (tripCustomers || []).filter((c: any) => c.trip_id === t.id),
+        }));
+      }
+
       setRequests(requestsWithProfiles);
       setTasks(tasksWithProfiles);
       setDryIceOrders(dryIceOrdersWithDetails);
       setGasCylinderOrders(gasCylinderOrdersWithDetails);
+      setAmbulanceTrips(ambulanceTripsWithCustomers);
       setProfiles(profilesData || []);
       setTaskTypes(taskTypesData || []);
       setTimeOffTypes(timeOffTypesData || []);
@@ -324,6 +360,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     } else if (item.type === "gascylinder") {
       setSelectedGasCylinderOrder(item.data);
       setGasCylinderDialogOpen(true);
+    } else if (item.type === "ambulance") {
+      setSelectedAmbulanceTrip(item.data);
+      setAmbulanceTripDialogOpen(true);
     } else {
       setSelectedItem(item);
       setDialogOpen(true);
@@ -338,6 +377,11 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     e.stopPropagation();
     setSelectedGasCylinderOrder(order);
     setGasCylinderDialogOpen(true);
+  };
+  const handleAmbulanceTripClick = (trip: AmbulanceTripWithCustomers, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedAmbulanceTrip(trip);
+    setAmbulanceTripDialogOpen(true);
   };
   const handleDialogUpdate = () => {
     fetchData();
@@ -360,6 +404,10 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   const handleCreateDryIce = () => {
     setShowCreateMenu(false);
     setCreateDryIceDialogOpen(true);
+  };
+  const handleCreateAmbulance = () => {
+    setShowCreateMenu(false);
+    setCreateAmbulanceDialogOpen(true);
   };
   const handleTaskCreated = () => {
     fetchData();
@@ -674,6 +722,16 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         }
       });
     }
+    if (showAmbulance) {
+      ambulanceTrips.forEach(trip => {
+        if (isSameDay(parseISO(trip.scheduled_date), day)) {
+          items.push({
+            type: "ambulance",
+            data: trip
+          });
+        }
+      });
+    }
     return items;
   };
   const getRequestsForDay = (day: Date): RequestWithProfile[] => {
@@ -967,6 +1025,17 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         });
       });
     }
+    if (showAmbulance) {
+      ambulanceTrips.forEach(trip => {
+        allItems.push({
+          date: parseISO(trip.scheduled_date),
+          item: {
+            type: "ambulance",
+            data: trip
+          }
+        });
+      });
+    }
 
     // Sort by date ascending
     allItems.sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -1166,6 +1235,26 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                     {order.notes && <div className="text-xs text-muted-foreground/70 mt-1 truncate italic">{order.notes}</div>}
                   </div>
                   <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-500" />
+                </motion.div>;
+              } else if (calendarItem.type === "ambulance") {
+                const trip = calendarItem.data;
+                return <motion.div key={`ambulance-${trip.id}`} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }} onClick={e => handleAmbulanceTripClick(trip, e)} className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4">
+                  <div className="w-1 h-12 rounded-full bg-red-500" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Ambulance className="h-4 w-4 text-red-500 flex-shrink-0" />
+                      <span className="font-medium truncate">Ambulance rit</span>
+                      <Badge variant="outline" className={cn("text-xs flex-shrink-0", trip.status === "completed" ? "bg-success/80 text-success-foreground" : trip.status === "cancelled" ? "bg-muted text-muted-foreground" : "bg-red-500/80 text-white")}>
+                        {trip.status === "completed" ? "Voltooid" : trip.status === "cancelled" ? "Geannuleerd" : "Gepland"}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+                      <span>{trip.cylinders_2l_300_o2}x 2L O2</span>
+                      <span>• {trip.cylinders_5l_o2_integrated}x 5L O2</span>
+                      {trip.customers.length > 0 && <span>• {trip.customers.length} klanten</span>}
+                    </div>
+                  </div>
+                  <div className="w-2 h-2 rounded-full flex-shrink-0 bg-red-500" />
                 </motion.div>;
               }
               return null;
@@ -1387,6 +1476,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
           const dayTasks = getTasksForDay(day);
           const dayDryIceOrders = getDryIceOrdersForDay(day);
           const dayGasCylinderOrders = getGasCylinderOrdersForDay(day);
+          const dayAmbulanceTrips = showAmbulance ? ambulanceTrips.filter(t => isSameDay(parseISO(t.scheduled_date), day)) : [];
           const allItems = [...dayRequests.map(r => ({
             type: 'timeoff' as const,
             item: r
@@ -1399,6 +1489,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
           })), ...dayGasCylinderOrders.map(o => ({
             type: 'gascylinder' as const,
             item: o
+          })), ...dayAmbulanceTrips.map(t => ({
+            type: 'ambulance' as const,
+            item: t
           }))];
           const isCurrentDay = isToday(day);
           const isDragOver = dragOverDate && isSameDay(dragOverDate, day);
@@ -1450,6 +1543,12 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                   return <div key={order.id} onClick={e => handleGasCylinderOrderClick(order, e)} className={cn("text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-orange-500/20 text-orange-700 dark:text-orange-300 border border-orange-500/30")}>
                     <Cylinder className="w-3 h-3 shrink-0" />
                     <span className="truncate font-medium">{order.customer_name} • {order.cylinder_count}x</span>
+                  </div>;
+                } else if (entry.type === 'ambulance') {
+                  const trip = entry.item as AmbulanceTripWithCustomers;
+                  return <div key={trip.id} onClick={e => handleAmbulanceTripClick(trip, e)} className={cn("text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/30")}>
+                    <Ambulance className="w-3 h-3 shrink-0" />
+                    <span className="truncate font-medium">{trip.cylinders_2l_300_o2}x 2L • {trip.cylinders_5l_o2_integrated}x 5L</span>
                   </div>;
                 }
                 return null;
@@ -1683,6 +1782,13 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                   Gascilinders
                 </label>
               </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="showAmbulance" checked={showAmbulance} onCheckedChange={checked => setShowAmbulance(checked as boolean)} />
+                <label htmlFor="showAmbulance" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                  <Ambulance className="h-3.5 w-3.5 text-red-500" />
+                  Ambulance
+                </label>
+              </div>
             </div>
 
             {/* Mobile View Toggle */}
@@ -1823,7 +1929,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
             }) : "deze dag"}?
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-3 gap-4 py-4">
+        <div className="grid grid-cols-2 gap-4 py-4">
           <Button variant="outline" className="h-24 flex flex-col items-center justify-center gap-2 hover:bg-blue-50 hover:border-blue-300 dark:hover:bg-blue-950/30" onClick={handleCreateTask}>
             <ClipboardList className="h-8 w-8 text-blue-500" />
             <span className="font-medium">Taak</span>
@@ -1835,6 +1941,10 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
           <Button variant="outline" className="h-24 flex flex-col items-center justify-center gap-2 hover:bg-cyan-50 hover:border-cyan-300 dark:hover:bg-cyan-950/30" onClick={handleCreateDryIce}>
             <Snowflake className="h-8 w-8 text-cyan-500" />
             <span className="font-medium">Droogijs</span>
+          </Button>
+          <Button variant="outline" className="h-24 flex flex-col items-center justify-center gap-2 hover:bg-red-50 hover:border-red-300 dark:hover:bg-red-950/30" onClick={handleCreateAmbulance}>
+            <Ambulance className="h-8 w-8 text-red-500" />
+            <span className="font-medium">Ambulance</span>
           </Button>
         </div>
       </DialogContent>
@@ -1848,6 +1958,12 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
 
     {/* Create Dry Ice Order Dialog */}
     <CreateDryIceOrderCalendarDialog open={createDryIceDialogOpen} onOpenChange={setCreateDryIceDialogOpen} onCreate={handleTaskCreated} initialDate={createDate} />
+
+    {/* Create Ambulance Trip Dialog */}
+    <CreateAmbulanceTripDialog open={createAmbulanceDialogOpen} onOpenChange={setCreateAmbulanceDialogOpen} onCreate={handleTaskCreated} initialDate={createDate} />
+
+    {/* Ambulance Trip Dialog */}
+    <AmbulanceTripDialog trip={selectedAmbulanceTrip} open={ambulanceTripDialogOpen} onOpenChange={setAmbulanceTripDialogOpen} onUpdate={handleDialogUpdate} isAdmin={isAdmin} />
 
     <AlertDialog open={moveSeriesDialogOpen} onOpenChange={setMoveSeriesDialogOpen}>
       <AlertDialogContent>
