@@ -1,8 +1,9 @@
 import { PageLayout } from "@/components/layout/PageLayout";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Factory, Calendar, ShoppingCart, Wrench, Clock, Shield, ArrowRight, Activity, ScanBarcode } from "lucide-react";
+import { Factory, Calendar, ShoppingCart, Wrench, Clock, Shield, ArrowRight, ScanBarcode } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { DailyOverview } from "./DailyOverview";
+
 
 import type { RolePermissions, AppRole } from "@/hooks/useUserPermissions";
 
@@ -75,6 +76,7 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
             title={`Welkom terug${userEmail ? `, ${userEmail.split("@")[0]}` : ""}`}
             description="Kies een module om aan de slag te gaan."
         >
+            <DailyOverview />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Admin Card - Special Case */}
                 {isAdmin && (
