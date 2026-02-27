@@ -1562,7 +1562,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                   const order = entry.item as GasCylinderOrderWithDetails;
                   return <div key={order.id} onClick={e => handleGasCylinderOrderClick(order, e)} className={cn("text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-orange-500/20 text-orange-700 dark:text-orange-300 border border-orange-500/30")}>
                     <Cylinder className="w-3 h-3 shrink-0" />
-                    <span className="truncate font-medium">{order.customer_name} • {order.cylinder_count}x {order.cylinder_size}</span>
+                    <span className="truncate font-medium">{order.customer_name} • {order.cylinder_count}x {order.cylinder_size} {order.gas_type_info?.name || order.gas_type}</span>
                   </div>;
                 } else if (entry.type === 'ambulance') {
                   const trip = entry.item as AmbulanceTripWithCustomers;
