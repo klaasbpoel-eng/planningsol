@@ -331,7 +331,8 @@ export function DailyOverview() {
                           const cylinderItems: { label: string; count: number }[] = [];
                           if (o.cylinders_2l_300_o2 > 0) cylinderItems.push({ label: "2L 300 O2", count: o.cylinders_2l_300_o2 });
                           if (o.cylinders_2l_200_o2 > 0) cylinderItems.push({ label: "2L 200 O2", count: o.cylinders_2l_200_o2 });
-                          if (o.cylinders_5l_o2_integrated > 0) cylinderItems.push({ label: `5L O2 (${o.model_5l || "std"})`, count: o.cylinders_5l_o2_integrated });
+                          const model5lLabel = o.model_5l === "any" ? "Alle" : o.model_5l === "high" ? "Hoog" : o.model_5l === "low" ? "Laag" : o.model_5l || "std";
+                          if (o.cylinders_5l_o2_integrated > 0) cylinderItems.push({ label: `5L O2 (${model5lLabel})`, count: o.cylinders_5l_o2_integrated });
                           if (o.cylinders_1l_pindex_o2 > 0) cylinderItems.push({ label: "1L Pindex O2", count: o.cylinders_1l_pindex_o2 });
                           if (o.cylinders_10l_o2_integrated > 0) cylinderItems.push({ label: "10L O2", count: o.cylinders_10l_o2_integrated });
                           if (o.cylinders_5l_air_integrated > 0) cylinderItems.push({ label: "5L Lucht", count: o.cylinders_5l_air_integrated });
@@ -386,9 +387,9 @@ export function DailyOverview() {
                       >
                         {dayGas.map((o) => {
                           const sizeLabels: Record<string, string> = {
-                            small: "Klein",
-                            medium: "Middel",
-                            large: "Groot",
+                            small: "Laag",
+                            medium: "Laag",
+                            large: "Hoog",
                           };
                           return (
                           <div key={o.id} className="flex items-center justify-between text-sm py-0.5 gap-2">
