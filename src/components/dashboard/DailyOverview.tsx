@@ -56,6 +56,7 @@ interface DryIceOrder {
   quantity_kg: number;
   status: string;
   scheduled_date: string;
+  dry_ice_packaging: { name: string } | null;
 }
 
 interface GasCylinderOrder {
@@ -144,7 +145,7 @@ export function DailyOverview() {
           .eq("status", "approved"),
         supabase
           .from("dry_ice_orders")
-          .select("id, customer_name, quantity_kg, status, scheduled_date")
+          .select("id, customer_name, quantity_kg, status, scheduled_date, dry_ice_packaging:packaging_id(name)")
           .gte("scheduled_date", fromStr)
           .lte("scheduled_date", toStr)
           .neq("status", "cancelled"),
@@ -423,7 +424,9 @@ export function DailyOverview() {
                           <div key={o.id} className="flex items-center justify-between text-sm py-0.5 gap-2">
                             <div className="min-w-0">
                               <div className="truncate font-medium text-xs">{o.customer_name}</div>
-                              <div className="text-xs text-muted-foreground">{o.quantity_kg} kg</div>
+                              <div className="text-xs text-muted-foreground">
+                                {o.quantity_kg} kg{o.dry_ice_packaging?.name ? ` · ${o.dry_ice_packaging.name}` : ""}
+                              </div>
                             </div>
                             <StatusBadge status={o.status} />
                           </div>
