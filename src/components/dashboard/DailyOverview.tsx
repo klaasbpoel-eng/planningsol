@@ -11,6 +11,7 @@ import {
   Palmtree,
   Snowflake,
   Cylinder,
+  Ambulance,
 } from "lucide-react";
 import {
   format,
