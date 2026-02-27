@@ -27,7 +27,11 @@ export interface AmbulanceTripWithCustomers {
   id: string;
   scheduled_date: string;
   cylinders_2l_300_o2: number;
+  cylinders_1l_pindex_o2: number;
   cylinders_5l_o2_integrated: number;
+  cylinders_10l_o2_integrated: number;
+  cylinders_5l_air_integrated: number;
+  cylinders_2l_air_integrated: number;
   model_5l: string;
   status: string;
   notes: string | null;
@@ -127,18 +131,58 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
         </ResponsiveDialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Cylinder counts */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-3 rounded-lg border bg-muted/30">
-              <div className="text-xs text-muted-foreground">2L 300 O2</div>
-              <div className="text-2xl font-bold">{trip.cylinders_2l_300_o2}</div>
-            </div>
-            <div className="p-3 rounded-lg border bg-muted/30">
-              <div className="text-xs text-muted-foreground">5L O2 Geïntegreerd</div>
-              <div className="text-2xl font-bold">{trip.cylinders_5l_o2_integrated}</div>
-              <div className="text-xs text-muted-foreground mt-1">{model5lLabels[trip.model_5l] || trip.model_5l}</div>
+          {/* Cylinder counts - O2 */}
+          <div className="space-y-2">
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Zuurstof (O2)</div>
+            <div className="grid grid-cols-2 gap-3">
+              {trip.cylinders_2l_300_o2 > 0 && (
+                <div className="p-3 rounded-lg border bg-muted/30">
+                  <div className="text-xs text-muted-foreground">2L 300 O2</div>
+                  <div className="text-2xl font-bold">{trip.cylinders_2l_300_o2}</div>
+                </div>
+              )}
+              {trip.cylinders_1l_pindex_o2 > 0 && (
+                <div className="p-3 rounded-lg border bg-muted/30">
+                  <div className="text-xs text-muted-foreground">1L Pindex O2</div>
+                  <div className="text-2xl font-bold">{trip.cylinders_1l_pindex_o2}</div>
+                </div>
+              )}
+              {trip.cylinders_5l_o2_integrated > 0 && (
+                <div className="p-3 rounded-lg border bg-muted/30">
+                  <div className="text-xs text-muted-foreground">5L O2 Geïntegreerd</div>
+                  <div className="text-2xl font-bold">{trip.cylinders_5l_o2_integrated}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{model5lLabels[trip.model_5l] || trip.model_5l}</div>
+                </div>
+              )}
+              {trip.cylinders_10l_o2_integrated > 0 && (
+                <div className="p-3 rounded-lg border bg-muted/30">
+                  <div className="text-xs text-muted-foreground">10L O2 Geïntegreerd</div>
+                  <div className="text-2xl font-bold">{trip.cylinders_10l_o2_integrated}</div>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Cylinder counts - Lucht */}
+          {(trip.cylinders_5l_air_integrated > 0 || trip.cylinders_2l_air_integrated > 0) && (
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lucht</div>
+              <div className="grid grid-cols-2 gap-3">
+                {trip.cylinders_5l_air_integrated > 0 && (
+                  <div className="p-3 rounded-lg border bg-muted/30">
+                    <div className="text-xs text-muted-foreground">5L Geïntegreerd</div>
+                    <div className="text-2xl font-bold">{trip.cylinders_5l_air_integrated}</div>
+                  </div>
+                )}
+                {trip.cylinders_2l_air_integrated > 0 && (
+                  <div className="p-3 rounded-lg border bg-muted/30">
+                    <div className="text-xs text-muted-foreground">2L Geïntegreerd</div>
+                    <div className="text-2xl font-bold">{trip.cylinders_2l_air_integrated}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Customer list */}
           {trip.customers.length > 0 && (

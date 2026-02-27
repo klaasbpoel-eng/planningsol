@@ -50,7 +50,11 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          cylinders_10l_o2_integrated: number
+          cylinders_1l_pindex_o2: number
           cylinders_2l_300_o2: number
+          cylinders_2l_air_integrated: number
+          cylinders_5l_air_integrated: number
           cylinders_5l_o2_integrated: number
           id: string
           model_5l: string
@@ -62,7 +66,11 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
+          cylinders_10l_o2_integrated?: number
+          cylinders_1l_pindex_o2?: number
           cylinders_2l_300_o2?: number
+          cylinders_2l_air_integrated?: number
+          cylinders_5l_air_integrated?: number
           cylinders_5l_o2_integrated?: number
           id?: string
           model_5l?: string
@@ -74,7 +82,11 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          cylinders_10l_o2_integrated?: number
+          cylinders_1l_pindex_o2?: number
           cylinders_2l_300_o2?: number
+          cylinders_2l_air_integrated?: number
+          cylinders_5l_air_integrated?: number
           cylinders_5l_o2_integrated?: number
           id?: string
           model_5l?: string
