@@ -80,6 +80,18 @@ export function DailyOverview() {
   const [timeOff, setTimeOff] = useState<TimeOffItem[]>([]);
   const [dryIceOrders, setDryIceOrders] = useState<DryIceOrder[]>([]);
   const [gasOrders, setGasOrders] = useState<GasCylinderOrder[]>([]);
+  const [lookaheadActive, setLookaheadActive] = useState(false);
+
+  // When in day mode, extend query range by 3 extra days so we can show upcoming items if today is empty
+  const queryRange = useMemo(() => {
+    if (viewMode === "day") {
+      return { from: currentDate, to: addDays(currentDate, 3) };
+    }
+    return {
+      from: startOfWeek(currentDate, { weekStartsOn: 1 }),
+      to: endOfWeek(currentDate, { weekStartsOn: 1 }),
+    };
+  }, [viewMode, currentDate]);
 
   const dateRange = useMemo(() => {
     if (viewMode === "day") {
@@ -91,8 +103,8 @@ export function DailyOverview() {
     };
   }, [viewMode, currentDate]);
 
-  const fromStr = format(dateRange.from, "yyyy-MM-dd");
-  const toStr = format(dateRange.to, "yyyy-MM-dd");
+  const fromStr = format(queryRange.from, "yyyy-MM-dd");
+  const toStr = format(queryRange.to, "yyyy-MM-dd");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -137,13 +149,34 @@ export function DailyOverview() {
         rawTasks.forEach(t => { t.assignee_name = t.assigned_to ? nameMap.get(t.assigned_to) ?? null : null; });
       }
       setTasks(rawTasks);
-      setTimeOff((timeOffRes.data as TimeOffItem[] | null) ?? []);
-      setDryIceOrders((dryIceRes.data as DryIceOrder[] | null) ?? []);
-      setGasOrders((gasRes.data as GasCylinderOrder[] | null) ?? []);
+
+      const allTimeOff = (timeOffRes.data as TimeOffItem[] | null) ?? [];
+      const allDryIce = (dryIceRes.data as DryIceOrder[] | null) ?? [];
+      const allGas = (gasRes.data as GasCylinderOrder[] | null) ?? [];
+
+      setTimeOff(allTimeOff);
+      setDryIceOrders(allDryIce);
+      setGasOrders(allGas);
+
+      // In day mode, check if today is empty and we need lookahead
+      if (viewMode === "day") {
+        const todayStr = format(currentDate, "yyyy-MM-dd");
+        const todayHasItems =
+          rawTasks.some(t => t.due_date === todayStr) ||
+          allTimeOff.some(t => t.start_date <= todayStr && t.end_date >= todayStr) ||
+          allDryIce.some(o => o.scheduled_date === todayStr) ||
+          allGas.some(o => o.scheduled_date === todayStr);
+        
+        const hasAnyUpcoming = rawTasks.length > 0 || allTimeOff.length > 0 || allDryIce.length > 0 || allGas.length > 0;
+        setLookaheadActive(!todayHasItems && hasAnyUpcoming);
+      } else {
+        setLookaheadActive(false);
+      }
+
       setLoading(false);
     };
     fetchData();
-  }, [fromStr, toStr]);
+  }, [fromStr, toStr, viewMode, currentDate]);
 
   const navigate = (dir: "prev" | "next") => {
     const delta = viewMode === "day" ? 1 : 7;
@@ -161,10 +194,16 @@ export function DailyOverview() {
     return `${format(dateRange.from, "d MMM", { locale: nl })} – ${format(dateRange.to, "d MMM yyyy", { locale: nl })}`;
   }, [viewMode, currentDate, dateRange]);
 
+  // In day mode with lookahead, show upcoming days that have items; otherwise show the selected range
   const days = useMemo(() => {
-    if (viewMode === "day") return [currentDate];
+    if (viewMode === "day") {
+      if (lookaheadActive) {
+        return eachDayOfInterval({ start: currentDate, end: addDays(currentDate, 3) });
+      }
+      return [currentDate];
+    }
     return eachDayOfInterval({ start: dateRange.from, end: dateRange.to });
-  }, [viewMode, currentDate, dateRange]);
+  }, [viewMode, currentDate, dateRange, lookaheadActive]);
 
   const isEmpty = tasks.length === 0 && timeOff.length === 0 && dryIceOrders.length === 0 && gasOrders.length === 0;
 
@@ -213,10 +252,15 @@ export function DailyOverview() {
           </div>
         ) : isEmpty ? (
           <p className="text-muted-foreground text-sm py-4 text-center">
-            Geen items gepland voor {viewMode === "day" ? "vandaag" : "deze week"}.
+            Geen items gepland voor {viewMode === "day" ? "de komende dagen" : "deze week"}.
           </p>
         ) : (
           <div className="space-y-4">
+            {lookaheadActive && viewMode === "day" && (
+              <p className="text-muted-foreground text-xs italic">
+                Vandaag geen items — hieronder de komende dagen:
+              </p>
+            )}
             {days.map((day) => {
               const dayStr = format(day, "yyyy-MM-dd");
               const dayTasks = tasks.filter((t) => t.due_date === dayStr);
@@ -227,11 +271,11 @@ export function DailyOverview() {
               const dayGas = gasOrders.filter((o) => o.scheduled_date === dayStr);
               const dayEmpty = dayTasks.length === 0 && dayTimeOff.length === 0 && dayDryIce.length === 0 && dayGas.length === 0;
 
-              if (viewMode === "week" && dayEmpty) return null;
+              if (dayEmpty && (viewMode === "week" || lookaheadActive)) return null;
 
               return (
                 <div key={dayStr}>
-                  {viewMode === "week" && (
+                  {(viewMode === "week" || lookaheadActive) && (
                     <h4 className="text-sm font-semibold text-muted-foreground mb-2 capitalize">
                       {format(day, "EEEE d MMMM", { locale: nl })}
                       {isToday(day) && (
