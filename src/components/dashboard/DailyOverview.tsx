@@ -466,7 +466,7 @@ export function DailyOverview() {
                     {dayTimeOff.length > 0 && (
                       <Section
                         icon={<Palmtree className="h-4 w-4" />}
-                        label="Vrij"
+                        label="Afwezig"
                         count={dayTimeOff.length}
                         color="text-green-500"
                         badgeClass="bg-green-500/10 text-green-700 dark:text-green-400"
