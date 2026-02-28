@@ -454,7 +454,7 @@ export function DailyOverview() {
                             )}
                           </div>
                         ))}
-                        {dayDryIce.length > 1 && (
+                        {dayDryIce.length >= 1 && (
                           <div className="border-t border-cyan-300/30 dark:border-cyan-700/30 pt-1.5 mt-1 flex items-center justify-between text-xs font-semibold">
                             <span>Totaal</span>
                             <span>{dayDryIce.reduce((sum, o) => sum + Number(o.quantity_kg), 0)} kg</span>
