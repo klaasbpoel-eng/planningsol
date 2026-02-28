@@ -9,9 +9,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, List, Grid3X3, LayoutGrid, Users, ClipboardList, Palmtree, GripVertical, Plus, Undo2, Snowflake, Cylinder, Ambulance } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, List, Grid3X3, LayoutGrid, Users, ClipboardList, Palmtree, GripVertical, Plus, Undo2, Snowflake, Cylinder, Ambulance, AlertTriangle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, eachMonthOfInterval, addDays, addWeeks, addMonths, addYears, subDays, subWeeks, subMonths, subYears, isToday, isSameMonth, isSameDay, parseISO, isWithinInterval, getWeek, isWeekend, getDay, differenceInDays } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, eachMonthOfInterval, addDays, addWeeks, addMonths, addYears, subDays, subWeeks, subMonths, subYears, isToday, isSameMonth, isSameDay, parseISO, isWithinInterval, getWeek, isWeekend, getDay, differenceInDays, isBefore, isAfter } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -680,6 +680,295 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   const filteredGasCylinderOrders = useMemo(() => {
     return gasCylinderOrders;
   }, [gasCylinderOrders]);
+
+  // === EXPIRING SERIES DETECTION ===
+  type ExpiringSeries = {
+    type: "task" | "dryice" | "gascylinder" | "ambulance";
+    seriesId: string;
+    label: string;
+    lastDate: string;
+    itemCount: number;
+    interval: number; // weeks between items
+  };
+
+  const expiringSeries = useMemo(() => {
+    if (!isAdmin) return [];
+    const now = new Date();
+    const threshold = addDays(now, 30);
+    const series: ExpiringSeries[] = [];
+
+    // Helper: detect interval from sorted dates
+    const detectInterval = (dates: string[]): number => {
+      if (dates.length < 2) return 1;
+      const sorted = [...dates].sort();
+      const d1 = parseISO(sorted[0]);
+      const d2 = parseISO(sorted[1]);
+      const diff = differenceInDays(d2, d1);
+      return diff >= 10 ? 2 : 1; // ~14 days = 2 weeks, ~7 days = 1 week
+    };
+
+    // Tasks with series_id
+    const taskSeriesMap = new Map<string, TaskWithProfile[]>();
+    tasks.forEach(t => {
+      if (t.series_id) {
+        if (!taskSeriesMap.has(t.series_id)) taskSeriesMap.set(t.series_id, []);
+        taskSeriesMap.get(t.series_id)!.push(t);
+      }
+    });
+    taskSeriesMap.forEach((items, sid) => {
+      if (items.length < 2) return;
+      const dates = items.map(i => i.due_date);
+      const lastDate = dates.sort().pop()!;
+      const lastDateParsed = parseISO(lastDate);
+      if (isBefore(lastDateParsed, threshold) && isAfter(lastDateParsed, subDays(now, 7))) {
+        series.push({
+          type: "task",
+          seriesId: sid,
+          label: items[0].title || "Taak",
+          lastDate,
+          itemCount: items.length,
+          interval: detectInterval(dates),
+        });
+      }
+    });
+
+    // Dry ice with parent_order_id
+    const dryIceSeriesMap = new Map<string, DryIceOrderWithDetails[]>();
+    dryIceOrders.forEach(o => {
+      const sid = o.parent_order_id || (dryIceOrders.some(x => x.parent_order_id === o.id) ? o.id : null);
+      if (sid) {
+        if (!dryIceSeriesMap.has(sid)) dryIceSeriesMap.set(sid, []);
+        dryIceSeriesMap.get(sid)!.push(o);
+      }
+    });
+    dryIceSeriesMap.forEach((items, sid) => {
+      if (items.length < 2) return;
+      const dates = items.map(i => i.scheduled_date);
+      const lastDate = dates.sort().pop()!;
+      const lastDateParsed = parseISO(lastDate);
+      if (isBefore(lastDateParsed, threshold) && isAfter(lastDateParsed, subDays(now, 7))) {
+        series.push({
+          type: "dryice",
+          seriesId: sid,
+          label: `${items[0].customer_name} - Droogijs`,
+          lastDate,
+          itemCount: items.length,
+          interval: detectInterval(dates),
+        });
+      }
+    });
+
+    // Gas cylinders with series_id
+    const gasSeriesMap = new Map<string, GasCylinderOrderWithDetails[]>();
+    gasCylinderOrders.forEach(o => {
+      if (o.series_id) {
+        if (!gasSeriesMap.has(o.series_id)) gasSeriesMap.set(o.series_id, []);
+        gasSeriesMap.get(o.series_id)!.push(o);
+      }
+    });
+    gasSeriesMap.forEach((items, sid) => {
+      if (items.length < 2) return;
+      const dates = items.map(i => i.scheduled_date);
+      const lastDate = dates.sort().pop()!;
+      const lastDateParsed = parseISO(lastDate);
+      if (isBefore(lastDateParsed, threshold) && isAfter(lastDateParsed, subDays(now, 7))) {
+        series.push({
+          type: "gascylinder",
+          seriesId: sid,
+          label: `${items[0].customer_name} - ${items[0].gas_type_info?.name || "Gas"}`,
+          lastDate,
+          itemCount: items.length,
+          interval: detectInterval(dates),
+        });
+      }
+    });
+
+    // Ambulance trips with series_id
+    const ambulanceSeriesMap = new Map<string, AmbulanceTripWithCustomers[]>();
+    ambulanceTrips.forEach(t => {
+      if (t.series_id) {
+        if (!ambulanceSeriesMap.has(t.series_id)) ambulanceSeriesMap.set(t.series_id, []);
+        ambulanceSeriesMap.get(t.series_id)!.push(t);
+      }
+    });
+    ambulanceSeriesMap.forEach((items, sid) => {
+      if (items.length < 2) return;
+      const dates = items.map(i => i.scheduled_date);
+      const lastDate = dates.sort().pop()!;
+      const lastDateParsed = parseISO(lastDate);
+      if (isBefore(lastDateParsed, threshold) && isAfter(lastDateParsed, subDays(now, 7))) {
+        series.push({
+          type: "ambulance",
+          seriesId: sid,
+          label: "Ambulance rit",
+          lastDate,
+          itemCount: items.length,
+          interval: detectInterval(dates),
+        });
+      }
+    });
+
+    return series;
+  }, [tasks, dryIceOrders, gasCylinderOrders, ambulanceTrips, isAdmin]);
+
+  const [extendingSeriesId, setExtendingSeriesId] = useState<string | null>(null);
+
+  const handleExtendSeries = async (series: ExpiringSeries) => {
+    setExtendingSeriesId(series.seriesId);
+    try {
+      const lastDate = parseISO(series.lastDate);
+      const endDate = addYears(lastDate, 1);
+      const intervalWeeks = series.interval;
+
+      if (series.type === "task") {
+        // Get a template task from the series
+        const templateTask = tasks.find(t => t.series_id === series.seriesId);
+        if (!templateTask) throw new Error("Template taak niet gevonden");
+
+        const newDates: Date[] = [];
+        let next = addWeeks(lastDate, intervalWeeks);
+        while (isBefore(next, endDate) || isSameDay(next, endDate)) {
+          newDates.push(next);
+          next = addWeeks(next, intervalWeeks);
+        }
+
+        for (const date of newDates) {
+          await api.tasks.create({
+            title: templateTask.title,
+            status: "pending",
+            priority: templateTask.priority,
+            due_date: format(date, "yyyy-MM-dd"),
+            assigned_to: templateTask.assigned_to,
+            created_by: templateTask.created_by,
+            series_id: series.seriesId,
+            start_time: templateTask.start_time,
+            end_time: templateTask.end_time,
+          });
+        }
+        toast.success(`${newDates.length} taken toegevoegd aan de reeks`);
+      } else if (series.type === "dryice") {
+        // Get a template from the series
+        const templateOrder = dryIceOrders.find(o => o.parent_order_id === series.seriesId || o.id === series.seriesId);
+        if (!templateOrder) throw new Error("Template order niet gevonden");
+
+        const newDates: Date[] = [];
+        let next = addWeeks(lastDate, intervalWeeks);
+        while (isBefore(next, endDate) || isSameDay(next, endDate)) {
+          newDates.push(next);
+          next = addWeeks(next, intervalWeeks);
+        }
+
+        const baseNumber = templateOrder.order_number.split("-").slice(0, 3).join("-");
+        for (let i = 0; i < newDates.length; i++) {
+          await api.dryIceOrders.create({
+            order_number: `${baseNumber}-ext-${i + 1}`,
+            customer_name: templateOrder.customer_name,
+            customer_id: templateOrder.customer_id,
+            quantity_kg: templateOrder.quantity_kg,
+            product_type: templateOrder.product_type,
+            product_type_id: templateOrder.product_type_id,
+            packaging_id: templateOrder.packaging_id,
+            box_count: templateOrder.box_count,
+            container_has_wheels: templateOrder.container_has_wheels,
+            notes: templateOrder.notes,
+            created_by: templateOrder.created_by,
+            is_recurring: true,
+            parent_order_id: series.seriesId,
+            scheduled_date: format(newDates[i], "yyyy-MM-dd"),
+            location: templateOrder.location,
+            status: "pending",
+          });
+        }
+        toast.success(`${newDates.length} droogijs orders toegevoegd aan de reeks`);
+      } else if (series.type === "gascylinder") {
+        const templateOrder = gasCylinderOrders.find(o => o.series_id === series.seriesId);
+        if (!templateOrder) throw new Error("Template order niet gevonden");
+
+        const newDates: Date[] = [];
+        let next = addWeeks(lastDate, intervalWeeks);
+        while (isBefore(next, endDate) || isSameDay(next, endDate)) {
+          newDates.push(next);
+          next = addWeeks(next, intervalWeeks);
+        }
+
+        const baseNumber = templateOrder.order_number.split("-").slice(0, 3).join("-");
+        for (let i = 0; i < newDates.length; i++) {
+          await api.gasCylinderOrders.create({
+            order_number: `${baseNumber}-ext-${i + 1}`,
+            customer_name: templateOrder.customer_name,
+            customer_id: templateOrder.customer_id,
+            gas_type: templateOrder.gas_type,
+            gas_type_id: templateOrder.gas_type_id,
+            gas_grade: templateOrder.gas_grade,
+            cylinder_count: templateOrder.cylinder_count,
+            cylinder_size: templateOrder.cylinder_size,
+            pressure: templateOrder.pressure,
+            notes: templateOrder.notes,
+            created_by: templateOrder.created_by,
+            series_id: series.seriesId,
+            scheduled_date: format(newDates[i], "yyyy-MM-dd"),
+            location: templateOrder.location,
+            status: "pending",
+          });
+        }
+        toast.success(`${newDates.length} cilinder orders toegevoegd aan de reeks`);
+      } else if (series.type === "ambulance") {
+        const templateTrip = ambulanceTrips.find(t => t.series_id === series.seriesId);
+        if (!templateTrip) throw new Error("Template rit niet gevonden");
+
+        const newDates: Date[] = [];
+        let next = addWeeks(lastDate, intervalWeeks);
+        while (isBefore(next, endDate) || isSameDay(next, endDate)) {
+          newDates.push(next);
+          next = addWeeks(next, intervalWeeks);
+        }
+
+        for (const date of newDates) {
+          const { data: trip, error: tripError } = await supabase
+            .from("ambulance_trips" as any)
+            .insert({
+              scheduled_date: format(date, "yyyy-MM-dd"),
+              cylinders_2l_300_o2: templateTrip.cylinders_2l_300_o2,
+              cylinders_2l_200_o2: templateTrip.cylinders_2l_200_o2,
+              cylinders_1l_pindex_o2: templateTrip.cylinders_1l_pindex_o2,
+              cylinders_5l_o2_integrated: templateTrip.cylinders_5l_o2_integrated,
+              model_5l: templateTrip.model_5l,
+              cylinders_10l_o2_integrated: templateTrip.cylinders_10l_o2_integrated,
+              cylinders_5l_air_integrated: templateTrip.cylinders_5l_air_integrated,
+              cylinders_2l_air_integrated: templateTrip.cylinders_2l_air_integrated,
+              created_by: currentProfileId || templateTrip.created_at, // use current user's profile
+              notes: templateTrip.notes,
+              series_id: series.seriesId,
+            })
+            .select()
+            .single();
+
+          if (tripError) throw tripError;
+
+          // Copy customers too
+          if (templateTrip.customers && templateTrip.customers.length > 0 && trip) {
+            await supabase
+              .from("ambulance_trip_customers" as any)
+              .insert(
+                templateTrip.customers.map((c: any) => ({
+                  trip_id: (trip as any).id,
+                  customer_number: c.customer_number,
+                  customer_name: c.customer_name,
+                }))
+              );
+          }
+        }
+        toast.success(`${newDates.length} ambulance ritten toegevoegd aan de reeks`);
+      }
+
+      fetchData();
+    } catch (error: any) {
+      console.error("Error extending series:", error);
+      toast.error("Fout bij verlengen reeks: " + (error.message || "Onbekende fout"));
+    } finally {
+      setExtendingSeriesId(null);
+    }
+  };
   const getItemsForDay = (day: Date): CalendarItem[] => {
     const items: CalendarItem[] = [];
     if (showTimeOff) {
@@ -1894,6 +2183,41 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     </div>
 
     <div className="flex-1 flex flex-col overflow-auto px-4 pb-4">
+      {/* Expiring Series Banner */}
+      {expiringSeries.length > 0 && (
+        <div className="mb-4 space-y-2">
+          {expiringSeries.map((series) => (
+            <div
+              key={`${series.type}-${series.seriesId}`}
+              className="flex items-center gap-3 p-3 rounded-lg border border-warning/50 bg-warning/10"
+            >
+              <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">
+                  {series.type === "task" && <ClipboardList className="h-3.5 w-3.5 inline mr-1.5 text-blue-500" />}
+                  {series.type === "dryice" && <Snowflake className="h-3.5 w-3.5 inline mr-1.5 text-cyan-500" />}
+                  {series.type === "gascylinder" && <Cylinder className="h-3.5 w-3.5 inline mr-1.5 text-orange-500" />}
+                  {series.type === "ambulance" && <Ambulance className="h-3.5 w-3.5 inline mr-1.5 text-destructive" />}
+                  {series.label}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Reeks eindigt op {format(parseISO(series.lastDate), "d MMM yyyy", { locale: nl })} · {series.itemCount} items · elke {series.interval === 1 ? "week" : "2 weken"}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1.5 border-warning/50 hover:bg-warning/20"
+                disabled={extendingSeriesId === series.seriesId}
+                onClick={() => handleExtendSeries(series)}
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", extendingSeriesId === series.seriesId && "animate-spin")} />
+                {extendingSeriesId === series.seriesId ? "Bezig..." : "Verleng 1 jaar"}
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
       {loading ? <div className="flex-1 py-4">
         <CalendarSkeleton className="h-full" />
       </div> : <FadeIn show={!loading} className="flex-1 flex flex-col">
