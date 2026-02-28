@@ -68,6 +68,7 @@ interface GasCylinderOrder {
   notes: string | null;
   created_at: string;
   pressure: number;
+  series_id: string | null;
   location: "sol_emmen" | "sol_tilburg";
   gas_type_ref?: {
     id: string;

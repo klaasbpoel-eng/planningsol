@@ -584,6 +584,7 @@ export type Database = {
           order_number: string
           pressure: number
           scheduled_date: string
+          series_id: string | null
           status: Database["public"]["Enums"]["production_order_status"]
           updated_at: string
         }
@@ -604,6 +605,7 @@ export type Database = {
           order_number: string
           pressure?: number
           scheduled_date: string
+          series_id?: string | null
           status?: Database["public"]["Enums"]["production_order_status"]
           updated_at?: string
         }
@@ -624,6 +626,7 @@ export type Database = {
           order_number?: string
           pressure?: number
           scheduled_date?: string
+          series_id?: string | null
           status?: Database["public"]["Enums"]["production_order_status"]
           updated_at?: string
         }

@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -32,7 +33,8 @@ import {
   Building2,
   FileText,
   Gauge,
-  Hash
+  Hash,
+  Repeat
 } from "lucide-react";
 import {
   AlertDialog,
@@ -44,6 +46,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { format, parseISO } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -65,6 +68,7 @@ interface GasCylinderOrder {
   status: string;
   notes: string | null;
   pressure: number;
+  series_id: string | null;
   gas_type_ref?: {
     id: string;
     name: string;
@@ -101,6 +105,8 @@ export function GasCylinderOrderDialog({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [applyToSeries, setApplyToSeries] = useState(false);
+  const [deleteSeries, setDeleteSeries] = useState(false);
 
   // Edit state
   const [status, setStatus] = useState<string>("");
@@ -154,6 +160,7 @@ export function GasCylinderOrderDialog({
       setCylinderSize(order.cylinder_size);
       setPressure(order.pressure.toString());
       setNotes(order.notes || "");
+      setApplyToSeries(!!order.series_id);
     }
     setIsEditing(true);
   };
@@ -206,7 +213,7 @@ export function GasCylinderOrderDialog({
       const selectedGasType = gasTypes.find(t => t.id === gasTypeId);
       const mappedGasType = selectedGasType ? mapGasTypeToEnum(selectedGasType.name) : order.gas_type;
 
-      await api.gasCylinderOrders.update(order.id, {
+      const updateFields: Record<string, any> = {
         status: status as "pending" | "in_progress" | "completed" | "cancelled",
         scheduled_date: scheduledDate ? format(scheduledDate, "yyyy-MM-dd") : order.scheduled_date,
         cylinder_count: count,
@@ -216,9 +223,24 @@ export function GasCylinderOrderDialog({
         cylinder_size: cylinderSize,
         pressure: pressureValue,
         notes: notes || null,
-      });
+      };
 
-      toast.success("Gascilinder order bijgewerkt");
+      if (applyToSeries && order.series_id) {
+        // Update series-wide fields (exclude status and date)
+        const seriesFields = { ...updateFields };
+        delete seriesFields.status;
+        delete seriesFields.scheduled_date;
+        await api.gasCylinderOrders.updateSeriesFields(order.series_id, seriesFields);
+        // Also update this specific order's date and status
+        await api.gasCylinderOrders.update(order.id, {
+          status: updateFields.status,
+          scheduled_date: updateFields.scheduled_date,
+        });
+        toast.success("Gehele reeks bijgewerkt");
+      } else {
+        await api.gasCylinderOrders.update(order.id, updateFields);
+        toast.success("Gascilinder order bijgewerkt");
+      }
 
       setIsEditing(false);
       onUpdate();
@@ -232,14 +254,24 @@ export function GasCylinderOrderDialog({
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (deleteAll?: boolean) => {
     if (!order) return;
     setDeleting(true);
 
     try {
-      await api.gasCylinderOrders.delete(order.id);
-
-      toast.success("Gascilinder order verwijderd");
+      if (deleteAll && order.series_id) {
+        // Delete all orders in the series
+        const client = supabase;
+        const { error } = await client
+          .from("gas_cylinder_orders")
+          .delete()
+          .or(`id.eq.${order.series_id},series_id.eq.${order.series_id}`);
+        if (error) throw error;
+        toast.success("Gehele reeks verwijderd");
+      } else {
+        await api.gasCylinderOrders.delete(order.id);
+        toast.success("Gascilinder order verwijderd");
+      }
 
       setShowDeleteConfirm(false);
       onOpenChange(false);
@@ -257,6 +289,8 @@ export function GasCylinderOrderDialog({
   const handleClose = () => {
     setIsEditing(false);
     setShowDeleteConfirm(false);
+    setApplyToSeries(false);
+    setDeleteSeries(false);
     onOpenChange(false);
   };
 
@@ -476,6 +510,20 @@ export function GasCylinderOrderDialog({
                     placeholder="Optionele opmerkingen..."
                   />
                 </div>
+
+                {/* Apply to series checkbox */}
+                {order.series_id && (
+                  <div className="flex items-center space-x-2 p-3 rounded-lg border bg-muted/30">
+                    <Checkbox
+                      id="apply-cylinder-series"
+                      checked={applyToSeries}
+                      onCheckedChange={(checked) => setApplyToSeries(!!checked)}
+                    />
+                    <Label htmlFor="apply-cylinder-series" className="text-sm cursor-pointer">
+                      Wijzigingen doorvoeren voor de gehele reeks
+                    </Label>
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -487,6 +535,12 @@ export function GasCylinderOrderDialog({
                   <Badge variant="outline" className="text-sm">
                     {gasGradeLabels[order.gas_grade] || order.gas_grade}
                   </Badge>
+                  {order.series_id && (
+                    <Badge variant="outline" className="text-sm gap-1">
+                      <Repeat className="h-3 w-3" />
+                      Reeks
+                    </Badge>
+                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -594,24 +648,45 @@ export function GasCylinderOrderDialog({
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+      <AlertDialog open={showDeleteConfirm} onOpenChange={(open) => { setShowDeleteConfirm(open); if (!open) setDeleteSeries(false); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Order verwijderen?</AlertDialogTitle>
             <AlertDialogDescription>
-              Weet je zeker dat je order {order.order_number} wilt verwijderen?
-              Deze actie kan niet ongedaan worden gemaakt.
+              {order.series_id
+                ? "Dit is een herhalende order. Wil je alleen deze order verwijderen of de hele reeks?"
+                : `Weet je zeker dat je order ${order.order_number} wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.`
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting ? "Verwijderen..." : "Verwijderen"}
-            </AlertDialogAction>
+            {order.series_id ? (
+              <>
+                <AlertDialogAction
+                  onClick={() => handleDelete(false)}
+                  disabled={deleting}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Alleen deze
+                </AlertDialogAction>
+                <AlertDialogAction
+                  onClick={() => handleDelete(true)}
+                  disabled={deleting}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Hele reeks
+                </AlertDialogAction>
+              </>
+            ) : (
+              <AlertDialogAction
+                onClick={() => handleDelete(false)}
+                disabled={deleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleting ? "Verwijderen..." : "Verwijderen"}
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

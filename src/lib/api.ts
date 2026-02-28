@@ -592,6 +592,40 @@ export const api = {
         delete: async (id: string) => {
             return primaryDelete("gas_cylinder_orders", id);
         },
+        updateSeriesFields: async (seriesId: string, fields: Record<string, any>) => {
+            const client = getPrimarySupabaseClient();
+            const { data: seriesOrders, error: fetchError } = await client
+                .from("gas_cylinder_orders")
+                .select("id")
+                .or(`id.eq.${seriesId},series_id.eq.${seriesId}`);
+            if (fetchError) throw fetchError;
+            if (!seriesOrders || seriesOrders.length === 0) return true;
+
+            for (const order of seriesOrders) {
+                const { error } = await client.from("gas_cylinder_orders").update(fields).eq("id", order.id);
+                if (error) throw error;
+            }
+
+            syncToMySQL(async () => {
+                const setClauses = Object.keys(fields).map(k => `${k} = ?`).join(", ");
+                const values = [...Object.values(fields), seriesId, seriesId];
+                await executeMySQL(
+                    `UPDATE gas_cylinder_orders SET ${setClauses} WHERE id = ? OR series_id = ?`,
+                    values
+                );
+            });
+            syncToExternalSupabase(async (ext) => {
+                for (const order of seriesOrders) {
+                    await ext.from("gas_cylinder_orders").update(fields).eq("id", order.id);
+                }
+            });
+            syncToCloud(async () => {
+                for (const order of seriesOrders) {
+                    await supabase.from("gas_cylinder_orders").update(fields).eq("id", order.id);
+                }
+            });
+            return true;
+        },
         getPending: async (fromDate: string) => {
             return primaryRead("gas_cylinder_orders", {
                 selectQuery: `*, gas_type_ref:gas_types(id, name, color)`,

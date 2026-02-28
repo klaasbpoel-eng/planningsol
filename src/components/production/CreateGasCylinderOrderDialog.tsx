@@ -12,11 +12,13 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays, Minus, Plus, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { DateQuickPick } from "./DateQuickPick";
-import { format, isToday } from "date-fns";
+import { format, isToday, addWeeks, addYears } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -50,6 +52,10 @@ export function CreateGasCylinderOrderDialog({
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(initialDate || new Date());
   const [notes, setNotes] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceInterval, setRecurrenceInterval] = useState<1 | 2>(1);
+  const [isInfiniteRecurrence, setIsInfiniteRecurrence] = useState(false);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>(undefined);
   const [location, setLocation] = useState<"sol_emmen" | "sol_tilburg">("sol_emmen");
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   const [userProductionLocation, setUserProductionLocation] = useState<"sol_emmen" | "sol_tilburg" | null>(null);
@@ -187,6 +193,10 @@ export function CreateGasCylinderOrderDialog({
     setScheduledDate(new Date());
     setNotes("");
     setIsCompleted(false);
+    setIsRecurring(false);
+    setRecurrenceInterval(1);
+    setIsInfiniteRecurrence(false);
+    setRecurrenceEndDate(undefined);
     setShowDetails(false);
     setGasSearch("");
     if (userProductionLocation) {
@@ -234,6 +244,11 @@ export function CreateGasCylinderOrderDialog({
       return;
     }
 
+    if (isRecurring && !isInfiniteRecurrence && !recurrenceEndDate) {
+      toast.error("Selecteer een einddatum voor de herhaling");
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -250,8 +265,26 @@ export function CreateGasCylinderOrderDialog({
         }
       }
 
-      const insertData = {
-        order_number: generateOrderNumber(),
+      // Generate dates for recurring orders
+      const orderDates: Date[] = [scheduledDate];
+      if (isRecurring) {
+        const endDate = isInfiniteRecurrence
+          ? addYears(scheduledDate, 1)
+          : recurrenceEndDate;
+        if (endDate) {
+          let nextDate = addWeeks(scheduledDate, recurrenceInterval);
+          while (nextDate <= endDate) {
+            orderDates.push(nextDate);
+            nextDate = addWeeks(nextDate, recurrenceInterval);
+          }
+        }
+      }
+
+      const parentOrderNumber = generateOrderNumber();
+
+      // Create parent order
+      const parentData = {
+        order_number: parentOrderNumber,
         customer_name: customerName.trim(),
         customer_id: customerId || null,
         gas_type: mappedGasType,
@@ -260,16 +293,34 @@ export function CreateGasCylinderOrderDialog({
         cylinder_count: cylinderCount,
         cylinder_size: cylinderSize,
         pressure: pressure,
-        scheduled_date: format(scheduledDate, "yyyy-MM-dd"),
+        scheduled_date: format(orderDates[0], "yyyy-MM-dd"),
         notes: finalNotes || null,
         created_by: currentProfileId,
         status: isCompleted ? "completed" as const : "pending" as const,
         location: location,
       };
 
-      await api.gasCylinderOrders.create(insertData);
+      const parentOrder = await api.gasCylinderOrders.create(parentData);
+      const parentId = parentOrder?.id;
 
-      toast.success("Vulorder aangemaakt");
+      // If recurring, set series_id on parent and create children
+      if (isRecurring && parentId) {
+        await api.gasCylinderOrders.update(parentId, { series_id: parentId });
+
+        if (orderDates.length > 1) {
+          for (let i = 1; i < orderDates.length; i++) {
+            await api.gasCylinderOrders.create({
+              ...parentData,
+              order_number: `${parentOrderNumber}-${i}`,
+              scheduled_date: format(orderDates[i], "yyyy-MM-dd"),
+              series_id: parentId,
+              status: "pending" as const,
+            });
+          }
+        }
+      }
+
+      toast.success(isRecurring ? `${orderDates.length} vulorders aangemaakt` : "Vulorder aangemaakt");
       resetForm();
       onCreated();
       onOpenChange(false);
@@ -632,6 +683,90 @@ export function CreateGasCylinderOrderDialog({
               </div>
             </div>
           )}
+
+          {/* Recurrence option */}
+          <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="isRecurringCylinder"
+                checked={isRecurring}
+                onCheckedChange={(checked) => {
+                  setIsRecurring(checked === true);
+                  if (!checked) {
+                    setRecurrenceEndDate(undefined);
+                    setRecurrenceInterval(1);
+                  }
+                }}
+              />
+              <Label htmlFor="isRecurringCylinder" className="text-sm cursor-pointer">Herhalende order</Label>
+            </div>
+
+            {isRecurring && (
+              <div className="space-y-3 pl-6">
+                <div className="space-y-2">
+                  <Label className="text-sm">Herhalingsinterval</Label>
+                  <RadioGroup
+                    value={recurrenceInterval.toString()}
+                    onValueChange={(v) => setRecurrenceInterval(parseInt(v) as 1 | 2)}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="1" id="cyl-weekly" />
+                      <Label htmlFor="cyl-weekly" className="text-sm cursor-pointer">Wekelijks</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="2" id="cyl-biweekly" />
+                      <Label htmlFor="cyl-biweekly" className="text-sm cursor-pointer">2-wekelijks</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="isInfiniteCylinder"
+                    checked={isInfiniteRecurrence}
+                    onCheckedChange={(checked) => {
+                      setIsInfiniteRecurrence(checked === true);
+                      if (checked) setRecurrenceEndDate(undefined);
+                    }}
+                  />
+                  <Label htmlFor="isInfiniteCylinder" className="text-sm cursor-pointer">Doorlopend (1 jaar vooruit)</Label>
+                </div>
+
+                {!isInfiniteRecurrence && (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Einddatum herhaling</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !recurrenceEndDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarDays className="mr-2 h-4 w-4" />
+                          {recurrenceEndDate
+                            ? format(recurrenceEndDate, "d MMM yyyy", { locale: nl })
+                            : "Selecteer einddatum"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={recurrenceEndDate}
+                          onSelect={setRecurrenceEndDate}
+                          locale={nl}
+                          disabled={(date) => scheduledDate ? date <= scheduledDate : false}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* === FOOTER === */}
