@@ -94,6 +94,8 @@ export function DryIceOrderDialog({
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteScope, setDeleteScope] = useState<'single' | 'series'>('single');
+  const [showSaveScope, setShowSaveScope] = useState(false);
+  const [saveScope, setSaveScope] = useState<'single' | 'series'>('single');
 
   // Edit state
   const [status, setStatus] = useState<string>("");
@@ -144,19 +146,26 @@ export function DryIceOrderDialog({
 
   const handleSave = async () => {
     if (!order) return;
-
     const quantity = parseFloat(quantityKg);
     if (isNaN(quantity) || quantity <= 0) {
       toast.error("Vul een geldig gewicht in");
       return;
     }
+    // If recurring, show scope dialog instead of saving directly
+    if ((order.is_recurring || order.parent_order_id)) {
+      setShowSaveScope(true);
+      return;
+    }
+    await executeSave('single');
+  };
 
+  const executeSave = async (scope: 'single' | 'series') => {
+    if (!order) return;
+    const quantity = parseFloat(quantityKg);
     setSaving(true);
-
     try {
-      await api.dryIceOrders.update(order.id, {
+      const updateFields: Record<string, any> = {
         status: status as "pending" | "in_progress" | "completed" | "cancelled",
-        scheduled_date: scheduledDate ? format(scheduledDate, "yyyy-MM-dd") : order.scheduled_date,
         quantity_kg: quantity,
         product_type_id: productTypeId || null,
         packaging_id: packagingId || null,
@@ -164,19 +173,33 @@ export function DryIceOrderDialog({
         notes: notes || null,
         is_recurring: isRecurring,
         recurrence_end_date: isRecurring && !isInfiniteRecurrence && recurrenceEndDate
-          ? format(recurrenceEndDate, "yyyy-MM-dd")
-          : null,
-      });
+          ? format(recurrenceEndDate, "yyyy-MM-dd") : null,
+      };
 
-      toast.success("Droogijs order bijgewerkt");
+      if (scope === 'series') {
+        const seriesFields = { ...updateFields };
+        delete seriesFields.status;
+        const seriesId = order.parent_order_id || order.id;
+        await api.dryIceOrders.updateSeriesFields(seriesId, seriesFields);
+        await api.dryIceOrders.update(order.id, {
+          ...updateFields,
+          scheduled_date: scheduledDate ? format(scheduledDate, "yyyy-MM-dd") : order.scheduled_date,
+        });
+        toast.success("Hele reeks bijgewerkt");
+      } else {
+        await api.dryIceOrders.update(order.id, {
+          ...updateFields,
+          scheduled_date: scheduledDate ? format(scheduledDate, "yyyy-MM-dd") : order.scheduled_date,
+        });
+        toast.success("Droogijs order bijgewerkt");
+      }
 
       setIsEditing(false);
+      setShowSaveScope(false);
       onUpdate();
     } catch (error) {
       console.error("Error updating order:", error);
-      toast.error("Fout bij opslaan", {
-        description: "Probeer het opnieuw",
-      });
+      toast.error("Fout bij opslaan");
     } finally {
       setSaving(false);
     }
@@ -215,6 +238,8 @@ export function DryIceOrderDialog({
     setIsEditing(false);
     setShowDeleteConfirm(false);
     setDeleteScope('single');
+    setShowSaveScope(false);
+    setSaveScope('single');
     onOpenChange(false);
   };
 
@@ -596,6 +621,38 @@ export function DryIceOrderDialog({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? "Verwijderen..." : "Verwijderen"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showSaveScope} onOpenChange={setShowSaveScope}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Wijzigingen opslaan</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deze order is onderdeel van een herhalende reeks. Wil je alleen deze order of de hele reeks aanpassen?
+            </AlertDialogDescription>
+            <div className="py-2">
+              <RadioGroup value={saveScope} onValueChange={(v) => setSaveScope(v as 'single' | 'series')}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="single" id="save-single" />
+                  <Label htmlFor="save-single">Alleen deze order</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="series" id="save-series" />
+                  <Label htmlFor="save-series">Hele reeks aanpassen</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Annuleren</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => executeSave(saveScope)}
+              disabled={saving}
+            >
+              {saving ? "Opslaan..." : "Opslaan"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

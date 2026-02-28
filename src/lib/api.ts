@@ -633,6 +633,40 @@ export const api = {
         update: async (id: string, item: any) => {
             return primaryUpdate("dry_ice_orders", id, item);
         },
+        updateSeriesFields: async (seriesId: string, fields: Record<string, any>) => {
+            const client = getPrimarySupabaseClient();
+            const { data: seriesOrders, error: fetchError } = await client
+                .from("dry_ice_orders")
+                .select("id")
+                .or(`id.eq.${seriesId},parent_order_id.eq.${seriesId}`);
+            if (fetchError) throw fetchError;
+            if (!seriesOrders || seriesOrders.length === 0) return true;
+
+            for (const order of seriesOrders) {
+                const { error } = await client.from("dry_ice_orders").update(fields).eq("id", order.id);
+                if (error) throw error;
+            }
+
+            syncToMySQL(async () => {
+                const setClauses = Object.keys(fields).map(k => `${k} = ?`).join(", ");
+                const values = [...Object.values(fields), seriesId, seriesId];
+                await executeMySQL(
+                    `UPDATE dry_ice_orders SET ${setClauses} WHERE id = ? OR parent_order_id = ?`,
+                    values
+                );
+            });
+            syncToExternalSupabase(async (ext) => {
+                for (const order of seriesOrders) {
+                    await ext.from("dry_ice_orders").update(fields).eq("id", order.id);
+                }
+            });
+            syncToCloud(async () => {
+                for (const order of seriesOrders) {
+                    await supabase.from("dry_ice_orders").update(fields).eq("id", order.id);
+                }
+            });
+            return true;
+        },
         updateSeries: async (seriesId: string, dayDifference: number) => {
             const source = getPrimarySource();
 
