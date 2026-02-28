@@ -1237,6 +1237,7 @@ export type Database = {
           due_date: string
           end_time: string | null
           id: string
+          notes: string | null
           priority: string
           series_id: string | null
           start_time: string | null
@@ -1252,6 +1253,7 @@ export type Database = {
           due_date: string
           end_time?: string | null
           id?: string
+          notes?: string | null
           priority?: string
           series_id?: string | null
           start_time?: string | null
@@ -1267,6 +1269,7 @@ export type Database = {
           due_date?: string
           end_time?: string | null
           id?: string
+          notes?: string | null
           priority?: string
           series_id?: string | null
           start_time?: string | null
