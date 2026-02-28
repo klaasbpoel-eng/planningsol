@@ -1230,6 +1230,11 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                     <div className="flex items-center gap-2 mb-1">
                       <Cylinder className="h-4 w-4 text-orange-500 flex-shrink-0" />
                       <span className="font-medium truncate">{order.customer_name}</span>
+                      {(order as any).series_id && (
+                        <span className="text-cyan-500 flex-shrink-0" title="Herhalende order">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+                        </span>
+                      )}
                       <Badge variant="outline" className={cn("text-xs flex-shrink-0", getGasCylinderStatusColor(order.status))}>
                         {getGasCylinderStatusLabel(order.status)}
                       </Badge>

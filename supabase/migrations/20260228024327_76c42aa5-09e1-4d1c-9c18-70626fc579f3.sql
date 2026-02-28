@@ -1,0 +1,1 @@
+ALTER TABLE public.gas_cylinder_orders ADD COLUMN series_id uuid DEFAULT NULL;
