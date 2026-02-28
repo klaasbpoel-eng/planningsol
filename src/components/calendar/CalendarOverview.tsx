@@ -676,9 +676,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     return dryIceOrders;
   }, [dryIceOrders]);
 
-  // Filter gas cylinder orders
+  // Filter gas cylinder orders - hide completed
   const filteredGasCylinderOrders = useMemo(() => {
-    return gasCylinderOrders;
+    return gasCylinderOrders.filter(o => o.status !== "completed");
   }, [gasCylinderOrders]);
 
   // === EXPIRING SERIES DETECTION ===
