@@ -57,6 +57,7 @@ interface DryIceOrder {
   box_count: number | null;
   status: string;
   scheduled_date: string;
+  notes: string | null;
   dry_ice_packaging: { name: string; capacity_kg: number | null } | null;
 }
 
@@ -67,6 +68,7 @@ interface GasCylinderOrder {
   cylinder_size: string;
   status: string;
   scheduled_date: string;
+  notes: string | null;
   gas_types: { name: string } | null;
 }
 
@@ -146,13 +148,13 @@ export function DailyOverview() {
           .eq("status", "approved"),
         supabase
           .from("dry_ice_orders")
-          .select("id, customer_name, quantity_kg, box_count, status, scheduled_date, dry_ice_packaging:packaging_id(name, capacity_kg)")
+          .select("id, customer_name, quantity_kg, box_count, status, scheduled_date, notes, dry_ice_packaging:packaging_id(name, capacity_kg)")
           .gte("scheduled_date", fromStr)
           .lte("scheduled_date", toStr)
           .neq("status", "cancelled"),
         supabase
           .from("gas_cylinder_orders")
-          .select("id, customer_name, cylinder_count, cylinder_size, status, scheduled_date, gas_types:gas_type_id(name)")
+          .select("id, customer_name, cylinder_count, cylinder_size, status, scheduled_date, notes, gas_types:gas_type_id(name)")
           .gte("scheduled_date", fromStr)
           .lte("scheduled_date", toStr)
           .neq("status", "cancelled")
@@ -370,6 +372,11 @@ export function DailyOverview() {
                                   </ul>
                                 </div>
                               )}
+                              {o.notes && (
+                                <p className="text-xs text-muted-foreground italic mt-1 border-t border-current/5 pt-1">
+                                  {o.notes}
+                                </p>
+                              )}
                             </div>
                           );
                         })}
@@ -393,18 +400,23 @@ export function DailyOverview() {
                             large: "Hoog",
                           };
                           return (
-                          <div key={o.id} className="flex items-center justify-between text-sm py-0.5 gap-2">
-                            <div className="min-w-0">
-                              <div className="truncate font-medium text-xs">{o.customer_name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {o.gas_types?.name || "Gas"} — {o.cylinder_count} cil.
+                          <div key={o.id} className="text-sm py-0.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="truncate font-medium text-xs">{o.customer_name}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {o.gas_types?.name || "Gas"} — {o.cylinder_count} cil.
+                                </div>
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Ruler className="h-3 w-3" />
+                                  <span>{sizeLabels[o.cylinder_size] || o.cylinder_size}</span>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Ruler className="h-3 w-3" />
-                                <span>{sizeLabels[o.cylinder_size] || o.cylinder_size}</span>
-                              </div>
+                              <StatusBadge status={o.status} />
                             </div>
-                            <StatusBadge status={o.status} />
+                            {o.notes && (
+                              <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
+                            )}
                           </div>
                           );
                         })}
@@ -422,19 +434,24 @@ export function DailyOverview() {
                         bgClass="bg-cyan-50 dark:bg-cyan-950/20 border-cyan-200 dark:border-cyan-900/30"
                       >
                         {dayDryIce.map((o) => (
-                          <div key={o.id} className="flex items-center justify-between text-sm py-0.5 gap-2">
-                            <div className="min-w-0">
-                              <div className="truncate font-medium text-xs">{o.customer_name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {o.quantity_kg} kg
-                                {o.dry_ice_packaging?.name ? ` · ${o.dry_ice_packaging.name}` : ""}
-                                {(() => {
-                                  const count = o.box_count || (o.dry_ice_packaging?.capacity_kg ? Math.ceil(o.quantity_kg / o.dry_ice_packaging.capacity_kg) : null);
-                                  return count ? ` · ${count}×` : "";
-                                })()}
+                          <div key={o.id} className="text-sm py-0.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="truncate font-medium text-xs">{o.customer_name}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {o.quantity_kg} kg
+                                  {o.dry_ice_packaging?.name ? ` · ${o.dry_ice_packaging.name}` : ""}
+                                  {(() => {
+                                    const count = o.box_count || (o.dry_ice_packaging?.capacity_kg ? Math.ceil(o.quantity_kg / o.dry_ice_packaging.capacity_kg) : null);
+                                    return count ? ` · ${count}×` : "";
+                                  })()}
+                                </div>
                               </div>
+                              <StatusBadge status={o.status} />
                             </div>
-                            <StatusBadge status={o.status} />
+                            {o.notes && (
+                              <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
+                            )}
                           </div>
                         ))}
                       </Section>
