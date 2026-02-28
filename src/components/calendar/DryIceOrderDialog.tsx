@@ -94,8 +94,7 @@ export function DryIceOrderDialog({
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteScope, setDeleteScope] = useState<'single' | 'series'>('single');
-  const [showSaveScope, setShowSaveScope] = useState(false);
-  const [saveScope, setSaveScope] = useState<'single' | 'series'>('single');
+  const [applyToSeries, setApplyToSeries] = useState(false);
 
   // Edit state
   const [status, setStatus] = useState<string>("");
@@ -136,6 +135,7 @@ export function DryIceOrderDialog({
       setIsRecurring(order.is_recurring || false);
       setIsInfiniteRecurrence(!order.recurrence_end_date && (order.is_recurring || false));
       setRecurrenceEndDate(order.recurrence_end_date ? parseISO(order.recurrence_end_date) : undefined);
+      setApplyToSeries(!!(order.is_recurring || order.parent_order_id));
     }
     setIsEditing(true);
   };
@@ -151,12 +151,7 @@ export function DryIceOrderDialog({
       toast.error("Vul een geldig gewicht in");
       return;
     }
-    // If recurring, show scope dialog instead of saving directly
-    if ((order.is_recurring || order.parent_order_id)) {
-      setShowSaveScope(true);
-      return;
-    }
-    await executeSave('single');
+    await executeSave(applyToSeries ? 'series' : 'single');
   };
 
   const executeSave = async (scope: 'single' | 'series') => {
@@ -195,7 +190,6 @@ export function DryIceOrderDialog({
       }
 
       setIsEditing(false);
-      setShowSaveScope(false);
       onUpdate();
     } catch (error) {
       console.error("Error updating order:", error);
@@ -238,8 +232,6 @@ export function DryIceOrderDialog({
     setIsEditing(false);
     setShowDeleteConfirm(false);
     setDeleteScope('single');
-    setShowSaveScope(false);
-    setSaveScope('single');
     onOpenChange(false);
   };
 
@@ -466,6 +458,20 @@ export function DryIceOrderDialog({
                     placeholder="Optionele opmerkingen..."
                   />
                 </div>
+
+                {/* Apply to series checkbox */}
+                {(order.is_recurring || order.parent_order_id) && (
+                  <div className="flex items-center space-x-2 p-3 rounded-lg border bg-muted/30">
+                    <Checkbox
+                      id="apply-dryice-series"
+                      checked={applyToSeries}
+                      onCheckedChange={(checked) => setApplyToSeries(!!checked)}
+                    />
+                    <Label htmlFor="apply-dryice-series" className="text-sm cursor-pointer">
+                      Wijzigingen doorvoeren voor de gehele reeks
+                    </Label>
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -626,37 +632,6 @@ export function DryIceOrderDialog({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={showSaveScope} onOpenChange={setShowSaveScope}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Wijzigingen opslaan</AlertDialogTitle>
-            <AlertDialogDescription>
-              Deze order is onderdeel van een herhalende reeks. Wil je alleen deze order of de hele reeks aanpassen?
-            </AlertDialogDescription>
-            <div className="py-2">
-              <RadioGroup value={saveScope} onValueChange={(v) => setSaveScope(v as 'single' | 'series')}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="single" id="save-single" />
-                  <Label htmlFor="save-single">Alleen deze order</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="series" id="save-series" />
-                  <Label htmlFor="save-series">Hele reeks aanpassen</Label>
-                </div>
-              </RadioGroup>
-            </div>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving}>Annuleren</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => executeSave(saveScope)}
-              disabled={saving}
-            >
-              {saving ? "Opslaan..." : "Opslaan"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }
