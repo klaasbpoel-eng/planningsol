@@ -38,9 +38,7 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    if (searchParams.get("view") === "admin") {
-      setShowAdminView(true);
-    }
+    setShowAdminView(searchParams.get("view") === "admin");
   }, [searchParams]);
 
   if (loading || permissionsLoading || approvalLoading) {
