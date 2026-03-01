@@ -1,6 +1,5 @@
 import * as React from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { X } from "lucide-react";
 import {
   Dialog,
   DialogClose,
@@ -134,14 +133,8 @@ export function ResponsiveDialogHeader({
 
   if (isMobile) {
     return (
-      <DrawerHeader className={cn("text-left relative", className)}>
+      <DrawerHeader className={cn("text-left", className)}>
         {children}
-        {handleOnly && (
-          <DrawerClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
-            <X className="h-5 w-5" />
-            <span className="sr-only">Sluiten</span>
-          </DrawerClose>
-        )}
       </DrawerHeader>
     );
   }
