@@ -63,7 +63,8 @@ export function TaskList() {
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<TaskWithRelations | null>(null);
+  const [deleteSeriesMode, setDeleteSeriesMode] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
@@ -132,8 +133,9 @@ export function TaskList() {
     setFormDialogOpen(true);
   };
 
-  const handleDeleteClick = (task: Task) => {
+  const handleDeleteClick = (task: TaskWithRelations) => {
     setTaskToDelete(task);
+    setDeleteSeriesMode(false);
     setDeleteDialogOpen(true);
   };
 
@@ -142,14 +144,21 @@ export function TaskList() {
 
     setDeleting(true);
     try {
-      const { error } = await supabase
-        .from("tasks")
-        .delete()
-        .eq("id", taskToDelete.id);
-
-      if (error) throw error;
-
-      toast.success("Taak verwijderd");
+      if (deleteSeriesMode && taskToDelete.series_id) {
+        const { error } = await supabase
+          .from("tasks")
+          .delete()
+          .eq("series_id", taskToDelete.series_id);
+        if (error) throw error;
+        toast.success("Gehele reeks verwijderd");
+      } else {
+        const { error } = await supabase
+          .from("tasks")
+          .delete()
+          .eq("id", taskToDelete.id);
+        if (error) throw error;
+        toast.success("Taak verwijderd");
+      }
       fetchData();
     } catch (error) {
       console.error("Error deleting task:", error);
@@ -543,10 +552,25 @@ export function TaskList() {
           <AlertDialogHeader>
             <AlertDialogTitle>Taak Verwijderen</AlertDialogTitle>
             <AlertDialogDescription>
-              Weet je zeker dat je deze taak wilt verwijderen?
-              Deze actie kan niet ongedaan worden gemaakt.
+              {deleteSeriesMode
+                ? "Weet je zeker dat je de gehele reeks wilt verwijderen? Alle taken in deze reeks worden verwijderd."
+                : "Weet je zeker dat je deze taak wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {taskToDelete?.series_id && (
+            <div className="flex items-center space-x-2 px-6">
+              <input
+                type="checkbox"
+                id="deleteSeriesCheckbox"
+                checked={deleteSeriesMode}
+                onChange={(e) => setDeleteSeriesMode(e.target.checked)}
+                className="rounded border-input"
+              />
+              <label htmlFor="deleteSeriesCheckbox" className="text-sm cursor-pointer">
+                Gehele reeks verwijderen
+              </label>
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
             <AlertDialogAction
@@ -555,7 +579,7 @@ export function TaskList() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Verwijderen
+              {deleteSeriesMode ? "Reeks verwijderen" : "Verwijderen"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
