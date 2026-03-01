@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1813,9 +1813,31 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
           return <div key={day.toISOString()} onClick={e => handleDayClick(day, e)} className={cn("p-3 rounded-xl border transition-all duration-300 hover:shadow-md flex flex-col min-h-[280px] lg:min-h-[400px]", isWeekendDay ? "bg-primary/5 backdrop-blur-sm border-primary/20 hover:bg-primary/10" : "bg-card/80 backdrop-blur-sm border-border/50", isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/10 to-transparent shadow-lg shadow-primary/5", isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]", isAdmin && "cursor-pointer")} style={{
             animationDelay: `${index * 30}ms`
           }} onDragOver={e => handleDragOver(e, day)} onDragLeave={handleDragLeave} onDrop={e => handleDrop(e, day)}>
-            <div className={cn("text-sm font-bold mb-3 flex items-center justify-center w-7 h-7 rounded-full", isCurrentDay ? "bg-primary text-primary-foreground" : "text-foreground")}>
+             <div className={cn("text-sm font-bold mb-1 flex items-center justify-center w-7 h-7 rounded-full", isCurrentDay ? "bg-primary text-primary-foreground" : "text-foreground")}>
               {format(day, "d")}
             </div>
+            {/* Category summary badges */}
+            {allItems.length > 0 && (
+              <div className="flex flex-wrap gap-0.5 mb-1.5">
+                {dayRequests.length > 0 && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-semibold bg-lime-100 text-lime-700 dark:bg-lime-900/40 dark:text-lime-300"><Palmtree className="w-2.5 h-2.5" />{dayRequests.length}</span>}
+                {dayTasks.length > 0 && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"><ClipboardList className="w-2.5 h-2.5" />{dayTasks.length}</span>}
+                {dayDryIceOrders.length > 0 && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-semibold bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300"><Snowflake className="w-2.5 h-2.5" />{dayDryIceOrders.length}</span>}
+                {dayGasCylinderOrders.length > 0 && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"><Cylinder className="w-2.5 h-2.5" />{dayGasCylinderOrders.length}</span>}
+                {dayAmbulanceTrips.length > 0 && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"><Ambulance className="w-2.5 h-2.5" />{dayAmbulanceTrips.length}</span>}
+              </div>
+            )}
+            {/* Capacity indicator bar */}
+            {allItems.length > 0 && (
+              <div className="w-full h-1 rounded-full bg-muted/50 mb-1.5 overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all duration-300",
+                    allItems.length <= 2 ? "bg-emerald-500" : allItems.length <= 4 ? "bg-amber-500" : "bg-destructive"
+                  )}
+                  style={{ width: `${Math.min(allItems.length / 8 * 100, 100)}%` }}
+                />
+              </div>
+            )}
             <div className="space-y-1.5">
               {allItems.slice(0, 6).map(entry => {
                 if (entry.type === 'timeoff') {
@@ -1904,17 +1926,21 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       end: calendarEnd
     });
     return <div className="space-y-3 animate-fade-in">
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-[2rem_repeat(7,1fr)] gap-1">
+        <div className="text-center text-[10px] font-semibold py-2 uppercase tracking-wider text-muted-foreground/50">Wk</div>
         {weekDays.map((day, index) => {
-          // Index 5 and 6 are Saturday and Sunday (0-indexed, starting from Monday)
           const isWeekendDay = index >= 5;
           return <div key={day} className={cn("text-center text-xs font-semibold py-2 uppercase tracking-wider", isWeekendDay ? "text-primary/70 bg-primary/5 rounded-lg" : "text-muted-foreground")}>
             {day}
           </div>;
         })}
       </div>
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-[2rem_repeat(7,1fr)] gap-1.5">
         {days.map((day, index) => {
+          const dayOfWeek = getDay(day);
+          // Monday = 1, so first col of each row
+          const isMonday = dayOfWeek === 1;
+          const weekNumber = isMonday ? getWeek(day, { weekStartsOn: 1 }) : null;
           const dayRequests = getRequestsForDay(day);
           const dayTasks = getTasksForDay(day);
           const dayDryIceOrders = getDryIceOrdersForDay(day);
@@ -1932,54 +1958,74 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
           const isCurrentDay = isToday(day);
           const isDragOver = dragOverDate && isSameDay(dragOverDate, day);
           const isWeekendDay = isWeekend(day);
-          return <div key={day.toISOString()} onClick={e => isCurrentMonth && handleDayClick(day, e)} className={cn("min-h-[90px] p-2 rounded-xl border transition-all duration-200", isCurrentMonth ? isWeekendDay ? "bg-primary/5 backdrop-blur-sm border-primary/20 hover:bg-primary/10 hover:shadow-sm" : "bg-card/80 backdrop-blur-sm border-border/50 hover:bg-card hover:shadow-sm" : "bg-muted/20 border-transparent opacity-50", isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/10 to-transparent", isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]", isCurrentMonth && isAdmin && "cursor-pointer")} onDragOver={e => handleDragOver(e, day)} onDragLeave={handleDragLeave} onDrop={e => handleDrop(e, day)}>
-            <div className={cn("text-xs font-bold mb-1.5 flex items-center justify-center w-6 h-6 rounded-full transition-colors", isCurrentDay ? "bg-primary text-primary-foreground" : isCurrentMonth ? "text-foreground" : "text-muted-foreground/50")}>
-              {format(day, "d")}
+          return <React.Fragment key={day.toISOString()}>
+            {/* Week number cell at the start of each row */}
+            {weekNumber !== null && (
+              <div className="flex items-start justify-center pt-2 text-[10px] font-bold text-muted-foreground/50">
+                {weekNumber}
+              </div>
+            )}
+            <div onClick={e => isCurrentMonth && handleDayClick(day, e)} className={cn("min-h-[90px] p-2 rounded-xl border transition-all duration-200", isCurrentMonth ? isWeekendDay ? "bg-primary/5 backdrop-blur-sm border-primary/20 hover:bg-primary/10 hover:shadow-sm" : "bg-card/80 backdrop-blur-sm border-border/50 hover:bg-card hover:shadow-sm" : "bg-muted/20 border-transparent opacity-50", isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/10 to-transparent", isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]", isCurrentMonth && isAdmin && "cursor-pointer")} onDragOver={e => handleDragOver(e, day)} onDragLeave={handleDragLeave} onDrop={e => handleDrop(e, day)}>
+              <div className={cn("text-xs font-bold mb-1 flex items-center justify-center w-6 h-6 rounded-full transition-colors", isCurrentDay ? "bg-primary text-primary-foreground" : isCurrentMonth ? "text-foreground" : "text-muted-foreground/50")}>
+                {format(day, "d")}
+              </div>
+              {/* Capacity bar */}
+              {allItems.length > 0 && isCurrentMonth && (
+                <div className="w-full h-0.5 rounded-full bg-muted/50 mb-1 overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full rounded-full",
+                      allItems.length <= 2 ? "bg-emerald-500" : allItems.length <= 4 ? "bg-amber-500" : "bg-destructive"
+                    )}
+                    style={{ width: `${Math.min(allItems.length / 6 * 100, 100)}%` }}
+                  />
+                </div>
+              )}
+              <div className="space-y-1">
+                {allItems.slice(0, 4).map(entry => {
+                  if (entry.type === 'timeoff') {
+                    const request = entry.item as RequestWithProfile;
+                    return <CalendarItemPreview key={request.id} item={request} type="timeoff" side="right" align="start">
+                      <div onClick={e => handleItemClick({
+                        type: "timeoff",
+                        data: request
+                      }, e)} className={cn("text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer", getTypeColor(request.type, request.status))}>
+                        {request.day_part === "morning" ? <Sun className="w-2.5 h-2.5 shrink-0" /> : request.day_part === "afternoon" ? <Sunset className="w-2.5 h-2.5 shrink-0" /> : <Palmtree className="w-2.5 h-2.5 shrink-0" />}
+                        <span className="truncate font-medium">{getEmployeeName(request)} • {getLeaveTypeLabel(request)}</span>
+                      </div>
+                    </CalendarItemPreview>;
+                  } else if (entry.type === 'task') {
+                    const task = entry.item as TaskWithProfile;
+                    return <CalendarItemPreview key={task.id} item={task} type="task" side="right" align="start">
+                      <div draggable onDragStart={e => handleDragStart(e, task)} onDragEnd={handleDragEnd} onClick={e => handleItemClick({
+                        type: "task",
+                        data: task
+                      }, e)} className={cn("text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-all hover:scale-105 cursor-pointer group", getTaskStatusColor(task.status), draggedTask?.id === task.id && "opacity-50")}>
+                        {hasTimeInfo(task.start_time, task.end_time) ? <Clock className="w-2.5 h-2.5 shrink-0 opacity-70" /> : <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />}
+                        <ClipboardList className="w-2.5 h-2.5 shrink-0" />
+                        <span className="truncate font-medium">
+                          {hasTimeInfo(task.start_time, task.end_time) && <span className="opacity-80 mr-0.5">{formatTimeRange(task.start_time, task.end_time)}</span>}
+                          {task.task_type?.name || "Taak"}
+                        </span>
+                      </div>
+                    </CalendarItemPreview>;
+                  } else if (entry.type === 'dryice') {
+                    const order = entry.item as DryIceOrderWithDetails;
+                    return <DryIceOrderPreview key={order.id} order={order} side="bottom" align="start">
+                      <div draggable onDragStart={(e: any) => handleDryIceDragStart(e, order)} onDragEnd={handleDragEnd} onClick={e => handleDryIceOrderClick(order, e)} className={cn("text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30", draggedDryIceOrder?.id === order.id && "opacity-50")}>
+                        <Snowflake className="w-2.5 h-2.5 shrink-0" />
+                        <span className="truncate font-medium">{order.customer_name} • {order.quantity_kg}kg</span>
+                      </div>
+                    </DryIceOrderPreview>;
+                  }
+                  return null;
+                })}
+                {allItems.length > 4 && <div className="text-[10px] text-primary font-semibold pl-1">
+                  +{allItems.length - 4}
+                </div>}
+              </div>
             </div>
-            <div className="space-y-1">
-              {allItems.slice(0, 4).map(entry => {
-                if (entry.type === 'timeoff') {
-                  const request = entry.item as RequestWithProfile;
-                  return <CalendarItemPreview key={request.id} item={request} type="timeoff" side="right" align="start">
-                    <div onClick={e => handleItemClick({
-                      type: "timeoff",
-                      data: request
-                    }, e)} className={cn("text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer", getTypeColor(request.type, request.status))}>
-                      {request.day_part === "morning" ? <Sun className="w-2.5 h-2.5 shrink-0" /> : request.day_part === "afternoon" ? <Sunset className="w-2.5 h-2.5 shrink-0" /> : <Palmtree className="w-2.5 h-2.5 shrink-0" />}
-                      <span className="truncate font-medium">{getEmployeeName(request)} • {getLeaveTypeLabel(request)}</span>
-                    </div>
-                  </CalendarItemPreview>;
-                } else if (entry.type === 'task') {
-                  const task = entry.item as TaskWithProfile;
-                  return <CalendarItemPreview key={task.id} item={task} type="task" side="right" align="start">
-                    <div draggable onDragStart={e => handleDragStart(e, task)} onDragEnd={handleDragEnd} onClick={e => handleItemClick({
-                      type: "task",
-                      data: task
-                    }, e)} className={cn("text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-all hover:scale-105 cursor-pointer group", getTaskStatusColor(task.status), draggedTask?.id === task.id && "opacity-50")}>
-                      {hasTimeInfo(task.start_time, task.end_time) ? <Clock className="w-2.5 h-2.5 shrink-0 opacity-70" /> : <GripVertical className="w-2.5 h-2.5 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />}
-                      <ClipboardList className="w-2.5 h-2.5 shrink-0" />
-                      <span className="truncate font-medium">
-                        {hasTimeInfo(task.start_time, task.end_time) && <span className="opacity-80 mr-0.5">{formatTimeRange(task.start_time, task.end_time)}</span>}
-                        {task.task_type?.name || "Taak"}
-                      </span>
-                    </div>
-                  </CalendarItemPreview>;
-                } else if (entry.type === 'dryice') {
-                  const order = entry.item as DryIceOrderWithDetails;
-                  return <DryIceOrderPreview key={order.id} order={order} side="bottom" align="start">
-                    <div draggable onDragStart={(e: any) => handleDryIceDragStart(e, order)} onDragEnd={handleDragEnd} onClick={e => handleDryIceOrderClick(order, e)} className={cn("text-[10px] px-1.5 py-1 rounded-md truncate flex items-center gap-1 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30", draggedDryIceOrder?.id === order.id && "opacity-50")}>
-                      <Snowflake className="w-2.5 h-2.5 shrink-0" />
-                      <span className="truncate font-medium">{order.customer_name} • {order.quantity_kg}kg</span>
-                    </div>
-                  </DryIceOrderPreview>;
-                }
-                return null;
-              })}
-              {allItems.length > 4 && <div className="text-[10px] text-primary font-semibold pl-1">
-                +{allItems.length - 4}
-              </div>}
-            </div>
-          </div>;
+          </React.Fragment>;
         })}
       </div>
     </div>;
@@ -2078,8 +2124,8 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
               </CardDescription>
             </div>
 
-            {/* Show/Hide Toggle */}
-            <div className="flex items-center gap-4 p-2 rounded-lg bg-muted/30 border border-border/50">
+            {/* Show/Hide Toggle - Desktop */}
+            <div className="hidden md:flex items-center gap-4 p-2 rounded-lg bg-muted/30 border border-border/50">
               <div className="flex items-center gap-2">
                 <Checkbox id="showTimeOff" checked={showTimeOff} onCheckedChange={checked => setShowTimeOff(checked as boolean)} />
                 <label htmlFor="showTimeOff" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
@@ -2115,6 +2161,31 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                   Ambulance
                 </label>
               </div>
+            </div>
+
+            {/* Show/Hide Toggle - Mobile: compact chips */}
+            <div className="flex md:hidden flex-wrap gap-1.5">
+              {[
+                { id: "showTimeOff-m", checked: showTimeOff, onChange: setShowTimeOff, icon: <Palmtree className="h-3 w-3" />, label: "Verlof", activeClass: "bg-lime-100 border-lime-400 text-lime-800 dark:bg-lime-900/40 dark:border-lime-600 dark:text-lime-300" },
+                { id: "showTasks-m", checked: showTasks, onChange: setShowTasks, icon: <ClipboardList className="h-3 w-3" />, label: "Taken", activeClass: "bg-blue-100 border-blue-400 text-blue-800 dark:bg-blue-900/40 dark:border-blue-600 dark:text-blue-300" },
+                { id: "showDryIce-m", checked: showDryIce, onChange: setShowDryIce, icon: <Snowflake className="h-3 w-3" />, label: "Droogijs", activeClass: "bg-cyan-100 border-cyan-400 text-cyan-800 dark:bg-cyan-900/40 dark:border-cyan-600 dark:text-cyan-300" },
+                { id: "showGasCylinders-m", checked: showGasCylinders, onChange: setShowGasCylinders, icon: <Cylinder className="h-3 w-3" />, label: "Gas", activeClass: "bg-orange-100 border-orange-400 text-orange-800 dark:bg-orange-900/40 dark:border-orange-600 dark:text-orange-300" },
+                { id: "showAmbulance-m", checked: showAmbulance, onChange: setShowAmbulance, icon: <Ambulance className="h-3 w-3" />, label: "Ambu", activeClass: "bg-red-100 border-red-400 text-red-800 dark:bg-red-900/40 dark:border-red-600 dark:text-red-300" },
+              ].map(filter => (
+                <button
+                  key={filter.id}
+                  onClick={() => filter.onChange(!filter.checked)}
+                  className={cn(
+                    "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all duration-200",
+                    filter.checked
+                      ? filter.activeClass
+                      : "bg-muted/30 border-border/50 text-muted-foreground opacity-60"
+                  )}
+                >
+                  {filter.icon}
+                  {filter.label}
+                </button>
+              ))}
             </div>
 
             {/* Mobile View Toggle */}
@@ -2165,12 +2236,12 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
             <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg hover:bg-background" onClick={() => navigate("prev")}>
               <ChevronLeft className="h-5 w-5" />
             </Button>
-            {viewType !== 'day' && <Button variant="outline" size="sm" onClick={() => {
+            <Button variant="outline" size="sm" onClick={() => {
               setCurrentDate(new Date());
               if (viewType === 'list') setViewType('day');
             }} className="text-xs font-medium border-primary/30 text-primary hover:bg-primary/10">
               Vandaag
-            </Button>}
+            </Button>
           </div>
           <span className="text-base font-semibold capitalize text-foreground">
             {getDateRangeLabel()}
