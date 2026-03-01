@@ -285,7 +285,7 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
 
   // View mode
   const renderViewMode = () => (
-    <div className="space-y-4 py-4">
+    <div className="space-y-4 py-4 px-4 md:px-0">
       {/* Cylinder counts - O2 */}
       <div className="space-y-2">
         <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Zuurstof (O2)</div>
@@ -392,7 +392,7 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
 
   // Edit mode
   const renderEditMode = () => (
-    <div className="space-y-4 py-4">
+    <div className="space-y-4 py-4 px-4 md:px-0">
       {/* Date */}
       <div className="space-y-2">
         <Label>Geplande datum</Label>
@@ -517,7 +517,7 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
 
   return (
     <ResponsiveDialog open={open} onOpenChange={(o) => { if (!o) { setEditing(false); } onOpenChange(o); }} handleOnly>
-      <ResponsiveDialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-red-500/10">
