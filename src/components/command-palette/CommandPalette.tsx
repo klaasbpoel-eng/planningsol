@@ -17,12 +17,15 @@ import {
   Moon,
   Sun,
   Settings,
-  Search,
-  Users,
-  ClipboardList,
-  BarChart3,
+  Clock,
   Snowflake,
   Cylinder,
+  BarChart3,
+  Truck,
+  BookOpen,
+  ScanBarcode,
+  FileUp,
+  Plus,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -44,7 +47,6 @@ export function CommandPalette({ isAdmin }: CommandPaletteProps) {
         setOpen((open) => !open);
       }
     };
-
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
   }, []);
@@ -56,11 +58,8 @@ export function CommandPalette({ isAdmin }: CommandPaletteProps) {
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success("Uitgelogd");
-    }
+    if (error) toast.error(error.message);
+    else toast.success("Uitgelogd");
   };
 
   return (
@@ -68,64 +67,77 @@ export function CommandPalette({ isAdmin }: CommandPaletteProps) {
       <CommandInput placeholder="Zoek naar pagina's, acties..." />
       <CommandList>
         <CommandEmpty>Geen resultaten gevonden.</CommandEmpty>
-        
+
+        {/* Quick Actions */}
+        <CommandGroup heading="Snelle acties">
+          <CommandItem onSelect={() => runCommand(() => navigate("/verlof"))} className="gap-2">
+            <Plus className="h-4 w-4 text-warning" />
+            <span>Verlof aanvragen</span>
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => navigate("/interne-bestellingen"))} className="gap-2">
+            <Plus className="h-4 w-4 text-success" />
+            <span>Nieuwe interne bestelling</span>
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => navigate("/productie"))} className="gap-2">
+            <Plus className="h-4 w-4 text-primary" />
+            <span>Nieuwe productieorder</span>
+          </CommandItem>
+        </CommandGroup>
+
+        <CommandSeparator />
+
         <CommandGroup heading="Navigatie">
-          <CommandItem
-            onSelect={() => runCommand(() => navigate("/"))}
-            className="gap-2"
-          >
+          <CommandItem onSelect={() => runCommand(() => navigate("/"))} className="gap-2">
             <Home className="h-4 w-4" />
             <span>Dashboard</span>
             <span className="ml-auto text-xs text-muted-foreground">Home</span>
           </CommandItem>
-          <CommandItem
-            onSelect={() => runCommand(() => navigate("/kalender"))}
-            className="gap-2"
-          >
+          <CommandItem onSelect={() => runCommand(() => navigate("/kalender"))} className="gap-2">
             <CalendarDays className="h-4 w-4" />
             <span>Kalender</span>
-            <span className="ml-auto text-xs text-muted-foreground">Planning overzicht</span>
           </CommandItem>
-          <CommandItem
-            onSelect={() => runCommand(() => navigate("/productie"))}
-            className="gap-2"
-          >
+          <CommandItem onSelect={() => runCommand(() => navigate("/productie"))} className="gap-2">
             <Factory className="h-4 w-4" />
             <span>Productieplanning</span>
-            <span className="ml-auto text-xs text-muted-foreground">Orders & planning</span>
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => navigate("/dagoverzicht"))} className="gap-2">
+            <CalendarDays className="h-4 w-4" />
+            <span>Dagelijks Overzicht</span>
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => navigate("/interne-bestellingen"))} className="gap-2">
+            <Truck className="h-4 w-4" />
+            <span>Interne Bestellingen</span>
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => navigate("/verlof"))} className="gap-2">
+            <Clock className="h-4 w-4" />
+            <span>Verlof & Aanvragen</span>
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => navigate("/toolbox"))} className="gap-2">
+            <BookOpen className="h-4 w-4" />
+            <span>Toolbox</span>
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => navigate("/barcode"))} className="gap-2">
+            <ScanBarcode className="h-4 w-4" />
+            <span>Barcode Generator</span>
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => navigate("/vrijgaves"))} className="gap-2">
+            <FileUp className="h-4 w-4" />
+            <span>Vrijgaves</span>
           </CommandItem>
         </CommandGroup>
 
         <CommandSeparator />
 
         <CommandGroup heading="Productie">
-          <CommandItem
-            onSelect={() => runCommand(() => {
-              navigate("/productie");
-              // Will navigate to productie and user can select dry ice tab
-            })}
-            className="gap-2"
-          >
+          <CommandItem onSelect={() => runCommand(() => navigate("/productie"))} className="gap-2">
             <Snowflake className="h-4 w-4 text-cyan-500" />
             <span>Droogijs Planning</span>
           </CommandItem>
-          <CommandItem
-            onSelect={() => runCommand(() => {
-              navigate("/productie");
-              // Will navigate to productie and user can select gas cylinder tab
-            })}
-            className="gap-2"
-          >
+          <CommandItem onSelect={() => runCommand(() => navigate("/productie"))} className="gap-2">
             <Cylinder className="h-4 w-4 text-blue-500" />
             <span>Gascilinder Planning</span>
           </CommandItem>
-          <CommandItem
-            onSelect={() => runCommand(() => {
-              navigate("/productie");
-              // Will navigate to productie reports
-            })}
-            className="gap-2"
-          >
+          <CommandItem onSelect={() => runCommand(() => navigate("/productie"))} className="gap-2">
             <BarChart3 className="h-4 w-4 text-primary" />
             <span>Rapportages</span>
           </CommandItem>
@@ -134,69 +146,44 @@ export function CommandPalette({ isAdmin }: CommandPaletteProps) {
         <CommandSeparator />
 
         <CommandGroup heading="Thema">
-          <CommandItem
-            onSelect={() => runCommand(() => setTheme("light"))}
-            className="gap-2"
-          >
+          <CommandItem onSelect={() => runCommand(() => setTheme("light"))} className="gap-2">
             <Sun className="h-4 w-4" />
             <span>Licht thema</span>
-            {theme === "light" && (
-              <span className="ml-auto text-xs text-primary">✓ Actief</span>
-            )}
+            {theme === "light" && <span className="ml-auto text-xs text-primary">✓</span>}
           </CommandItem>
-          <CommandItem
-            onSelect={() => runCommand(() => setTheme("dark"))}
-            className="gap-2"
-          >
+          <CommandItem onSelect={() => runCommand(() => setTheme("dark"))} className="gap-2">
             <Moon className="h-4 w-4" />
             <span>Donker thema</span>
-            {theme === "dark" && (
-              <span className="ml-auto text-xs text-primary">✓ Actief</span>
-            )}
+            {theme === "dark" && <span className="ml-auto text-xs text-primary">✓</span>}
           </CommandItem>
-          <CommandItem
-            onSelect={() => runCommand(() => setTheme("system"))}
-            className="gap-2"
-          >
+          <CommandItem onSelect={() => runCommand(() => setTheme("system"))} className="gap-2">
             <Settings className="h-4 w-4" />
             <span>Systeem thema</span>
-            {theme === "system" && (
-              <span className="ml-auto text-xs text-primary">✓ Actief</span>
-            )}
+            {theme === "system" && <span className="ml-auto text-xs text-primary">✓</span>}
           </CommandItem>
         </CommandGroup>
 
         <CommandSeparator />
 
         <CommandGroup heading="Account">
-          <CommandItem
-            onSelect={() => runCommand(handleLogout)}
-            className="gap-2"
-          >
+          <CommandItem onSelect={() => runCommand(handleLogout)} className="gap-2">
             <LogOut className="h-4 w-4" />
             <span>Uitloggen</span>
           </CommandItem>
         </CommandGroup>
       </CommandList>
-      
-      {/* Keyboard shortcut hint */}
+
       <div className="border-t border-border p-2 text-xs text-muted-foreground flex items-center justify-between">
         <div className="flex items-center gap-1">
-          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-            ↑↓
-          </kbd>
+          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">↑↓</kbd>
           <span>navigeren</span>
         </div>
         <div className="flex items-center gap-1">
-          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-            ↵
-          </kbd>
+          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">↵</kbd>
           <span>selecteren</span>
         </div>
         <div className="flex items-center gap-1">
-          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-            esc
-          </kbd>
+          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">esc</kbd>
           <span>sluiten</span>
         </div>
       </div>

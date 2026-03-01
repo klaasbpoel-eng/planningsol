@@ -3,7 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Factory, Calendar, ShoppingCart, Wrench, Clock, Shield, ArrowRight, ScanBarcode, CalendarDays } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { DailyOverview } from "./DailyOverview";
-
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 import type { RolePermissions, AppRole } from "@/hooks/useUserPermissions";
 
@@ -15,8 +18,37 @@ interface UserLaunchpadProps {
     onSwitchToAdmin: () => void;
 }
 
+interface LiveStats {
+    pendingTasks: number;
+    todayOrders: number;
+    pendingLeave: number;
+}
+
 export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchToAdmin }: UserLaunchpadProps) {
     const navigate = useNavigate();
+    const [stats, setStats] = useState<LiveStats>({ pendingTasks: 0, todayOrders: 0, pendingLeave: 0 });
+
+    useEffect(() => {
+        fetchStats();
+    }, []);
+
+    const fetchStats = async () => {
+        try {
+            const today = format(new Date(), "yyyy-MM-dd");
+            const [tasksRes, ordersRes, leaveRes] = await Promise.all([
+                supabase.from("tasks").select("id", { count: "exact", head: true }).in("status", ["pending", "in_progress"]),
+                supabase.from("gas_cylinder_orders").select("id", { count: "exact", head: true }).eq("scheduled_date", today),
+                supabase.from("time_off_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+            ]);
+            setStats({
+                pendingTasks: tasksRes.count || 0,
+                todayOrders: ordersRes.count || 0,
+                pendingLeave: leaveRes.count || 0,
+            });
+        } catch (e) {
+            console.error("Stats fetch error:", e);
+        }
+    };
 
     const features = [
         {
@@ -26,14 +58,27 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
             path: "/productie",
             enabled: permissions?.canViewOrders,
             color: "bg-primary/10 hover:bg-primary/20",
+            stat: stats.todayOrders > 0 ? `${stats.todayOrders} orders vandaag` : undefined,
+            hero: true,
         },
         {
             title: "Kalender",
             description: "Bekijk de productieplanning in kalenderweergave",
             icon: <Calendar className="h-8 w-8 text-accent" />,
             path: "/kalender",
-            enabled: true, // Everyone can see calendar? Or check permission? Assumed true for now based on previous code
+            enabled: true,
             color: "bg-accent/10 hover:bg-accent/20",
+            hero: true,
+        },
+        {
+            title: "Dagelijks Overzicht",
+            description: "Bekijk alle taken, orders en verlof per dag",
+            icon: <CalendarDays className="h-8 w-8 text-primary" />,
+            path: "/dagoverzicht",
+            enabled: true,
+            color: "bg-primary/10 hover:bg-primary/20",
+            stat: stats.pendingTasks > 0 ? `${stats.pendingTasks} openstaande taken` : undefined,
+            hero: true,
         },
         {
             title: "Interne Bestellingen",
@@ -50,6 +95,7 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
             path: "/verlof",
             enabled: true,
             color: "bg-warning/10 hover:bg-warning/20",
+            stat: stats.pendingLeave > 0 ? `${stats.pendingLeave} in behandeling` : undefined,
         },
         {
             title: "Toolbox",
@@ -67,14 +113,6 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
             enabled: true,
             color: "bg-muted hover:bg-muted/80",
         },
-        {
-            title: "Dagelijks Overzicht",
-            description: "Bekijk alle taken, orders en verlof per dag",
-            icon: <CalendarDays className="h-8 w-8 text-primary" />,
-            path: "/dagoverzicht",
-            enabled: true,
-            color: "bg-primary/10 hover:bg-primary/20",
-        },
     ];
 
     return (
@@ -86,7 +124,7 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
         >
             <DailyOverview />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {/* Admin Card - Special Case */}
+                {/* Admin Card */}
                 {isAdmin && (
                     <Card
                         className="group cursor-pointer border-l-4 border-l-destructive hover:shadow-lg hover:scale-[1.02] transition-all duration-300"
@@ -114,7 +152,10 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
                 {features.map((feature, index) => feature.enabled && (
                     <Card
                         key={index}
-                        className={`group cursor-pointer border-l-4 border-l-transparent hover:shadow-lg hover:scale-[1.02] transition-all duration-300 hover:border-l-primary`}
+                        className={cn(
+                            "group cursor-pointer border-l-4 border-l-transparent hover:shadow-lg hover:scale-[1.02] transition-all duration-300 hover:border-l-primary",
+                            feature.hero && "md:col-span-1 lg:col-span-1"
+                        )}
                         onClick={() => navigate(feature.path)}
                     >
                         <CardHeader>
@@ -122,6 +163,11 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
                                 <div className={`p-3 rounded-xl transition-colors ${feature.color}`}>
                                     {feature.icon}
                                 </div>
+                                {feature.stat && (
+                                    <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
+                                        {feature.stat}
+                                    </span>
+                                )}
                             </div>
                             <CardTitle className="mt-4">{feature.title}</CardTitle>
                             <CardDescription>

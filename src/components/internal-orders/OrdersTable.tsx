@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -158,21 +159,16 @@ export const OrdersTable = ({ orders, type, productionLocation, onUpdateStatus, 
                                 )}
                             </TableCell>
                             <TableCell>
-                                {order.status === "pending" && (
-                                    <Badge variant="secondary" className="gap-1">
-                                        <Clock className="h-3 w-3" /> In behandeling
-                                    </Badge>
-                                )}
-                                {order.status === "shipped" && (
-                                    <Badge className="bg-primary gap-1">
-                                        <Truck className="h-3 w-3" /> Onderweg
-                                    </Badge>
-                                )}
-                                {order.status === "received" && (
-                                    <Badge variant="outline" className="border-emerald-500 text-emerald-600 dark:text-emerald-400 gap-1">
-                                        <CheckCircle2 className="h-3 w-3" /> Ontvangen
-                                    </Badge>
-                                )}
+                                <div className="flex items-center gap-1.5">
+                                    {/* Step indicator */}
+                                    <div className="flex items-center gap-0.5">
+                                        <Package className={cn("h-3.5 w-3.5", order.status === "pending" ? "text-warning" : "text-muted-foreground/40")} />
+                                        <div className={cn("w-4 h-0.5 rounded-full", order.status !== "pending" ? "bg-primary" : "bg-muted")} />
+                                        <Truck className={cn("h-3.5 w-3.5", order.status === "shipped" ? "text-primary" : "text-muted-foreground/40")} />
+                                        <div className={cn("w-4 h-0.5 rounded-full", order.status === "received" ? "bg-emerald-500" : "bg-muted")} />
+                                        <CheckCircle2 className={cn("h-3.5 w-3.5", order.status === "received" ? "text-emerald-500" : "text-muted-foreground/40")} />
+                                    </div>
+                                </div>
                             </TableCell>
                             <TableCell>
                                 <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
