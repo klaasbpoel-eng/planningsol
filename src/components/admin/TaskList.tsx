@@ -35,8 +35,9 @@ import {
   Clock,
   AlertCircle,
   ListTodo,
+  Filter,
 } from "lucide-react";
-import { format, parseISO, isPast, isToday } from "date-fns";
+import { format, parseISO, isPast, isToday, isBefore, isAfter, startOfDay } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,6 +68,10 @@ export function TaskList() {
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [employeeFilter, setEmployeeFilter] = useState<string>("all");
+  const [taskTypeFilter, setTaskTypeFilter] = useState<string>("all");
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -262,9 +267,22 @@ export function TaskList() {
     return "text-muted-foreground";
   };
 
-  const filteredTasks = statusFilter === "all" 
-    ? tasks 
-    : tasks.filter((t) => t.status === statusFilter);
+  const filteredTasks = tasks.filter((t) => {
+    if (statusFilter !== "all" && t.status !== statusFilter) return false;
+    if (employeeFilter !== "all" && t.assigned_to !== employeeFilter) return false;
+    if (taskTypeFilter !== "all" && t.type_id !== taskTypeFilter) return false;
+    if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
+    return true;
+  });
+
+  const activeFilterCount = [statusFilter, employeeFilter, taskTypeFilter, priorityFilter].filter(f => f !== "all").length;
+
+  const clearFilters = () => {
+    setStatusFilter("all");
+    setEmployeeFilter("all");
+    setTaskTypeFilter("all");
+    setPriorityFilter("all");
+  };
 
   if (loading) {
     return (
@@ -277,40 +295,116 @@ export function TaskList() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Taken</h2>
-          <p className="text-muted-foreground">
-            Beheer taken en wijs ze toe aan medewerkers
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Filter status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle statussen</SelectItem>
-              <SelectItem value="pending">In afwachting</SelectItem>
-              <SelectItem value="in_progress">In uitvoering</SelectItem>
-              <SelectItem value="completed">Voltooid</SelectItem>
-            </SelectContent>
-          </Select>
-          {filteredTasks.length > 0 && (
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold">Taken</h2>
+            <p className="text-muted-foreground">
+              Beheer taken en wijs ze toe aan medewerkers
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
             <Button
-              variant="outline"
-              className="text-destructive border-destructive/30 hover:bg-destructive/10"
-              onClick={() => setDeleteAllDialogOpen(true)}
+              variant={showFilters ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="relative"
             >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Alles verwijderen ({filteredTasks.length})
+              <Filter className="h-4 w-4 mr-2" />
+              Filters
+              {activeFilterCount > 0 && (
+                <Badge className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-[10px]">
+                  {activeFilterCount}
+                </Badge>
+              )}
             </Button>
-          )}
-          <Button onClick={handleCreateTask}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nieuwe Taak
-          </Button>
+            {filteredTasks.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={() => setDeleteAllDialogOpen(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Verwijderen ({filteredTasks.length})
+              </Button>
+            )}
+            <Button onClick={handleCreateTask}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nieuwe Taak
+            </Button>
+          </div>
         </div>
+
+        {/* Filter Bar */}
+        {showFilters && (
+          <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/50 rounded-lg border animate-fade-in">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px] h-9 text-sm">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle statussen</SelectItem>
+                <SelectItem value="pending">In afwachting</SelectItem>
+                <SelectItem value="in_progress">In uitvoering</SelectItem>
+                <SelectItem value="completed">Voltooid</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
+              <SelectTrigger className="w-[170px] h-9 text-sm">
+                <SelectValue placeholder="Medewerker" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle medewerkers</SelectItem>
+                {employees
+                  .filter((e) => e.full_name)
+                  .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""))
+                  .map((e) => (
+                    <SelectItem key={e.user_id || e.id} value={e.user_id || e.id}>
+                      {e.full_name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={taskTypeFilter} onValueChange={setTaskTypeFilter}>
+              <SelectTrigger className="w-[150px] h-9 text-sm">
+                <SelectValue placeholder="Taaktype" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle types</SelectItem>
+                {taskTypes.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="w-[140px] h-9 text-sm">
+                <SelectValue placeholder="Prioriteit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle prioriteiten</SelectItem>
+                <SelectItem value="high">Hoog</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Laag</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {activeFilterCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                Filters wissen
+              </Button>
+            )}
+
+            <span className="text-sm text-muted-foreground ml-auto">
+              {filteredTasks.length} van {tasks.length} taken
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Tasks Grid */}
@@ -320,11 +414,15 @@ export function TaskList() {
             <ListTodo className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <h3 className="font-semibold text-lg mb-1">Geen taken gevonden</h3>
             <p className="text-muted-foreground text-sm mb-4">
-              {statusFilter === "all"
-                ? "Maak een nieuwe taak aan om te beginnen."
-                : "Geen taken met deze status."}
+              {activeFilterCount > 0
+                ? "Geen taken met deze filters."
+                : "Maak een nieuwe taak aan om te beginnen."}
             </p>
-            {statusFilter === "all" && (
+            {activeFilterCount > 0 ? (
+              <Button onClick={clearFilters} variant="outline">
+                Filters wissen
+              </Button>
+            ) : (
               <Button onClick={handleCreateTask} variant="outline">
                 <Plus className="h-4 w-4 mr-2" />
                 Eerste Taak Aanmaken
@@ -468,7 +566,7 @@ export function TaskList() {
           <AlertDialogHeader>
             <AlertDialogTitle>Alle taken verwijderen</AlertDialogTitle>
             <AlertDialogDescription>
-              Weet je zeker dat je {filteredTasks.length} {statusFilter !== "all" ? "gefilterde " : ""}taken wilt verwijderen?
+              Weet je zeker dat je {filteredTasks.length} {activeFilterCount > 0 ? "gefilterde " : ""}taken wilt verwijderen?
               Deze actie kan niet ongedaan worden gemaakt.
             </AlertDialogDescription>
           </AlertDialogHeader>
