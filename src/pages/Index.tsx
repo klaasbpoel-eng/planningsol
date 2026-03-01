@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthForm } from "@/components/auth/AuthForm";
-import { Dashboard } from "@/components/dashboard/Dashboard";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { PendingApproval } from "@/components/auth/PendingApproval";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
 import { PageTransition } from "@/components/ui/page-transition";
-import { Loader2 } from "lucide-react";
-import { UserLaunchpad } from "@/components/dashboard/UserLaunchpad";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { Loader2, CalendarDays } from "lucide-react";
+import { DailyOverview } from "@/components/dashboard/DailyOverview";
 import type { User } from "@supabase/supabase-js";
 
 import { useSearchParams } from "react-router-dom";
@@ -80,16 +80,19 @@ const Index = () => {
     );
   }
 
-  // Show User Launchpad for all authenticated users
+  // Show Daily Overview as the home page
   return (
     <PageTransition>
-      <UserLaunchpad
+      <PageLayout
         userEmail={user.email}
-        isAdmin={isAdmin}
-        onSwitchToAdmin={() => setShowAdminView(true)}
-        permissions={permissions}
         role={role}
-      />
+        isAdmin={isAdmin}
+        title="Dagelijks Overzicht"
+        description="Bekijk alle taken, orders en verlof per dag of week."
+        titleIcon={<CalendarDays className="h-8 w-8" />}
+      >
+        <DailyOverview />
+      </PageLayout>
     </PageTransition>
   );
 };
