@@ -9,28 +9,53 @@ import {
     Users,
     Settings,
     Menu,
-    X
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AdminSidebarProps {
     activeTab: string;
     onTabChange: (tab: string) => void;
 }
 
+interface BadgeCounts {
+    requests: number;
+    employees: number;
+}
+
 export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
     const isMobile = useIsMobile();
     const [isOpen, setIsOpen] = useState(false);
+    const [badges, setBadges] = useState<BadgeCounts>({ requests: 0, employees: 0 });
+
+    useEffect(() => {
+        fetchBadgeCounts();
+    }, []);
+
+    const fetchBadgeCounts = async () => {
+        try {
+            const [requestsRes, profilesRes] = await Promise.all([
+                supabase.from("time_off_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+                supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_approved", false),
+            ]);
+            setBadges({
+                requests: requestsRes.count || 0,
+                employees: profilesRes.count || 0,
+            });
+        } catch (e) {
+            console.error("Badge count fetch error:", e);
+        }
+    };
 
     const navItems = [
-        { id: "requests", label: "Aanvragen", icon: ListChecks },
-        { id: "tasks", label: "Taken", icon: ClipboardList },
-        { id: "calendar", label: "Teamkalender", icon: CalendarDays },
-        { id: "logbook", label: "Toolbox Logboek", icon: BookOpen },
-        { id: "employees", label: "Medewerkers", icon: Users },
-        { id: "settings", label: "Instellingen", icon: Settings },
+        { id: "requests", label: "Aanvragen", icon: ListChecks, badgeKey: "requests" as const },
+        { id: "tasks", label: "Taken", icon: ClipboardList, badgeKey: null },
+        { id: "calendar", label: "Teamkalender", icon: CalendarDays, badgeKey: null },
+        { id: "logbook", label: "Toolbox Logboek", icon: BookOpen, badgeKey: null },
+        { id: "employees", label: "Medewerkers", icon: Users, badgeKey: "employees" as const },
+        { id: "settings", label: "Instellingen", icon: Settings, badgeKey: null },
     ];
 
     const handleTabChange = (tabId: string) => {
@@ -50,6 +75,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                 {navItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.id;
+                    const badgeCount = item.badgeKey ? badges[item.badgeKey] : 0;
 
                     return (
                         <Button
@@ -68,6 +94,11 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
                             )}
                             <Icon className={cn("h-4 w-4", isActive ? "text-primary" : "text-muted-foreground")} />
                             {item.label}
+                            {badgeCount > 0 && (
+                                <span className="ml-auto inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                                    {badgeCount}
+                                </span>
+                            )}
                         </Button>
                     );
                 })}
