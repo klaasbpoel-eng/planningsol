@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ChevronLeft,
@@ -13,6 +14,7 @@ import {
   Cylinder,
   Ambulance,
   Ruler,
+  Printer,
 } from "lucide-react";
 import {
   format,
@@ -22,9 +24,12 @@ import {
   endOfWeek,
   isToday,
   eachDayOfInterval,
-  isSameDay,
 } from "date-fns";
 import { nl } from "date-fns/locale";
+import { DryIceOrderDialog } from "@/components/calendar/DryIceOrderDialog";
+import { GasCylinderOrderDialog } from "@/components/production/GasCylinderOrderDialog";
+import { AmbulanceTripDialog } from "@/components/calendar/AmbulanceTripDialog";
+import { CalendarItemDialog } from "@/components/calendar/CalendarItemDialog";
 
 type ViewMode = "day" | "week";
 
@@ -35,8 +40,12 @@ interface TaskItem {
   start_time: string | null;
   end_time: string | null;
   status: string;
+  priority: string;
   assigned_to: string | null;
   assignee_name?: string | null;
+  notes: string | null;
+  type_id: string | null;
+  series_id: string | null;
   task_types: { name: string; color: string } | null;
 }
 
@@ -106,6 +115,17 @@ export function DailyOverview() {
   const [ambulanceTrips, setAmbulanceTrips] = useState<AmbulanceTrip[]>([]);
   const [lookaheadActive, setLookaheadActive] = useState(false);
 
+  // Dialog state
+  const [selectedDryIceOrder, setSelectedDryIceOrder] = useState<any>(null);
+  const [dryIceDialogOpen, setDryIceDialogOpen] = useState(false);
+  const [selectedGasOrder, setSelectedGasOrder] = useState<any>(null);
+  const [gasDialogOpen, setGasDialogOpen] = useState(false);
+  const [selectedAmbulanceTrip, setSelectedAmbulanceTrip] = useState<any>(null);
+  const [ambulanceDialogOpen, setAmbulanceDialogOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [selectedTimeOff, setSelectedTimeOff] = useState<TimeOffItem | null>(null);
+
   // When in day mode, extend query range by 3 extra days so we can show upcoming items if today is empty
   const queryRange = useMemo(() => {
     if (viewMode === "day") {
@@ -130,87 +150,162 @@ export function DailyOverview() {
   const fromStr = format(queryRange.from, "yyyy-MM-dd");
   const toStr = format(queryRange.to, "yyyy-MM-dd");
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      const [tasksRes, timeOffRes, dryIceRes, gasRes, ambulanceRes] = await Promise.all([
-        supabase
-          .from("tasks")
-          .select("id, title, due_date, start_time, end_time, status, assigned_to, task_types:type_id(name, color)")
-          .gte("due_date", fromStr)
-          .lte("due_date", toStr)
-          .neq("status", "cancelled"),
-        supabase
-          .from("time_off_requests")
-          .select("id, start_date, end_date, status, day_part, profiles:profile_id(full_name), time_off_types:type_id(name, color)")
-          .lte("start_date", toStr)
-          .gte("end_date", fromStr)
-          .eq("status", "approved"),
-        supabase
-          .from("dry_ice_orders")
-          .select("id, customer_name, quantity_kg, box_count, status, scheduled_date, notes, dry_ice_packaging:packaging_id(name, capacity_kg)")
-          .gte("scheduled_date", fromStr)
-          .lte("scheduled_date", toStr)
-          .neq("status", "cancelled"),
-        supabase
-          .from("gas_cylinder_orders")
-          .select("id, customer_name, cylinder_count, cylinder_size, status, scheduled_date, notes, gas_types:gas_type_id(name)")
-          .gte("scheduled_date", fromStr)
-          .lte("scheduled_date", toStr)
-          .neq("status", "cancelled")
-          .neq("status", "completed"),
-        supabase
-          .from("ambulance_trips")
-          .select("id, scheduled_date, cylinders_2l_300_o2, cylinders_2l_200_o2, cylinders_5l_o2_integrated, cylinders_1l_pindex_o2, cylinders_10l_o2_integrated, cylinders_5l_air_integrated, cylinders_2l_air_integrated, model_5l, status, notes, ambulance_trip_customers(customer_number, customer_name)")
-          .gte("scheduled_date", fromStr)
-          .lte("scheduled_date", toStr)
-          .neq("status", "cancelled"),
-      ]);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    const [tasksRes, timeOffRes, dryIceRes, gasRes, ambulanceRes] = await Promise.all([
+      supabase
+        .from("tasks")
+        .select("id, title, due_date, start_time, end_time, status, priority, assigned_to, notes, type_id, series_id, task_types:type_id(name, color)")
+        .gte("due_date", fromStr)
+        .lte("due_date", toStr)
+        .neq("status", "cancelled"),
+      supabase
+        .from("time_off_requests")
+        .select("id, start_date, end_date, status, day_part, profiles:profile_id(full_name), time_off_types:type_id(name, color)")
+        .lte("start_date", toStr)
+        .gte("end_date", fromStr)
+        .eq("status", "approved"),
+      supabase
+        .from("dry_ice_orders")
+        .select("id, customer_name, quantity_kg, box_count, status, scheduled_date, notes, dry_ice_packaging:packaging_id(name, capacity_kg)")
+        .gte("scheduled_date", fromStr)
+        .lte("scheduled_date", toStr)
+        .neq("status", "cancelled"),
+      supabase
+        .from("gas_cylinder_orders")
+        .select("id, customer_name, cylinder_count, cylinder_size, status, scheduled_date, notes, gas_types:gas_type_id(name)")
+        .gte("scheduled_date", fromStr)
+        .lte("scheduled_date", toStr)
+        .neq("status", "cancelled")
+        .neq("status", "completed"),
+      supabase
+        .from("ambulance_trips")
+        .select("id, scheduled_date, cylinders_2l_300_o2, cylinders_2l_200_o2, cylinders_5l_o2_integrated, cylinders_1l_pindex_o2, cylinders_10l_o2_integrated, cylinders_5l_air_integrated, cylinders_2l_air_integrated, model_5l, status, notes, ambulance_trip_customers(customer_number, customer_name)")
+        .gte("scheduled_date", fromStr)
+        .lte("scheduled_date", toStr)
+        .neq("status", "cancelled"),
+    ]);
 
-      const rawTasks = (tasksRes.data as unknown as TaskItem[]) ?? [];
+    const rawTasks = (tasksRes.data as unknown as TaskItem[]) ?? [];
+    
+    // Fetch assignee names for tasks
+    const assigneeIds = [...new Set(rawTasks.map(t => t.assigned_to).filter(Boolean))];
+    if (assigneeIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles_limited")
+        .select("id, full_name")
+        .in("id", assigneeIds as string[]);
+      const nameMap = new Map(profiles?.map(p => [p.id, p.full_name]) ?? []);
+      rawTasks.forEach(t => { t.assignee_name = t.assigned_to ? nameMap.get(t.assigned_to) ?? null : null; });
+    }
+    setTasks(rawTasks);
+
+    const allTimeOff = (timeOffRes.data as TimeOffItem[] | null) ?? [];
+    const allDryIce = (dryIceRes.data as DryIceOrder[] | null) ?? [];
+    const allGas = (gasRes.data as GasCylinderOrder[] | null) ?? [];
+    const allAmbulance = (ambulanceRes.data as AmbulanceTrip[] | null) ?? [];
+
+    setTimeOff(allTimeOff);
+    setDryIceOrders(allDryIce);
+    setGasOrders(allGas);
+    setAmbulanceTrips(allAmbulance);
+
+    // In day mode, check if today is empty and we need lookahead
+    if (viewMode === "day") {
+      const todayStr = format(currentDate, "yyyy-MM-dd");
+      const todayHasItems =
+        rawTasks.some(t => t.due_date === todayStr) ||
+        allTimeOff.some(t => t.start_date <= todayStr && t.end_date >= todayStr) ||
+        allDryIce.some(o => o.scheduled_date === todayStr) ||
+        allGas.some(o => o.scheduled_date === todayStr) ||
+        allAmbulance.some(o => o.scheduled_date === todayStr);
       
-      // Fetch assignee names for tasks
-      const assigneeIds = [...new Set(rawTasks.map(t => t.assigned_to).filter(Boolean))];
-      if (assigneeIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from("profiles_limited")
-          .select("id, full_name")
-          .in("id", assigneeIds as string[]);
-        const nameMap = new Map(profiles?.map(p => [p.id, p.full_name]) ?? []);
-        rawTasks.forEach(t => { t.assignee_name = t.assigned_to ? nameMap.get(t.assigned_to) ?? null : null; });
-      }
-      setTasks(rawTasks);
+      const hasAnyUpcoming = rawTasks.length > 0 || allTimeOff.length > 0 || allDryIce.length > 0 || allGas.length > 0 || allAmbulance.length > 0;
+      setLookaheadActive(!todayHasItems && hasAnyUpcoming);
+    } else {
+      setLookaheadActive(false);
+    }
 
-      const allTimeOff = (timeOffRes.data as TimeOffItem[] | null) ?? [];
-      const allDryIce = (dryIceRes.data as DryIceOrder[] | null) ?? [];
-      const allGas = (gasRes.data as GasCylinderOrder[] | null) ?? [];
-      const allAmbulance = (ambulanceRes.data as AmbulanceTrip[] | null) ?? [];
-
-      setTimeOff(allTimeOff);
-      setDryIceOrders(allDryIce);
-      setGasOrders(allGas);
-      setAmbulanceTrips(allAmbulance);
-
-      // In day mode, check if today is empty and we need lookahead
-      if (viewMode === "day") {
-        const todayStr = format(currentDate, "yyyy-MM-dd");
-        const todayHasItems =
-          rawTasks.some(t => t.due_date === todayStr) ||
-          allTimeOff.some(t => t.start_date <= todayStr && t.end_date >= todayStr) ||
-          allDryIce.some(o => o.scheduled_date === todayStr) ||
-          allGas.some(o => o.scheduled_date === todayStr) ||
-          allAmbulance.some(o => o.scheduled_date === todayStr);
-        
-        const hasAnyUpcoming = rawTasks.length > 0 || allTimeOff.length > 0 || allDryIce.length > 0 || allGas.length > 0 || allAmbulance.length > 0;
-        setLookaheadActive(!todayHasItems && hasAnyUpcoming);
-      } else {
-        setLookaheadActive(false);
-      }
-
-      setLoading(false);
-    };
-    fetchData();
+    setLoading(false);
   }, [fromStr, toStr, viewMode, currentDate]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Realtime subscriptions
+  useEffect(() => {
+    const channel = supabase
+      .channel('daily-overview-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_off_requests' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dry_ice_orders' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'gas_cylinder_orders' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ambulance_trips' }, () => fetchData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchData]);
+
+  // Click handlers
+  const handleDryIceClick = async (order: DryIceOrder) => {
+    const { data } = await supabase
+      .from("dry_ice_orders")
+      .select("*, product_type_info:product_type_id(id, name, description, is_active, sort_order, created_at, updated_at), packaging_info:packaging_id(id, name, capacity_kg, description, is_active, sort_order, created_at, updated_at)")
+      .eq("id", order.id)
+      .single();
+    if (data) {
+      setSelectedDryIceOrder(data);
+      setDryIceDialogOpen(true);
+    }
+  };
+
+  const handleGasClick = async (order: GasCylinderOrder) => {
+    const { data } = await supabase
+      .from("gas_cylinder_orders")
+      .select("*, gas_type_ref:gas_type_id(id, name, color)")
+      .eq("id", order.id)
+      .single();
+    if (data) {
+      setSelectedGasOrder(data);
+      setGasDialogOpen(true);
+    }
+  };
+
+  const handleAmbulanceClick = async (trip: AmbulanceTrip) => {
+    const { data } = await supabase
+      .from("ambulance_trips")
+      .select("*, ambulance_trip_customers(*)")
+      .eq("id", trip.id)
+      .single();
+    if (data) {
+      const formatted = {
+        ...data,
+        customers: (data as any).ambulance_trip_customers || [],
+      };
+      setSelectedAmbulanceTrip(formatted);
+      setAmbulanceDialogOpen(true);
+    }
+  };
+
+  const handleTaskClick = (task: TaskItem) => {
+    const calendarItem = {
+      type: "task" as const,
+      data: {
+        ...task,
+        created_at: "",
+        created_by: "",
+        updated_at: "",
+        priority: task.priority || "medium",
+        task_type: task.task_types ? { id: task.type_id || "", name: task.task_types.name, color: task.task_types.color, is_active: true, sort_order: 0, created_at: "", updated_at: "", description: null, parent_id: null } : null,
+        profile: task.assignee_name ? { full_name: task.assignee_name } as any : null,
+      },
+    };
+    setSelectedTask(calendarItem);
+    setTaskDialogOpen(true);
+  };
 
   const navigate = (dir: "prev" | "next") => {
     const delta = viewMode === "day" ? 1 : 7;
@@ -242,290 +337,440 @@ export function DailyOverview() {
   const isEmpty = tasks.length === 0 && timeOff.length === 0 && dryIceOrders.length === 0 && gasOrders.length === 0 && ambulanceTrips.length === 0;
 
   return (
-    <Card className="mb-6">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate("prev")}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <button
-              onClick={goToToday}
-              className="text-lg font-semibold capitalize hover:text-primary transition-colors"
-            >
-              {headerLabel}
-            </button>
-            <Button variant="ghost" size="icon" onClick={() => navigate("next")}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+    <>
+      <Card className="mb-6 print-daily-overview">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={() => navigate("prev")} className="print:hidden">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <button
+                onClick={goToToday}
+                className="text-lg font-semibold capitalize hover:text-primary transition-colors"
+              >
+                {headerLabel}
+              </button>
+              <Button variant="ghost" size="icon" onClick={() => navigate("next")} className="print:hidden">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.print()}
+                className="print:hidden"
+              >
+                <Printer className="h-4 w-4 mr-1" />
+                Print
+              </Button>
+              <div className="flex rounded-lg border bg-muted p-0.5 print:hidden">
+                <button
+                  onClick={() => setViewMode("day")}
+                  className={`px-3 py-1 text-sm rounded-md font-medium transition-colors ${viewMode === "day" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+                >
+                  Dag
+                </button>
+                <button
+                  onClick={() => setViewMode("week")}
+                  className={`px-3 py-1 text-sm rounded-md font-medium transition-colors ${viewMode === "week" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+                >
+                  Week
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="flex rounded-lg border bg-muted p-0.5">
-            <button
-              onClick={() => setViewMode("day")}
-              className={`px-3 py-1 text-sm rounded-md font-medium transition-colors ${viewMode === "day" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
-            >
-              Dag
-            </button>
-            <button
-              onClick={() => setViewMode("week")}
-              className={`px-3 py-1 text-sm rounded-md font-medium transition-colors ${viewMode === "week" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
-            >
-              Week
-            </button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-5 w-40" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-5 w-32 mt-2" />
-            <Skeleton className="h-4 w-full" />
-          </div>
-        ) : isEmpty ? (
-          <p className="text-muted-foreground text-sm py-4 text-center">
-            Geen items gepland voor {viewMode === "day" ? "de komende dagen" : "deze week"}.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {lookaheadActive && viewMode === "day" && (
-              <p className="text-muted-foreground text-xs italic">
-                Vandaag geen items — hieronder de komende dagen:
-              </p>
-            )}
-            {days.map((day) => {
-              const dayStr = format(day, "yyyy-MM-dd");
-              const dayTasks = tasks.filter((t) => t.due_date === dayStr);
-              const dayTimeOff = timeOff.filter(
-                (t) => t.start_date <= dayStr && t.end_date >= dayStr
-              );
-              const dayDryIce = dryIceOrders.filter((o) => o.scheduled_date === dayStr);
-              const dayGas = gasOrders.filter((o) => o.scheduled_date === dayStr);
-              const dayAmbulance = ambulanceTrips.filter((o) => o.scheduled_date === dayStr);
-              const dayEmpty = dayTasks.length === 0 && dayTimeOff.length === 0 && dayDryIce.length === 0 && dayGas.length === 0 && dayAmbulance.length === 0;
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-5 w-32 mt-2" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          ) : isEmpty ? (
+            <p className="text-muted-foreground text-sm py-4 text-center">
+              Geen items gepland voor {viewMode === "day" ? "de komende dagen" : "deze week"}.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {lookaheadActive && viewMode === "day" && (
+                <p className="text-muted-foreground text-xs italic">
+                  Vandaag geen items — hieronder de komende dagen:
+                </p>
+              )}
+              {days.map((day) => {
+                const dayStr = format(day, "yyyy-MM-dd");
+                const dayTasks = tasks.filter((t) => t.due_date === dayStr);
+                const dayTimeOff = timeOff.filter(
+                  (t) => t.start_date <= dayStr && t.end_date >= dayStr
+                );
+                const dayDryIce = dryIceOrders.filter((o) => o.scheduled_date === dayStr);
+                const dayGas = gasOrders.filter((o) => o.scheduled_date === dayStr);
+                const dayAmbulance = ambulanceTrips.filter((o) => o.scheduled_date === dayStr);
+                const dayEmpty = dayTasks.length === 0 && dayTimeOff.length === 0 && dayDryIce.length === 0 && dayGas.length === 0 && dayAmbulance.length === 0;
 
-              if (dayEmpty && (viewMode === "week" || lookaheadActive)) return null;
+                if (dayEmpty && (viewMode === "week" || lookaheadActive)) return null;
 
-              return (
-                <div key={dayStr}>
-                  {(viewMode === "week" || lookaheadActive) && (
-                    <h4 className="text-sm font-semibold text-muted-foreground mb-2 capitalize">
-                      {format(day, "EEEE d MMMM", { locale: nl })}
-                      {isToday(day) && (
-                        <Badge variant="secondary" className="ml-2 text-xs">Vandaag</Badge>
-                      )}
-                    </h4>
-                  )}
+                const totalDryIceKg = dayDryIce.reduce((sum, o) => sum + Number(o.quantity_kg), 0);
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-                    {/* Ambulance */}
-                    {dayAmbulance.length > 0 && (
-                      <Section
-                        icon={<Ambulance className="h-4 w-4" />}
-                        label="Ambulance"
-                        count={dayAmbulance.length}
-                        color="text-red-500"
-                        badgeClass="bg-red-500/10 text-red-700 dark:text-red-400"
-                        bgClass="bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30"
-                      >
-                        {dayAmbulance.map((o) => {
-                          const cylinderItems: { label: string; count: number }[] = [];
-                          if (o.cylinders_2l_300_o2 > 0) cylinderItems.push({ label: "2L 300 O2", count: o.cylinders_2l_300_o2 });
-                          if (o.cylinders_2l_200_o2 > 0) cylinderItems.push({ label: "2L 200 O2", count: o.cylinders_2l_200_o2 });
-                          const model5lLabel = o.model_5l === "any" ? "Laag / Hoog" : o.model_5l === "high" ? "Hoog" : o.model_5l === "low" ? "Laag" : o.model_5l || "std";
-                          if (o.cylinders_5l_o2_integrated > 0) cylinderItems.push({ label: `5L O2 (${model5lLabel})`, count: o.cylinders_5l_o2_integrated });
-                          if (o.cylinders_1l_pindex_o2 > 0) cylinderItems.push({ label: "1L Pindex O2", count: o.cylinders_1l_pindex_o2 });
-                          if (o.cylinders_10l_o2_integrated > 0) cylinderItems.push({ label: "10L O2", count: o.cylinders_10l_o2_integrated });
-                          if (o.cylinders_5l_air_integrated > 0) cylinderItems.push({ label: "5L Lucht", count: o.cylinders_5l_air_integrated });
-                          if (o.cylinders_2l_air_integrated > 0) cylinderItems.push({ label: "2L Lucht", count: o.cylinders_2l_air_integrated });
-                          const customers = o.ambulance_trip_customers ?? [];
-                          return (
-                            <div key={o.id} className="text-sm space-y-1.5">
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Cilinders</span>
-                                <StatusBadge status={o.status} />
-                              </div>
-                              {cylinderItems.length > 0 ? (
-                                <ul className="space-y-0.5">
-                                  {cylinderItems.map((c) => (
-                                    <li key={c.label} className="flex items-center justify-between text-xs">
-                                      <span className="flex items-center gap-1">{c.label}{c.label.startsWith("5L O2") && <Ruler className="h-3 w-3 text-muted-foreground" />}</span>
-                                      <span className="font-semibold">{c.count}×</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <p className="text-xs text-muted-foreground">Geen cilinders</p>
-                              )}
-                              {customers.length > 0 && (
-                                <div>
-                                  <span className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Klanten</span>
-                                  <ul className="mt-0.5 space-y-0">
-                                    {customers.map((c) => (
-                                      <li key={c.customer_number} className="text-xs text-muted-foreground">
-                                        <span className="font-mono text-xs mr-1">{c.customer_number}</span>
-                                        {c.customer_name}
+                return (
+                  <div key={dayStr}>
+                    {(viewMode === "week" || lookaheadActive) && (
+                      <>
+                        <h4 className="text-sm font-semibold text-muted-foreground mb-1 capitalize">
+                          {format(day, "EEEE d MMMM", { locale: nl })}
+                          {isToday(day) && (
+                            <Badge variant="secondary" className="ml-2 text-xs">Vandaag</Badge>
+                          )}
+                        </h4>
+                        {/* Day summary badges */}
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {dayAmbulance.length > 0 && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-500/10 text-red-700 dark:text-red-400">
+                              <Ambulance className="h-3 w-3" /> {dayAmbulance.length}
+                            </span>
+                          )}
+                          {dayGas.length > 0 && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-700 dark:text-orange-400">
+                              <Cylinder className="h-3 w-3" /> {dayGas.length}
+                            </span>
+                          )}
+                          {dayDryIce.length > 0 && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-700 dark:text-cyan-400">
+                              <Snowflake className="h-3 w-3" /> {totalDryIceKg} kg
+                            </span>
+                          )}
+                          {dayTasks.length > 0 && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-400">
+                              <ClipboardList className="h-3 w-3" /> {dayTasks.length}
+                            </span>
+                          )}
+                          {dayTimeOff.length > 0 && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
+                              <Palmtree className="h-3 w-3" /> {dayTimeOff.length}
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                      {/* Ambulance */}
+                      {dayAmbulance.length > 0 && (
+                        <Section
+                          icon={<Ambulance className="h-4 w-4" />}
+                          label="Ambulance"
+                          count={dayAmbulance.length}
+                          color="text-red-500"
+                          badgeClass="bg-red-500/10 text-red-700 dark:text-red-400"
+                          bgClass="bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30"
+                        >
+                          {dayAmbulance.map((o) => {
+                            const cylinderItems: { label: string; count: number }[] = [];
+                            if (o.cylinders_2l_300_o2 > 0) cylinderItems.push({ label: "2L 300 O2", count: o.cylinders_2l_300_o2 });
+                            if (o.cylinders_2l_200_o2 > 0) cylinderItems.push({ label: "2L 200 O2", count: o.cylinders_2l_200_o2 });
+                            const model5lLabel = o.model_5l === "any" ? "Laag / Hoog" : o.model_5l === "high" ? "Hoog" : o.model_5l === "low" ? "Laag" : o.model_5l || "std";
+                            if (o.cylinders_5l_o2_integrated > 0) cylinderItems.push({ label: `5L O2 (${model5lLabel})`, count: o.cylinders_5l_o2_integrated });
+                            if (o.cylinders_1l_pindex_o2 > 0) cylinderItems.push({ label: "1L Pindex O2", count: o.cylinders_1l_pindex_o2 });
+                            if (o.cylinders_10l_o2_integrated > 0) cylinderItems.push({ label: "10L O2", count: o.cylinders_10l_o2_integrated });
+                            if (o.cylinders_5l_air_integrated > 0) cylinderItems.push({ label: "5L Lucht", count: o.cylinders_5l_air_integrated });
+                            if (o.cylinders_2l_air_integrated > 0) cylinderItems.push({ label: "2L Lucht", count: o.cylinders_2l_air_integrated });
+                            const customers = o.ambulance_trip_customers ?? [];
+                            return (
+                              <div
+                                key={o.id}
+                                className="text-sm space-y-1.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors"
+                                onClick={() => handleAmbulanceClick(o)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Cilinders</span>
+                                  <StatusBadge status={o.status} />
+                                </div>
+                                {cylinderItems.length > 0 ? (
+                                  <ul className="space-y-0.5">
+                                    {cylinderItems.map((c) => (
+                                      <li key={c.label} className="flex items-center justify-between text-xs">
+                                        <span className="flex items-center gap-1">{c.label}{c.label.startsWith("5L O2") && <Ruler className="h-3 w-3 text-muted-foreground" />}</span>
+                                        <span className="font-semibold">{c.count}×</span>
                                       </li>
                                     ))}
                                   </ul>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">Geen cilinders</p>
+                                )}
+                                {customers.length > 0 && (
+                                  <div>
+                                    <span className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Klanten</span>
+                                    <ul className="mt-0.5 space-y-0">
+                                      {customers.map((c) => (
+                                        <li key={c.customer_number} className="text-xs text-muted-foreground">
+                                          <span className="font-mono text-xs mr-1">{c.customer_number}</span>
+                                          {c.customer_name}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                                {o.notes && (
+                                  <p className="text-xs text-muted-foreground italic mt-1 border-t border-current/5 pt-1">
+                                    {o.notes}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </Section>
+                      )}
+
+                      {/* Gascilinders - grouped by customer */}
+                      {dayGas.length > 0 && (
+                        <Section
+                          icon={<Cylinder className="h-4 w-4" />}
+                          label="Gascilinders"
+                          count={dayGas.length}
+                          color="text-orange-500"
+                          badgeClass="bg-orange-500/10 text-orange-700 dark:text-orange-400"
+                          bgClass="bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900/30"
+                        >
+                          {(() => {
+                            // Group by customer
+                            const grouped = new Map<string, GasCylinderOrder[]>();
+                            dayGas.forEach(o => {
+                              const key = o.customer_name;
+                              if (!grouped.has(key)) grouped.set(key, []);
+                              grouped.get(key)!.push(o);
+                            });
+
+                            return Array.from(grouped.entries()).map(([customerName, orders]) => {
+                              const sizeLabels: Record<string, string> = {
+                                small: "Laag",
+                                medium: "Laag",
+                                large: "Hoog",
+                              };
+
+                              if (orders.length === 1) {
+                                const o = orders[0];
+                                return (
+                                  <div
+                                    key={o.id}
+                                    className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""}`}
+                                    onClick={() => handleGasClick(o)}
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <div className="truncate font-medium text-xs">{o.customer_name}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {o.gas_types?.name || "Gas"} — {o.cylinder_count} cil.
+                                        </div>
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                          <Ruler className="h-3 w-3" />
+                                          <span>{sizeLabels[o.cylinder_size] || o.cylinder_size}</span>
+                                        </div>
+                                      </div>
+                                      <StatusBadge status={o.status} />
+                                    </div>
+                                    {o.notes && (
+                                      <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
+                                    )}
+                                  </div>
+                                );
+                              }
+
+                              // Multiple orders for same customer
+                              return (
+                                <div key={customerName} className="text-sm">
+                                  <div className="font-medium text-xs mb-1">{customerName}</div>
+                                  <div className="pl-2 border-l border-orange-300/50 dark:border-orange-700/50 space-y-1">
+                                    {orders.map(o => (
+                                      <div
+                                        key={o.id}
+                                        className={`hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""}`}
+                                        onClick={() => handleGasClick(o)}
+                                      >
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="text-xs text-muted-foreground">
+                                            {o.gas_types?.name || "Gas"} — {o.cylinder_count} cil.
+                                            <span className="ml-1">
+                                              <Ruler className="h-3 w-3 inline" /> {sizeLabels[o.cylinder_size] || o.cylinder_size}
+                                            </span>
+                                          </div>
+                                          <StatusBadge status={o.status} />
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              )}
+                              );
+                            });
+                          })()}
+                        </Section>
+                      )}
+
+                      {/* Droogijs */}
+                      {dayDryIce.length > 0 && (
+                        <Section
+                          icon={<Snowflake className="h-4 w-4" />}
+                          label="Droogijs"
+                          count={dayDryIce.length}
+                          color="text-cyan-500"
+                          badgeClass="bg-cyan-500/10 text-cyan-700 dark:text-cyan-400"
+                          bgClass="bg-cyan-50 dark:bg-cyan-950/20 border-cyan-200 dark:border-cyan-900/30"
+                        >
+                          {dayDryIce.map((o) => (
+                            <div
+                              key={o.id}
+                              className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""}`}
+                              onClick={() => handleDryIceClick(o)}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="truncate font-medium text-xs">{o.customer_name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {o.quantity_kg} kg
+                                    {o.dry_ice_packaging?.name ? ` · ${o.dry_ice_packaging.name}` : ""}
+                                    {(() => {
+                                      const count = o.box_count || (o.dry_ice_packaging?.capacity_kg ? Math.ceil(o.quantity_kg / o.dry_ice_packaging.capacity_kg) : null);
+                                      return count ? ` · ${count}×` : "";
+                                    })()}
+                                  </div>
+                                </div>
+                                <StatusBadge status={o.status} />
+                              </div>
                               {o.notes && (
-                                <p className="text-xs text-muted-foreground italic mt-1 border-t border-current/5 pt-1">
-                                  {o.notes}
-                                </p>
+                                <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
                               )}
                             </div>
-                          );
-                        })}
-                      </Section>
-                    )}
-
-                    {/* Gascilinders */}
-                    {dayGas.length > 0 && (
-                      <Section
-                        icon={<Cylinder className="h-4 w-4" />}
-                        label="Gascilinders"
-                        count={dayGas.length}
-                        color="text-orange-500"
-                        badgeClass="bg-orange-500/10 text-orange-700 dark:text-orange-400"
-                        bgClass="bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900/30"
-                      >
-                        {dayGas.map((o) => {
-                          const sizeLabels: Record<string, string> = {
-                            small: "Laag",
-                            medium: "Laag",
-                            large: "Hoog",
-                          };
-                          return (
-                          <div key={o.id} className="text-sm py-0.5">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className="truncate font-medium text-xs">{o.customer_name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {o.gas_types?.name || "Gas"} — {o.cylinder_count} cil.
-                                </div>
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <Ruler className="h-3 w-3" />
-                                  <span>{sizeLabels[o.cylinder_size] || o.cylinder_size}</span>
-                                </div>
-                              </div>
-                              <StatusBadge status={o.status} />
+                          ))}
+                          {dayDryIce.length >= 1 && (
+                            <div className="border-t border-cyan-300/30 dark:border-cyan-700/30 pt-1.5 mt-1 flex items-center justify-between text-xs font-semibold">
+                              <span>Totaal</span>
+                              <span>{totalDryIceKg} kg</span>
                             </div>
-                            {o.notes && (
-                              <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
-                            )}
-                          </div>
-                          );
-                        })}
-                      </Section>
-                    )}
+                          )}
+                        </Section>
+                      )}
 
-                    {/* Droogijs */}
-                    {dayDryIce.length > 0 && (
-                      <Section
-                        icon={<Snowflake className="h-4 w-4" />}
-                        label="Droogijs"
-                        count={dayDryIce.length}
-                        color="text-cyan-500"
-                        badgeClass="bg-cyan-500/10 text-cyan-700 dark:text-cyan-400"
-                        bgClass="bg-cyan-50 dark:bg-cyan-950/20 border-cyan-200 dark:border-cyan-900/30"
-                      >
-                        {dayDryIce.map((o) => (
-                          <div key={o.id} className="text-sm py-0.5">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className="truncate font-medium text-xs">{o.customer_name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {o.quantity_kg} kg
-                                  {o.dry_ice_packaging?.name ? ` · ${o.dry_ice_packaging.name}` : ""}
-                                  {(() => {
-                                    const count = o.box_count || (o.dry_ice_packaging?.capacity_kg ? Math.ceil(o.quantity_kg / o.dry_ice_packaging.capacity_kg) : null);
-                                    return count ? ` · ${count}×` : "";
-                                  })()}
-                                </div>
-                              </div>
-                              <StatusBadge status={o.status} />
-                            </div>
-                            {o.notes && (
-                              <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
-                            )}
-                          </div>
-                        ))}
-                        {dayDryIce.length >= 1 && (
-                          <div className="border-t border-cyan-300/30 dark:border-cyan-700/30 pt-1.5 mt-1 flex items-center justify-between text-xs font-semibold">
-                            <span>Totaal</span>
-                            <span>{dayDryIce.reduce((sum, o) => sum + Number(o.quantity_kg), 0)} kg</span>
-                          </div>
-                        )}
-                      </Section>
-                    )}
-
-                    {/* Taken */}
-                    {dayTasks.length > 0 && (
-                      <Section
-                        icon={<ClipboardList className="h-4 w-4" />}
-                        label="Taken"
-                        count={dayTasks.length}
-                        color="text-blue-500"
-                        badgeClass="bg-blue-500/10 text-blue-700 dark:text-blue-400"
-                        bgClass="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/30"
-                      >
-                        {dayTasks.map((t) => (
-                          <div key={t.id} className="flex items-center gap-2 text-sm py-0.5">
-                            {t.start_time && (
-                              <span className="text-muted-foreground font-mono text-xs w-24 shrink-0">
-                                {t.start_time.slice(0, 5)}
-                                {t.end_time && `–${t.end_time.slice(0, 5)}`}
+                      {/* Taken */}
+                      {dayTasks.length > 0 && (
+                        <Section
+                          icon={<ClipboardList className="h-4 w-4" />}
+                          label="Taken"
+                          count={dayTasks.length}
+                          color="text-blue-500"
+                          badgeClass="bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                          bgClass="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/30"
+                        >
+                          {dayTasks.map((t) => (
+                            <div
+                              key={t.id}
+                              className={`flex items-center gap-2 text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${
+                                t.priority === "high" ? "border-l-2 border-red-500 pl-2" :
+                                t.priority === "low" ? "border-l-2 border-muted-foreground/30 pl-2" : ""
+                              }`}
+                              onClick={() => handleTaskClick(t)}
+                            >
+                              {t.start_time && (
+                                <span className="text-muted-foreground font-mono text-xs w-24 shrink-0">
+                                  {t.start_time.slice(0, 5)}
+                                  {t.end_time && `–${t.end_time.slice(0, 5)}`}
+                                </span>
+                              )}
+                              <span className="truncate">
+                                {t.task_types?.name || t.title || "Taak"}
+                                {t.title && t.task_types?.name ? ` — ${t.title}` : ""}
                               </span>
-                            )}
-                            <span className="truncate">
-                              {t.task_types?.name || t.title || "Taak"}
-                              {t.title && t.task_types?.name ? ` — ${t.title}` : ""}
-                            </span>
-                            <span className="text-muted-foreground text-xs ml-auto shrink-0">
-                              {t.assignee_name || "Algemeen"}
-                            </span>
-                          </div>
-                        ))}
-                      </Section>
-                    )}
+                              <span className="text-muted-foreground text-xs ml-auto shrink-0">
+                                {t.assignee_name || "Algemeen"}
+                              </span>
+                            </div>
+                          ))}
+                        </Section>
+                      )}
 
-                    {/* Vrij */}
-                    {dayTimeOff.length > 0 && (
-                      <Section
-                        icon={<Palmtree className="h-4 w-4" />}
-                        label="Afwezig"
-                        count={dayTimeOff.length}
-                        color="text-green-500"
-                        badgeClass="bg-green-500/10 text-green-700 dark:text-green-400"
-                        bgClass="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900/30"
-                      >
-                        {dayTimeOff.map((t) => (
-                          <div key={t.id} className="flex items-center gap-2 text-sm py-0.5">
-                            <span className="truncate">
-                              {t.profiles?.full_name || "Medewerker"}
-                            </span>
-                            <span className="text-muted-foreground text-xs ml-auto shrink-0">
-                              {t.time_off_types?.name || "Verlof"}
-                              {t.day_part && t.day_part !== "full_day" && ` (${t.day_part === "morning" ? "ochtend" : "middag"})`}
-                            </span>
-                          </div>
-                        ))}
-                      </Section>
-                    )}
+                      {/* Vrij */}
+                      {dayTimeOff.length > 0 && (
+                        <Section
+                          icon={<Palmtree className="h-4 w-4" />}
+                          label="Afwezig"
+                          count={dayTimeOff.length}
+                          color="text-green-500"
+                          badgeClass="bg-green-500/10 text-green-700 dark:text-green-400"
+                          bgClass="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900/30"
+                        >
+                          {dayTimeOff.map((t) => (
+                            <Popover key={t.id}>
+                              <PopoverTrigger asChild>
+                                <div className="flex items-center gap-2 text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors">
+                                  <span className="truncate">
+                                    {t.profiles?.full_name || "Medewerker"}
+                                  </span>
+                                  <span className="text-muted-foreground text-xs ml-auto shrink-0">
+                                    {t.time_off_types?.name || "Verlof"}
+                                    {t.day_part && t.day_part !== "full_day" && ` (${t.day_part === "morning" ? "ochtend" : "middag"})`}
+                                  </span>
+                                </div>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 p-3">
+                                <div className="space-y-1.5">
+                                  <div className="font-medium text-sm">{t.profiles?.full_name || "Medewerker"}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {t.time_off_types?.name || "Verlof"}
+                                    {t.day_part && t.day_part !== "full_day" && ` (${t.day_part === "morning" ? "ochtend" : "middag"})`}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {format(new Date(t.start_date), "d MMM", { locale: nl })} – {format(new Date(t.end_date), "d MMM yyyy", { locale: nl })}
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          ))}
+                        </Section>
+                      )}
+                    </div>
+
+                    {viewMode === "week" && <div className="border-b my-2" />}
                   </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-                  {viewMode === "week" && <div className="border-b my-2" />}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {/* Dialogs */}
+      <DryIceOrderDialog
+        order={selectedDryIceOrder}
+        open={dryIceDialogOpen}
+        onOpenChange={setDryIceDialogOpen}
+        onUpdate={fetchData}
+      />
+
+      <GasCylinderOrderDialog
+        order={selectedGasOrder}
+        open={gasDialogOpen}
+        onOpenChange={setGasDialogOpen}
+        onUpdate={fetchData}
+      />
+
+      <AmbulanceTripDialog
+        trip={selectedAmbulanceTrip}
+        open={ambulanceDialogOpen}
+        onOpenChange={setAmbulanceDialogOpen}
+        onUpdate={fetchData}
+        isAdmin={false}
+      />
+
+      <CalendarItemDialog
+        item={selectedTask}
+        open={taskDialogOpen}
+        onOpenChange={setTaskDialogOpen}
+        onUpdate={fetchData}
+      />
+    </>
   );
 }
 

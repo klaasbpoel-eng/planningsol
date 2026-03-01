@@ -314,3 +314,36 @@ All colors MUST be HSL.
     @apply bg-gradient-to-r from-primary to-primary/80 text-primary-foreground font-semibold shadow-lg shadow-primary/25;
   }
 }
+
+/* Print styles for Daily Overview */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .print-daily-overview,
+  .print-daily-overview * {
+    visibility: visible !important;
+  }
+
+  .print-daily-overview {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+
+  nav,
+  header,
+  aside,
+  [data-sidebar],
+  .sidebar {
+    display: none !important;
+  }
+}
