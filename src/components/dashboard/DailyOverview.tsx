@@ -4,7 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+} from "@/components/ui/context-menu";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   ChevronLeft,
   ChevronRight,
@@ -15,6 +22,10 @@ import {
   Ambulance,
   Ruler,
   Printer,
+  Clock,
+  Play,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import {
   format,
@@ -314,6 +325,46 @@ export function DailyOverview() {
 
   const goToToday = () => setCurrentDate(new Date());
 
+  // Quick status change handlers
+  const statusOptions = [
+    { value: "pending", label: "Gepland", icon: Clock },
+    { value: "in_progress", label: "Bezig", icon: Play },
+    { value: "completed", label: "Voltooid", icon: CheckCircle2 },
+    { value: "cancelled", label: "Geannuleerd", icon: XCircle },
+  ];
+
+  const handleQuickStatus = async (
+    table: "ambulance_trips" | "gas_cylinder_orders" | "dry_ice_orders" | "tasks",
+    id: string,
+    newStatus: string,
+    setter: React.Dispatch<React.SetStateAction<any[]>>,
+  ) => {
+    const prev = (table === "ambulance_trips" ? ambulanceTrips : table === "gas_cylinder_orders" ? gasOrders : table === "dry_ice_orders" ? dryIceOrders : tasks) as any[];
+    setter((items: any[]) => items.map(i => i.id === id ? { ...i, status: newStatus } : i));
+    const { error } = await supabase.from(table).update({ status: newStatus }).eq("id", id);
+    if (error) {
+      setter(prev);
+      toast.error("Status wijzigen mislukt");
+    } else {
+      toast.success("Status bijgewerkt");
+    }
+  };
+
+  const renderStatusMenu = (currentStatus: string, onSelect: (status: string) => void) => (
+    <>
+      {statusOptions.map(({ value, label, icon: Icon }) => (
+        <ContextMenuItem
+          key={value}
+          onClick={(e) => { e.stopPropagation(); onSelect(value); }}
+          className={currentStatus === value ? "font-semibold bg-accent" : ""}
+        >
+          <Icon className="h-4 w-4 mr-2" />
+          {label}
+        </ContextMenuItem>
+      ))}
+    </>
+  );
+
   const headerLabel = useMemo(() => {
     if (viewMode === "day") {
       return isToday(currentDate)
@@ -491,46 +542,52 @@ export function DailyOverview() {
                             if (o.cylinders_2l_air_integrated > 0) cylinderItems.push({ label: "2L Lucht", count: o.cylinders_2l_air_integrated });
                             const customers = o.ambulance_trip_customers ?? [];
                             return (
-                              <div
-                                key={o.id}
-                                className="text-sm space-y-1.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors"
-                                onClick={() => handleAmbulanceClick(o)}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Cilinders</span>
-                                  <StatusBadge status={o.status} />
-                                </div>
-                                {cylinderItems.length > 0 ? (
-                                  <ul className="space-y-0.5">
-                                    {cylinderItems.map((c) => (
-                                      <li key={c.label} className="flex items-center justify-between text-xs">
-                                        <span className="flex items-center gap-1">{c.label}{c.label.startsWith("5L O2") && <Ruler className="h-3 w-3 text-muted-foreground" />}</span>
-                                        <span className="font-semibold">{c.count}×</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                ) : (
-                                  <p className="text-xs text-muted-foreground">Geen cilinders</p>
-                                )}
-                                {customers.length > 0 && (
-                                  <div>
-                                    <span className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Klanten</span>
-                                    <ul className="mt-0.5 space-y-0">
-                                      {customers.map((c) => (
-                                        <li key={c.customer_number} className="text-xs text-muted-foreground">
-                                          <span className="font-mono text-xs mr-1">{c.customer_number}</span>
-                                          {c.customer_name}
-                                        </li>
-                                      ))}
-                                    </ul>
+                              <ContextMenu key={o.id}>
+                                <ContextMenuTrigger asChild>
+                                  <div
+                                    className="text-sm space-y-1.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors"
+                                    onClick={() => handleAmbulanceClick(o)}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Cilinders</span>
+                                      <StatusBadge status={o.status} />
+                                    </div>
+                                    {cylinderItems.length > 0 ? (
+                                      <ul className="space-y-0.5">
+                                        {cylinderItems.map((c) => (
+                                          <li key={c.label} className="flex items-center justify-between text-xs">
+                                            <span className="flex items-center gap-1">{c.label}{c.label.startsWith("5L O2") && <Ruler className="h-3 w-3 text-muted-foreground" />}</span>
+                                            <span className="font-semibold">{c.count}×</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    ) : (
+                                      <p className="text-xs text-muted-foreground">Geen cilinders</p>
+                                    )}
+                                    {customers.length > 0 && (
+                                      <div>
+                                        <span className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Klanten</span>
+                                        <ul className="mt-0.5 space-y-0">
+                                          {customers.map((c) => (
+                                            <li key={c.customer_number} className="text-xs text-muted-foreground">
+                                              <span className="font-mono text-xs mr-1">{c.customer_number}</span>
+                                              {c.customer_name}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {o.notes && (
+                                      <p className="text-xs text-muted-foreground italic mt-1 border-t border-current/5 pt-1">
+                                        {o.notes}
+                                      </p>
+                                    )}
                                   </div>
-                                )}
-                                {o.notes && (
-                                  <p className="text-xs text-muted-foreground italic mt-1 border-t border-current/5 pt-1">
-                                    {o.notes}
-                                  </p>
-                                )}
-                              </div>
+                                </ContextMenuTrigger>
+                                <ContextMenuContent>
+                                  {renderStatusMenu(o.status, (s) => handleQuickStatus("ambulance_trips", o.id, s, setAmbulanceTrips))}
+                                </ContextMenuContent>
+                              </ContextMenu>
                             );
                           })}
                         </Section>
@@ -565,28 +622,34 @@ export function DailyOverview() {
                               if (orders.length === 1) {
                                 const o = orders[0];
                                 return (
-                                  <div
-                                    key={o.id}
-                                    className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""}`}
-                                    onClick={() => handleGasClick(o)}
-                                  >
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="min-w-0">
-                                        <div className="truncate font-medium text-xs">{o.customer_name}</div>
-                                        <div className="text-xs text-muted-foreground">
-                                          {o.gas_types?.name || "Gas"} — {o.cylinder_count} cil.
+                                  <ContextMenu key={o.id}>
+                                    <ContextMenuTrigger asChild>
+                                      <div
+                                        className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""}`}
+                                        onClick={() => handleGasClick(o)}
+                                      >
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="min-w-0">
+                                            <div className="truncate font-medium text-xs">{o.customer_name}</div>
+                                            <div className="text-xs text-muted-foreground">
+                                              {o.gas_types?.name || "Gas"} — {o.cylinder_count} cil.
+                                            </div>
+                                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                              <Ruler className="h-3 w-3" />
+                                              <span>{sizeLabels[o.cylinder_size] || o.cylinder_size}</span>
+                                            </div>
+                                          </div>
+                                          <StatusBadge status={o.status} />
                                         </div>
-                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                          <Ruler className="h-3 w-3" />
-                                          <span>{sizeLabels[o.cylinder_size] || o.cylinder_size}</span>
-                                        </div>
+                                        {o.notes && (
+                                          <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
+                                        )}
                                       </div>
-                                      <StatusBadge status={o.status} />
-                                    </div>
-                                    {o.notes && (
-                                      <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
-                                    )}
-                                  </div>
+                                    </ContextMenuTrigger>
+                                    <ContextMenuContent>
+                                      {renderStatusMenu(o.status, (s) => handleQuickStatus("gas_cylinder_orders", o.id, s, setGasOrders))}
+                                    </ContextMenuContent>
+                                  </ContextMenu>
                                 );
                               }
 
@@ -596,21 +659,27 @@ export function DailyOverview() {
                                   <div className="font-medium text-xs mb-1">{customerName}</div>
                                   <div className="pl-2 border-l border-orange-300/50 dark:border-orange-700/50 space-y-1">
                                     {orders.map(o => (
-                                      <div
-                                        key={o.id}
-                                        className={`hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""}`}
-                                        onClick={() => handleGasClick(o)}
-                                      >
-                                        <div className="flex items-center justify-between gap-2">
-                                          <div className="text-xs text-muted-foreground">
-                                            {o.gas_types?.name || "Gas"} — {o.cylinder_count} cil.
-                                            <span className="ml-1">
-                                              <Ruler className="h-3 w-3 inline" /> {sizeLabels[o.cylinder_size] || o.cylinder_size}
-                                            </span>
+                                      <ContextMenu key={o.id}>
+                                        <ContextMenuTrigger asChild>
+                                          <div
+                                            className={`hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""}`}
+                                            onClick={() => handleGasClick(o)}
+                                          >
+                                            <div className="flex items-center justify-between gap-2">
+                                              <div className="text-xs text-muted-foreground">
+                                                {o.gas_types?.name || "Gas"} — {o.cylinder_count} cil.
+                                                <span className="ml-1">
+                                                  <Ruler className="h-3 w-3 inline" /> {sizeLabels[o.cylinder_size] || o.cylinder_size}
+                                                </span>
+                                              </div>
+                                              <StatusBadge status={o.status} />
+                                            </div>
                                           </div>
-                                          <StatusBadge status={o.status} />
-                                        </div>
-                                      </div>
+                                        </ContextMenuTrigger>
+                                        <ContextMenuContent>
+                                          {renderStatusMenu(o.status, (s) => handleQuickStatus("gas_cylinder_orders", o.id, s, setGasOrders))}
+                                        </ContextMenuContent>
+                                      </ContextMenu>
                                     ))}
                                   </div>
                                 </div>
@@ -631,29 +700,35 @@ export function DailyOverview() {
                           bgClass="bg-cyan-50 dark:bg-cyan-950/20 border-cyan-200 dark:border-cyan-900/30"
                         >
                           {dayDryIce.map((o) => (
-                            <div
-                              key={o.id}
-                              className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""}`}
-                              onClick={() => handleDryIceClick(o)}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="min-w-0">
-                                  <div className="truncate font-medium text-xs">{o.customer_name}</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {o.quantity_kg} kg
-                                    {o.dry_ice_packaging?.name ? ` · ${o.dry_ice_packaging.name}` : ""}
-                                    {(() => {
-                                      const count = o.box_count || (o.dry_ice_packaging?.capacity_kg ? Math.ceil(o.quantity_kg / o.dry_ice_packaging.capacity_kg) : null);
-                                      return count ? ` · ${count}×` : "";
-                                    })()}
+                            <ContextMenu key={o.id}>
+                              <ContextMenuTrigger asChild>
+                                <div
+                                  className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""}`}
+                                  onClick={() => handleDryIceClick(o)}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <div className="truncate font-medium text-xs">{o.customer_name}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {o.quantity_kg} kg
+                                        {o.dry_ice_packaging?.name ? ` · ${o.dry_ice_packaging.name}` : ""}
+                                        {(() => {
+                                          const count = o.box_count || (o.dry_ice_packaging?.capacity_kg ? Math.ceil(o.quantity_kg / o.dry_ice_packaging.capacity_kg) : null);
+                                          return count ? ` · ${count}×` : "";
+                                        })()}
+                                      </div>
+                                    </div>
+                                    <StatusBadge status={o.status} />
                                   </div>
+                                  {o.notes && (
+                                    <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
+                                  )}
                                 </div>
-                                <StatusBadge status={o.status} />
-                              </div>
-                              {o.notes && (
-                                <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
-                              )}
-                            </div>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent>
+                                {renderStatusMenu(o.status, (s) => handleQuickStatus("dry_ice_orders", o.id, s, setDryIceOrders))}
+                              </ContextMenuContent>
+                            </ContextMenu>
                           ))}
                           {dayDryIce.length >= 1 && (
                             <div className="border-t border-cyan-300/30 dark:border-cyan-700/30 pt-1.5 mt-1 flex items-center justify-between text-xs font-semibold">
@@ -675,28 +750,34 @@ export function DailyOverview() {
                           bgClass="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/30"
                         >
                           {dayTasks.map((t) => (
-                            <div
-                              key={t.id}
-                              className={`flex items-center gap-2 text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${
-                                t.priority === "high" ? "border-l-2 border-red-500 pl-2" :
-                                t.priority === "low" ? "border-l-2 border-muted-foreground/30 pl-2" : ""
-                              }`}
-                              onClick={() => handleTaskClick(t)}
-                            >
-                              {t.start_time && (
-                                <span className="text-muted-foreground font-mono text-xs w-24 shrink-0">
-                                  {t.start_time.slice(0, 5)}
-                                  {t.end_time && `–${t.end_time.slice(0, 5)}`}
-                                </span>
-                              )}
-                              <span className="truncate">
-                                {t.task_types?.name || t.title || "Taak"}
-                                {t.title && t.task_types?.name ? ` — ${t.title}` : ""}
-                              </span>
-                              <span className="text-muted-foreground text-xs ml-auto shrink-0">
-                                {t.assignee_name || "Algemeen"}
-                              </span>
-                            </div>
+                            <ContextMenu key={t.id}>
+                              <ContextMenuTrigger asChild>
+                                <div
+                                  className={`flex items-center gap-2 text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${
+                                    t.priority === "high" ? "border-l-2 border-red-500 pl-2" :
+                                    t.priority === "low" ? "border-l-2 border-muted-foreground/30 pl-2" : ""
+                                  }`}
+                                  onClick={() => handleTaskClick(t)}
+                                >
+                                  {t.start_time && (
+                                    <span className="text-muted-foreground font-mono text-xs w-24 shrink-0">
+                                      {t.start_time.slice(0, 5)}
+                                      {t.end_time && `–${t.end_time.slice(0, 5)}`}
+                                    </span>
+                                  )}
+                                  <span className="truncate">
+                                    {t.task_types?.name || t.title || "Taak"}
+                                    {t.title && t.task_types?.name ? ` — ${t.title}` : ""}
+                                  </span>
+                                  <span className="text-muted-foreground text-xs ml-auto shrink-0">
+                                    {t.assignee_name || "Algemeen"}
+                                  </span>
+                                </div>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent>
+                                {renderStatusMenu(t.status, (s) => handleQuickStatus("tasks", t.id, s, setTasks))}
+                              </ContextMenuContent>
+                            </ContextMenu>
                           ))}
                         </Section>
                       )}
