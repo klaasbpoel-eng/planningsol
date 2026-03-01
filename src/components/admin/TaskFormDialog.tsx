@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { CalendarIcon, Clock, Loader2, Repeat } from "lucide-react";
+import { CalendarIcon, Clock, Loader2, Repeat, Users } from "lucide-react";
 import { format, addWeeks, addYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -54,12 +54,14 @@ interface TaskFormDialogProps {
 const EVERYONE_VALUE = "__everyone__";
 
 const initialFormData = {
+  title: "" as string,
   due_date: undefined as Date | undefined,
   priority: "medium" as string,
   status: "pending" as string,
   assigned_to: EVERYONE_VALUE,
   type_id: null as string | null,
   main_category_id: null as string | null,
+  has_time: false,
   start_time: "" as string,
   end_time: "" as string,
   is_recurring: false,
@@ -94,14 +96,17 @@ export function TaskFormDialog({
         const taskType = taskTypes.find((t) => t.id === task.type_id);
         const mainCategoryId = taskType?.parent_id || (taskType && !taskType.parent_id ? task.type_id : null);
         const subCategoryId = taskType?.parent_id ? task.type_id : null;
+        const hasTime = !!(task as any).start_time || !!(task as any).end_time;
 
         setFormData({
+          title: task.title || "",
           due_date: task.due_date ? new Date(task.due_date) : undefined,
           priority: task.priority,
           status: task.status,
           assigned_to: task.assigned_to || EVERYONE_VALUE,
           type_id: subCategoryId,
           main_category_id: mainCategoryId,
+          has_time: hasTime,
           start_time: (task as any).start_time || "",
           end_time: (task as any).end_time || "",
           is_recurring: false,
@@ -121,7 +126,7 @@ export function TaskFormDialog({
     }
 
     // Validate that end time is after start time (if both are provided)
-    if (formData.start_time && formData.end_time) {
+    if (formData.has_time && formData.start_time && formData.end_time) {
       if (formData.end_time <= formData.start_time) {
         toast.error("Eindtijd moet na starttijd liggen");
         return;
@@ -146,12 +151,13 @@ export function TaskFormDialog({
       const finalTypeId = formData.type_id || formData.main_category_id;
 
       const baseTaskData = {
+        title: formData.title || null,
         priority: formData.priority,
         status: formData.status,
         assigned_to: formData.assigned_to === EVERYONE_VALUE ? null : formData.assigned_to || null,
         type_id: finalTypeId,
-        start_time: formData.start_time || null,
-        end_time: formData.end_time || null,
+        start_time: formData.has_time && formData.start_time ? formData.start_time : null,
+        end_time: formData.has_time && formData.end_time ? formData.end_time : null,
       };
 
       if (mode === "create") {
@@ -234,6 +240,16 @@ export function TaskFormDialog({
 
         <div className="grid gap-4 py-4">
 
+          {/* Title */}
+          <div className="grid gap-2">
+            <Label>Algemene omschrijving</Label>
+            <Input
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              placeholder="Beschrijf de taak..."
+            />
+          </div>
+
           {/* Assigned To */}
           <div className="grid gap-2">
             <Label>Toewijzen aan *</Label>
@@ -248,8 +264,11 @@ export function TaskFormDialog({
               </SelectTrigger>
               <SelectContent className="bg-background border shadow-lg z-50">
                 <SelectItem value={EVERYONE_VALUE}>
-                  <span className="font-medium">Iedereen</span>
-                  <span className="ml-2 text-xs text-muted-foreground">(algemeen)</span>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <span className="font-medium">Iedereen</span>
+                    <span className="text-xs text-muted-foreground">(algemeen)</span>
+                  </div>
                 </SelectItem>
                 {employees.map((employee) => (
                   <SelectItem key={employee.id} value={employee.id}>
@@ -460,36 +479,58 @@ export function TaskFormDialog({
             </div>
           )}
 
-          {/* Start and End Time */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Starttijd
-              </Label>
-              <Input
-                type="time"
-                value={formData.start_time}
-                onChange={(e) =>
-                  setFormData({ ...formData, start_time: e.target.value })
-                }
-                placeholder="09:00"
+          {/* Time selection (optional) */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="hasTimeAdmin"
+                checked={formData.has_time}
+                onCheckedChange={(checked) => {
+                  setFormData({
+                    ...formData,
+                    has_time: checked === true,
+                    ...(checked ? {} : { start_time: "", end_time: "" }),
+                  });
+                }}
               />
-            </div>
-            <div className="grid gap-2">
-              <Label className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Eindtijd
+              <Label
+                htmlFor="hasTimeAdmin"
+                className="font-normal cursor-pointer flex items-center gap-2"
+              >
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                Specifieke tijd instellen
               </Label>
-              <Input
-                type="time"
-                value={formData.end_time}
-                onChange={(e) =>
-                  setFormData({ ...formData, end_time: e.target.value })
-                }
-                placeholder="17:00"
-              />
             </div>
+
+            {formData.has_time && (
+              <div className="grid grid-cols-2 gap-4 pl-6 animate-in slide-in-from-top-2 duration-200">
+                <div className="grid gap-2">
+                  <Label>Starttijd</Label>
+                  <Input
+                    type="time"
+                    value={formData.start_time}
+                    onChange={(e) =>
+                      setFormData({ ...formData, start_time: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Eindtijd</Label>
+                  <Input
+                    type="time"
+                    value={formData.end_time}
+                    onChange={(e) =>
+                      setFormData({ ...formData, end_time: e.target.value })
+                    }
+                  />
+                </div>
+                {formData.start_time && formData.end_time && formData.end_time <= formData.start_time && (
+                  <div className="col-span-2 text-sm text-destructive">
+                    Eindtijd moet na starttijd liggen
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Priority & Status */}
