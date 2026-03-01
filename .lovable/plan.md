@@ -1,31 +1,29 @@
 
 
-# Navigatie-items verwijderen uit de topbar
+# Klikbare statusbadge in Dagelijks Overzicht
 
-De desktop navigatielinks (Kalender, Productie, Dagoverzicht, Bestellingen, Verlof, Vrijgaves, Toolbox, Barcode, Medewerkersweergave) worden verwijderd uit de header. Gebruikers navigeren via de Command Palette (Ctrl+K / zoekknop) die al alle pagina's bevat.
+## Wat verandert er
 
-## Wat blijft behouden
+1. **Klikbare StatusBadge**: De statusbadge op elk item wordt een klikbaar element dat de status doorschakelt: Gepland -> Bezig -> Voltooid -> Gepland (cyclisch). Een klik op de badge stopt event propagation zodat het detail-dialoog niet opent.
 
-- Logo + rol-badge (links)
-- Zoekknop / Command Palette trigger (rechts)
-- Thema-toggle
-- Notificatiebel
-- Gebruikersnaam + uitlogknop (desktop)
-- Hamburger-menu (mobiel) -- dit blijft beschikbaar als fallback-navigatie
+2. **Items altijd zichtbaar**: De database-queries filteren momenteel geannuleerde orders en voltooide gascilinders weg. Deze filters worden verwijderd zodat alle items altijd zichtbaar blijven, ongeacht hun status.
 
-## Wat wordt verwijderd
+3. **Context-menu's blijven**: De bestaande rechtermuisklik context-menu's blijven beschikbaar als alternatief (bijv. voor "Geannuleerd" instellen, wat niet in de klik-cyclus zit).
 
-- De volledige `DesktopNav` component (navigatielinks in het midden van de header)
-- De bijbehorende `NAV_GROUPS` constante, `DesktopNavLink` component, en `isActive` helper worden verwijderd als ze niet meer door de mobiele navigatie gebruikt worden
+## Technische details
 
-**Let op**: De mobiele Sheet-navigatie (`MobileNav`) blijft bestaan zodat gebruikers op telefoon nog steeds via een menu kunnen navigeren zonder het toetsenbord.
+### Bestand: `src/components/dashboard/DailyOverview.tsx`
 
-## Technisch
+**StatusBadge component aanpassen (regels 899-911)**:
+- Voegt een `onClick` prop toe die de volgende status in de cyclus selecteert
+- Toont een cursor-pointer en hover-effect
+- `e.stopPropagation()` voorkomt dat het detail-dialoog opent
 
-### Bestand: `src/components/layout/Header.tsx`
+**Query filters verwijderen (regels 164-198)**:
+- Verwijder `.neq("status", "cancelled")` bij tasks, dry_ice_orders, ambulance_trips
+- Verwijder `.neq("status", "completed")` bij gas_cylinder_orders
+- Alle items worden nu altijd opgehaald en getoond
 
-1. Verwijder de `DesktopNav` component-definitie (regels 125-160)
-2. Verwijder de `<DesktopNav />` aanroep in de render (regel 256)
-3. Verwijder ongebruikte imports: `Separator`, `Tooltip`/`TooltipProvider`/`TooltipTrigger`/`TooltipContent` (als alleen door DesktopNav gebruikt)
-4. Verwijder de `DesktopNavLink` component (regels 95-123)
-5. De `NAV_GROUPS`, `isActive`, en gerelateerde imports (`CalendarDays`, `Factory`, etc.) blijven omdat `MobileNav` ze nog gebruikt
+**Visuele indicatie voor geannuleerde items**:
+- Geannuleerde items krijgen een doorgestreepte/vervaagde stijl (`opacity-50 line-through`) zodat ze visueel onderscheidbaar zijn maar toch zichtbaar blijven
+
