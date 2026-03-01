@@ -256,6 +256,7 @@ export function TaskList() {
   };
 
   const getEmployeeName = (task: TaskWithRelations) => {
+    if (!task.assigned_to) return "Iedereen";
     return task.profiles?.full_name || task.profiles?.email?.split("@")[0] || "Onbekend";
   };
 

@@ -49,11 +49,13 @@ interface TaskFormDialogProps {
   mode: "create" | "edit";
 }
 
+const EVERYONE_VALUE = "__everyone__";
+
 const initialFormData = {
   due_date: undefined as Date | undefined,
   priority: "medium" as string,
   status: "pending" as string,
-  assigned_to: "",
+  assigned_to: EVERYONE_VALUE,
   type_id: null as string | null,
   main_category_id: null as string | null,
   start_time: "" as string,
@@ -91,7 +93,7 @@ export function TaskFormDialog({
           due_date: task.due_date ? new Date(task.due_date) : undefined,
           priority: task.priority,
           status: task.status,
-          assigned_to: task.assigned_to,
+          assigned_to: task.assigned_to || EVERYONE_VALUE,
           type_id: subCategoryId,
           main_category_id: mainCategoryId,
           start_time: (task as any).start_time || "",
@@ -132,7 +134,7 @@ export function TaskFormDialog({
         due_date: format(formData.due_date, "yyyy-MM-dd"),
         priority: formData.priority,
         status: formData.status,
-        assigned_to: formData.assigned_to || null,
+        assigned_to: formData.assigned_to === EVERYONE_VALUE ? null : formData.assigned_to || null,
         type_id: finalTypeId,
         start_time: formData.start_time || null,
         end_time: formData.end_time || null,
@@ -202,6 +204,10 @@ export function TaskFormDialog({
                 <SelectValue placeholder="Selecteer medewerker" />
               </SelectTrigger>
               <SelectContent className="bg-background border shadow-lg z-50">
+                <SelectItem value={EVERYONE_VALUE}>
+                  <span className="font-medium">Iedereen</span>
+                  <span className="ml-2 text-xs text-muted-foreground">(algemeen)</span>
+                </SelectItem>
                 {employees.map((employee) => (
                   <SelectItem key={employee.id} value={employee.id}>
                     {employee.full_name || employee.email || "Onbekend"}
