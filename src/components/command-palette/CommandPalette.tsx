@@ -31,6 +31,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const RECENT_KEY = "command-palette-recent";
 const MAX_RECENT = 5;
@@ -79,15 +80,23 @@ const PRODUCTION_ITEMS = [
   { id: "rapportages", label: "Rapportages", path: "/productie", icon: BarChart3, iconClass: "text-primary", keywords: ["rapport", "report", "grafiek", "chart", "statistiek"] },
 ];
 
-interface CommandPaletteProps {
-  isAdmin?: boolean;
-}
-
-export function CommandPalette({ isAdmin }: CommandPaletteProps) {
+export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [recentActions, setRecentActions] = useState<RecentAction[]>([]);
+  const [userId, setUserId] = useState<string | undefined>();
+  const { isAdmin } = useUserRole(userId);
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
