@@ -24,8 +24,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Clock, Loader2 } from "lucide-react";
-import { format } from "date-fns";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { CalendarIcon, Clock, Loader2, Repeat } from "lucide-react";
+import { format, addWeeks, addYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -60,6 +62,10 @@ const initialFormData = {
   main_category_id: null as string | null,
   start_time: "" as string,
   end_time: "" as string,
+  is_recurring: false,
+  recurrence_interval: 1 as 1 | 2,
+  is_infinite_recurrence: false,
+  recurrence_end_date: undefined as Date | undefined,
 };
 
 export function TaskFormDialog({
@@ -98,6 +104,10 @@ export function TaskFormDialog({
           main_category_id: mainCategoryId,
           start_time: (task as any).start_time || "",
           end_time: (task as any).end_time || "",
+          is_recurring: false,
+          recurrence_interval: 1,
+          is_infinite_recurrence: false,
+          recurrence_end_date: undefined,
         });
       }
     }
@@ -118,6 +128,11 @@ export function TaskFormDialog({
       }
     }
 
+    if (formData.is_recurring && !formData.is_infinite_recurrence && !formData.recurrence_end_date) {
+      toast.error("Selecteer een einddatum voor de herhaling");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -130,8 +145,7 @@ export function TaskFormDialog({
       // Use subcategory if selected, otherwise use main category
       const finalTypeId = formData.type_id || formData.main_category_id;
 
-      const taskData = {
-        due_date: format(formData.due_date, "yyyy-MM-dd"),
+      const baseTaskData = {
         priority: formData.priority,
         status: formData.status,
         assigned_to: formData.assigned_to === EVERYONE_VALUE ? null : formData.assigned_to || null,
@@ -141,15 +155,44 @@ export function TaskFormDialog({
       };
 
       if (mode === "create") {
-        await api.tasks.create({
-          ...taskData,
+        // Generate dates for recurring tasks
+        const taskDates: Date[] = [formData.due_date];
+
+        if (formData.is_recurring) {
+          const endDate = formData.is_infinite_recurrence
+            ? addYears(formData.due_date, 1)
+            : formData.recurrence_end_date;
+
+          if (endDate) {
+            let nextDate = addWeeks(formData.due_date, formData.recurrence_interval);
+            while (nextDate <= endDate) {
+              taskDates.push(nextDate);
+              nextDate = addWeeks(nextDate, formData.recurrence_interval);
+            }
+          }
+        }
+
+        const seriesId = formData.is_recurring ? crypto.randomUUID() : null;
+
+        const tasksToCreate = taskDates.map(date => ({
+          ...baseTaskData,
+          due_date: format(date, "yyyy-MM-dd"),
           created_by: user.id,
-        });
+          series_id: seriesId,
+        }));
 
-        toast.success("Taak aangemaakt");
+        await Promise.all(tasksToCreate.map(t => api.tasks.create(t)));
+
+        toast.success(
+          tasksToCreate.length > 1
+            ? `${tasksToCreate.length} taken aangemaakt`
+            : "Taak aangemaakt"
+        );
       } else if (task) {
-        await api.tasks.update(task.id, taskData);
-
+        await api.tasks.update(task.id, {
+          ...baseTaskData,
+          due_date: format(formData.due_date, "yyyy-MM-dd"),
+        });
         toast.success("Taak bijgewerkt");
       }
 
@@ -317,6 +360,105 @@ export function TaskFormDialog({
               </PopoverContent>
             </Popover>
           </div>
+
+          {/* Recurrence - only in create mode */}
+          {mode === "create" && (
+            <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="isRecurringAdmin"
+                  checked={formData.is_recurring}
+                  onCheckedChange={(checked) =>
+                    setFormData({
+                      ...formData,
+                      is_recurring: checked === true,
+                      ...(checked ? {} : { recurrence_end_date: undefined, recurrence_interval: 1 as 1 | 2 }),
+                    })
+                  }
+                />
+                <Label htmlFor="isRecurringAdmin" className="flex items-center gap-2 cursor-pointer font-normal">
+                  <Repeat className="h-4 w-4" />
+                  Herhalen
+                </Label>
+              </div>
+
+              {formData.is_recurring && (
+                <div className="space-y-3 pl-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm">Herhalingsinterval</Label>
+                    <RadioGroup
+                      value={formData.recurrence_interval.toString()}
+                      onValueChange={(v) =>
+                        setFormData({ ...formData, recurrence_interval: parseInt(v) as 1 | 2 })
+                      }
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="1" id="interval-weekly-admin" />
+                        <Label htmlFor="interval-weekly-admin" className="font-normal cursor-pointer text-sm">Wekelijks</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="2" id="interval-biweekly-admin" />
+                        <Label htmlFor="interval-biweekly-admin" className="font-normal cursor-pointer text-sm">2-wekelijks</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="isInfiniteAdmin"
+                      checked={formData.is_infinite_recurrence}
+                      onCheckedChange={(checked) =>
+                        setFormData({
+                          ...formData,
+                          is_infinite_recurrence: checked === true,
+                          ...(checked ? { recurrence_end_date: undefined } : {}),
+                        })
+                      }
+                    />
+                    <Label htmlFor="isInfiniteAdmin" className="cursor-pointer font-normal text-sm">
+                      Oneindig herhalen (1 jaar vooruit)
+                    </Label>
+                  </div>
+
+                  {!formData.is_infinite_recurrence && (
+                    <div className="grid gap-2">
+                      <Label className="text-sm">
+                        Herhalen tot <span className="text-destructive">*</span>
+                      </Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !formData.recurrence_end_date && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formData.recurrence_end_date
+                              ? format(formData.recurrence_end_date, "d MMM yyyy", { locale: nl })
+                              : "Selecteer einddatum"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={formData.recurrence_end_date}
+                            onSelect={(date) =>
+                              setFormData({ ...formData, recurrence_end_date: date })
+                            }
+                            locale={nl}
+                            disabled={(date) => formData.due_date ? date <= formData.due_date : false}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Start and End Time */}
           <div className="grid grid-cols-2 gap-4">
