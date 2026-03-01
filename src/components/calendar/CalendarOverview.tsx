@@ -1056,29 +1056,29 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   const getDryIceStatusColor = (status: string) => {
     switch (status) {
       case "completed":
-        return "bg-success/80 text-success-foreground";
+        return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200";
       case "in_progress":
-        return "bg-blue-500/80 text-white";
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200";
       case "pending":
-        return "bg-cyan-500/80 text-white";
+        return "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-200";
       case "cancelled":
         return "bg-muted text-muted-foreground";
       default:
-        return "bg-cyan-500/80 text-white";
+        return "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-200";
     }
   };
   const getGasCylinderStatusColor = (status: string) => {
     switch (status) {
       case "completed":
-        return "bg-success/80 text-success-foreground";
+        return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200";
       case "in_progress":
-        return "bg-blue-500/80 text-white";
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200";
       case "pending":
-        return "bg-orange-500/80 text-white";
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200";
       case "cancelled":
         return "bg-muted text-muted-foreground";
       default:
-        return "bg-orange-500/80 text-white";
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200";
     }
   };
   const getGasCylinderStatusLabel = (status: string) => {
@@ -1134,11 +1134,11 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   const getTaskStatusColor = (status: string) => {
     switch (status) {
       case "completed":
-        return "bg-success/80 text-success-foreground";
+        return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200";
       case "in_progress":
-        return "bg-blue-500/80 text-white";
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200";
       case "pending":
-        return "bg-warning/80 text-warning-foreground";
+        return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200";
       default:
         return "bg-muted text-muted-foreground";
     }
@@ -1187,14 +1187,14 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     return employee?.color || "bg-muted";
   };
   const getTypeColor = (type: string, status: string) => {
-    if (status === "pending") return "bg-warning/80 text-warning-foreground";
+    if (status === "pending") return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200";
     switch (type) {
       case "vacation":
-        return "bg-primary text-primary-foreground";
+        return "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200";
       case "sick":
-        return "bg-destructive text-destructive-foreground";
+        return "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200";
       case "personal":
-        return "bg-accent text-accent-foreground";
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200";
       default:
         return "bg-muted text-muted-foreground";
     }
@@ -1869,7 +1869,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                 } else if (entry.type === 'dryice') {
                   const order = entry.item as DryIceOrderWithDetails;
                   return <DryIceOrderPreview key={order.id} order={order} side="bottom" align="start">
-                    <div draggable onDragStart={(e: any) => handleDryIceDragStart(e, order)} onDragEnd={handleDragEnd} onClick={e => handleDryIceOrderClick(order, e)} className={cn("text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer border border-cyan-500/30 bg-muted-foreground text-destructive-foreground", draggedDryIceOrder?.id === order.id && "opacity-50")}>
+                    <div draggable onDragStart={(e: any) => handleDryIceDragStart(e, order)} onDragEnd={handleDragEnd} onClick={e => handleDryIceOrderClick(order, e)} className={cn("text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-800 dark:text-cyan-200 border border-cyan-500/30", draggedDryIceOrder?.id === order.id && "opacity-50")}>
                       <Snowflake className="w-3 h-3 shrink-0" />
                       <span className="truncate font-medium">{order.customer_name} • {order.quantity_kg}kg</span>
                     </div>
