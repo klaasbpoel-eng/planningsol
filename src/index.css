@@ -317,6 +317,16 @@ All colors MUST be HSL.
 
 /* Print styles for Daily Overview */
 @media print {
+  @page {
+    size: landscape;
+    margin: 12mm 10mm;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   body * {
     visibility: hidden;
   }
@@ -333,8 +343,58 @@ All colors MUST be HSL.
     width: 100%;
     border: none !important;
     box-shadow: none !important;
+    padding: 0 !important;
+    background: white !important;
+    color: #1a1a1a !important;
+    font-size: 11px !important;
   }
 
+  /* Print header styling */
+  .print-header {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid #1a1a1a;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+
+  .print-header-title {
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.025em;
+  }
+
+  .print-header-meta {
+    font-size: 10px !important;
+    color: #666 !important;
+    text-align: right;
+  }
+
+  /* Make grid columns fit landscape */
+  .print-daily-overview .grid {
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  /* Section cards */
+  .print-daily-overview .rounded-lg {
+    border: 1px solid #ddd !important;
+    padding: 6px !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Badges print-friendly */
+  .print-daily-overview [class*="badge"],
+  .print-daily-overview [class*="Badge"] {
+    border: 1px solid #999 !important;
+    background: transparent !important;
+    font-size: 8px !important;
+    padding: 0 4px !important;
+  }
+
+  /* Hide interactive elements */
   .print\:hidden {
     display: none !important;
   }
@@ -345,5 +405,13 @@ All colors MUST be HSL.
   [data-sidebar],
   .sidebar {
     display: none !important;
+  }
+
+  /* Dark mode overrides for print */
+  .dark .print-daily-overview,
+  .dark .print-daily-overview * {
+    background: white !important;
+    color: #1a1a1a !important;
+    border-color: #ddd !important;
   }
 }

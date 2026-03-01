@@ -339,6 +339,16 @@ export function DailyOverview() {
   return (
     <>
       <Card className="mb-6 print-daily-overview">
+        {/* Print-only header */}
+        <div className="hidden print-header">
+          <div>
+            <div className="print-header-title">Dagelijks Overzicht</div>
+            <div className="text-sm text-muted-foreground capitalize">{headerLabel}</div>
+          </div>
+          <div className="print-header-meta">
+            <div>Afgedrukt: {format(new Date(), "d MMMM yyyy 'om' HH:mm", { locale: nl })}</div>
+          </div>
+        </div>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
