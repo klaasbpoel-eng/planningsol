@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, List, Grid3X3, LayoutGrid, Users, ClipboardList, Palmtree, GripVertical, Plus, Undo2, Snowflake, Cylinder, Ambulance, AlertTriangle, RefreshCw } from "lucide-react";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator, ContextMenuLabel } from "@/components/ui/context-menu";
+import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, List, Grid3X3, LayoutGrid, Users, ClipboardList, Palmtree, GripVertical, Plus, Undo2, Snowflake, Cylinder, Ambulance, AlertTriangle, RefreshCw, Circle, PlayCircle, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, eachMonthOfInterval, addDays, addWeeks, addMonths, addYears, subDays, subWeeks, subMonths, subYears, isToday, isSameMonth, isSameDay, parseISO, isWithinInterval, getWeek, isWeekend, getDay, differenceInDays, isBefore, isAfter } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -1212,6 +1213,111 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     }
   };
 
+  // Quick status change handlers
+  const productionStatuses = [
+    { value: "pending", label: "Gepland", icon: Circle, color: "text-amber-500" },
+    { value: "in_progress", label: "Bezig", icon: PlayCircle, color: "text-blue-500" },
+    { value: "completed", label: "Voltooid", icon: CheckCircle2, color: "text-emerald-500" },
+    { value: "cancelled", label: "Geannuleerd", icon: XCircle, color: "text-muted-foreground" },
+  ];
+
+  const taskStatuses = [
+    { value: "pending", label: "Te doen", icon: Circle, color: "text-amber-500" },
+    { value: "in_progress", label: "Bezig", icon: PlayCircle, color: "text-blue-500" },
+    { value: "completed", label: "Voltooid", icon: CheckCircle2, color: "text-emerald-500" },
+  ];
+
+  const handleQuickTaskStatus = async (task: TaskWithProfile, newStatus: string) => {
+    if (task.status === newStatus) return;
+    const oldStatus = task.status;
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
+    try {
+      await api.tasks.update(task.id, { status: newStatus });
+      toast.success("Status bijgewerkt", {
+        description: `${task.title || task.task_type?.name || "Taak"}: ${taskStatuses.find(s => s.value === newStatus)?.label}`,
+      });
+    } catch (error) {
+      console.error("Error updating task status:", error);
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: oldStatus } : t));
+      toast.error("Fout bij statuswijziging");
+    }
+  };
+
+  const handleQuickDryIceStatus = async (order: DryIceOrderWithDetails, newStatus: string) => {
+    if (order.status === newStatus) return;
+    const oldStatus = order.status;
+    setDryIceOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: newStatus as any } : o));
+    try {
+      await api.dryIceOrders.update(order.id, { status: newStatus });
+      toast.success("Status bijgewerkt", {
+        description: `${order.order_number}: ${productionStatuses.find(s => s.value === newStatus)?.label}`,
+      });
+    } catch (error) {
+      console.error("Error updating dry ice status:", error);
+      setDryIceOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: oldStatus as any } : o));
+      toast.error("Fout bij statuswijziging");
+    }
+  };
+
+  const handleQuickGasCylinderStatus = async (order: GasCylinderOrderWithDetails, newStatus: string) => {
+    if (order.status === newStatus) return;
+    const oldStatus = order.status;
+    setGasCylinderOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: newStatus as any } : o));
+    try {
+      await api.gasCylinderOrders.update(order.id, { status: newStatus });
+      toast.success("Status bijgewerkt", {
+        description: `${order.order_number}: ${productionStatuses.find(s => s.value === newStatus)?.label}`,
+      });
+    } catch (error) {
+      console.error("Error updating gas cylinder status:", error);
+      setGasCylinderOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: oldStatus as any } : o));
+      toast.error("Fout bij statuswijziging");
+    }
+  };
+
+  const handleQuickAmbulanceStatus = async (trip: AmbulanceTripWithCustomers, newStatus: string) => {
+    if (trip.status === newStatus) return;
+    const oldStatus = trip.status;
+    setAmbulanceTrips(prev => prev.map(t => t.id === trip.id ? { ...t, status: newStatus } : t));
+    try {
+      const { error } = await supabase.from("ambulance_trips").update({ status: newStatus }).eq("id", trip.id);
+      if (error) throw error;
+      toast.success("Status bijgewerkt", {
+        description: `Ambulance rit: ${productionStatuses.find(s => s.value === newStatus)?.label}`,
+      });
+    } catch (error) {
+      console.error("Error updating ambulance status:", error);
+      setAmbulanceTrips(prev => prev.map(t => t.id === trip.id ? { ...t, status: oldStatus } : t));
+      toast.error("Fout bij statuswijziging");
+    }
+  };
+
+  const renderStatusContextMenuItems = (
+    currentStatus: string, 
+    statuses: typeof productionStatuses, 
+    onSelect: (status: string) => void
+  ) => (
+    <>
+      <ContextMenuLabel className="text-xs font-semibold">Status wijzigen</ContextMenuLabel>
+      <ContextMenuSeparator />
+      {statuses.map(s => {
+        const Icon = s.icon;
+        const isActive = currentStatus === s.value;
+        return (
+          <ContextMenuItem
+            key={s.value}
+            disabled={isActive}
+            onClick={(e) => { e.stopPropagation(); onSelect(s.value); }}
+            className={cn("gap-2", isActive && "opacity-50")}
+          >
+            <Icon className={cn("w-4 h-4", s.color)} />
+            <span>{s.label}</span>
+            {isActive && <span className="ml-auto text-xs text-muted-foreground">✓</span>}
+          </ContextMenuItem>
+        );
+      })}
+    </>
+  );
   // Get leave type label from custom type or fall back to enum type
   const getLeaveTypeLabel = (request: RequestWithProfile) => {
     if (request.leave_type?.name) {
@@ -1434,142 +1540,145 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                 </CalendarItemPreview>;
               } else if (calendarItem.type === "task") {
                 const task = calendarItem.data;
-                return <CalendarItemPreview key={`task-${task.id}`} item={task} type="task" side="right">
-                  <motion.div initial={{
-                    opacity: 0,
-                    x: -20
-                  }} animate={{
-                    opacity: 1,
-                    x: 0
-                  }} transition={{
-                    duration: 0.25,
-                    delay: groupIndex * 0.05 + index * 0.03
-                  }} onClick={e => handleItemClick(calendarItem, e)} className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4">
-                    <div className="w-1 h-12 rounded-full" style={{
-                      backgroundColor: task.task_type?.color || "#888"
-                    }} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <ClipboardList className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                        <span className="font-medium truncate">{task.title || task.task_type?.name || "Taak"}</span>
-                        <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTaskStatusColor(task.status))}>
-                          {task.status === "pending" ? "Te doen" : task.status === "in_progress" ? "Bezig" : "Voltooid"}
-                        </Badge>
-                        <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTaskPriorityColor(task.priority))}>
-                          {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Gemiddeld" : "Laag"}
-                        </Badge>
-                      </div>
-                      <div className="text-sm text-muted-foreground flex items-center gap-2">
-                        <span>{getEmployeeName(task)}</span>
-                        {hasTimeInfo(task.start_time, task.end_time) && <span className="flex items-center gap-1 text-xs">
-                          <Clock className="h-3 w-3" />
-                          {formatTimeRange(task.start_time, task.end_time)}
-                        </span>}
-                      </div>
+                return <ContextMenu key={`task-${task.id}`}>
+                  <ContextMenuTrigger asChild>
+                    <div>
+                      <CalendarItemPreview item={task} type="task" side="right">
+                        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }} onClick={e => handleItemClick(calendarItem, e)} className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4">
+                          <div className="w-1 h-12 rounded-full" style={{ backgroundColor: task.task_type?.color || "#888" }} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <ClipboardList className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                              <span className="font-medium truncate">{task.title || task.task_type?.name || "Taak"}</span>
+                              <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTaskStatusColor(task.status))}>
+                                {task.status === "pending" ? "Te doen" : task.status === "in_progress" ? "Bezig" : "Voltooid"}
+                              </Badge>
+                              <Badge variant="outline" className={cn("text-xs flex-shrink-0", getTaskPriorityColor(task.priority))}>
+                                {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Gemiddeld" : "Laag"}
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground flex items-center gap-2">
+                              <span>{getEmployeeName(task)}</span>
+                              {hasTimeInfo(task.start_time, task.end_time) && <span className="flex items-center gap-1 text-xs">
+                                <Clock className="h-3 w-3" />
+                                {formatTimeRange(task.start_time, task.end_time)}
+                              </span>}
+                            </div>
+                          </div>
+                          <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getEmployeeColor(task.assigned_to))} />
+                        </motion.div>
+                      </CalendarItemPreview>
                     </div>
-                    <div className={cn("w-2 h-2 rounded-full flex-shrink-0", getEmployeeColor(task.assigned_to))} />
-                  </motion.div>
-                </CalendarItemPreview>;
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    {renderStatusContextMenuItems(task.status, taskStatuses, (s) => handleQuickTaskStatus(task, s))}
+                  </ContextMenuContent>
+                </ContextMenu>;
               } else if (calendarItem.type === "dryice") {
                 const order = calendarItem.data;
-                return <DryIceOrderPreview key={`dryice-${order.id}`} order={order} side="right">
-                  <motion.div initial={{
-                    opacity: 0,
-                    x: -20
-                  }} animate={{
-                    opacity: 1,
-                    x: 0
-                  }} transition={{
-                    duration: 0.25,
-                    delay: groupIndex * 0.05 + index * 0.03
-                  }} draggable onDragStartCapture={(e: any) => handleDryIceDragStart(e, order)} onDragEndCapture={handleDragEnd} onClick={e => handleDryIceOrderClick(order, e)} className={cn("p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4", draggedDryIceOrder?.id === order.id && "opacity-50 border-2 border-dashed border-cyan-500/50 bg-cyan-50/50")}>
-                    <div className="w-1 h-12 rounded-full bg-cyan-500" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Snowflake className="h-4 w-4 text-cyan-500 flex-shrink-0" />
-                        <span className="font-medium truncate">{order.customer_name}</span>
-                        <Badge variant="outline" className={cn("text-xs flex-shrink-0", getDryIceStatusColor(order.status))}>
-                          {getDryIceStatusLabel(order.status)}
-                        </Badge>
-                      </div>
-                      <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
-                        <span>{order.quantity_kg} kg {order.product_type_info?.name || ""}</span>
-                        {order.packaging_info && <span className="text-xs">• {order.packaging_info.name}</span>}
-                        {order.packaging_info?.name?.toLowerCase().includes("container") && <span className="text-xs">• {order.container_has_wheels ? "Met wielen" : "Zonder wielen"}</span>}
-                      </div>
-                      {order.notes && <div className="text-xs text-muted-foreground/70 mt-1 truncate italic">{order.notes}</div>}
+                return <ContextMenu key={`dryice-${order.id}`}>
+                  <ContextMenuTrigger asChild>
+                    <div>
+                      <DryIceOrderPreview order={order} side="right">
+                        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }} draggable onDragStartCapture={(e: any) => handleDryIceDragStart(e, order)} onDragEndCapture={handleDragEnd} onClick={e => handleDryIceOrderClick(order, e)} className={cn("p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4", draggedDryIceOrder?.id === order.id && "opacity-50 border-2 border-dashed border-cyan-500/50 bg-cyan-50/50")}>
+                          <div className="w-1 h-12 rounded-full bg-cyan-500" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Snowflake className="h-4 w-4 text-cyan-500 flex-shrink-0" />
+                              <span className="font-medium truncate">{order.customer_name}</span>
+                              <Badge variant="outline" className={cn("text-xs flex-shrink-0", getDryIceStatusColor(order.status))}>
+                                {getDryIceStatusLabel(order.status)}
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+                              <span>{order.quantity_kg} kg {order.product_type_info?.name || ""}</span>
+                              {order.packaging_info && <span className="text-xs">• {order.packaging_info.name}</span>}
+                              {order.packaging_info?.name?.toLowerCase().includes("container") && <span className="text-xs">• {order.container_has_wheels ? "Met wielen" : "Zonder wielen"}</span>}
+                            </div>
+                            {order.notes && <div className="text-xs text-muted-foreground/70 mt-1 truncate italic">{order.notes}</div>}
+                          </div>
+                          <div className="w-2 h-2 rounded-full flex-shrink-0 bg-cyan-500" />
+                        </motion.div>
+                      </DryIceOrderPreview>
                     </div>
-                    <div className="w-2 h-2 rounded-full flex-shrink-0 bg-cyan-500" />
-                  </motion.div>
-                </DryIceOrderPreview>;
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    {renderStatusContextMenuItems(order.status, productionStatuses, (s) => handleQuickDryIceStatus(order, s))}
+                  </ContextMenuContent>
+                </ContextMenu>;
               } else if (calendarItem.type === "gascylinder") {
                 const order = calendarItem.data;
-                return <motion.div key={`gascylinder-${order.id}`} initial={{
-                  opacity: 0,
-                  x: -20
-                }} animate={{
-                  opacity: 1,
-                  x: 0
-                }} transition={{
-                  duration: 0.25,
-                  delay: groupIndex * 0.05 + index * 0.03
-                }} onClick={e => handleGasCylinderOrderClick(order, e)} className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4">
-                  <div className="w-1 h-12 rounded-full bg-orange-500" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Cylinder className="h-4 w-4 text-orange-500 flex-shrink-0" />
-                      <span className="font-medium truncate">{order.customer_name}</span>
-                      {(order as any).series_id && (
-                        <span className="text-cyan-500 flex-shrink-0" title="Herhalende order">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
-                        </span>
-                      )}
-                      <Badge variant="outline" className={cn("text-xs flex-shrink-0", getGasCylinderStatusColor(order.status))}>
-                        {getGasCylinderStatusLabel(order.status)}
-                      </Badge>
-                    </div>
-                    <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
-                      <span>{order.cylinder_count}x {order.gas_type_info?.name || order.gas_type}</span>
-                      <span className="text-xs">• {order.cylinder_size}</span>
-                      <span className="text-xs">• {order.pressure} bar</span>
-                    </div>
-                    {order.notes && <div className="text-xs text-muted-foreground/70 mt-1 truncate italic">{order.notes}</div>}
-                  </div>
-                  <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-500" />
-                </motion.div>;
+                return <ContextMenu key={`gascylinder-${order.id}`}>
+                  <ContextMenuTrigger asChild>
+                    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }} onClick={e => handleGasCylinderOrderClick(order, e)} className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4">
+                      <div className="w-1 h-12 rounded-full bg-orange-500" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Cylinder className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                          <span className="font-medium truncate">{order.customer_name}</span>
+                          {(order as any).series_id && (
+                            <span className="text-cyan-500 flex-shrink-0" title="Herhalende order">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+                            </span>
+                          )}
+                          <Badge variant="outline" className={cn("text-xs flex-shrink-0", getGasCylinderStatusColor(order.status))}>
+                            {getGasCylinderStatusLabel(order.status)}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+                          <span>{order.cylinder_count}x {order.gas_type_info?.name || order.gas_type}</span>
+                          <span className="text-xs">• {order.cylinder_size}</span>
+                          <span className="text-xs">• {order.pressure} bar</span>
+                        </div>
+                        {order.notes && <div className="text-xs text-muted-foreground/70 mt-1 truncate italic">{order.notes}</div>}
+                      </div>
+                      <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-500" />
+                    </motion.div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    {renderStatusContextMenuItems(order.status, productionStatuses, (s) => handleQuickGasCylinderStatus(order, s))}
+                  </ContextMenuContent>
+                </ContextMenu>;
               } else if (calendarItem.type === "ambulance") {
                 const trip = calendarItem.data;
-                return <motion.div key={`ambulance-${trip.id}`} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }} onClick={e => handleAmbulanceTripClick(trip, e)} className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4">
-                  <div className="w-1 h-12 rounded-full bg-red-500" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Ambulance className="h-4 w-4 text-red-500 flex-shrink-0" />
-                      <span className="font-medium truncate">Ambulance rit</span>
-                      <Badge variant="outline" className={cn("text-xs flex-shrink-0", trip.status === "completed" ? "bg-success/80 text-success-foreground" : trip.status === "cancelled" ? "bg-muted text-muted-foreground" : "bg-red-500/80 text-white")}>
-                        {trip.status === "completed" ? "Voltooid" : trip.status === "cancelled" ? "Geannuleerd" : "Gepland"}
-                      </Badge>
-                    </div>
-                    <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
-                      {(() => {
-                        const parts: string[] = [];
-                        if (trip.cylinders_2l_300_o2 > 0) parts.push(`${trip.cylinders_2l_300_o2}x 2L 300 O2`);
-                        if (trip.cylinders_2l_200_o2 > 0) parts.push(`${trip.cylinders_2l_200_o2}x 2L 200 O2`);
-                        if (trip.cylinders_1l_pindex_o2 > 0) parts.push(`${trip.cylinders_1l_pindex_o2}x 1L Pindex`);
-                        if (trip.cylinders_5l_o2_integrated > 0) parts.push(`${trip.cylinders_5l_o2_integrated}x 5L O2`);
-                        if (trip.cylinders_10l_o2_integrated > 0) parts.push(`${trip.cylinders_10l_o2_integrated}x 10L O2`);
-                        if (trip.cylinders_5l_air_integrated > 0) parts.push(`${trip.cylinders_5l_air_integrated}x 5L Lucht`);
-                        if (trip.cylinders_2l_air_integrated > 0) parts.push(`${trip.cylinders_2l_air_integrated}x 2L Lucht`);
-                        return <span>{parts.join(" · ") || "Geen cilinders"}</span>;
-                      })()}
-                    </div>
-                    {trip.customers.length > 0 && (
-                      <div className="text-xs text-muted-foreground">
-                        Klanten: {trip.customers.map(c => c.customer_name).join(", ")}
+                return <ContextMenu key={`ambulance-${trip.id}`}>
+                  <ContextMenuTrigger asChild>
+                    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25, delay: groupIndex * 0.05 + index * 0.03 }} onClick={e => handleAmbulanceTripClick(trip, e)} className="p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-center gap-4">
+                      <div className="w-1 h-12 rounded-full bg-red-500" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Ambulance className="h-4 w-4 text-red-500 flex-shrink-0" />
+                          <span className="font-medium truncate">Ambulance rit</span>
+                          <Badge variant="outline" className={cn("text-xs flex-shrink-0", trip.status === "completed" ? "bg-success/80 text-success-foreground" : trip.status === "cancelled" ? "bg-muted text-muted-foreground" : "bg-red-500/80 text-white")}>
+                            {trip.status === "completed" ? "Voltooid" : trip.status === "cancelled" ? "Geannuleerd" : "Gepland"}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+                          {(() => {
+                            const parts: string[] = [];
+                            if (trip.cylinders_2l_300_o2 > 0) parts.push(`${trip.cylinders_2l_300_o2}x 2L 300 O2`);
+                            if (trip.cylinders_2l_200_o2 > 0) parts.push(`${trip.cylinders_2l_200_o2}x 2L 200 O2`);
+                            if (trip.cylinders_1l_pindex_o2 > 0) parts.push(`${trip.cylinders_1l_pindex_o2}x 1L Pindex`);
+                            if (trip.cylinders_5l_o2_integrated > 0) parts.push(`${trip.cylinders_5l_o2_integrated}x 5L O2`);
+                            if (trip.cylinders_10l_o2_integrated > 0) parts.push(`${trip.cylinders_10l_o2_integrated}x 10L O2`);
+                            if (trip.cylinders_5l_air_integrated > 0) parts.push(`${trip.cylinders_5l_air_integrated}x 5L Lucht`);
+                            if (trip.cylinders_2l_air_integrated > 0) parts.push(`${trip.cylinders_2l_air_integrated}x 2L Lucht`);
+                            return <span>{parts.join(" · ") || "Geen cilinders"}</span>;
+                          })()}
+                        </div>
+                        {trip.customers.length > 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            Klanten: {trip.customers.map(c => c.customer_name).join(", ")}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div className="w-2 h-2 rounded-full flex-shrink-0 bg-red-500" />
-                </motion.div>;
+                      <div className="w-2 h-2 rounded-full flex-shrink-0 bg-red-500" />
+                    </motion.div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    {renderStatusContextMenuItems(trip.status, productionStatuses, (s) => handleQuickAmbulanceStatus(trip, s))}
+                  </ContextMenuContent>
+                </ContextMenu>;
               }
               return null;
             })}
@@ -1652,38 +1761,35 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
               <ClipboardList className="h-4 w-4" />
               <span>Taken</span>
             </div>
-            {dayTasks.map((task, index) => <CalendarItemPreview key={task.id} item={task} type="task" side="right">
-              <motion.div initial={{
-                opacity: 0,
-                y: 10
-              }} animate={{
-                opacity: 1,
-                y: 0
-              }} transition={{
-                duration: 0.25,
-                delay: (dayRequests.length + index) * 0.05
-              }} onClick={e => handleItemClick({
-                type: "task",
-                data: task
-              }, e)} className={cn("p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md border-l-4 cursor-pointer", getTaskStatusColor(task.status))}>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className={cn("w-3 h-3 rounded-full ring-2 ring-white/30", getEmployeeColor(task.assigned_to))} />
-                    <span className="font-semibold">{getEmployeeName(task)}</span>
-                  </div>
-                  {hasTimeInfo(task.start_time, task.end_time) && <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/20 text-xs font-medium">
-                    <Clock className="h-3 w-3" />
-                    <span>{formatTimeRange(task.start_time, task.end_time)}</span>
-                  </div>}
+            {dayTasks.map((task, index) => <ContextMenu key={task.id}>
+              <ContextMenuTrigger asChild>
+                <div>
+                  <CalendarItemPreview item={task} type="task" side="right">
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: (dayRequests.length + index) * 0.05 }} onClick={e => handleItemClick({ type: "task", data: task }, e)} className={cn("p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md border-l-4 cursor-pointer", getTaskStatusColor(task.status))}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className={cn("w-3 h-3 rounded-full ring-2 ring-white/30", getEmployeeColor(task.assigned_to))} />
+                          <span className="font-semibold">{getEmployeeName(task)}</span>
+                        </div>
+                        {hasTimeInfo(task.start_time, task.end_time) && <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/20 text-xs font-medium">
+                          <Clock className="h-3 w-3" />
+                          <span>{formatTimeRange(task.start_time, task.end_time)}</span>
+                        </div>}
+                      </div>
+                      <div className="font-medium mt-2">{task.task_type?.name || "Taak"}</div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant="outline" className={cn("text-xs", getTaskPriorityColor(task.priority))}>
+                          {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Gemiddeld" : "Laag"}
+                        </Badge>
+                      </div>
+                    </motion.div>
+                  </CalendarItemPreview>
                 </div>
-                <div className="font-medium mt-2">{task.task_type?.name || "Taak"}</div>
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge variant="outline" className={cn("text-xs", getTaskPriorityColor(task.priority))}>
-                    {task.priority === "high" ? "Hoog" : task.priority === "medium" ? "Gemiddeld" : "Laag"}
-                  </Badge>
-                </div>
-              </motion.div>
-            </CalendarItemPreview>)}
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                {renderStatusContextMenuItems(task.status, taskStatuses, (s) => handleQuickTaskStatus(task, s))}
+              </ContextMenuContent>
+            </ContextMenu>)}
           </div>}
 
           {/* Dry Ice Orders */}
@@ -1692,36 +1798,36 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
               <Snowflake className="h-4 w-4 text-cyan-500" />
               <span>Droogijs productie</span>
             </div>
-            {dayDryIceOrders.map((order, index) => <DryIceOrderPreview key={order.id} order={order} side="right">
-              <motion.div initial={{
-                opacity: 0,
-                y: 10
-              }} animate={{
-                opacity: 1,
-                y: 0
-              }} transition={{
-                duration: 0.25,
-                delay: (dayRequests.length + dayTasks.length + index) * 0.05
-              }} draggable onDragStartCapture={(e: any) => handleDryIceDragStart(e, order)} onDragEndCapture={handleDragEnd} onClick={e => handleDryIceOrderClick(order, e)} className={cn("p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md cursor-pointer", getDryIceStatusColor(order.status), draggedDryIceOrder?.id === order.id && "opacity-50 border-2 border-dashed border-cyan-500/50")}>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <Snowflake className="w-4 h-4" />
-                    <span className="font-semibold">{order.customer_name}</span>
-                  </div>
-                  <Badge variant="outline" className="text-xs bg-white/20">
-                    {order.order_number}
-                  </Badge>
+            {dayDryIceOrders.map((order, index) => <ContextMenu key={order.id}>
+              <ContextMenuTrigger asChild>
+                <div>
+                  <DryIceOrderPreview order={order} side="right">
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: (dayRequests.length + dayTasks.length + index) * 0.05 }} draggable onDragStartCapture={(e: any) => handleDryIceDragStart(e, order)} onDragEndCapture={handleDragEnd} onClick={e => handleDryIceOrderClick(order, e)} className={cn("p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md cursor-pointer", getDryIceStatusColor(order.status), draggedDryIceOrder?.id === order.id && "opacity-50 border-2 border-dashed border-cyan-500/50")}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <Snowflake className="w-4 h-4" />
+                          <span className="font-semibold">{order.customer_name}</span>
+                        </div>
+                        <Badge variant="outline" className="text-xs bg-white/20">
+                          {order.order_number}
+                        </Badge>
+                      </div>
+                      <div className="font-medium mt-2">
+                        {order.quantity_kg} kg {order.product_type_info?.name || ""}
+                      </div>
+                      {order.packaging_info && <div className="text-xs opacity-75 mt-1">
+                        {order.packaging_info.name}
+                        {order.packaging_info.name?.toLowerCase().includes("container") && <span> • {order.container_has_wheels ? "Met wielen" : "Zonder wielen"}</span>}
+                      </div>}
+                      {order.notes && <div className="text-xs opacity-60 mt-2 italic">{order.notes}</div>}
+                    </motion.div>
+                  </DryIceOrderPreview>
                 </div>
-                <div className="font-medium mt-2">
-                  {order.quantity_kg} kg {order.product_type_info?.name || ""}
-                </div>
-                {order.packaging_info && <div className="text-xs opacity-75 mt-1">
-                  {order.packaging_info.name}
-                  {order.packaging_info.name?.toLowerCase().includes("container") && <span> • {order.container_has_wheels ? "Met wielen" : "Zonder wielen"}</span>}
-                </div>}
-                {order.notes && <div className="text-xs opacity-60 mt-2 italic">{order.notes}</div>}
-              </motion.div>
-            </DryIceOrderPreview>)}
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                {renderStatusContextMenuItems(order.status, productionStatuses, (s) => handleQuickDryIceStatus(order, s))}
+              </ContextMenuContent>
+            </ContextMenu>)}
           </div>}
 
           {/* Gas Cylinder Orders */}
@@ -1730,33 +1836,31 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
               <Cylinder className="h-4 w-4 text-orange-500" />
               <span>Gascilinders</span>
             </div>
-            {dayGasCylinderOrders.map((order, index) => <motion.div key={order.id} initial={{
-              opacity: 0,
-              y: 10
-            }} animate={{
-              opacity: 1,
-              y: 0
-            }} transition={{
-              duration: 0.25,
-              delay: (dayRequests.length + dayTasks.length + dayDryIceOrders.length + index) * 0.05
-            }} onClick={e => handleGasCylinderOrderClick(order, e)} className={cn("p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md cursor-pointer", getGasCylinderStatusColor(order.status))}>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <Cylinder className="w-4 h-4" />
-                  <span className="font-semibold">{order.customer_name}</span>
-                </div>
-                <Badge variant="outline" className="text-xs bg-white/20">
-                  {order.order_number}
-                </Badge>
-              </div>
-              <div className="font-medium mt-2">
-                {order.cylinder_count}x {order.gas_type_info?.name || order.gas_type}
-              </div>
-              <div className="text-xs opacity-75 mt-1">
-                {order.pressure} bar • {order.cylinder_size}
-              </div>
-              {order.notes && <div className="text-xs opacity-60 mt-2 italic">{order.notes}</div>}
-            </motion.div>)}
+            {dayGasCylinderOrders.map((order, index) => <ContextMenu key={order.id}>
+              <ContextMenuTrigger asChild>
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: (dayRequests.length + dayTasks.length + dayDryIceOrders.length + index) * 0.05 }} onClick={e => handleGasCylinderOrderClick(order, e)} className={cn("p-4 rounded-xl text-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md cursor-pointer", getGasCylinderStatusColor(order.status))}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Cylinder className="w-4 h-4" />
+                      <span className="font-semibold">{order.customer_name}</span>
+                    </div>
+                    <Badge variant="outline" className="text-xs bg-white/20">
+                      {order.order_number}
+                    </Badge>
+                  </div>
+                  <div className="font-medium mt-2">
+                    {order.cylinder_count}x {order.gas_type_info?.name || order.gas_type}
+                  </div>
+                  <div className="text-xs opacity-75 mt-1">
+                    {order.pressure} bar • {order.cylinder_size}
+                  </div>
+                  {order.notes && <div className="text-xs opacity-60 mt-2 italic">{order.notes}</div>}
+                </motion.div>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                {renderStatusContextMenuItems(order.status, productionStatuses, (s) => handleQuickGasCylinderStatus(order, s))}
+              </ContextMenuContent>
+            </ContextMenu>)}
           </div>}
         </div>}
       </div>
@@ -1853,33 +1957,58 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                   </CalendarItemPreview>;
                 } else if (entry.type === 'task') {
                   const task = entry.item as TaskWithProfile;
-                  return <CalendarItemPreview key={task.id} item={task} type="task" side="bottom" align="start">
-                    <div draggable onDragStart={e => handleDragStart(e, task)} onDragEnd={handleDragEnd} onClick={e => handleItemClick({
-                      type: "task",
-                      data: task
-                    }, e)} className={cn("text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-all hover:scale-105 cursor-pointer group", getTaskStatusColor(task.status), draggedTask?.id === task.id && "opacity-50")} title={`${task.task_type?.name || "Taak"}${hasTimeInfo(task.start_time, task.end_time) ? ` (${formatTimeRange(task.start_time, task.end_time)})` : ""}`}>
-                      {hasTimeInfo(task.start_time, task.end_time) ? <Clock className="w-3 h-3 shrink-0 opacity-70" /> : <GripVertical className="w-3 h-3 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />}
-                      <ClipboardList className="w-3 h-3 shrink-0" />
-                      <span className="truncate font-medium">
-                        {hasTimeInfo(task.start_time, task.end_time) && <span className="opacity-80 mr-1">{formatTimeRange(task.start_time, task.end_time)}</span>}
-                        {task.title || task.task_type?.name || "Taak"}
-                      </span>
-                    </div>
-                  </CalendarItemPreview>;
+                  return <ContextMenu key={task.id}>
+                    <ContextMenuTrigger asChild>
+                      <div>
+                        <CalendarItemPreview item={task} type="task" side="bottom" align="start">
+                          <div draggable onDragStart={e => handleDragStart(e, task)} onDragEnd={handleDragEnd} onClick={e => handleItemClick({
+                            type: "task",
+                            data: task
+                          }, e)} className={cn("text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-all hover:scale-105 cursor-pointer group", getTaskStatusColor(task.status), draggedTask?.id === task.id && "opacity-50")} title={`${task.task_type?.name || "Taak"}${hasTimeInfo(task.start_time, task.end_time) ? ` (${formatTimeRange(task.start_time, task.end_time)})` : ""}`}>
+                            {hasTimeInfo(task.start_time, task.end_time) ? <Clock className="w-3 h-3 shrink-0 opacity-70" /> : <GripVertical className="w-3 h-3 shrink-0 opacity-50 group-hover:opacity-100 cursor-grab" />}
+                            <ClipboardList className="w-3 h-3 shrink-0" />
+                            <span className="truncate font-medium">
+                              {hasTimeInfo(task.start_time, task.end_time) && <span className="opacity-80 mr-1">{formatTimeRange(task.start_time, task.end_time)}</span>}
+                              {task.title || task.task_type?.name || "Taak"}
+                            </span>
+                          </div>
+                        </CalendarItemPreview>
+                      </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      {renderStatusContextMenuItems(task.status, taskStatuses, (s) => handleQuickTaskStatus(task, s))}
+                    </ContextMenuContent>
+                  </ContextMenu>;
                 } else if (entry.type === 'dryice') {
                   const order = entry.item as DryIceOrderWithDetails;
-                  return <DryIceOrderPreview key={order.id} order={order} side="bottom" align="start">
-                    <div draggable onDragStart={(e: any) => handleDryIceDragStart(e, order)} onDragEnd={handleDragEnd} onClick={e => handleDryIceOrderClick(order, e)} className={cn("text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-800 dark:text-cyan-200 border border-cyan-500/30", draggedDryIceOrder?.id === order.id && "opacity-50")}>
-                      <Snowflake className="w-3 h-3 shrink-0" />
-                      <span className="truncate font-medium">{order.customer_name} • {order.quantity_kg}kg</span>
-                    </div>
-                  </DryIceOrderPreview>;
+                  return <ContextMenu key={order.id}>
+                    <ContextMenuTrigger asChild>
+                      <div>
+                        <DryIceOrderPreview order={order} side="bottom" align="start">
+                          <div draggable onDragStart={(e: any) => handleDryIceDragStart(e, order)} onDragEnd={handleDragEnd} onClick={e => handleDryIceOrderClick(order, e)} className={cn("text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-cyan-500/20 text-cyan-800 dark:text-cyan-200 border border-cyan-500/30", draggedDryIceOrder?.id === order.id && "opacity-50")}>
+                            <Snowflake className="w-3 h-3 shrink-0" />
+                            <span className="truncate font-medium">{order.customer_name} • {order.quantity_kg}kg</span>
+                          </div>
+                        </DryIceOrderPreview>
+                      </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      {renderStatusContextMenuItems(order.status, productionStatuses, (s) => handleQuickDryIceStatus(order, s))}
+                    </ContextMenuContent>
+                  </ContextMenu>;
                 } else if (entry.type === 'gascylinder') {
                   const order = entry.item as GasCylinderOrderWithDetails;
-                  return <div key={order.id} onClick={e => handleGasCylinderOrderClick(order, e)} className={cn("text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-orange-500/20 text-orange-700 dark:text-orange-300 border border-orange-500/30")}>
-                    <Cylinder className="w-3 h-3 shrink-0" />
-                    <span className="truncate font-medium">{order.customer_name} • {order.cylinder_count}x {order.cylinder_size} {order.gas_type_info?.name || order.gas_type}</span>
-                  </div>;
+                  return <ContextMenu key={order.id}>
+                    <ContextMenuTrigger asChild>
+                      <div onClick={e => handleGasCylinderOrderClick(order, e)} className={cn("text-xs px-2 py-1.5 rounded-lg truncate flex items-center gap-1.5 transition-transform hover:scale-105 cursor-pointer bg-orange-500/20 text-orange-700 dark:text-orange-300 border border-orange-500/30")}>
+                        <Cylinder className="w-3 h-3 shrink-0" />
+                        <span className="truncate font-medium">{order.customer_name} • {order.cylinder_count}x {order.cylinder_size} {order.gas_type_info?.name || order.gas_type}</span>
+                      </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      {renderStatusContextMenuItems(order.status, productionStatuses, (s) => handleQuickGasCylinderStatus(order, s))}
+                    </ContextMenuContent>
+                  </ContextMenu>;
                 } else if (entry.type === 'ambulance') {
                   const trip = entry.item as AmbulanceTripWithCustomers;
                   const tripParts: string[] = [];
@@ -1891,13 +2020,20 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                   if (trip.cylinders_5l_air_integrated > 0) tripParts.push(`${trip.cylinders_5l_air_integrated}x 5L L`);
                   if (trip.cylinders_2l_air_integrated > 0) tripParts.push(`${trip.cylinders_2l_air_integrated}x 2L L`);
                   const tripCustomerNames = trip.customers.map(c => c.customer_name).join(", ");
-                  return <div key={trip.id} onClick={e => handleAmbulanceTripClick(trip, e)} className={cn("text-xs px-2 py-1.5 rounded-lg flex flex-col gap-0.5 transition-transform hover:scale-105 cursor-pointer bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/30")}>
-                    <div className="flex items-center gap-1.5">
-                      <Ambulance className="w-3 h-3 shrink-0" />
-                      <span className="truncate font-medium">{tripParts.join(" · ")}</span>
-                    </div>
-                    {tripCustomerNames && <span className="truncate text-red-600/70 dark:text-red-400/70 pl-[18px]">{tripCustomerNames}</span>}
-                  </div>;
+                  return <ContextMenu key={trip.id}>
+                    <ContextMenuTrigger asChild>
+                      <div onClick={e => handleAmbulanceTripClick(trip, e)} className={cn("text-xs px-2 py-1.5 rounded-lg flex flex-col gap-0.5 transition-transform hover:scale-105 cursor-pointer bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/30")}>
+                        <div className="flex items-center gap-1.5">
+                          <Ambulance className="w-3 h-3 shrink-0" />
+                          <span className="truncate font-medium">{tripParts.join(" · ")}</span>
+                        </div>
+                        {tripCustomerNames && <span className="truncate text-red-600/70 dark:text-red-400/70 pl-[18px]">{tripCustomerNames}</span>}
+                      </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      {renderStatusContextMenuItems(trip.status, productionStatuses, (s) => handleQuickAmbulanceStatus(trip, s))}
+                    </ContextMenuContent>
+                  </ContextMenu>;
                 }
                 return null;
               })}
