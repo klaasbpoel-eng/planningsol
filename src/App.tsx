@@ -14,6 +14,7 @@ import DashboardPage from "./pages/DashboardPage";
 import { BarcodeGenerator } from "@/components/barcode/BarcodeGenerator";
 import VrijgavesPage from "./pages/VrijgavesPage";
 import DailyOverviewPage from "./pages/DailyOverviewPage";
+import { CommandPalette } from "@/components/command-palette";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ const App = () => (
         <TooltipProvider>
           <Sonner />
           <BrowserRouter>
+            <CommandPalette />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/verlof" element={<DashboardPage />} />
