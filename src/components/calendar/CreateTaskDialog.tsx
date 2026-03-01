@@ -10,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -32,6 +31,9 @@ import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+type TaskType = Database["public"]["Tables"]["task_types"]["Row"] & {
+  parent_id?: string | null;
+};
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -60,11 +62,33 @@ export function CreateTaskDialog({
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
 
+  // Category state
+  const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
+  const [mainCategoryId, setMainCategoryId] = useState<string | null>(null);
+  const [subCategoryId, setSubCategoryId] = useState<string | null>(null);
+
   // Recurrence state
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceInterval, setRecurrenceInterval] = useState<1 | 2>(1);
   const [isInfiniteRecurrence, setIsInfiniteRecurrence] = useState(false);
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>(undefined);
+
+  // Load task types
+  useEffect(() => {
+    const fetchTaskTypes = async () => {
+      const { data } = await supabase
+        .from("task_types")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order");
+      setTaskTypes((data as TaskType[]) || []);
+    };
+    if (open) fetchTaskTypes();
+  }, [open]);
+
+  const mainCategories = taskTypes.filter((t) => !t.parent_id);
+  const getSubcategories = (parentId: string) =>
+    taskTypes.filter((t) => t.parent_id === parentId);
 
   const resetForm = () => {
     setStatus("pending");
@@ -75,6 +99,8 @@ export function CreateTaskDialog({
     setHasTime(false);
     setStartTime("");
     setEndTime("");
+    setMainCategoryId(null);
+    setSubCategoryId(null);
     setIsRecurring(false);
     setRecurrenceInterval(1);
     setIsInfiniteRecurrence(false);
@@ -92,7 +118,7 @@ export function CreateTaskDialog({
   };
 
   const handleCreate = async () => {
-    if (!dueDate || !currentUserId || !title) {
+    if (!dueDate || !currentUserId) {
       toast.error("Vul alle verplichte velden in");
       return;
     }
@@ -114,7 +140,6 @@ export function CreateTaskDialog({
       const taskDates: Date[] = [dueDate];
 
       if (isRecurring) {
-        // For infinite recurrence, create tasks for 1 year ahead
         const endDate = isInfiniteRecurrence
           ? addYears(dueDate, 1)
           : recurrenceEndDate;
@@ -128,34 +153,28 @@ export function CreateTaskDialog({
         }
       }
 
-      // Generate series_id for recurring tasks
       const seriesId = isRecurring ? crypto.randomUUID() : null;
-
+      const finalTypeId = subCategoryId || mainCategoryId;
 
       const tasksToCreate = taskDates.map(date => ({
-        title,
+        title: title || null,
         status,
         priority,
         due_date: format(date, "yyyy-MM-dd"),
         assigned_to: (assignedTo === "everyone" || !assignedTo) ? null : assignedTo,
         created_by: currentUserId,
-        type_id: null, // Keep type_id null as we use title now
+        type_id: finalTypeId,
         series_id: seriesId,
         start_time: hasTime && startTime ? startTime : null,
         end_time: hasTime && endTime ? endTime : null,
       }));
 
-      console.log('Creating tasks with assignment:', assignedTo, 'Mapped to:', tasksToCreate[0].assigned_to);
-
-
-      // Use api.tasks.create in parallel to ensure correct DB routing (and syncing)
-      // Direct supabase insert bypasses the api layer which might cause issues if primary source is not cloud
       const createdTasks = await Promise.all(tasksToCreate.map(task => api.tasks.create(task)));
 
       toast.success(
         createdTasks.length > 1
           ? `${createdTasks.length} taken aangemaakt`
-          : `Taak aangemaakt (DB Resultaat: ${createdTasks[0].assigned_to ? "Specifieke medewerker" : "Iedereen/Null"})`
+          : "Taak aangemaakt"
       );
 
       resetForm();
@@ -195,6 +214,7 @@ export function CreateTaskDialog({
 
         <div className="space-y-4 py-4">
 
+          {/* Title */}
           <div className="space-y-2">
             <Label>Algemene omschrijving</Label>
             <Input
@@ -205,34 +225,133 @@ export function CreateTaskDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="bg-background">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="pending">Te doen</SelectItem>
-                  <SelectItem value="in_progress">Bezig</SelectItem>
-                  <SelectItem value="completed">Voltooid</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Assigned To */}
+          <div className="space-y-2">
+            <Label>
+              Toegewezen aan <span className="text-destructive">*</span>
+            </Label>
+            <Select value={assignedTo} onValueChange={setAssignedTo}>
+              <SelectTrigger className="bg-background">
+                <SelectValue placeholder="Selecteer medewerker" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border shadow-lg z-50">
+                <SelectItem value="everyone" className="font-medium border-b mb-1">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Iedereen
+                    <span className="text-xs text-muted-foreground">(algemeen)</span>
+                  </div>
+                </SelectItem>
+                {profiles.map((profile) => (
+                  <SelectItem
+                    key={profile.id}
+                    value={profile.id}
+                  >
+                    {profile.full_name || profile.email?.split("@")[0]}
+                    {!profile.user_id && (
+                      <span className="ml-2 text-xs text-muted-foreground">(geen account)</span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
+          {/* Main Category */}
+          {mainCategories.length > 0 && (
             <div className="space-y-2">
-              <Label>Prioriteit</Label>
-              <Select value={priority} onValueChange={setPriority}>
+              <Label>Hoofdcategorie</Label>
+              <Select
+                value={mainCategoryId || "none"}
+                onValueChange={(value) => {
+                  setMainCategoryId(value === "none" ? null : value);
+                  setSubCategoryId(null);
+                }}
+              >
                 <SelectTrigger className="bg-background">
-                  <SelectValue />
+                  <SelectValue placeholder="Selecteer hoofdcategorie" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="low">Laag</SelectItem>
-                  <SelectItem value="medium">Gemiddeld</SelectItem>
-                  <SelectItem value="high">Hoog</SelectItem>
+                  <SelectItem value="none">Geen categorie</SelectItem>
+                  {mainCategories.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: type.color }}
+                        />
+                        {type.name}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
+          )}
+
+          {/* Subcategory */}
+          {mainCategoryId && getSubcategories(mainCategoryId).length > 0 && (
+            <div className="space-y-2">
+              <Label>Subcategorie</Label>
+              <Select
+                value={subCategoryId || "none"}
+                onValueChange={(value) => setSubCategoryId(value === "none" ? null : value)}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Selecteer subcategorie" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="none">Geen subcategorie</SelectItem>
+                  {getSubcategories(mainCategoryId).map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: type.color }}
+                        />
+                        {type.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Deadline */}
+          <div className="space-y-2">
+            <Label>
+              Deadline <span className="text-destructive">*</span>
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !dueDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarDays className="mr-2 h-4 w-4" />
+                  {dueDate
+                    ? format(dueDate, "d MMM yyyy", { locale: nl })
+                    : "Selecteer datum"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-auto p-0 bg-background border shadow-lg z-50"
+                align="start"
+              >
+                <Calendar
+                  mode="single"
+                  selected={dueDate}
+                  onSelect={setDueDate}
+                  locale={nl}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Recurrence option */}
@@ -331,74 +450,7 @@ export function CreateTaskDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>
-                Deadline <span className="text-destructive">*</span>
-              </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dueDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarDays className="mr-2 h-4 w-4" />
-                    {dueDate
-                      ? format(dueDate, "d MMM yyyy", { locale: nl })
-                      : "Selecteer datum"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-auto p-0 bg-background border shadow-lg z-50"
-                  align="start"
-                >
-                  <Calendar
-                    mode="single"
-                    selected={dueDate}
-                    onSelect={setDueDate}
-                    locale={nl}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label>
-                Toegewezen aan <span className="text-destructive">*</span>
-              </Label>
-              <Select value={assignedTo} onValueChange={setAssignedTo}>
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Selecteer medewerker" />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="everyone" className="font-medium border-b mb-1">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Algemeen
-                    </div>
-                  </SelectItem>
-                  {profiles.map((profile) => (
-                    <SelectItem
-                      key={profile.id}
-                      value={profile.id}
-                    >
-                      {profile.full_name || profile.email?.split("@")[0]}
-                      {!profile.user_id && (
-                        <span className="ml-2 text-xs text-muted-foreground">(geen account)</span>
-                      )}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Time selection */}
+          {/* Time selection (optional) */}
           <div className="space-y-3">
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -450,6 +502,37 @@ export function CreateTaskDialog({
                 )}
               </div>
             )}
+          </div>
+
+          {/* Priority & Status */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Prioriteit</Label>
+              <Select value={priority} onValueChange={setPriority}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="low">Laag</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">Hoog</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="pending">In afwachting</SelectItem>
+                  <SelectItem value="in_progress">In uitvoering</SelectItem>
+                  <SelectItem value="completed">Voltooid</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
