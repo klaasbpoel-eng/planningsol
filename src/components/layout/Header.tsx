@@ -8,8 +8,6 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import siteLogo from "@/assets/site_logo.png";
 import type { AppRole } from "@/hooks/useUserPermissions";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
@@ -92,72 +90,6 @@ export function Header({
 
   const isActive = (path: string) => location.pathname === path;
 
-  const DesktopNavLink = ({ item }: { item: NavItem }) => (
-    <TooltipProvider delayDuration={300}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Link to={item.path}>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "relative text-primary/70 hover:bg-primary/10 hover:text-primary transition-all h-10 px-3",
-                "lg:gap-2",
-                isActive(item.path) && "text-primary font-semibold"
-              )}
-            >
-              {item.icon}
-              <span className="hidden lg:inline">{item.shortLabel || item.label}</span>
-              {/* Underline indicator */}
-              {isActive(item.path) && (
-                <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-full" />
-              )}
-            </Button>
-          </Link>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" className="lg:hidden">
-          {item.label}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-
-  const DesktopNav = () => (
-    <nav className="hidden md:flex items-center gap-0.5">
-      {NAV_GROUPS.map((group, gi) => (
-        <div key={group.label} className="flex items-center">
-          {gi > 0 && <Separator orientation="vertical" className="h-6 mx-1" />}
-          {group.items.map((item) => (
-            <DesktopNavLink key={item.path} item={item} />
-          ))}
-        </div>
-      ))}
-
-      {isAdmin && onSwitchView && (
-        <>
-          <Separator orientation="vertical" className="h-6 mx-1" />
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onSwitchView}
-                  className="text-primary/70 hover:bg-primary/10 hover:text-primary h-10 px-3 lg:gap-2"
-                >
-                  <ArrowLeftRight className="h-4 w-4" />
-                  <span className="hidden lg:inline">Medewerker</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="lg:hidden">
-                Medewerkersweergave
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </>
-      )}
-    </nav>
-  );
 
   const MobileNav = () => (
     <div className="flex flex-col p-2">
@@ -252,8 +184,6 @@ export function Header({
           </Link>
         </div>
 
-        {/* Center - Desktop Navigation */}
-        <DesktopNav />
 
         {/* Right side - Actions */}
         <div className="flex items-center gap-1 shrink-0">
