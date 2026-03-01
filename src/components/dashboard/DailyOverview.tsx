@@ -169,7 +169,7 @@ export function DailyOverview() {
         .select("id, title, due_date, start_time, end_time, status, priority, assigned_to, notes, type_id, series_id, task_types:type_id(name, color)")
         .gte("due_date", fromStr)
         .lte("due_date", toStr)
-        .neq("status", "cancelled"),
+        ,
       supabase
         .from("time_off_requests")
         .select("id, start_date, end_date, status, day_part, profiles:profile_id(full_name), time_off_types:type_id(name, color)")
@@ -181,20 +181,19 @@ export function DailyOverview() {
         .select("id, customer_name, quantity_kg, box_count, status, scheduled_date, notes, dry_ice_packaging:packaging_id(name, capacity_kg)")
         .gte("scheduled_date", fromStr)
         .lte("scheduled_date", toStr)
-        .neq("status", "cancelled"),
+        ,
       supabase
         .from("gas_cylinder_orders")
         .select("id, customer_name, cylinder_count, cylinder_size, status, scheduled_date, notes, gas_types:gas_type_id(name)")
         .gte("scheduled_date", fromStr)
         .lte("scheduled_date", toStr)
-        .neq("status", "cancelled")
-        .neq("status", "completed"),
+        ,
       supabase
         .from("ambulance_trips")
         .select("id, scheduled_date, cylinders_2l_300_o2, cylinders_2l_200_o2, cylinders_5l_o2_integrated, cylinders_1l_pindex_o2, cylinders_10l_o2_integrated, cylinders_5l_air_integrated, cylinders_2l_air_integrated, model_5l, status, notes, ambulance_trip_customers(customer_number, customer_name)")
         .gte("scheduled_date", fromStr)
         .lte("scheduled_date", toStr)
-        .neq("status", "cancelled"),
+        ,
     ]);
 
     const rawTasks = (tasksRes.data as unknown as TaskItem[]) ?? [];
@@ -348,6 +347,11 @@ export function DailyOverview() {
     } else {
       toast.success("Status bijgewerkt");
     }
+  };
+
+  const cycleStatus = (currentStatus: string): string => {
+    const idx = STATUS_CYCLE.indexOf(currentStatus);
+    return STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
   };
 
   const renderStatusMenu = (currentStatus: string, onSelect: (status: string) => void) => (
@@ -545,12 +549,12 @@ export function DailyOverview() {
                               <ContextMenu key={o.id}>
                                 <ContextMenuTrigger asChild>
                                   <div
-                                    className="text-sm space-y-1.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors"
+                                    className={`text-sm space-y-1.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "cancelled" ? "opacity-50" : ""}`}
                                     onClick={() => handleAmbulanceClick(o)}
                                   >
                                     <div className="flex items-center justify-between">
-                                      <span className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Cilinders</span>
-                                      <StatusBadge status={o.status} />
+                                      <span className={`font-medium text-xs uppercase tracking-wide text-muted-foreground ${o.status === "cancelled" ? "line-through" : ""}`}>Cilinders</span>
+                                      <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("ambulance_trips", o.id, cycleStatus(o.status), setAmbulanceTrips)} />
                                     </div>
                                     {cylinderItems.length > 0 ? (
                                       <ul className="space-y-0.5">
@@ -624,12 +628,12 @@ export function DailyOverview() {
                                 return (
                                   <ContextMenu key={o.id}>
                                     <ContextMenuTrigger asChild>
-                                      <div
-                                        className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""}`}
+                                       <div
+                                        className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""}`}
                                         onClick={() => handleGasClick(o)}
                                       >
                                         <div className="flex items-center justify-between gap-2">
-                                          <div className="min-w-0">
+                                          <div className={`min-w-0 ${o.status === "cancelled" ? "line-through" : ""}`}>
                                             <div className="truncate font-medium text-xs">{o.customer_name}</div>
                                             <div className="text-xs text-muted-foreground">
                                               {o.gas_types?.name || "Gas"} — {o.cylinder_count} cil.
@@ -639,7 +643,7 @@ export function DailyOverview() {
                                               <span>{sizeLabels[o.cylinder_size] || o.cylinder_size}</span>
                                             </div>
                                           </div>
-                                          <StatusBadge status={o.status} />
+                                          <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("gas_cylinder_orders", o.id, cycleStatus(o.status), setGasOrders)} />
                                         </div>
                                         {o.notes && (
                                           <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
@@ -662,17 +666,17 @@ export function DailyOverview() {
                                       <ContextMenu key={o.id}>
                                         <ContextMenuTrigger asChild>
                                           <div
-                                            className={`hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""}`}
+                                            className={`hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""}`}
                                             onClick={() => handleGasClick(o)}
                                           >
                                             <div className="flex items-center justify-between gap-2">
-                                              <div className="text-xs text-muted-foreground">
+                                              <div className={`text-xs text-muted-foreground ${o.status === "cancelled" ? "line-through" : ""}`}>
                                                 {o.gas_types?.name || "Gas"} — {o.cylinder_count} cil.
                                                 <span className="ml-1">
                                                   <Ruler className="h-3 w-3 inline" /> {sizeLabels[o.cylinder_size] || o.cylinder_size}
                                                 </span>
                                               </div>
-                                              <StatusBadge status={o.status} />
+                                              <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("gas_cylinder_orders", o.id, cycleStatus(o.status), setGasOrders)} />
                                             </div>
                                           </div>
                                         </ContextMenuTrigger>
@@ -703,11 +707,11 @@ export function DailyOverview() {
                             <ContextMenu key={o.id}>
                               <ContextMenuTrigger asChild>
                                 <div
-                                  className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""}`}
+                                  className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""}`}
                                   onClick={() => handleDryIceClick(o)}
                                 >
                                   <div className="flex items-center justify-between gap-2">
-                                    <div className="min-w-0">
+                                    <div className={`min-w-0 ${o.status === "cancelled" ? "line-through" : ""}`}>
                                       <div className="truncate font-medium text-xs">{o.customer_name}</div>
                                       <div className="text-xs text-muted-foreground">
                                         {o.quantity_kg} kg
@@ -718,7 +722,7 @@ export function DailyOverview() {
                                         })()}
                                       </div>
                                     </div>
-                                    <StatusBadge status={o.status} />
+                                    <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("dry_ice_orders", o.id, cycleStatus(o.status), setDryIceOrders)} />
                                   </div>
                                   {o.notes && (
                                     <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
@@ -756,7 +760,7 @@ export function DailyOverview() {
                                   className={`flex items-center gap-2 text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${
                                     t.priority === "high" ? "border-l-2 border-red-500 pl-2" :
                                     t.priority === "low" ? "border-l-2 border-muted-foreground/30 pl-2" : ""
-                                  }`}
+                                  } ${t.status === "cancelled" ? "opacity-50" : ""}`}
                                   onClick={() => handleTaskClick(t)}
                                 >
                                   {t.start_time && (
@@ -765,13 +769,11 @@ export function DailyOverview() {
                                       {t.end_time && `–${t.end_time.slice(0, 5)}`}
                                     </span>
                                   )}
-                                  <span className="truncate">
+                                  <span className={`truncate ${t.status === "cancelled" ? "line-through" : ""}`}>
                                     {t.task_types?.name || t.title || "Taak"}
                                     {t.title && t.task_types?.name ? ` — ${t.title}` : ""}
                                   </span>
-                                  <span className="text-muted-foreground text-xs ml-auto shrink-0">
-                                    {t.assignee_name || "Algemeen"}
-                                  </span>
+                                  <StatusBadge status={t.status} onStatusChange={() => handleQuickStatus("tasks", t.id, cycleStatus(t.status), setTasks)} />
                                 </div>
                               </ContextMenuTrigger>
                               <ContextMenuContent>
@@ -896,15 +898,21 @@ function Section({
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+const STATUS_CYCLE: string[] = ["pending", "in_progress", "completed"];
+
+function StatusBadge({ status, onStatusChange }: { status: string; onStatusChange?: () => void }) {
   const variant =
     status === "completed" ? "success" :
     status === "in_progress" ? "info" :
-    status === "pending" ? "secondary" :
-    "outline";
+    status === "cancelled" ? "destructive" :
+    "secondary";
 
   return (
-    <Badge variant={variant} className="ml-auto text-[10px] shrink-0">
+    <Badge
+      variant={variant}
+      className={`ml-auto text-[10px] shrink-0 ${onStatusChange ? "cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all" : ""}`}
+      onClick={onStatusChange ? (e: React.MouseEvent) => { e.stopPropagation(); onStatusChange(); } : undefined}
+    >
       {statusLabels[status] || status}
     </Badge>
   );
