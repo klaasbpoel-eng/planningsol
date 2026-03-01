@@ -178,6 +178,17 @@ export function CommandPalette({ isAdmin }: CommandPaletteProps) {
               <span>{item.label}</span>
             </CommandItem>
           ))}
+          {isAdmin && (
+            <CommandItem
+              key="admin-settings"
+              onSelect={() => runCommand(() => navigate("/?view=admin"), { id: "admin-settings", label: "Instellingen" })}
+              className="gap-2"
+              keywords={["settings", "instellingen", "beheer", "admin", "configuratie"]}
+            >
+              <Settings className="h-4 w-4" />
+              <span>Instellingen</span>
+            </CommandItem>
+          )}
         </CommandGroup>
 
         <CommandSeparator />
