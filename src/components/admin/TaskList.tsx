@@ -64,6 +64,8 @@ export function TaskList() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   useEffect(() => {
@@ -151,6 +153,28 @@ export function TaskList() {
       setDeleting(false);
       setDeleteDialogOpen(false);
       setTaskToDelete(null);
+    }
+  };
+
+  const handleDeleteAllConfirm = async () => {
+    setDeletingAll(true);
+    try {
+      const idsToDelete = filteredTasks.map((t) => t.id);
+      const { error } = await supabase
+        .from("tasks")
+        .delete()
+        .in("id", idsToDelete);
+
+      if (error) throw error;
+
+      toast.success(`${idsToDelete.length} taken verwijderd`);
+      fetchData();
+    } catch (error) {
+      console.error("Error deleting all tasks:", error);
+      toast.error("Fout bij verwijderen van taken");
+    } finally {
+      setDeletingAll(false);
+      setDeleteAllDialogOpen(false);
     }
   };
 
@@ -272,6 +296,16 @@ export function TaskList() {
               <SelectItem value="completed">Voltooid</SelectItem>
             </SelectContent>
           </Select>
+          {filteredTasks.length > 0 && (
+            <Button
+              variant="outline"
+              className="text-destructive border-destructive/30 hover:bg-destructive/10"
+              onClick={() => setDeleteAllDialogOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Alles verwijderen ({filteredTasks.length})
+            </Button>
+          )}
           <Button onClick={handleCreateTask}>
             <Plus className="h-4 w-4 mr-2" />
             Nieuwe Taak
@@ -423,6 +457,30 @@ export function TaskList() {
             >
               {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Verwijderen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete All Confirmation Dialog */}
+      <AlertDialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Alle taken verwijderen</AlertDialogTitle>
+            <AlertDialogDescription>
+              Weet je zeker dat je {filteredTasks.length} {statusFilter !== "all" ? "gefilterde " : ""}taken wilt verwijderen?
+              Deze actie kan niet ongedaan worden gemaakt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingAll}>Annuleren</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAllConfirm}
+              disabled={deletingAll}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingAll && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Alles verwijderen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
