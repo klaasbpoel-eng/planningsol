@@ -1,34 +1,54 @@
 
+# Snelle statuswijziging in Dagelijks Overzicht
 
-# Command Palette UX Verbetering
+Dezelfde context-menu functionaliteit die in de kalenderweergave is geimplementeerd, wordt nu toegevoegd aan alle items in het Dagelijks Overzicht (DailyOverview component).
 
-## Wat gaat er veranderen
+## Wat verandert er
 
-### 1. Positie naar boven + groter resultatenvenster
-De dialoog verschuift van het midden naar het bovenste derde deel van het scherm (zoals Spotlight/Raycast). De resultatenlijst wordt vergroot van 300px naar 450px zodat meer items zichtbaar zijn.
+Rechts-klikken (of long-press op mobiel) op een ambulancerit, gascilinder-order, droogijs-order of taak opent een context-menu met statusopties. De status wordt direct (optimistisch) bijgewerkt zonder het detail-dialoog te openen.
 
-### 2. Fullscreen op mobiel
-Op mobiele apparaten wordt het command palette fullscreen weergegeven als een bottom sheet-achtige ervaring die het hele scherm vult.
+## Statusopties per categorie
 
-### 3. Recente acties
-Een "Recent" groep bovenaan die de laatst gebruikte 5 acties toont. Wordt opgeslagen in localStorage zodat het tussen sessies bewaard blijft. Wanneer je een actie uitvoert, wordt deze automatisch bovenaan de recente lijst geplaatst.
+- **Ambulance**: Gepland, Bezig, Voltooid, Geannuleerd
+- **Gascilinders**: Gepland, Bezig, Voltooid, Geannuleerd
+- **Droogijs**: Gepland, Bezig, Voltooid, Geannuleerd
+- **Taken**: Gepland, Bezig, Voltooid, Geannuleerd
 
-### 4. Fuzzy search verbetering
-Keywords toevoegen aan elk item zodat gedeeltelijke zoektermen beter matchen. Bijvoorbeeld: "prod" vindt "Productieplanning", "gas" vindt "Gascilinder Planning". Dit werkt via het `keywords` prop van cmdk.
-
----
+Verlof-items (Afwezig) krijgen geen context-menu omdat hun status via een apart goedkeuringsproces loopt.
 
 ## Technische aanpak
 
-### Bestanden die gewijzigd worden:
+### Bestand: `src/components/dashboard/DailyOverview.tsx`
 
-**`src/components/ui/command.tsx`**
-- `CommandDialog`: positie aanpassen via CSS (`top-[20%] translate-y-0` i.p.v. `top-[50%] translate-y-[-50%]`)
-- Mobiele variant: fullscreen styling via `max-sm:` classes
+1. **Import toevoegen**: `ContextMenu`, `ContextMenuTrigger`, `ContextMenuContent`, `ContextMenuItem` uit `@/components/ui/context-menu`, plus `toast` uit `sonner` en relevante iconen (`Clock`, `Play`, `CheckCircle2`, `XCircle`).
 
-**`src/components/command-palette/CommandPalette.tsx`**
-- Recente acties state + localStorage logica toevoegen
-- `keywords` prop toevoegen aan alle `CommandItem` componenten voor betere fuzzy search
-- "Recent" `CommandGroup` bovenaan renderen wanneer er recente items zijn
-- `CommandList` max-height verhogen naar 450px
+2. **Quick-status handlers toevoegen**: Vier functies die optimistisch de lokale state updaten en asynchroon de database bijwerken via Supabase:
+   - `handleQuickAmbulanceStatus` - update `ambulance_trips`
+   - `handleQuickGasStatus` - update `gas_cylinder_orders`
+   - `handleQuickDryIceStatus` - update `dry_ice_orders`
+   - `handleQuickTaskStatus` - update `tasks`
 
+   Bij fout wordt de oude state hersteld (rollback) en een foutmelding getoond.
+
+3. **Items wrappen in ContextMenu**: Elk clickable item-div wordt gewrapped in:
+   ```text
+   <ContextMenu>
+     <ContextMenuTrigger asChild>
+       <div onClick={...}>bestaande inhoud</div>
+     </ContextMenuTrigger>
+     <ContextMenuContent>
+       <ContextMenuItem>Gepland</ContextMenuItem>
+       <ContextMenuItem>Bezig</ContextMenuItem>
+       <ContextMenuItem>Voltooid</ContextMenuItem>
+       <ContextMenuItem>Geannuleerd</ContextMenuItem>
+     </ContextMenuContent>
+   </ContextMenu>
+   ```
+
+4. **Herbruikbare helper**: Een `renderDailyStatusMenu` functie die de vier menu-items rendert met iconen, labels en een visuele markering van de huidige status.
+
+### Items die gewrapped worden
+- Ambulancerit items (regel ~494-534)
+- Gascilinder items - zowel enkelvoudige als gegroepeerde klant-items (regel ~567-614)
+- Droogijs items (regel ~633-657)
+- Taak items (regel ~677-699)
