@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -32,6 +33,7 @@ import {
   Play,
   CheckCircle2,
   XCircle,
+  CheckCheck,
 } from "lucide-react";
 import {
   format,
@@ -146,6 +148,66 @@ export function DailyOverview() {
   // Print state
   const [printRequested, setPrintRequested] = useState<"day" | "week" | null>(null);
   const preWeekPrintViewMode = useRef<ViewMode>("day");
+
+  // === New item tracking ===
+  const STORAGE_KEY = "daily-overview-seen-ids";
+  const [seenItemIds, setSeenItemIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed: { ids: string[]; ts: number } = JSON.parse(stored);
+        // Cleanup entries older than 7 days
+        if (Date.now() - parsed.ts > 7 * 24 * 60 * 60 * 1000) {
+          localStorage.removeItem(STORAGE_KEY);
+          return new Set<string>();
+        }
+        return new Set(parsed.ids);
+      }
+    } catch {}
+    return new Set<string>();
+  });
+
+  const persistSeen = useCallback((ids: Set<string>) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ids: Array.from(ids), ts: Date.now() }));
+  }, []);
+
+  const allCurrentIds = useMemo(() => {
+    const ids = new Set<string>();
+    tasks.forEach(t => ids.add(t.id));
+    dryIceOrders.forEach(o => ids.add(o.id));
+    gasOrders.forEach(o => ids.add(o.id));
+    ambulanceTrips.forEach(o => ids.add(o.id));
+    return ids;
+  }, [tasks, dryIceOrders, gasOrders, ambulanceTrips]);
+
+  const newItemIds = useMemo(() => {
+    const n = new Set<string>();
+    allCurrentIds.forEach(id => { if (!seenItemIds.has(id)) n.add(id); });
+    return n;
+  }, [allCurrentIds, seenItemIds]);
+
+  const hasNewItems = newItemIds.size > 0;
+
+  const markAsSeen = useCallback((id: string) => {
+    setSeenItemIds(prev => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      persistSeen(next);
+      return next;
+    });
+  }, [persistSeen]);
+
+  const markAllAsSeen = useCallback(() => {
+    setSeenItemIds(prev => {
+      const next = new Set(prev);
+      allCurrentIds.forEach(id => next.add(id));
+      persistSeen(next);
+      return next;
+    });
+  }, [allCurrentIds, persistSeen]);
+
+  const isNewItem = useCallback((id: string) => newItemIds.has(id), [newItemIds]);
 
   // When in day mode, extend query range by 3 extra days so we can show upcoming items if today is empty
   const queryRange = useMemo(() => {
@@ -303,6 +365,7 @@ export function DailyOverview() {
 
   // Click handlers
   const handleDryIceClick = async (order: DryIceOrder) => {
+    markAsSeen(order.id);
     const { data } = await supabase
       .from("dry_ice_orders")
       .select("*, product_type_info:product_type_id(id, name, description, is_active, sort_order, created_at, updated_at), packaging_info:packaging_id(id, name, capacity_kg, description, is_active, sort_order, created_at, updated_at)")
@@ -315,6 +378,7 @@ export function DailyOverview() {
   };
 
   const handleGasClick = async (order: GasCylinderOrder) => {
+    markAsSeen(order.id);
     const { data } = await supabase
       .from("gas_cylinder_orders")
       .select("*, gas_type_ref:gas_type_id(id, name, color)")
@@ -327,6 +391,7 @@ export function DailyOverview() {
   };
 
   const handleAmbulanceClick = async (trip: AmbulanceTrip) => {
+    markAsSeen(trip.id);
     const { data } = await supabase
       .from("ambulance_trips")
       .select("*, ambulance_trip_customers(*)")
@@ -343,6 +408,7 @@ export function DailyOverview() {
   };
 
   const handleTaskClick = (task: TaskItem) => {
+    markAsSeen(task.id);
     const calendarItem = {
       type: "task" as const,
       data: {
@@ -481,6 +547,16 @@ export function DailyOverview() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              {hasNewItems && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="sm" onClick={markAllAsSeen} className="print:hidden text-warning hover:text-warning">
+                      <CheckCheck className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Alles als gelezen markeren</TooltipContent>
+                </Tooltip>
+              )}
               <div className="flex rounded-lg border bg-muted p-0.5 print:hidden">
                 <button
                   onClick={() => setViewMode("day")}
@@ -600,12 +676,15 @@ export function DailyOverview() {
                               <ContextMenu key={o.id}>
                                 <ContextMenuTrigger asChild>
                                   <div
-                                    className={`text-sm space-y-1.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "cancelled" ? "opacity-50" : ""}`}
+                                    className={`text-sm space-y-1.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""}`}
                                     onClick={() => handleAmbulanceClick(o)}
                                   >
                                     <div className="flex items-center justify-between">
                                       <span className={`font-medium text-xs uppercase tracking-wide text-muted-foreground ${o.status === "cancelled" ? "line-through" : ""}`}>Cilinders</span>
-                                      <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("ambulance_trips", o.id, cycleStatus(o.status), setAmbulanceTrips)} />
+                                      <div className="flex items-center gap-1">
+                                        {isNewItem(o.id) && <Badge variant="warning" className="text-[9px] px-1.5 py-0">Nieuw</Badge>}
+                                        <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("ambulance_trips", o.id, cycleStatus(o.status), setAmbulanceTrips)} />
+                                      </div>
                                     </div>
                                     {cylinderItems.length > 0 ? (
                                       <ul className="space-y-0.5">
@@ -680,7 +759,7 @@ export function DailyOverview() {
                                   <ContextMenu key={o.id}>
                                     <ContextMenuTrigger asChild>
                                        <div
-                                        className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""}`}
+                                        className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""}`}
                                         onClick={() => handleGasClick(o)}
                                       >
                                         <div className="flex items-center justify-between gap-2">
@@ -694,7 +773,10 @@ export function DailyOverview() {
                                               <span>{sizeLabels[o.cylinder_size] || o.cylinder_size}</span>
                                             </div>
                                           </div>
-                                          <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("gas_cylinder_orders", o.id, cycleStatus(o.status), setGasOrders)} />
+                                          <div className="flex items-center gap-1">
+                                            {isNewItem(o.id) && <Badge variant="warning" className="text-[9px] px-1.5 py-0">Nieuw</Badge>}
+                                            <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("gas_cylinder_orders", o.id, cycleStatus(o.status), setGasOrders)} />
+                                          </div>
                                         </div>
                                         {o.notes && (
                                           <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
@@ -717,7 +799,7 @@ export function DailyOverview() {
                                       <ContextMenu key={o.id}>
                                         <ContextMenuTrigger asChild>
                                           <div
-                                            className={`hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""}`}
+                                            className={`hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""}`}
                                             onClick={() => handleGasClick(o)}
                                           >
                                             <div className="flex items-center justify-between gap-2">
@@ -727,7 +809,10 @@ export function DailyOverview() {
                                                   <Ruler className="h-3 w-3 inline" /> {sizeLabels[o.cylinder_size] || o.cylinder_size}
                                                 </span>
                                               </div>
-                                              <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("gas_cylinder_orders", o.id, cycleStatus(o.status), setGasOrders)} />
+                                              <div className="flex items-center gap-1">
+                                                {isNewItem(o.id) && <Badge variant="warning" className="text-[9px] px-1.5 py-0">Nieuw</Badge>}
+                                                <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("gas_cylinder_orders", o.id, cycleStatus(o.status), setGasOrders)} />
+                                              </div>
                                             </div>
                                           </div>
                                         </ContextMenuTrigger>
@@ -758,7 +843,7 @@ export function DailyOverview() {
                             <ContextMenu key={o.id}>
                               <ContextMenuTrigger asChild>
                                 <div
-                                  className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""}`}
+                                  className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""}`}
                                   onClick={() => handleDryIceClick(o)}
                                 >
                                   <div className="flex items-center justify-between gap-2">
@@ -773,7 +858,10 @@ export function DailyOverview() {
                                         })()}
                                       </div>
                                     </div>
-                                    <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("dry_ice_orders", o.id, cycleStatus(o.status), setDryIceOrders)} />
+                                    <div className="flex items-center gap-1">
+                                      {isNewItem(o.id) && <Badge variant="warning" className="text-[9px] px-1.5 py-0">Nieuw</Badge>}
+                                      <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("dry_ice_orders", o.id, cycleStatus(o.status), setDryIceOrders)} />
+                                    </div>
                                   </div>
                                   {o.notes && (
                                     <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
@@ -811,7 +899,7 @@ export function DailyOverview() {
                                   className={`flex items-center gap-2 text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${
                                     t.priority === "high" ? "border-l-2 border-red-500 pl-2" :
                                     t.priority === "low" ? "border-l-2 border-muted-foreground/30 pl-2" : ""
-                                  } ${t.status === "cancelled" ? "opacity-50" : ""}`}
+                                  } ${t.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(t.id) ? "animate-new-item" : ""}`}
                                   onClick={() => handleTaskClick(t)}
                                 >
                                   {t.start_time && (
@@ -824,7 +912,10 @@ export function DailyOverview() {
                                     {t.task_types?.name || t.title || "Taak"}
                                     {t.title && t.task_types?.name ? ` — ${t.title}` : ""}
                                   </span>
-                                  <StatusBadge status={t.status} onStatusChange={() => handleQuickStatus("tasks", t.id, cycleStatus(t.status), setTasks)} />
+                                  <div className="flex items-center gap-1 ml-auto">
+                                    {isNewItem(t.id) && <Badge variant="warning" className="text-[9px] px-1.5 py-0">Nieuw</Badge>}
+                                    <StatusBadge status={t.status} onStatusChange={() => handleQuickStatus("tasks", t.id, cycleStatus(t.status), setTasks)} />
+                                  </div>
                                 </div>
                               </ContextMenuTrigger>
                               <ContextMenuContent>
