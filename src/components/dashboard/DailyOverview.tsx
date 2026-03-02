@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -34,6 +35,7 @@ import {
   CheckCircle2,
   XCircle,
   CheckCheck,
+  AlertTriangle,
 } from "lucide-react";
 import {
   format,
@@ -136,6 +138,23 @@ export function DailyOverview() {
   const [gasOrders, setGasOrders] = useState<GasCylinderOrder[]>([]);
   const [ambulanceTrips, setAmbulanceTrips] = useState<AmbulanceTrip[]>([]);
   const [lookaheadActive, setLookaheadActive] = useState(false);
+  
+  // Overdue tick – re-evaluates every minute so warnings appear live at 17:00
+  const [, setOverdueTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setOverdueTick(t => t + 1), 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const isOverdue = useCallback((scheduledDate: string, status: string) => {
+    if (["completed", "cancelled"].includes(status)) return false;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const scheduled = new Date(scheduledDate + "T00:00:00");
+    if (scheduled < today) return true; // past day
+    if (scheduled.getTime() === today.getTime() && now.getHours() >= 17) return true; // today after 17:00
+    return false;
+  }, []);
 
   // Dialog state
   const [selectedDryIceOrder, setSelectedDryIceOrder] = useState<any>(null);
@@ -521,6 +540,15 @@ export function DailyOverview() {
 
   const isEmpty = tasks.length === 0 && timeOff.length === 0 && dryIceOrders.length === 0 && gasOrders.length === 0 && ambulanceTrips.length === 0;
 
+  // Overdue item counts for warning banner
+  const overdueStats = useMemo(() => {
+    const ambulance = ambulanceTrips.filter(o => isOverdue(o.scheduled_date, o.status)).length;
+    const gas = gasOrders.filter(o => isOverdue(o.scheduled_date, o.status)).length;
+    const dryIce = dryIceOrders.filter(o => isOverdue(o.scheduled_date, o.status)).length;
+    const task = tasks.filter(t => isOverdue(t.due_date, t.status)).length;
+    return { ambulance, gas, dryIce, task, total: ambulance + gas + dryIce + task };
+  }, [ambulanceTrips, gasOrders, dryIceOrders, tasks, isOverdue]);
+
   return (
     <>
       <Card className="mb-6 print-daily-overview">
@@ -610,6 +638,22 @@ export function DailyOverview() {
               Geen items gepland voor {viewMode === "day" ? "de komende dagen" : "deze week"}.
             </p>
           ) : (
+            <>
+            {overdueStats.total > 0 && (
+              <Alert className="overdue-banner mb-4 print:hidden">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <AlertDescription className="text-sm font-medium text-destructive">
+                  <span className="font-semibold">{overdueStats.total} openstaande {overdueStats.total === 1 ? "item" : "items"}</span>
+                  {" na werktijd — "}
+                  {[
+                    overdueStats.ambulance > 0 && `${overdueStats.ambulance} ambulance`,
+                    overdueStats.gas > 0 && `${overdueStats.gas} gascilinder`,
+                    overdueStats.dryIce > 0 && `${overdueStats.dryIce} droogijs`,
+                    overdueStats.task > 0 && `${overdueStats.task} ${overdueStats.task === 1 ? "taak" : "taken"}`,
+                  ].filter(Boolean).join(", ")}
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="space-y-4">
               {lookaheadActive && viewMode === "day" && (
                 <p className="text-muted-foreground text-xs italic">
@@ -698,7 +742,7 @@ export function DailyOverview() {
                               <ContextMenu key={o.id}>
                                 <ContextMenuTrigger asChild>
                                   <div
-                                    className={`text-sm space-y-1.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""}`}
+                                    className={`text-sm space-y-1.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""} ${isOverdue(o.scheduled_date, o.status) ? "overdue-item" : ""}`}
                                     onClick={() => handleAmbulanceClick(o)}
                                   >
                                     <div className="flex items-center justify-between">
@@ -781,7 +825,7 @@ export function DailyOverview() {
                                   <ContextMenu key={o.id}>
                                     <ContextMenuTrigger asChild>
                                        <div
-                                        className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""}`}
+                                        className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""} ${isOverdue(o.scheduled_date, o.status) ? "overdue-item" : ""}`}
                                         onClick={() => handleGasClick(o)}
                                       >
                                         <div className="flex items-center justify-between gap-2">
@@ -821,7 +865,7 @@ export function DailyOverview() {
                                       <ContextMenu key={o.id}>
                                         <ContextMenuTrigger asChild>
                                           <div
-                                            className={`hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""}`}
+                                            className={`hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""} ${isOverdue(o.scheduled_date, o.status) ? "overdue-item" : ""}`}
                                             onClick={() => handleGasClick(o)}
                                           >
                                             <div className="flex items-center justify-between gap-2">
@@ -865,7 +909,7 @@ export function DailyOverview() {
                             <ContextMenu key={o.id}>
                               <ContextMenuTrigger asChild>
                                 <div
-                                  className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""}`}
+                                  className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""} ${isOverdue(o.scheduled_date, o.status) ? "overdue-item" : ""}`}
                                   onClick={() => handleDryIceClick(o)}
                                 >
                                   <div className="flex items-center justify-between gap-2">
@@ -921,7 +965,7 @@ export function DailyOverview() {
                                   className={`flex items-center gap-2 text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${
                                     t.priority === "high" ? "border-l-2 border-red-500 pl-2" :
                                     t.priority === "low" ? "border-l-2 border-muted-foreground/30 pl-2" : ""
-                                  } ${t.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(t.id) ? "animate-new-item" : ""}`}
+                                  } ${t.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(t.id) ? "animate-new-item" : ""} ${isOverdue(t.due_date, t.status) ? "overdue-item" : ""}`}
                                   onClick={() => handleTaskClick(t)}
                                 >
                                   {t.start_time && (
@@ -994,6 +1038,7 @@ export function DailyOverview() {
                 );
               })}
             </div>
+            </>
           )}
         </CardContent>
       </Card>

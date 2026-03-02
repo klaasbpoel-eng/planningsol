@@ -15,7 +15,6 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Create admin client with service role
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get current date in Europe/Amsterdam timezone
@@ -23,30 +22,26 @@ Deno.serve(async (req) => {
     const amsterdamDate = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Amsterdam" }));
     const today = amsterdamDate.toISOString().split('T')[0];
 
-    // Update all pending dry ice orders where scheduled_date is before today
+    // Count all pending dry ice orders where scheduled_date is before today (monitoring only, no status change)
     const { data, error, count } = await adminClient
       .from("dry_ice_orders")
-      .update({ 
-        status: "completed",
-        updated_at: new Date().toISOString()
-      })
+      .select("id", { count: "exact" })
       .eq("status", "pending")
-      .lt("scheduled_date", today)
-      .select("id");
+      .lt("scheduled_date", today);
 
     if (error) {
-      console.error("Error updating dry ice orders:", error);
+      console.error("Error querying dry ice orders:", error);
       throw error;
     }
 
-    const updatedCount = data?.length || 0;
-    console.log(`Updated ${updatedCount} dry ice orders from pending to completed`);
+    const overdueCount = count || 0;
+    console.log(`Monitoring: ${overdueCount} openstaande droogijs-orders van voor ${today}`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `${updatedCount} orders bijgewerkt naar voltooid`,
-        updatedCount,
+        message: `${overdueCount} openstaande orders gevonden`,
+        overdueCount,
         processedDate: today
       }),
       {
@@ -59,7 +54,7 @@ Deno.serve(async (req) => {
     console.error("Error in complete-past-dry-ice-orders:", error);
     return new Response(
       JSON.stringify({ 
-        error: "Fout bij bijwerken van orders", 
+        error: "Fout bij controleren van orders", 
         details: errorMessage 
       }),
       {
