@@ -53,6 +53,7 @@ import { DryIceOrderDialog } from "@/components/calendar/DryIceOrderDialog";
 import { GasCylinderOrderDialog } from "@/components/production/GasCylinderOrderDialog";
 import { AmbulanceTripDialog } from "@/components/calendar/AmbulanceTripDialog";
 import { CalendarItemDialog } from "@/components/calendar/CalendarItemDialog";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 
 type ViewMode = "day" | "week";
 
@@ -141,6 +142,28 @@ export function DailyOverview() {
   const [ambulanceTrips, setAmbulanceTrips] = useState<AmbulanceTrip[]>([]);
   const [lookaheadActive, setLookaheadActive] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Auth & permissions
+  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const { isAdmin, permissions } = useUserPermissions(userId);
+  const [adminProfiles, setAdminProfiles] = useState<any[]>([]);
+  const [adminTimeOffTypes, setAdminTimeOffTypes] = useState<any[]>([]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
+  }, []);
+
+  // Fetch admin-specific data for dialogs
+  useEffect(() => {
+    if (!isAdmin) return;
+    Promise.all([
+      supabase.from("profiles").select("id, full_name, user_id").order("full_name"),
+      supabase.from("time_off_types").select("*").eq("is_active", true).order("name"),
+    ]).then(([profilesRes, typesRes]) => {
+      setAdminProfiles(profilesRes.data ?? []);
+      setAdminTimeOffTypes(typesRes.data ?? []);
+    });
+  }, [isAdmin]);
 
   // Escape key to exit fullscreen
   useEffect(() => {
@@ -1077,6 +1100,8 @@ export function DailyOverview() {
         open={dryIceDialogOpen}
         onOpenChange={setDryIceDialogOpen}
         onUpdate={fetchData}
+        isAdmin={isAdmin}
+        canEdit={permissions.canEditOrders}
       />
 
       <GasCylinderOrderDialog
@@ -1084,6 +1109,8 @@ export function DailyOverview() {
         open={gasDialogOpen}
         onOpenChange={setGasDialogOpen}
         onUpdate={fetchData}
+        isAdmin={isAdmin}
+        canEdit={permissions.canEditOrders}
       />
 
       <AmbulanceTripDialog
@@ -1091,7 +1118,7 @@ export function DailyOverview() {
         open={ambulanceDialogOpen}
         onOpenChange={setAmbulanceDialogOpen}
         onUpdate={fetchData}
-        isAdmin={false}
+        isAdmin={isAdmin}
       />
 
       <CalendarItemDialog
@@ -1099,6 +1126,9 @@ export function DailyOverview() {
         open={taskDialogOpen}
         onOpenChange={setTaskDialogOpen}
         onUpdate={fetchData}
+        isAdmin={isAdmin}
+        profiles={adminProfiles}
+        timeOffTypes={adminTimeOffTypes}
       />
     </div>
   );
