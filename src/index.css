@@ -332,6 +332,16 @@ All colors MUST be HSL.
   .animate-new-item {
     animation: new-item-pulse 2s ease-in-out infinite;
   }
+
+  .overdue-item {
+    border-left: 4px solid hsl(var(--destructive)) !important;
+    background-color: hsl(var(--destructive) / 0.05);
+    padding-left: 0.5rem;
+  }
+
+  .overdue-banner {
+    @apply bg-destructive/10 border border-destructive/30 rounded-lg p-3 mb-3;
+  }
 }
 
 /* Print styles for Daily Overview */
