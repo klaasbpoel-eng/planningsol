@@ -617,6 +617,11 @@ export function DailyOverview() {
               <Button variant="ghost" size="icon" onClick={() => navigate("next")} className="print:hidden">
                 <ChevronRight className="h-4 w-4" />
               </Button>
+              {!isToday(currentDate) && (
+                <Button variant="outline" size="sm" onClick={goToToday} className="print:hidden ml-1 text-xs">
+                  Vandaag
+                </Button>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <DropdownMenu>
