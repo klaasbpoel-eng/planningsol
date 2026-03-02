@@ -332,18 +332,10 @@ export function DailyOverview() {
     setLoading(false);
   }, [fromStr, toStr, viewMode, currentDate]);
 
-  const initialLoadDone = useRef(false);
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Seed: mark all items from the first load as seen so only future additions show "Nieuw"
-  useEffect(() => {
-    if (!loading && !initialLoadDone.current && allCurrentIds.size > 0) {
-      initialLoadDone.current = true;
-      markAllAsSeen();
-    }
-  }, [loading, allCurrentIds, markAllAsSeen]);
 
   // Realtime subscriptions
   useEffect(() => {
