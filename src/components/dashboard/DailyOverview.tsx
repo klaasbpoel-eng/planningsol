@@ -36,6 +36,8 @@ import {
   XCircle,
   CheckCheck,
   AlertTriangle,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import {
   format,
@@ -138,6 +140,17 @@ export function DailyOverview() {
   const [gasOrders, setGasOrders] = useState<GasCylinderOrder[]>([]);
   const [ambulanceTrips, setAmbulanceTrips] = useState<AmbulanceTrip[]>([]);
   const [lookaheadActive, setLookaheadActive] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Escape key to exit fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isFullscreen]);
   
   // Overdue tick – re-evaluates every minute so warnings appear live at 17:00
   const [, setOverdueTick] = useState(0);
@@ -549,8 +562,10 @@ export function DailyOverview() {
     return { ambulance, gas, dryIce, task, total: ambulance + gas + dryIce + task };
   }, [ambulanceTrips, gasOrders, dryIceOrders, tasks, isOverdue]);
 
+  const fullscreenWrapper = isFullscreen ? "fixed inset-0 z-50 bg-background overflow-auto p-4" : "";
+
   return (
-    <>
+    <div className={fullscreenWrapper}>
       <Card className="mb-6 print-daily-overview">
         {/* Print-only header */}
         <div className="hidden print-header">
@@ -597,6 +612,19 @@ export function DailyOverview() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsFullscreen(f => !f)}
+                    className="print:hidden"
+                  >
+                    {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{isFullscreen ? "Fullscreen sluiten" : "Fullscreen"}</TooltipContent>
+              </Tooltip>
               {hasNewItems && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1072,7 +1100,7 @@ export function DailyOverview() {
         onOpenChange={setTaskDialogOpen}
         onUpdate={fetchData}
       />
-    </>
+    </div>
   );
 }
 
