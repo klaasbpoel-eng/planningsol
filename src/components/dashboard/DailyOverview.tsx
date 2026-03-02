@@ -999,7 +999,7 @@ export function DailyOverview() {
                 const dayAmbulance = filteredAmbulance.filter((o) => o.scheduled_date === dayStr);
                 const dayEmpty = dayTasks.length === 0 && dayTimeOff.length === 0 && dayDryIce.length === 0 && dayGas.length === 0 && dayAmbulance.length === 0;
 
-                if (dayEmpty && (viewMode === "week" || lookaheadActive)) return null;
+                if (dayEmpty && !printRequested && (viewMode === "week" || lookaheadActive)) return null;
 
                 const totalDryIceKg = dayDryIce.reduce((sum, o) => sum + Number(o.quantity_kg), 0);
 
@@ -1044,6 +1044,9 @@ export function DailyOverview() {
                       </div>
                     )}
 
+                    {dayEmpty ? (
+                      <p className="text-xs text-muted-foreground italic py-1">Geen items gepland</p>
+                    ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                       {/* Ambulance */}
                       {dayAmbulance.length > 0 && (
@@ -1371,6 +1374,7 @@ export function DailyOverview() {
                         </Section>
                       )}
                     </div>
+                    )}
 
                     {viewMode === "week" && <div className="border-b my-2" />}
                   </div>
