@@ -434,9 +434,9 @@ export function DailyOverview() {
       type: "task" as const,
       data: {
         ...task,
-        created_at: "",
+        created_at: new Date().toISOString(),
         created_by: "",
-        updated_at: "",
+        updated_at: new Date().toISOString(),
         priority: task.priority || "medium",
         task_type: task.task_types ? { id: task.type_id || "", name: task.task_types.name, color: task.task_types.color, is_active: true, sort_order: 0, created_at: "", updated_at: "", description: null, parent_id: null } : null,
         profile: task.assignee_name ? { full_name: task.assignee_name } as any : null,
