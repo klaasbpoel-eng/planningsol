@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -23,6 +25,7 @@ import { toast } from "sonner";
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   ClipboardList,
   Palmtree,
   Snowflake,
@@ -38,6 +41,8 @@ import {
   AlertTriangle,
   Maximize2,
   Minimize2,
+  Search,
+  Plus,
 } from "lucide-react";
 import {
   format,
@@ -53,9 +58,14 @@ import { DryIceOrderDialog } from "@/components/calendar/DryIceOrderDialog";
 import { GasCylinderOrderDialog } from "@/components/production/GasCylinderOrderDialog";
 import { AmbulanceTripDialog } from "@/components/calendar/AmbulanceTripDialog";
 import { CalendarItemDialog } from "@/components/calendar/CalendarItemDialog";
+import { CreateAmbulanceTripDialog } from "@/components/calendar/CreateAmbulanceTripDialog";
+import { CreateDryIceOrderCalendarDialog } from "@/components/calendar/CreateDryIceOrderCalendarDialog";
+import { CreateTaskDialog } from "@/components/calendar/CreateTaskDialog";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { useDebounce } from "@/hooks/use-debounce";
 
 type ViewMode = "day" | "week";
+type StatusFilter = "all" | "open" | "completed";
 
 interface TaskItem {
   id: string;
@@ -131,6 +141,16 @@ const statusLabels: Record<string, string> = {
   cancelled: "Geannuleerd",
 };
 
+const COLLAPSED_STORAGE_KEY = "daily-overview-collapsed-sections";
+
+function getInitialCollapsedSections(): Record<string, boolean> {
+  try {
+    const stored = localStorage.getItem(COLLAPSED_STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return {};
+}
+
 export function DailyOverview() {
   const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -142,6 +162,27 @@ export function DailyOverview() {
   const [ambulanceTrips, setAmbulanceTrips] = useState<AmbulanceTrip[]>([]);
   const [lookaheadActive, setLookaheadActive] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Search & filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 300);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  // Collapsible sections state
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(getInitialCollapsedSections);
+
+  const toggleSection = useCallback((sectionKey: string) => {
+    setCollapsedSections(prev => {
+      const next = { ...prev, [sectionKey]: !prev[sectionKey] };
+      localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  // Create dialog state
+  const [createAmbulanceOpen, setCreateAmbulanceOpen] = useState(false);
+  const [createDryIceOpen, setCreateDryIceOpen] = useState(false);
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
 
   // Auth & permissions
   const [userId, setUserId] = useState<string | undefined>(undefined);
@@ -175,7 +216,7 @@ export function DailyOverview() {
     return () => window.removeEventListener("keydown", handler);
   }, [isFullscreen]);
   
-  // Overdue tick – re-evaluates every minute so warnings appear live at 17:00
+  // Overdue tick
   const [, setOverdueTick] = useState(0);
   useEffect(() => {
     const interval = setInterval(() => setOverdueTick(t => t + 1), 60_000);
@@ -187,8 +228,8 @@ export function DailyOverview() {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const scheduled = new Date(scheduledDate + "T00:00:00");
-    if (scheduled < today) return true; // past day
-    if (scheduled.getTime() === today.getTime() && now.getHours() >= 17) return true; // today after 17:00
+    if (scheduled < today) return true;
+    if (scheduled.getTime() === today.getTime() && now.getHours() >= 17) return true;
     return false;
   }, []);
 
@@ -214,7 +255,6 @@ export function DailyOverview() {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed: { ids: string[]; ts: number } = JSON.parse(stored);
-        // Cleanup entries older than 7 days
         if (Date.now() - parsed.ts > 7 * 24 * 60 * 60 * 1000) {
           localStorage.removeItem(STORAGE_KEY);
           return new Set<string>();
@@ -263,7 +303,6 @@ export function DailyOverview() {
     }
     setSeenItemIds(prev => {
       const next = new Set(prev);
-      // Find all items with this series/parent id
       tasks.forEach(t => { if (t.series_id === seriesId) next.add(t.id); });
       dryIceOrders.forEach(o => { if (o.parent_order_id === seriesId) next.add(o.id); });
       gasOrders.forEach(o => { if (o.series_id === seriesId) next.add(o.id); });
@@ -285,7 +324,7 @@ export function DailyOverview() {
 
   const isNewItem = useCallback((id: string) => newItemIds.has(id), [newItemIds]);
 
-  // When in day mode, extend query range by 3 extra days so we can show upcoming items if today is empty
+  // Query range
   const queryRange = useMemo(() => {
     if (viewMode === "day") {
       return { from: currentDate, to: addDays(currentDate, 3) };
@@ -316,8 +355,7 @@ export function DailyOverview() {
         .from("tasks")
         .select("id, title, due_date, start_time, end_time, status, priority, assigned_to, notes, type_id, series_id, task_types:type_id(name, color)")
         .gte("due_date", fromStr)
-        .lte("due_date", toStr)
-        ,
+        .lte("due_date", toStr),
       supabase
         .from("time_off_requests")
         .select("id, start_date, end_date, status, day_part, profiles:profile_id(full_name), time_off_types:type_id(name, color)")
@@ -328,25 +366,21 @@ export function DailyOverview() {
         .from("dry_ice_orders")
         .select("id, customer_name, quantity_kg, box_count, status, scheduled_date, notes, parent_order_id, dry_ice_packaging:packaging_id(name, capacity_kg)")
         .gte("scheduled_date", fromStr)
-        .lte("scheduled_date", toStr)
-        ,
+        .lte("scheduled_date", toStr),
       supabase
         .from("gas_cylinder_orders")
         .select("id, customer_name, cylinder_count, cylinder_size, status, scheduled_date, notes, series_id, gas_types:gas_type_id(name)")
         .gte("scheduled_date", fromStr)
-        .lte("scheduled_date", toStr)
-        ,
+        .lte("scheduled_date", toStr),
       supabase
         .from("ambulance_trips")
         .select("id, scheduled_date, cylinders_2l_300_o2, cylinders_2l_200_o2, cylinders_5l_o2_integrated, cylinders_1l_pindex_o2, cylinders_10l_o2_integrated, cylinders_5l_air_integrated, cylinders_2l_air_integrated, model_5l, status, notes, series_id, ambulance_trip_customers(customer_number, customer_name)")
         .gte("scheduled_date", fromStr)
-        .lte("scheduled_date", toStr)
-        ,
+        .lte("scheduled_date", toStr),
     ]);
 
     const rawTasks = (tasksRes.data as unknown as TaskItem[]) ?? [];
     
-    // Fetch assignee names for tasks
     const assigneeIds = [...new Set(rawTasks.map(t => t.assigned_to).filter(Boolean))];
     if (assigneeIds.length > 0) {
       const { data: profiles } = await supabase
@@ -368,7 +402,6 @@ export function DailyOverview() {
     setGasOrders(allGas);
     setAmbulanceTrips(allAmbulance);
 
-    // In day mode, check if today is empty and we need lookahead
     if (viewMode === "day") {
       const todayStr = format(currentDate, "yyyy-MM-dd");
       const todayHasItems =
@@ -391,7 +424,6 @@ export function DailyOverview() {
     fetchData();
   }, [fetchData]);
 
-
   // Realtime subscriptions
   useEffect(() => {
     const channel = supabase
@@ -408,13 +440,11 @@ export function DailyOverview() {
     };
   }, [fetchData]);
 
-  // Print week effect: when printRequested is set and data has loaded, trigger print
+  // Print week effect
   useEffect(() => {
     if (printRequested && !loading) {
-      // Small delay to let the DOM update
       const timer = setTimeout(() => {
         window.print();
-        // After print dialog closes, restore original view if we switched for week print
         if (printRequested === "week") {
           setViewMode(preWeekPrintViewMode.current);
         }
@@ -563,7 +593,6 @@ export function DailyOverview() {
     return `${format(dateRange.from, "d MMM", { locale: nl })} – ${format(dateRange.to, "d MMM yyyy", { locale: nl })}`;
   }, [viewMode, currentDate, dateRange]);
 
-  // In day mode with lookahead, show upcoming days that have items; otherwise show the selected range
   const days = useMemo(() => {
     if (viewMode === "day") {
       if (lookaheadActive) {
@@ -576,7 +605,69 @@ export function DailyOverview() {
 
   const isEmpty = tasks.length === 0 && timeOff.length === 0 && dryIceOrders.length === 0 && gasOrders.length === 0 && ambulanceTrips.length === 0;
 
-  // Overdue item counts for warning banner
+  // === FILTERING LOGIC ===
+  const matchesSearch = useCallback((text: string) => {
+    if (!debouncedSearch) return true;
+    return text.toLowerCase().includes(debouncedSearch.toLowerCase());
+  }, [debouncedSearch]);
+
+  const matchesStatus = useCallback((status: string) => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "open") return !["completed", "cancelled"].includes(status);
+    if (statusFilter === "completed") return status === "completed";
+    return true;
+  }, [statusFilter]);
+
+  const filteredTasks = useMemo(() => tasks.filter(t =>
+    matchesStatus(t.status) &&
+    matchesSearch(t.task_types?.name || t.title || "Taak")
+  ), [tasks, matchesSearch, matchesStatus]);
+
+  const filteredDryIce = useMemo(() => dryIceOrders.filter(o =>
+    matchesStatus(o.status) && matchesSearch(o.customer_name)
+  ), [dryIceOrders, matchesSearch, matchesStatus]);
+
+  const filteredGas = useMemo(() => gasOrders.filter(o =>
+    matchesStatus(o.status) && matchesSearch(o.customer_name)
+  ), [gasOrders, matchesSearch, matchesStatus]);
+
+  const filteredAmbulance = useMemo(() => ambulanceTrips.filter(o =>
+    matchesStatus(o.status) && matchesSearch(
+      o.ambulance_trip_customers?.map(c => c.customer_name).join(" ") || "Ambulance"
+    )
+  ), [ambulanceTrips, matchesSearch, matchesStatus]);
+
+  const filteredTimeOff = useMemo(() => timeOff.filter(t =>
+    matchesSearch(t.profiles?.full_name || "Medewerker")
+  ), [timeOff, matchesSearch]);
+
+  // === PROGRESS STATS ===
+  const progressStats = useMemo(() => {
+    const allItems = [
+      ...filteredAmbulance.map(o => ({ status: o.status })),
+      ...filteredGas.map(o => ({ status: o.status })),
+      ...filteredDryIce.map(o => ({ status: o.status })),
+      ...filteredTasks.map(t => ({ status: t.status })),
+    ];
+    const total = allItems.length;
+    const completed = allItems.filter(i => i.status === "completed").length;
+    const totalDryIceKg = filteredDryIce.reduce((sum, o) => sum + Number(o.quantity_kg), 0);
+    const totalCylinders = filteredGas.reduce((sum, o) => sum + o.cylinder_count, 0);
+    return {
+      total,
+      completed,
+      percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
+      ambulanceCount: filteredAmbulance.length,
+      gasCount: filteredGas.length,
+      dryIceCount: filteredDryIce.length,
+      totalDryIceKg,
+      totalCylinders,
+      taskCount: filteredTasks.length,
+      timeOffCount: filteredTimeOff.length,
+    };
+  }, [filteredAmbulance, filteredGas, filteredDryIce, filteredTasks, filteredTimeOff]);
+
+  // Overdue stats
   const overdueStats = useMemo(() => {
     const ambulance = ambulanceTrips.filter(o => isOverdue(o.scheduled_date, o.status)).length;
     const gas = gasOrders.filter(o => isOverdue(o.scheduled_date, o.status)).length;
@@ -586,6 +677,8 @@ export function DailyOverview() {
   }, [ambulanceTrips, gasOrders, dryIceOrders, tasks, isOverdue]);
 
   const fullscreenWrapper = isFullscreen ? "fixed inset-0 z-50 bg-background overflow-auto p-4" : "";
+
+  const isFiltering = debouncedSearch !== "" || statusFilter !== "all";
 
   return (
     <div className={fullscreenWrapper}>
@@ -695,6 +788,69 @@ export function DailyOverview() {
             </p>
           ) : (
             <>
+            {/* === PROGRESS BAR + SUMMARY === */}
+            <div className="mb-4 print:hidden space-y-2">
+              <div className="flex items-center gap-3">
+                <Progress value={progressStats.percentage} className="flex-1 h-2.5" />
+                <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+                  {progressStats.completed}/{progressStats.total} afgerond
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {progressStats.ambulanceCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-red-500/10 text-red-700 dark:text-red-400">
+                    <Ambulance className="h-3 w-3" /> {progressStats.ambulanceCount}
+                  </span>
+                )}
+                {progressStats.gasCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-700 dark:text-orange-400">
+                    <Cylinder className="h-3 w-3" /> {progressStats.totalCylinders} cil.
+                  </span>
+                )}
+                {progressStats.dryIceCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-700 dark:text-cyan-400">
+                    <Snowflake className="h-3 w-3" /> {progressStats.totalDryIceKg} kg
+                  </span>
+                )}
+                {progressStats.taskCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-400">
+                    <ClipboardList className="h-3 w-3" /> {progressStats.taskCount}
+                  </span>
+                )}
+                {progressStats.timeOffCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
+                    <Palmtree className="h-3 w-3" /> {progressStats.timeOffCount}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* === SEARCH + FILTER === */}
+            <div className="mb-4 print:hidden flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[200px] max-w-sm">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Zoek op klant of taak..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9 text-sm"
+                />
+              </div>
+              <div className="flex rounded-lg border bg-muted p-0.5">
+                {(["all", "open", "completed"] as StatusFilter[]).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setStatusFilter(f)}
+                    className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
+                      statusFilter === f ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                    }`}
+                  >
+                    {f === "all" ? "Alles" : f === "open" ? "Open" : "Afgerond"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {overdueStats.total > 0 && (
               <Alert className="overdue-banner mb-4 print:hidden">
                 <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -718,13 +874,13 @@ export function DailyOverview() {
               )}
               {days.map((day) => {
                 const dayStr = format(day, "yyyy-MM-dd");
-                const dayTasks = tasks.filter((t) => t.due_date === dayStr);
-                const dayTimeOff = timeOff.filter(
+                const dayTasks = filteredTasks.filter((t) => t.due_date === dayStr);
+                const dayTimeOff = filteredTimeOff.filter(
                   (t) => t.start_date <= dayStr && t.end_date >= dayStr
                 );
-                const dayDryIce = dryIceOrders.filter((o) => o.scheduled_date === dayStr);
-                const dayGas = gasOrders.filter((o) => o.scheduled_date === dayStr);
-                const dayAmbulance = ambulanceTrips.filter((o) => o.scheduled_date === dayStr);
+                const dayDryIce = filteredDryIce.filter((o) => o.scheduled_date === dayStr);
+                const dayGas = filteredGas.filter((o) => o.scheduled_date === dayStr);
+                const dayAmbulance = filteredAmbulance.filter((o) => o.scheduled_date === dayStr);
                 const dayEmpty = dayTasks.length === 0 && dayTimeOff.length === 0 && dayDryIce.length === 0 && dayGas.length === 0 && dayAmbulance.length === 0;
 
                 if (dayEmpty && (viewMode === "week" || lookaheadActive)) return null;
@@ -782,6 +938,9 @@ export function DailyOverview() {
                           color="text-red-500"
                           badgeClass="bg-red-500/10 text-red-700 dark:text-red-400"
                           bgClass="bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30"
+                          collapsed={collapsedSections["ambulance"]}
+                          onToggle={() => toggleSection("ambulance")}
+                          onAdd={isAdmin ? () => setCreateAmbulanceOpen(true) : undefined}
                         >
                           {dayAmbulance.map((o) => {
                             const cylinderItems: { label: string; count: number }[] = [];
@@ -858,9 +1017,10 @@ export function DailyOverview() {
                           color="text-orange-500"
                           badgeClass="bg-orange-500/10 text-orange-700 dark:text-orange-400"
                           bgClass="bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900/30"
+                          collapsed={collapsedSections["gas"]}
+                          onToggle={() => toggleSection("gas")}
                         >
                           {(() => {
-                            // Group by customer
                             const grouped = new Map<string, GasCylinderOrder[]>();
                             dayGas.forEach(o => {
                               const key = o.customer_name;
@@ -912,7 +1072,6 @@ export function DailyOverview() {
                                 );
                               }
 
-                              // Multiple orders for same customer
                               return (
                                 <div key={customerName} className="text-sm">
                                   <div className="font-medium text-xs mb-1">{customerName}</div>
@@ -960,6 +1119,9 @@ export function DailyOverview() {
                           color="text-cyan-500"
                           badgeClass="bg-cyan-500/10 text-cyan-700 dark:text-cyan-400"
                           bgClass="bg-cyan-50 dark:bg-cyan-950/20 border-cyan-200 dark:border-cyan-900/30"
+                          collapsed={collapsedSections["dryice"]}
+                          onToggle={() => toggleSection("dryice")}
+                          onAdd={isAdmin ? () => setCreateDryIceOpen(true) : undefined}
                         >
                           {dayDryIce.map((o) => (
                             <ContextMenu key={o.id}>
@@ -1013,6 +1175,9 @@ export function DailyOverview() {
                           color="text-blue-500"
                           badgeClass="bg-blue-500/10 text-blue-700 dark:text-blue-400"
                           bgClass="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/30"
+                          collapsed={collapsedSections["tasks"]}
+                          onToggle={() => toggleSection("tasks")}
+                          onAdd={isAdmin ? () => setCreateTaskOpen(true) : undefined}
                         >
                           {dayTasks.map((t) => (
                             <ContextMenu key={t.id}>
@@ -1057,6 +1222,8 @@ export function DailyOverview() {
                           color="text-green-500"
                           badgeClass="bg-green-500/10 text-green-700 dark:text-green-400"
                           bgClass="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900/30"
+                          collapsed={collapsedSections["timeoff"]}
+                          onToggle={() => toggleSection("timeoff")}
                         >
                           {dayTimeOff.map((t) => (
                             <Popover key={t.id}>
@@ -1093,6 +1260,22 @@ export function DailyOverview() {
                   </div>
                 );
               })}
+
+              {/* Empty state when filtering */}
+              {isFiltering && days.every(day => {
+                const dayStr = format(day, "yyyy-MM-dd");
+                return (
+                  filteredTasks.filter(t => t.due_date === dayStr).length === 0 &&
+                  filteredTimeOff.filter(t => t.start_date <= dayStr && t.end_date >= dayStr).length === 0 &&
+                  filteredDryIce.filter(o => o.scheduled_date === dayStr).length === 0 &&
+                  filteredGas.filter(o => o.scheduled_date === dayStr).length === 0 &&
+                  filteredAmbulance.filter(o => o.scheduled_date === dayStr).length === 0
+                );
+              }) && (
+                <p className="text-muted-foreground text-sm py-4 text-center">
+                  Geen resultaten gevonden voor "{debouncedSearch}"{statusFilter !== "all" ? ` met filter "${statusFilter === "open" ? "Open" : "Afgerond"}"` : ""}.
+                </p>
+              )}
             </div>
             </>
           )}
@@ -1135,6 +1318,30 @@ export function DailyOverview() {
         profiles={adminProfiles}
         timeOffTypes={adminTimeOffTypes}
       />
+
+      {/* Create dialogs */}
+      <CreateAmbulanceTripDialog
+        open={createAmbulanceOpen}
+        onOpenChange={setCreateAmbulanceOpen}
+        onCreate={fetchData}
+        initialDate={currentDate}
+      />
+
+      <CreateDryIceOrderCalendarDialog
+        open={createDryIceOpen}
+        onOpenChange={setCreateDryIceOpen}
+        onCreate={fetchData}
+        initialDate={currentDate}
+      />
+
+      <CreateTaskDialog
+        open={createTaskOpen}
+        onOpenChange={setCreateTaskOpen}
+        onCreate={fetchData}
+        initialDate={currentDate}
+        profiles={adminProfiles}
+        currentUserId={userId}
+      />
     </div>
   );
 }
@@ -1146,6 +1353,9 @@ function Section({
   color,
   badgeClass,
   bgClass,
+  collapsed,
+  onToggle,
+  onAdd,
   children,
 }: {
   icon: React.ReactNode;
@@ -1154,18 +1364,42 @@ function Section({
   color: string;
   badgeClass: string;
   bgClass?: string;
+  collapsed?: boolean;
+  onToggle?: () => void;
+  onAdd?: () => void;
   children: React.ReactNode;
 }) {
   return (
     <div className={`rounded-lg border p-3 ${bgClass || ""}`}>
       <div className="flex items-center gap-2 mb-2">
-        <span className={color}>{icon}</span>
-        <span className="text-sm font-medium">{label}</span>
-        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${badgeClass}`}>
-          {count}
-        </span>
+        <button
+          onClick={onToggle}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+        >
+          <span className={color}>{icon}</span>
+          <span className="text-sm font-medium">{label}</span>
+          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${badgeClass}`}>
+            {count}
+          </span>
+          <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform print:hidden ${collapsed ? "-rotate-90" : ""}`} />
+        </button>
+        {onAdd && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={onAdd}
+                className="print:hidden h-6 w-6 rounded-md flex items-center justify-center hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Nieuw toevoegen</TooltipContent>
+          </Tooltip>
+        )}
       </div>
-      <div className="divide-y divide-current/5 space-y-1.5">{children}</div>
+      {!collapsed && (
+        <div className="divide-y divide-current/5 space-y-1.5">{children}</div>
+      )}
     </div>
   );
 }
