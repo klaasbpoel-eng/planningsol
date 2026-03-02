@@ -348,7 +348,7 @@ All colors MUST be HSL.
 @media print {
   @page {
     size: landscape;
-    margin: 12mm 10mm;
+    margin: 0;
   }
 
   body {
@@ -372,7 +372,7 @@ All colors MUST be HSL.
     width: 100%;
     border: none !important;
     box-shadow: none !important;
-    padding: 0 !important;
+    padding: 10mm !important;
     background: white !important;
     color: #1a1a1a !important;
     font-size: 11px !important;
