@@ -1,41 +1,44 @@
 
 
-## Weekplanning printen vanuit Dagelijks Overzicht
+## Nieuwe items markeren in Dagelijks Overzicht
 
 ### Wat verandert er
 
-De bestaande Print-knop wordt uitgebreid met een keuzemogelijkheid: je kunt kiezen om alleen de huidige dag of de gehele weekplanning te printen. Als je op "Print" klikt verschijnt een klein dropdown-menu met twee opties:
+Wanneer er een nieuw item verschijnt in het dagelijks overzicht (via realtime updates of bij het openen van de pagina), wordt dit visueel gemarkeerd met:
 
-- **Dag printen** -- print alleen de geselecteerde dag (huidige gedrag)
-- **Weekplanning printen** -- schakelt tijdelijk naar weekweergave, print alle 7 dagen, en schakelt daarna terug
+1. **Een subtiele glow/highlight** rondom het nieuwe item (lichte gekleurde achtergrond-puls)
+2. **Een "Nieuw" badge** naast het item
+3. **Klikken op het item of de badge** markeert het als "gezien" en verwijdert de markering
 
-### Hoe het werkt
+### Aanpak
 
-1. De Print-knop wordt een **dropdown-knop** (split button) met twee opties
-2. Bij "Weekplanning printen":
-   - De component schakelt intern naar weekmodus
-   - Wacht tot de data geladen is
-   - Roept `window.print()` aan
-   - Schakelt terug naar de oorspronkelijke weergave
-3. De print-header toont automatisch "Weekplanning" met het weeknummer en de periode
+De "gezien"-status wordt bijgehouden in **localStorage** per gebruiker. Bij elke data-fetch worden de huidige item-IDs vergeleken met de opgeslagen set. Items die nog niet in de set zitten, worden als "nieuw" gemarkeerd.
 
 ### Technische details
 
 **Bestand: `src/components/dashboard/DailyOverview.tsx`**
 
-- Vervang de enkele Print-knop door een `DropdownMenu` met twee opties: "Dag printen" en "Weekplanning printen"
-- Voeg een `printWeek` functie toe die:
-  - De `viewMode` tijdelijk op "week" zet
-  - De `queryRange` en data laat herladen
-  - Na het laden `window.print()` aanroept via `useEffect` met een `printRequested` state
-  - Na het printen de originele `viewMode` herstelt
-- Pas de print-header aan zodat deze dynamisch "Dagelijks Overzicht" of "Weekplanning" toont afhankelijk van de printmodus
+- Nieuwe state: `seenItemIds` (Set van strings) geladen uit localStorage bij mount
+- Helper `getStorageKey()` die een localStorage-key genereert (bijv. `daily-overview-seen-ids`)
+- Na elke `fetchData`: vergelijk alle item-IDs (taken, droogijs, gas, ambulance) met `seenItemIds` om een `newItemIds` Set te berekenen
+- Functie `markAsSeen(id: string)` die het ID toevoegt aan de Set en localStorage bijwerkt
+- Functie `markAllAsSeen()` voor een optionele "Alles gezien" knop in de header
+- Bij het klikken op een item (bestaande click handlers) wordt `markAsSeen` automatisch mee aangeroepen
+- Oude IDs (ouder dan 7 dagen) worden periodiek opgeschoond uit localStorage om groei te beperken
+
+**Visuele markering per item:**
+- Items in `newItemIds` krijgen een extra CSS-class met een zachte achtergrondkleur-animatie (pulse)
+- Een kleine "Nieuw" Badge (variant "warning", oranje) wordt getoond naast de StatusBadge
+- Bij klik verdwijnt de badge en de highlight
+
+**Optionele "Alles gelezen" knop:**
+- Een kleine knop in de CardHeader (naast de print-knop) die alle huidige items als gezien markeert
+- Alleen zichtbaar wanneer er nieuwe items zijn
 
 **Bestand: `src/index.css`**
-
-- Voeg print-stijlen toe voor de weekweergave: elke dag als blok onder elkaar (niet naast elkaar) zodat de inhoud leesbaar blijft op papier
-- Voeg `page-break-before` toe per dagblok zodat lange weken netjes over meerdere pagina's verdeeld worden
+- Toevoegen van een `@keyframes new-item-pulse` animatie voor de highlight
 
 ### Bestanden die worden aangepast
-- `src/components/dashboard/DailyOverview.tsx`
-- `src/index.css`
+- `src/components/dashboard/DailyOverview.tsx` - nieuwe items tracking + visuele markering
+- `src/index.css` - pulse animatie voor nieuwe items
+
