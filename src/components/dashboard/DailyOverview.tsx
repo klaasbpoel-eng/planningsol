@@ -86,6 +86,7 @@ interface DryIceOrder {
   status: string;
   scheduled_date: string;
   notes: string | null;
+  parent_order_id: string | null;
   dry_ice_packaging: { name: string; capacity_kg: number | null } | null;
 }
 
@@ -97,6 +98,7 @@ interface GasCylinderOrder {
   status: string;
   scheduled_date: string;
   notes: string | null;
+  series_id: string | null;
   gas_types: { name: string } | null;
 }
 
@@ -113,6 +115,7 @@ interface AmbulanceTrip {
   model_5l: string;
   status: string;
   notes: string | null;
+  series_id: string | null;
   ambulance_trip_customers: { customer_number: string; customer_name: string }[];
 }
 
@@ -198,6 +201,24 @@ export function DailyOverview() {
     });
   }, [persistSeen]);
 
+  const markSeriesAsSeen = useCallback((seriesId: string | null | undefined, itemId: string) => {
+    if (!seriesId) {
+      markAsSeen(itemId);
+      return;
+    }
+    setSeenItemIds(prev => {
+      const next = new Set(prev);
+      // Find all items with this series/parent id
+      tasks.forEach(t => { if (t.series_id === seriesId) next.add(t.id); });
+      dryIceOrders.forEach(o => { if (o.parent_order_id === seriesId) next.add(o.id); });
+      gasOrders.forEach(o => { if (o.series_id === seriesId) next.add(o.id); });
+      ambulanceTrips.forEach(o => { if (o.series_id === seriesId) next.add(o.id); });
+      next.add(itemId);
+      persistSeen(next);
+      return next;
+    });
+  }, [tasks, dryIceOrders, gasOrders, ambulanceTrips, markAsSeen, persistSeen]);
+
   const markAllAsSeen = useCallback(() => {
     setSeenItemIds(prev => {
       const next = new Set(prev);
@@ -250,19 +271,19 @@ export function DailyOverview() {
         .eq("status", "approved"),
       supabase
         .from("dry_ice_orders")
-        .select("id, customer_name, quantity_kg, box_count, status, scheduled_date, notes, dry_ice_packaging:packaging_id(name, capacity_kg)")
+        .select("id, customer_name, quantity_kg, box_count, status, scheduled_date, notes, parent_order_id, dry_ice_packaging:packaging_id(name, capacity_kg)")
         .gte("scheduled_date", fromStr)
         .lte("scheduled_date", toStr)
         ,
       supabase
         .from("gas_cylinder_orders")
-        .select("id, customer_name, cylinder_count, cylinder_size, status, scheduled_date, notes, gas_types:gas_type_id(name)")
+        .select("id, customer_name, cylinder_count, cylinder_size, status, scheduled_date, notes, series_id, gas_types:gas_type_id(name)")
         .gte("scheduled_date", fromStr)
         .lte("scheduled_date", toStr)
         ,
       supabase
         .from("ambulance_trips")
-        .select("id, scheduled_date, cylinders_2l_300_o2, cylinders_2l_200_o2, cylinders_5l_o2_integrated, cylinders_1l_pindex_o2, cylinders_10l_o2_integrated, cylinders_5l_air_integrated, cylinders_2l_air_integrated, model_5l, status, notes, ambulance_trip_customers(customer_number, customer_name)")
+        .select("id, scheduled_date, cylinders_2l_300_o2, cylinders_2l_200_o2, cylinders_5l_o2_integrated, cylinders_1l_pindex_o2, cylinders_10l_o2_integrated, cylinders_5l_air_integrated, cylinders_2l_air_integrated, model_5l, status, notes, series_id, ambulance_trip_customers(customer_number, customer_name)")
         .gte("scheduled_date", fromStr)
         .lte("scheduled_date", toStr)
         ,
@@ -365,7 +386,7 @@ export function DailyOverview() {
 
   // Click handlers
   const handleDryIceClick = async (order: DryIceOrder) => {
-    markAsSeen(order.id);
+    markSeriesAsSeen(order.parent_order_id, order.id);
     const { data } = await supabase
       .from("dry_ice_orders")
       .select("*, product_type_info:product_type_id(id, name, description, is_active, sort_order, created_at, updated_at), packaging_info:packaging_id(id, name, capacity_kg, description, is_active, sort_order, created_at, updated_at)")
@@ -378,7 +399,7 @@ export function DailyOverview() {
   };
 
   const handleGasClick = async (order: GasCylinderOrder) => {
-    markAsSeen(order.id);
+    markSeriesAsSeen(order.series_id, order.id);
     const { data } = await supabase
       .from("gas_cylinder_orders")
       .select("*, gas_type_ref:gas_type_id(id, name, color)")
@@ -391,7 +412,7 @@ export function DailyOverview() {
   };
 
   const handleAmbulanceClick = async (trip: AmbulanceTrip) => {
-    markAsSeen(trip.id);
+    markSeriesAsSeen(trip.series_id, trip.id);
     const { data } = await supabase
       .from("ambulance_trips")
       .select("*, ambulance_trip_customers(*)")
@@ -408,7 +429,7 @@ export function DailyOverview() {
   };
 
   const handleTaskClick = (task: TaskItem) => {
-    markAsSeen(task.id);
+    markSeriesAsSeen(task.series_id, task.id);
     const calendarItem = {
       type: "task" as const,
       data: {
