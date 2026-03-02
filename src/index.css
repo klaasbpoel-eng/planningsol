@@ -395,6 +395,19 @@ All colors MUST be HSL.
     break-inside: avoid;
   }
 
+  /* Week print: each day block stacks vertically with page breaks */
+  .print-daily-overview .space-y-4 > div {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .print-daily-overview .space-y-4 > div + div {
+    page-break-before: auto;
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #ccc;
+  }
+
   /* Badges print-friendly */
   .print-daily-overview [class*="badge"],
   .print-daily-overview [class*="Badge"] {
@@ -415,6 +428,14 @@ All colors MUST be HSL.
   [data-sidebar],
   .sidebar {
     display: none !important;
+  }
+
+  /* Dark mode overrides for print */
+  .dark .print-daily-overview,
+  .dark .print-daily-overview * {
+    background: white !important;
+    color: #1a1a1a !important;
+    border-color: #ddd !important;
   }
 
   /* Dark mode overrides for print */

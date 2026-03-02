@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,12 @@ import {
   ContextMenuContent,
   ContextMenuItem,
 } from "@/components/ui/context-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -137,6 +143,10 @@ export function DailyOverview() {
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [selectedTimeOff, setSelectedTimeOff] = useState<TimeOffItem | null>(null);
 
+  // Print state
+  const [printRequested, setPrintRequested] = useState<"day" | "week" | null>(null);
+  const preWeekPrintViewMode = useRef<ViewMode>("day");
+
   // When in day mode, extend query range by 3 extra days so we can show upcoming items if today is empty
   const queryRange = useMemo(() => {
     if (viewMode === "day") {
@@ -258,6 +268,38 @@ export function DailyOverview() {
       supabase.removeChannel(channel);
     };
   }, [fetchData]);
+
+  // Print week effect: when printRequested is set and data has loaded, trigger print
+  useEffect(() => {
+    if (printRequested && !loading) {
+      // Small delay to let the DOM update
+      const timer = setTimeout(() => {
+        window.print();
+        // After print dialog closes, restore original view if we switched for week print
+        if (printRequested === "week") {
+          setViewMode(preWeekPrintViewMode.current);
+        }
+        setPrintRequested(null);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [printRequested, loading]);
+
+  const handlePrintDay = () => {
+    setPrintRequested("day");
+    window.print();
+    setPrintRequested(null);
+  };
+
+  const handlePrintWeek = () => {
+    preWeekPrintViewMode.current = viewMode;
+    if (viewMode !== "week") {
+      setViewMode("week");
+      setPrintRequested("week");
+    } else {
+      setPrintRequested("week");
+    }
+  };
 
   // Click handlers
   const handleDryIceClick = async (order: DryIceOrder) => {
@@ -397,7 +439,9 @@ export function DailyOverview() {
         {/* Print-only header */}
         <div className="hidden print-header">
           <div>
-            <div className="print-header-title">Dagelijks Overzicht</div>
+            <div className="print-header-title">
+              {printRequested === "week" ? "Weekplanning" : "Dagelijks Overzicht"}
+            </div>
             <div className="text-sm text-muted-foreground capitalize">{headerLabel}</div>
           </div>
           <div className="print-header-meta">
@@ -421,15 +465,22 @@ export function DailyOverview() {
               </Button>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.print()}
-                className="print:hidden"
-              >
-                <Printer className="h-4 w-4 mr-1" />
-                Print
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="print:hidden">
+                    <Printer className="h-4 w-4 mr-1" />
+                    Print
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handlePrintDay}>
+                    Dag printen
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handlePrintWeek}>
+                    Weekplanning printen
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <div className="flex rounded-lg border bg-muted p-0.5 print:hidden">
                 <button
                   onClick={() => setViewMode("day")}
