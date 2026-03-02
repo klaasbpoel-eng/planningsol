@@ -347,11 +347,12 @@ All colors MUST be HSL.
 /* Print styles for Daily Overview */
 @media print {
   @page {
-    size: A4 landscape;
+    size: 297mm 210mm landscape;
     margin: 8mm;
   }
 
-  body {
+  html, body {
+    width: 297mm !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -372,7 +373,7 @@ All colors MUST be HSL.
     width: 100%;
     border: none !important;
     box-shadow: none !important;
-    padding: 10mm !important;
+    padding: 8mm !important;
     background: white !important;
     color: #1a1a1a !important;
     font-size: 11px !important;
@@ -447,14 +448,6 @@ All colors MUST be HSL.
   [data-sidebar],
   .sidebar {
     display: none !important;
-  }
-
-  /* Dark mode overrides for print */
-  .dark .print-daily-overview,
-  .dark .print-daily-overview * {
-    background: white !important;
-    color: #1a1a1a !important;
-    border-color: #ddd !important;
   }
 
   /* Dark mode overrides for print */

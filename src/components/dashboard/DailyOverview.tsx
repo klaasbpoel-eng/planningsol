@@ -500,7 +500,7 @@ export function DailyOverview() {
     };
   }, [fetchData]);
 
-  // Print week effect
+  // Print effect — waits for render, then triggers print
   useEffect(() => {
     if (printRequested && !loading) {
       const timer = setTimeout(() => {
@@ -509,15 +509,13 @@ export function DailyOverview() {
           setViewMode(preWeekPrintViewMode.current);
         }
         setPrintRequested(null);
-      }, 300);
+      }, 400);
       return () => clearTimeout(timer);
     }
   }, [printRequested, loading]);
 
   const handlePrintDay = () => {
     setPrintRequested("day");
-    window.print();
-    setPrintRequested(null);
   };
 
   const handlePrintWeek = () => {
