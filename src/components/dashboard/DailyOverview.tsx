@@ -26,6 +26,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  ChevronsUpDown,
+  ChevronsDownUp,
   ClipboardList,
   Palmtree,
   Snowflake,
@@ -43,6 +45,7 @@ import {
   Minimize2,
   Search,
   Plus,
+  Filter,
 } from "lucide-react";
 import {
   format,
@@ -215,6 +218,63 @@ export function DailyOverview() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [isFullscreen]);
+
+  // === KEYBOARD SHORTCUTS ===
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (document.activeElement?.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || (document.activeElement as HTMLElement)?.isContentEditable) return;
+      // Check if any dialog is open
+      if (document.querySelector("[role='dialog']")) return;
+
+      switch (e.key) {
+        case "ArrowLeft":
+          e.preventDefault();
+          navigate("prev");
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          navigate("next");
+          break;
+        case "t":
+        case "T":
+          e.preventDefault();
+          goToToday();
+          break;
+        case "d":
+        case "D":
+          e.preventDefault();
+          setViewMode("day");
+          break;
+        case "w":
+        case "W":
+          e.preventDefault();
+          setViewMode("week");
+          break;
+        case "f":
+        case "F":
+          e.preventDefault();
+          setIsFullscreen(f => !f);
+          break;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // === SWIPE NAVIGATION ===
+  const touchStartX = useRef<number | null>(null);
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const diff = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(diff) < 50) return;
+    if (diff > 0) navigate("prev");
+    else navigate("next");
+  }, []);
   
   // Overdue tick
   const [, setOverdueTick] = useState(0);
@@ -688,6 +748,33 @@ export function DailyOverview() {
 
   const isFiltering = debouncedSearch !== "" || statusFilter !== "all";
 
+  // === COLLAPSE ALL / EXPAND ALL ===
+  const SECTION_KEYS = ["ambulance", "gas", "dryice", "tasks", "timeoff"];
+  const allCollapsed = useMemo(() => SECTION_KEYS.every(k => collapsedSections[k]), [collapsedSections]);
+  const toggleAllSections = useCallback(() => {
+    setCollapsedSections(() => {
+      const newVal = !allCollapsed;
+      const next: Record<string, boolean> = {};
+      SECTION_KEYS.forEach(k => { next[k] = newVal; });
+      localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, [allCollapsed]);
+
+  // === FILTER INDICATOR (hidden sections count) ===
+  const hiddenSectionsCount = useMemo(() => {
+    if (!isFiltering) return 0;
+    let hidden = 0;
+    // Check across all days if each category has zero results
+    const hasCat = (arr: any[]) => arr.length > 0;
+    if (!hasCat(filteredAmbulance)) hidden++;
+    if (!hasCat(filteredGas)) hidden++;
+    if (!hasCat(filteredDryIce)) hidden++;
+    if (!hasCat(filteredTasks)) hidden++;
+    if (!hasCat(filteredTimeOff)) hidden++;
+    return hidden;
+  }, [isFiltering, filteredAmbulance, filteredGas, filteredDryIce, filteredTasks, filteredTimeOff]);
+
   return (
     <div className={fullscreenWrapper}>
       <Card className="mb-6 print-daily-overview">
@@ -746,6 +833,19 @@ export function DailyOverview() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={toggleAllSections}
+                    className="print:hidden"
+                  >
+                    {allCollapsed ? <ChevronsUpDown className="h-4 w-4" /> : <ChevronsDownUp className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{allCollapsed ? "Alles uitklappen" : "Alles inklappen"}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setIsFullscreen(f => !f)}
                     className="print:hidden"
                   >
@@ -781,7 +881,7 @@ export function DailyOverview() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
           {loading ? (
             <div className="space-y-3">
               <Skeleton className="h-5 w-40" />
@@ -859,6 +959,14 @@ export function DailyOverview() {
               </div>
             </div>
 
+            {/* === FILTER INDICATOR === */}
+            {isFiltering && hiddenSectionsCount > 0 && (
+              <div className="mb-3 print:hidden flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Filter className="h-3 w-3" />
+                <span>{hiddenSectionsCount} {hiddenSectionsCount === 1 ? "sectie" : "secties"} verborgen door filter</span>
+              </div>
+            )}
+
             {overdueStats.total > 0 && (
               <Alert className="overdue-banner mb-4 print:hidden">
                 <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -898,7 +1006,7 @@ export function DailyOverview() {
                 return (
                   <div key={dayStr}>
                     {(viewMode === "week" || lookaheadActive) && (
-                      <>
+                      <div className={viewMode === "week" ? "sticky top-0 z-10 bg-card py-2 -mx-3 px-3" : ""}>
                         <h4 className="text-sm font-semibold text-muted-foreground mb-1 capitalize">
                           {format(day, "EEEE d MMMM", { locale: nl })}
                           {isToday(day) && (
@@ -933,7 +1041,7 @@ export function DailyOverview() {
                             </span>
                           )}
                         </div>
-                      </>
+                      </div>
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
