@@ -1,40 +1,30 @@
 
-
-## Waarschuwingssysteem voor openstaande items
+## Fullscreen modus voor Dagelijks Overzicht
 
 ### Wat verandert er
+Er komt een fullscreen-knop in de header van het Dagelijks Overzicht. Wanneer ingeschakeld:
+- Het overzicht vult het hele scherm (geen header, breadcrumbs, titel of padding)
+- Een compacte toolbar blijft zichtbaar met de datum-navigatie en een knop om fullscreen te verlaten
+- Escape-toets sluit fullscreen ook
 
-1. **Automatisch afronden wordt verwijderd**: De edge function `complete-past-dry-ice-orders` die droogijs-orders automatisch op "afgerond" zet, wordt aangepast zodat deze alleen nog een waarschuwing genereert in plaats van de status te wijzigen.
+### Aanpak
 
-2. **Visuele waarschuwing in het Dagelijks Overzicht**: Items die na 17:00 nog de status "gepland" of "in behandeling" hebben, krijgen een opvallende waarschuwingsindicator (oranje/rode rand en een waarschuwingsicoon).
+**`src/components/dashboard/DailyOverview.tsx`**
+- Voeg een `isFullscreen` state toe
+- Voeg een `Maximize2` / `Minimize2` toggle-knop toe naast de bestaande knoppen (print, etc.)
+- Wanneer fullscreen actief is, wrap de hele component in een fixed overlay (`fixed inset-0 z-50 bg-background overflow-auto`) zonder extra padding
+- Bind de `Escape`-toets om fullscreen te sluiten via een `useEffect`
 
-3. **Waarschuwingsbanner**: Bovenaan het overzicht verschijnt een waarschuwingsbanner wanneer er openstaande items zijn van vandaag (na 17:00) of van eerdere dagen.
-
-### Logica
-
-- **Werkuren**: 08:00 - 17:00 (ma-vr)
-- **Overdue-check**: Een item is "overdue" wanneer:
-  - De geplande datum in het verleden ligt, OF
-  - De geplande datum vandaag is en het huidige tijdstip na 17:00 valt
-- **Uitgezonderd**: Items met status "completed" of "cancelled" worden niet als overdue beschouwd
+**`src/pages/DailyOverviewPage.tsx`**
+- Geen wijzigingen nodig; de fullscreen overlay wordt intern afgehandeld door DailyOverview
 
 ### Technische details
 
-**Bestand: `supabase/functions/complete-past-dry-ice-orders/index.ts`**
-- Verwijder de `UPDATE` query die de status naar "completed" zet
-- Vervang door een simpele `SELECT` query die het aantal openstaande orders telt en rapporteert (de functie blijft bestaan voor monitoring maar wijzigt geen data meer)
-
-**Bestand: `src/components/dashboard/DailyOverview.tsx`**
-- Nieuwe helper `isOverdue(scheduledDate: string, status: string)` die controleert of een item overdue is op basis van de datum en het huidige tijdstip (na 17:00)
-- Waarschuwingsbanner component bovenaan de CardContent die het totaal aantal overdue items toont per categorie
-- Per item-rij: overdue items krijgen een rode/oranje linkerborder en een `AlertTriangle` icoon
-- Een `useEffect` met interval (elke minuut) die de overdue-status herberekent zodat om 17:00 de waarschuwingen live verschijnen
-
-**Bestand: `src/index.css`**
-- CSS-class `overdue-item` voor de visuele markering (rode linkerborder + lichte rode achtergrond)
+1. **State**: `const [isFullscreen, setIsFullscreen] = useState(false)`
+2. **Wrapper**: Conditioneel een `div` met `fixed inset-0 z-50 bg-background overflow-auto p-4` om de bestaande content
+3. **Toggle-knop**: Icoon `Maximize2` (aan) / `Minimize2` (uit) in de bestaande knoppenrij
+4. **Escape-handler**: `useEffect` met `keydown` listener voor `Escape`
+5. **Lucide icons**: `Maximize2` en `Minimize2` importeren (al beschikbaar in het project)
 
 ### Bestanden die worden aangepast
-- `supabase/functions/complete-past-dry-ice-orders/index.ts` - stop auto-completion
-- `src/components/dashboard/DailyOverview.tsx` - overdue waarschuwingssysteem
-- `src/index.css` - overdue styling
-
+- `src/components/dashboard/DailyOverview.tsx`
