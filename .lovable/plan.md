@@ -1,44 +1,32 @@
 
 
-## Nieuwe items markeren in Dagelijks Overzicht
+## Reeks-items markeren als gezien bij klik
 
 ### Wat verandert er
 
-Wanneer er een nieuw item verschijnt in het dagelijks overzicht (via realtime updates of bij het openen van de pagina), wordt dit visueel gemarkeerd met:
-
-1. **Een subtiele glow/highlight** rondom het nieuwe item (lichte gekleurde achtergrond-puls)
-2. **Een "Nieuw" badge** naast het item
-3. **Klikken op het item of de badge** markeert het als "gezien" en verwijdert de markering
+Wanneer je op een item klikt dat onderdeel is van een herhalende reeks, worden **alle items uit dezelfde reeks** als "gezien" gemarkeerd. De "Nieuw" badge en pulse-animatie verdwijnen dan voor de hele reeks in een keer.
 
 ### Aanpak
 
-De "gezien"-status wordt bijgehouden in **localStorage** per gebruiker. Bij elke data-fetch worden de huidige item-IDs vergeleken met de opgeslagen set. Items die nog niet in de set zitten, worden als "nieuw" gemarkeerd.
+Elk itemtype heeft een reeks-veld:
+- **Taken**: `series_id`
+- **Gascilinders**: `series_id`
+- **Ambulanceritten**: `series_id`
+- **Droogijs**: `parent_order_id`
+
+Bij het klikken op een item wordt gekeken of het een reeks-ID heeft. Zo ja, dan worden alle zichtbare items met hetzelfde reeks-ID als gezien gemarkeerd.
 
 ### Technische details
 
 **Bestand: `src/components/dashboard/DailyOverview.tsx`**
 
-- Nieuwe state: `seenItemIds` (Set van strings) geladen uit localStorage bij mount
-- Helper `getStorageKey()` die een localStorage-key genereert (bijv. `daily-overview-seen-ids`)
-- Na elke `fetchData`: vergelijk alle item-IDs (taken, droogijs, gas, ambulance) met `seenItemIds` om een `newItemIds` Set te berekenen
-- Functie `markAsSeen(id: string)` die het ID toevoegt aan de Set en localStorage bijwerkt
-- Functie `markAllAsSeen()` voor een optionele "Alles gezien" knop in de header
-- Bij het klikken op een item (bestaande click handlers) wordt `markAsSeen` automatisch mee aangeroepen
-- Oude IDs (ouder dan 7 dagen) worden periodiek opgeschoond uit localStorage om groei te beperken
+1. **Interfaces uitbreiden**: `series_id` toevoegen aan `GasCylinderOrder` en `AmbulanceTrip`, `parent_order_id` toevoegen aan `DryIceOrder`
 
-**Visuele markering per item:**
-- Items in `newItemIds` krijgen een extra CSS-class met een zachte achtergrondkleur-animatie (pulse)
-- Een kleine "Nieuw" Badge (variant "warning", oranje) wordt getoond naast de StatusBadge
-- Bij klik verdwijnt de badge en de highlight
+2. **Queries aanpassen**: `series_id` / `parent_order_id` meenemen in de select-queries voor gas_cylinder_orders, ambulance_trips en dry_ice_orders
 
-**Optionele "Alles gelezen" knop:**
-- Een kleine knop in de CardHeader (naast de print-knop) die alle huidige items als gezien markeert
-- Alleen zichtbaar wanneer er nieuwe items zijn
+3. **Nieuwe functie `markSeriesAsSeen`**: Zoekt alle items (taken, droogijs, gas, ambulance) met hetzelfde reeks-ID en markeert ze allemaal als gezien in een keer
 
-**Bestand: `src/index.css`**
-- Toevoegen van een `@keyframes new-item-pulse` animatie voor de highlight
+4. **Click handlers aanpassen**: De vier click handlers (`handleTaskClick`, `handleDryIceClick`, `handleGasClick`, `handleAmbulanceClick`) roepen `markSeriesAsSeen` aan in plaats van alleen `markAsSeen` voor het individuele item
 
 ### Bestanden die worden aangepast
-- `src/components/dashboard/DailyOverview.tsx` - nieuwe items tracking + visuele markering
-- `src/index.css` - pulse animatie voor nieuwe items
-
+- `src/components/dashboard/DailyOverview.tsx`
