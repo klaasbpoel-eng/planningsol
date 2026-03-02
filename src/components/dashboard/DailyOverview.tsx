@@ -618,28 +618,36 @@ export function DailyOverview() {
     return true;
   }, [statusFilter]);
 
+  const matchesAny = useCallback((texts: (string | null | undefined)[]) => {
+    if (!debouncedSearch) return true;
+    const q = debouncedSearch.toLowerCase();
+    return texts.some(t => t && t.toLowerCase().includes(q));
+  }, [debouncedSearch]);
+
   const filteredTasks = useMemo(() => tasks.filter(t =>
     matchesStatus(t.status) &&
-    matchesSearch(t.task_types?.name || t.title || "Taak")
-  ), [tasks, matchesSearch, matchesStatus]);
+    matchesAny([t.task_types?.name, t.title, t.notes, t.assignee_name])
+  ), [tasks, matchesAny, matchesStatus]);
 
   const filteredDryIce = useMemo(() => dryIceOrders.filter(o =>
-    matchesStatus(o.status) && matchesSearch(o.customer_name)
-  ), [dryIceOrders, matchesSearch, matchesStatus]);
+    matchesStatus(o.status) && matchesAny([o.customer_name, o.notes, o.dry_ice_packaging?.name])
+  ), [dryIceOrders, matchesAny, matchesStatus]);
 
   const filteredGas = useMemo(() => gasOrders.filter(o =>
-    matchesStatus(o.status) && matchesSearch(o.customer_name)
-  ), [gasOrders, matchesSearch, matchesStatus]);
+    matchesStatus(o.status) && matchesAny([o.customer_name, o.gas_types?.name, o.notes, o.cylinder_size])
+  ), [gasOrders, matchesAny, matchesStatus]);
 
   const filteredAmbulance = useMemo(() => ambulanceTrips.filter(o =>
-    matchesStatus(o.status) && matchesSearch(
-      o.ambulance_trip_customers?.map(c => c.customer_name).join(" ") || "Ambulance"
-    )
-  ), [ambulanceTrips, matchesSearch, matchesStatus]);
+    matchesStatus(o.status) && matchesAny([
+      ...(o.ambulance_trip_customers?.map(c => c.customer_name) || []),
+      ...(o.ambulance_trip_customers?.map(c => c.customer_number) || []),
+      o.notes,
+    ])
+  ), [ambulanceTrips, matchesAny, matchesStatus]);
 
   const filteredTimeOff = useMemo(() => timeOff.filter(t =>
-    matchesSearch(t.profiles?.full_name || "Medewerker")
-  ), [timeOff, matchesSearch]);
+    matchesAny([t.profiles?.full_name, t.time_off_types?.name])
+  ), [timeOff, matchesAny]);
 
   // === PROGRESS STATS ===
   const progressStats = useMemo(() => {
