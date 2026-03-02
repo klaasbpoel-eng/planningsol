@@ -323,6 +323,15 @@ All colors MUST be HSL.
   .today-badge {
     @apply bg-gradient-to-r from-primary to-primary/80 text-primary-foreground font-semibold shadow-lg shadow-primary/25;
   }
+
+  @keyframes new-item-pulse {
+    0%, 100% { background-color: transparent; }
+    50% { background-color: hsl(var(--warning) / 0.1); }
+  }
+
+  .animate-new-item {
+    animation: new-item-pulse 2s ease-in-out infinite;
+  }
 }
 
 /* Print styles for Daily Overview */
