@@ -974,7 +974,7 @@ export function DailyOverview() {
                                       {t.end_time && `–${t.end_time.slice(0, 5)}`}
                                     </span>
                                   )}
-                                  <span className={`truncate ${t.status === "cancelled" ? "line-through" : ""}`}>
+                                  <span className={`min-w-0 break-words ${t.status === "cancelled" ? "line-through" : ""}`}>
                                     {t.task_types?.name || t.title || "Taak"}
                                     {t.title && t.task_types?.name ? ` — ${t.title}` : ""}
                                   </span>
