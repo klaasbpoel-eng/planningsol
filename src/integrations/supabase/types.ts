@@ -1185,6 +1185,33 @@ export type Database = {
           },
         ]
       }
+      stock_products: {
+        Row: {
+          created_at: string
+          description: string
+          filled_in_emmen: boolean
+          id: string
+          sub_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          filled_in_emmen?: boolean
+          id?: string
+          sub_code: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          filled_in_emmen?: boolean
+          id?: string
+          sub_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       task_types: {
         Row: {
           color: string
