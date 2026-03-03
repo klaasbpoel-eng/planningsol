@@ -67,7 +67,7 @@ export function PageLayout({
         </a>
         <Header userEmail={userEmail} role={role} isAdmin={isAdmin} onSwitchView={onSwitchView} />
 
-        <main id="main-content" className={`flex-1 flex flex-col w-full container mx-auto px-4 py-8 ${className}`}>
+        <main id="main-content" className={`flex-1 w-full container mx-auto px-4 py-8 ${className}`}>
           {autoBreadcrumbs.length > 0 && (
             <Breadcrumb className="mb-4">
               <BreadcrumbList>
