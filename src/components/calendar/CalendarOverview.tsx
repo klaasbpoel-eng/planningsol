@@ -1942,8 +1942,8 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                 />
               </div>
             )}
-            <div className="space-y-1.5">
-              {allItems.slice(0, 6).map(entry => {
+            <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+              {allItems.map(entry => {
                 if (entry.type === 'timeoff') {
                   const request = entry.item as RequestWithProfile;
                   return <CalendarItemPreview key={request.id} item={request} type="timeoff" side="bottom" align="start">
@@ -2037,9 +2037,6 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                 }
                 return null;
               })}
-              {allItems.length > 6 && <div className="text-xs text-primary font-medium pl-1">
-                +{allItems.length - 6} meer
-              </div>}
             </div>
           </div>;
         })}
@@ -2117,8 +2114,8 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                   />
                 </div>
               )}
-              <div className="space-y-1">
-                {allItems.slice(0, 4).map(entry => {
+              <div className="space-y-1 max-h-[120px] overflow-y-auto">
+                {allItems.map(entry => {
                   if (entry.type === 'timeoff') {
                     const request = entry.item as RequestWithProfile;
                     return <CalendarItemPreview key={request.id} item={request} type="timeoff" side="right" align="start">
@@ -2156,9 +2153,6 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                   }
                   return null;
                 })}
-                {allItems.length > 4 && <div className="text-[10px] text-primary font-semibold pl-1">
-                  +{allItems.length - 4}
-                </div>}
               </div>
             </div>
           </React.Fragment>;
