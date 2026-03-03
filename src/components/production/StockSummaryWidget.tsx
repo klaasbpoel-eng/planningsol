@@ -110,8 +110,8 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
         .select("sub_code, filled_in_emmen")
         .in("sub_code", subCodes);
 
-      const existingMap = new Map(
-        (existing || []).map((e: any) => [e.sub_code, e.filled_in_emmen as boolean])
+      const existingMap = new Map<string, boolean>(
+        (existing || []).map((e) => [e.sub_code, e.filled_in_emmen])
       );
 
       // Find new products to insert
