@@ -1,24 +1,39 @@
 
 
-## Alle items tonen in het kalenderoverzicht (geen "+X meer")
+## Printbaar voorraadoverzicht met onderscheid Emmen-vulling
 
-Het doel is om alle items in de kalendercellen volledig zichtbaar te maken, zonder afkapping via "+X meer". Om de layout beheersbaar te houden wanneer een dag veel items heeft, worden de cellen scrollbaar gemaakt met een maximale hoogte.
+### Wat wordt er gebouwd
+Een printfunctie voor de voorraadstatus die een overzichtelijk rapport genereert, opgesplitst in twee secties: producten die in Emmen gevuld worden en producten die niet in Emmen gevuld worden.
 
 ### Aanpassingen
 
-**Bestand: `src/components/calendar/CalendarOverview.tsx`**
+**1. StockItem uitbreiden met `filledInEmmen` veld**
+- In `StockExcelImportDialog.tsx`: een `filledInEmmen` boolean toevoegen aan de `StockItem` interface
+- De default mock data in `StockSummaryWidget.tsx` voorzien van dit veld
+- Bij Excel-import: een extra kolom herkennen (bijv. "vullocatie", "filled", "emmen") of een handmatige toggle per product bieden
 
-1. **Weekweergave (regel ~1946)**: Verwijder `.slice(0, 6)` zodat alle items worden gerenderd. Verwijder de "+X meer" indicator (regels 2040-2042). Voeg een `max-h-[300px] overflow-y-auto` toe aan de items-container zodat bij veel items gescrolld kan worden.
+**2. Printbaar overzicht component maken**
+- Nieuw bestand: `src/components/production/StockPrintView.tsx`
+- Landscape A4 layout met twee duidelijke secties:
+  - **Gevuld in Emmen**: tabel met Code, Omschrijving, Gem. Verbruik, Voorraad, Verschil, Status
+  - **Niet gevuld in Emmen**: zelfde tabelstructuur
+- Binnen elke sectie gesorteerd op status (kritiek eerst, dan laag, dan goed, dan overschot)
+- Kleurcodering behouden in print (rood/oranje/groen/cyan voor statusbadges)
+- Header met titel, datum, en locatie-info
 
-2. **Maandweergave (regel ~2121)**: Verwijder `.slice(0, 4)` zodat alle items worden gerenderd. Verwijder de "+X meer" indicator (regels 2159-2160). Voeg een `max-h-[120px] overflow-y-auto` toe (kleiner dan weekview vanwege beperkte celgrootte).
+**3. Print-knop toevoegen aan StockSummaryWidget**
+- Printericoon naast de bestaande upload-knop in de widget header
+- Bij klikken: opent een verborgen printbare div (of dialog) en roept `window.print()` aan
+- Alleen zichtbaar als er voorraaddata beschikbaar is
 
-**Bestand: `src/components/admin/TeamCalendar.tsx`**
+**4. Print CSS**
+- In `src/index.css`: print-specifieke styling voor het voorraadoverzicht
+- Landscape oriëntatie, compacte tabellen, page-break tussen de twee secties indien nodig
 
-3. **TeamCalendar (regel ~193)**: Verwijder `.slice(0, 3)` en de "+X meer" tekst (regels 215-219). Voeg een `max-h-[80px] overflow-y-auto` container toe.
+### Technische details
 
-### Technisch detail
-
-- De scrollbare container krijgt een subtiele scrollbar-styling via Tailwind (`scrollbar-thin`) of een `overscroll-contain` class
-- De `min-h-[90px]` op de maandcellen blijft intact; alleen de items-lijst wordt gescrolld
-- Weekcellen hebben meer ruimte en krijgen een hogere max-height
+- Het `filledInEmmen` veld wordt standaard `true` voor de bestaande mock data (aangezien die Emmen-producten voorstellen)
+- Bij import wordt gezocht naar kolommen als "vullocatie" of "locatie vulling"; als niet gevonden, wordt een fallback gebruikt (standaard `true` als locatie Emmen is)
+- De printview wordt als een hidden div in de DOM geplaatst, met `@media print` regels die alleen deze div tonen
+- Bestaande export-utils (`exportToPDF`) worden hergebruikt voor een eventuele PDF-download optie
 
