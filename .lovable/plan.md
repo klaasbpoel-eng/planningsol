@@ -1,59 +1,24 @@
 
 
-## UI/UX Verbeteringen Dagelijks Overzicht
+## Alle items tonen in het kalenderoverzicht (geen "+X meer")
 
-### 1. Keyboard Shortcuts voor navigatie
-Voeg toetsenbordsnelkoppelingen toe zodat power-users sneller navigeren:
-- Pijl links/rechts: vorige/volgende dag of week
-- `T`: spring naar vandaag
-- `D`/`W`: wissel tussen dag- en weekmodus
-- `F`: toggle fullscreen
+Het doel is om alle items in de kalendercellen volledig zichtbaar te maken, zonder afkapping via "+X meer". Om de layout beheersbaar te houden wanneer een dag veel items heeft, worden de cellen scrollbaar gemaakt met een maximale hoogte.
 
-Technisch: een `useEffect` met `keydown` listener die alleen actief is als geen dialoog/input focus heeft.
+### Aanpassingen
 
-### 2. Swipe-navigatie op mobiel
-Voeg touch swipe-ondersteuning toe zodat gebruikers op mobiel met een veeg naar links/rechts door dagen/weken kunnen bladeren. Wordt geimplementeerd met `onTouchStart`/`onTouchEnd` handlers op de `CardContent`, zonder extra dependency.
+**Bestand: `src/components/calendar/CalendarOverview.tsx`**
 
-### 3. Alles inklappen/uitklappen knop
-Een enkele toggle-knop in de toolbar die alle secties tegelijk in- of uitklapt. Icoon wisselt tussen "expand all" en "collapse all" afhankelijk van de huidige staat.
+1. **Weekweergave (regel ~1946)**: Verwijder `.slice(0, 6)` zodat alle items worden gerenderd. Verwijder de "+X meer" indicator (regels 2040-2042). Voeg een `max-h-[300px] overflow-y-auto` toe aan de items-container zodat bij veel items gescrolld kan worden.
 
-### 4. Lege secties verbergen met filter-indicator
-Wanneer een filter actief is en bepaalde secties geen resultaten opleveren, toon een subtiele melding met het aantal verborgen secties (bijv. "3 secties verborgen door filter") in plaats van niets.
+2. **Maandweergave (regel ~2121)**: Verwijder `.slice(0, 4)` zodat alle items worden gerenderd. Verwijder de "+X meer" indicator (regels 2159-2160). Voeg een `max-h-[120px] overflow-y-auto` toe (kleiner dan weekview vanwege beperkte celgrootte).
 
-### 5. Sticky dag-headers in weekweergave
-In de weekweergave worden dag-headers (bijv. "Maandag 3 maart") sticky gemaakt zodat bij scrollen altijd zichtbaar is welke dag je bekijkt. Gebruik `sticky top-0 z-10 bg-background` styling.
+**Bestand: `src/components/admin/TeamCalendar.tsx`**
 
----
+3. **TeamCalendar (regel ~193)**: Verwijder `.slice(0, 3)` en de "+X meer" tekst (regels 215-219). Voeg een `max-h-[80px] overflow-y-auto` container toe.
 
-### Technische aanpak
+### Technisch detail
 
-**Bestand: `src/components/dashboard/DailyOverview.tsx`**
-
-**Keyboard shortcuts (verbetering 1):**
-- Nieuwe `useEffect` met `keydown` handler
-- Checkt `document.activeElement` om input-velden over te slaan
-- Roept bestaande functies aan: `navigate("prev")`, `navigate("next")`, `goToToday()`, `setViewMode()`, `setIsFullscreen()`
-
-**Swipe-navigatie (verbetering 2):**
-- State: `touchStartX: number | null`
-- `onTouchStart` en `onTouchEnd` handlers op de `CardContent`
-- Drempel van 50px voor een swipe
-- Links swipen = volgende dag/week, rechts swipen = vorige
-
-**Alles inklappen/uitklappen (verbetering 3):**
-- Nieuwe knop naast de print-knop in de header toolbar
-- `allCollapsed` berekend via `useMemo` over alle sectie-keys
-- `toggleAllSections()` functie die alle secties in- of uitklapt en opslaat in `localStorage`
-- Iconen: `ChevronsUpDown` / `ChevronsDownUp` uit lucide-react
-
-**Filter-indicator (verbetering 4):**
-- Berekening van het aantal verborgen (lege) secties wanneer `isFiltering` actief is
-- Subtiele tekstregel onder de zoekbalk: "X secties verborgen door filter"
-
-**Sticky dag-headers (verbetering 5):**
-- De dag-header `div` in weekmodus krijgt `sticky top-0 z-10 bg-card py-2` classes
-- Alleen toegepast wanneer `viewMode === "week"`
-
-**Bestanden die worden aangepast:**
-- `src/components/dashboard/DailyOverview.tsx` (alle wijzigingen in dit ene bestand)
+- De scrollbare container krijgt een subtiele scrollbar-styling via Tailwind (`scrollbar-thin`) of een `overscroll-contain` class
+- De `min-h-[90px]` op de maandcellen blijft intact; alleen de items-lijst wordt gescrolld
+- Weekcellen hebben meer ruimte en krijgen een hogere max-height
 
