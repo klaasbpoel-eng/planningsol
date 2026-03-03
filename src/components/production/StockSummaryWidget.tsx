@@ -361,8 +361,8 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
       </CardContent>
     </Card>
 
-    {/* Hidden print view */}
-    <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
+    {/* Hidden print view - visible only when printing */}
+    <div className="stock-print-container">
       <StockPrintView
         ref={printRef}
         stockData={stockData}
