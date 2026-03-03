@@ -4,12 +4,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Upload, Maximize2, Minimize2 } from "lucide-react";
+import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Upload, Maximize2, Minimize2, Printer } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
 import { getStockStatus, type StockStatus } from "./StockStatusBadge";
 import { StockExcelImportDialog, type StockItem } from "./StockExcelImportDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
+import { StockPrintView } from "./StockPrintView";
+import { useRef, useCallback } from "react";
 
 type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 
@@ -22,21 +24,21 @@ interface StockSummaryWidgetProps {
 
 // Default mock data for Emmen
 const defaultEmmenStock: StockItem[] = [
-  { subCode: "250049", description: "Lucht Inhalatie (tech) (50L)", averageConsumption: 11, numberOnStock: 3, difference: -8 },
-  { subCode: "201112", description: "Zuurstof Medicinaal Gasv. SOL act. geint. 300bar (1L)", averageConsumption: 5, numberOnStock: 1, difference: -4 },
-  { subCode: "201107", description: "Zuurstof Medicinaal Gasv. SOL P.I. (1L)", averageConsumption: 5, numberOnStock: 3, difference: -2 },
-  { subCode: "205408", description: "Kooldioxide E.P. Alu P.I. (5L)", averageConsumption: 2, numberOnStock: 1, difference: -1 },
-  { subCode: "210050", description: "Lucht (10L)", averageConsumption: 2, numberOnStock: 1, difference: -1 },
-  { subCode: "250045", description: "Lucht Synth. Medicinaal Gasv. SOL (50L)", averageConsumption: 3, numberOnStock: 2, difference: -1 },
-  { subCode: "202507", description: "Distikstofoxide Medicinaal SOL P.I. (2L)", averageConsumption: 2, numberOnStock: 2, difference: 0 },
-  { subCode: "205407", description: "Kooldioxide E.P. P.I. (5L)", averageConsumption: 3, numberOnStock: 3, difference: 0 },
-  { subCode: "270382", description: "Pakket AliSOL Stikstof (16x50L)", averageConsumption: 1, numberOnStock: 1, difference: 0 },
-  { subCode: "270840", description: "Pakket Helium 5.0 (16x50L)", averageConsumption: 1, numberOnStock: 1, difference: 0 },
-  { subCode: "250700", description: "Acetyleen (50L)", averageConsumption: 2, numberOnStock: 3, difference: 1 },
-  { subCode: "250288", description: "12% O2 in N2 (50L)", averageConsumption: 3, numberOnStock: 5, difference: 2 },
-  { subCode: "250370", description: "Argon 5.0 300bar (50L)", averageConsumption: 7, numberOnStock: 10, difference: 3 },
-  { subCode: "250383", description: "AliSOL 028 (50L)", averageConsumption: 8, numberOnStock: 13, difference: 5 },
-  { subCode: "250350", description: "Argon 5.0 (50L)", averageConsumption: 1, numberOnStock: 17, difference: 16 },
+  { subCode: "250049", description: "Lucht Inhalatie (tech) (50L)", averageConsumption: 11, numberOnStock: 3, difference: -8, filledInEmmen: true },
+  { subCode: "201112", description: "Zuurstof Medicinaal Gasv. SOL act. geint. 300bar (1L)", averageConsumption: 5, numberOnStock: 1, difference: -4, filledInEmmen: true },
+  { subCode: "201107", description: "Zuurstof Medicinaal Gasv. SOL P.I. (1L)", averageConsumption: 5, numberOnStock: 3, difference: -2, filledInEmmen: true },
+  { subCode: "205408", description: "Kooldioxide E.P. Alu P.I. (5L)", averageConsumption: 2, numberOnStock: 1, difference: -1, filledInEmmen: false },
+  { subCode: "210050", description: "Lucht (10L)", averageConsumption: 2, numberOnStock: 1, difference: -1, filledInEmmen: false },
+  { subCode: "250045", description: "Lucht Synth. Medicinaal Gasv. SOL (50L)", averageConsumption: 3, numberOnStock: 2, difference: -1, filledInEmmen: true },
+  { subCode: "202507", description: "Distikstofoxide Medicinaal SOL P.I. (2L)", averageConsumption: 2, numberOnStock: 2, difference: 0, filledInEmmen: true },
+  { subCode: "205407", description: "Kooldioxide E.P. P.I. (5L)", averageConsumption: 3, numberOnStock: 3, difference: 0, filledInEmmen: false },
+  { subCode: "270382", description: "Pakket AliSOL Stikstof (16x50L)", averageConsumption: 1, numberOnStock: 1, difference: 0, filledInEmmen: true },
+  { subCode: "270840", description: "Pakket Helium 5.0 (16x50L)", averageConsumption: 1, numberOnStock: 1, difference: 0, filledInEmmen: false },
+  { subCode: "250700", description: "Acetyleen (50L)", averageConsumption: 2, numberOnStock: 3, difference: 1, filledInEmmen: true },
+  { subCode: "250288", description: "12% O2 in N2 (50L)", averageConsumption: 3, numberOnStock: 5, difference: 2, filledInEmmen: true },
+  { subCode: "250370", description: "Argon 5.0 300bar (50L)", averageConsumption: 7, numberOnStock: 10, difference: 3, filledInEmmen: true },
+  { subCode: "250383", description: "AliSOL 028 (50L)", averageConsumption: 8, numberOnStock: 13, difference: 5, filledInEmmen: true },
+  { subCode: "250350", description: "Argon 5.0 (50L)", averageConsumption: 1, numberOnStock: 17, difference: 16, filledInEmmen: true },
 ];
 
 interface StatusConfig {
@@ -51,6 +53,7 @@ interface StatusConfig {
 }
 
 export function StockSummaryWidget({ refreshKey, isRefreshing, className, selectedLocation = "all" }: StockSummaryWidgetProps) {
+  const printRef = useRef<HTMLDivElement>(null);
   // Store stock data per location
   const [stockByLocation, setStockByLocation] = useState<Record<string, StockItem[]>>({
     sol_emmen: defaultEmmenStock,
@@ -106,6 +109,10 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
   const importLocationLabel = selectedLocation === "sol_tilburg" ? "SOL Tilburg" 
     : selectedLocation === "sol_emmen" ? "SOL Emmen" 
     : "SOL Emmen";
+
+  const handlePrint = useCallback(() => {
+    window.print();
+  }, []);
 
   // Group items by status
   const statusConfigs = useMemo(() => {
@@ -193,6 +200,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
           : "Op voorraad";
 
   return (
+    <>
     <Card
       className={cn(
         "glass-card transition-all duration-300",
@@ -211,17 +219,30 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
               </Badge>
             )}
           </span>
-          {isAdmin && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => setImportDialogOpen(true)}
-              title={`Excel importeren voor ${importLocationLabel}`}
-            >
-              <Upload className="h-3.5 w-3.5" />
-            </Button>
-          )}
+          <span className="flex items-center gap-0.5">
+            {stockData.length > 0 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={handlePrint}
+                title="Voorraadoverzicht printen"
+              >
+                <Printer className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setImportDialogOpen(true)}
+                title={`Excel importeren voor ${importLocationLabel}`}
+              >
+                <Upload className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </span>
         </CardDescription>
       </CardHeader>
 
@@ -339,5 +360,15 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
         )}
       </CardContent>
     </Card>
+
+    {/* Hidden print view */}
+    <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
+      <StockPrintView
+        ref={printRef}
+        stockData={stockData}
+        locationLabel={importLocationLabel}
+      />
+    </div>
+    </>
   );
 }

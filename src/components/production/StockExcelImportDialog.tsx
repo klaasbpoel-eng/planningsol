@@ -27,6 +27,7 @@ export interface StockItem {
   averageConsumption: number;
   numberOnStock: number;
   difference: number;
+  filledInEmmen?: boolean;
 }
 
 interface ImportStats {
@@ -107,6 +108,9 @@ export function StockExcelImportDialog({
               if (cellStr.includes("verschil") || cellStr.includes("difference") || cellStr.includes("diff") || cellStr.includes("verscil")) {
                 columnMap.difference = idx;
               }
+              if (cellStr.includes("vullocatie") || cellStr.includes("locatie vulling") || cellStr.includes("filled") || cellStr.includes("emmen") || cellStr.includes("vulplaats")) {
+                columnMap.filledInEmmen = idx;
+              }
             });
             break;
           }
@@ -151,12 +155,20 @@ export function StockExcelImportDialog({
             continue;
           }
 
+          // Determine filledInEmmen
+          let filledInEmmen = true; // default
+          if (columnMap.filledInEmmen !== undefined && row[columnMap.filledInEmmen] !== undefined) {
+            const val = String(row[columnMap.filledInEmmen] || "").toLowerCase().trim();
+            filledInEmmen = val === "ja" || val === "yes" || val === "true" || val === "1" || val.includes("emmen");
+          }
+
           items.push({
             subCode: subCode || `AUTO-${i}`,
             description: description || "Onbekend product",
             averageConsumption: Math.round(avgConsumption),
             numberOnStock: Math.round(stockCount),
             difference: Math.round(difference),
+            filledInEmmen,
           });
         }
 
