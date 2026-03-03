@@ -46,6 +46,7 @@ import {
   Search,
   Plus,
   Filter,
+  MoreVertical,
 } from "lucide-react";
 import {
   format,
@@ -66,6 +67,7 @@ import { CreateDryIceOrderCalendarDialog } from "@/components/calendar/CreateDry
 import { CreateTaskDialog } from "@/components/calendar/CreateTaskDialog";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type ViewMode = "day" | "week";
 type StatusFilter = "all" | "open" | "completed";
@@ -144,6 +146,15 @@ const statusLabels: Record<string, string> = {
   cancelled: "Geannuleerd",
 };
 
+const STATUS_CYCLE: string[] = ["pending", "in_progress", "completed"];
+
+const STATUS_OPTIONS = [
+  { value: "pending", label: "Gepland", icon: Clock },
+  { value: "in_progress", label: "Bezig", icon: Play },
+  { value: "completed", label: "Voltooid", icon: CheckCircle2 },
+  { value: "cancelled", label: "Geannuleerd", icon: XCircle },
+];
+
 const COLLAPSED_STORAGE_KEY = "daily-overview-collapsed-sections";
 
 function getInitialCollapsedSections(): Record<string, boolean> {
@@ -190,6 +201,7 @@ export function DailyOverview() {
   // Auth & permissions
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const { isAdmin, permissions } = useUserPermissions(userId);
+  const isMobile = useIsMobile();
   const [adminProfiles, setAdminProfiles] = useState<any[]>([]);
   const [adminTimeOffTypes, setAdminTimeOffTypes] = useState<any[]>([]);
 
@@ -598,12 +610,7 @@ export function DailyOverview() {
   const goToToday = () => setCurrentDate(new Date());
 
   // Quick status change handlers
-  const statusOptions = [
-    { value: "pending", label: "Gepland", icon: Clock },
-    { value: "in_progress", label: "Bezig", icon: Play },
-    { value: "completed", label: "Voltooid", icon: CheckCircle2 },
-    { value: "cancelled", label: "Geannuleerd", icon: XCircle },
-  ];
+  // statusOptions moved to module-level STATUS_OPTIONS
 
   const handleQuickStatus = async (
     table: "ambulance_trips" | "gas_cylinder_orders" | "dry_ice_orders" | "tasks",
@@ -629,7 +636,7 @@ export function DailyOverview() {
 
   const renderStatusMenu = (currentStatus: string, onSelect: (status: string) => void) => (
     <>
-      {statusOptions.map(({ value, label, icon: Icon }) => (
+      {STATUS_OPTIONS.map(({ value, label, icon: Icon }) => (
         <ContextMenuItem
           key={value}
           onClick={(e) => { e.stopPropagation(); onSelect(value); }}
