@@ -344,6 +344,11 @@ All colors MUST be HSL.
   }
 }
 
+/* Hide stock print container on screen */
+.stock-print-container {
+  display: none;
+}
+
 /* Print styles for Daily Overview */
 @media print {
   @page {
@@ -459,16 +464,21 @@ All colors MUST be HSL.
   }
 
   /* Stock overview print styles */
-  .print-stock-overview,
-  .print-stock-overview * {
+  .stock-print-container,
+  .stock-print-container * {
     visibility: visible !important;
+    display: block !important;
   }
 
-  .print-stock-overview {
+  .stock-print-container {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
+    z-index: 9999;
+  }
+
+  .print-stock-overview {
     padding: 10mm !important;
     background: white !important;
     color: #1a1a1a !important;
@@ -502,6 +512,10 @@ All colors MUST be HSL.
     color: #666 !important;
   }
 
+  .stock-print-meta p {
+    margin: 0 !important;
+  }
+
   .stock-print-section {
     page-break-inside: avoid;
     break-inside: avoid;
@@ -520,7 +534,13 @@ All colors MUST be HSL.
     width: 100%;
     border-collapse: collapse;
     font-size: 9px !important;
+    display: table !important;
   }
+
+  .stock-print-table thead { display: table-header-group !important; }
+  .stock-print-table tbody { display: table-row-group !important; }
+  .stock-print-table tr { display: table-row !important; }
+  .stock-print-table th, .stock-print-table td { display: table-cell !important; }
 
   .stock-print-table th {
     padding: 3px 6px;
@@ -538,12 +558,19 @@ All colors MUST be HSL.
   }
 
   .stock-print-badge {
-    display: inline-block;
+    display: inline-block !important;
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 8px !important;
     font-weight: 600;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  .dark .stock-print-container,
+  .dark .stock-print-container * {
+    background: white !important;
+    color: #1a1a1a !important;
+    border-color: #ddd !important;
   }
 }
