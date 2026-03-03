@@ -189,8 +189,8 @@ export function TeamCalendar({ requests }: TeamCalendarProps) {
                       {format(day, "d")}
                     </span>
                   </div>
-                  <div className="space-y-1 overflow-hidden">
-                    {dayRequests.slice(0, 3).map((request, i) => (
+                  <div className="space-y-1 max-h-[80px] overflow-y-auto">
+                    {dayRequests.map((request, i) => (
                       <motion.div
                         key={`${request.id}-${i}`}
                         initial={{ opacity: 0, x: -5 }}
@@ -212,11 +212,6 @@ export function TeamCalendar({ requests }: TeamCalendarProps) {
                         </span>
                       </motion.div>
                     ))}
-                    {dayRequests.length > 3 && (
-                      <div className="text-[10px] text-muted-foreground px-1.5 font-medium">
-                        +{dayRequests.length - 3} meer
-                      </div>
-                    )}
                   </div>
                 </motion.div>
               );
