@@ -796,7 +796,76 @@ export function DailyOverview() {
           </div>
         </div>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between flex-wrap gap-2">
+          {/* Mobile toolbar */}
+          <div className="flex flex-col gap-2 md:hidden print:hidden">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 min-w-0">
+                <Button variant="ghost" size="icon" onClick={() => navigate("prev")} className="h-9 w-9 shrink-0">
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <button
+                  onClick={goToToday}
+                  className="text-base font-semibold capitalize hover:text-primary transition-colors truncate"
+                >
+                  {headerLabel}
+                </button>
+                <Button variant="ghost" size="icon" onClick={() => navigate("next")} className="h-9 w-9 shrink-0">
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handlePrintDay}>
+                    <Printer className="h-4 w-4 mr-2" /> Dag printen
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handlePrintWeek}>
+                    <Printer className="h-4 w-4 mr-2" /> Week printen
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={toggleAllSections}>
+                    {allCollapsed ? <ChevronsUpDown className="h-4 w-4 mr-2" /> : <ChevronsDownUp className="h-4 w-4 mr-2" />}
+                    {allCollapsed ? "Uitklappen" : "Inklappen"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsFullscreen(f => !f)}>
+                    {isFullscreen ? <Minimize2 className="h-4 w-4 mr-2" /> : <Maximize2 className="h-4 w-4 mr-2" />}
+                    {isFullscreen ? "Fullscreen sluiten" : "Fullscreen"}
+                  </DropdownMenuItem>
+                  {hasNewItems && (
+                    <DropdownMenuItem onClick={markAllAsSeen}>
+                      <CheckCheck className="h-4 w-4 mr-2" /> Alles gelezen
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <div className="flex items-center justify-between">
+              {!isToday(currentDate) ? (
+                <Button variant="outline" size="sm" onClick={goToToday} className="text-xs h-8">
+                  Vandaag
+                </Button>
+              ) : <div />}
+              <div className="flex rounded-lg border bg-muted p-0.5 ml-auto">
+                <button
+                  onClick={() => setViewMode("day")}
+                  className={`px-3 py-1 text-sm rounded-md font-medium transition-colors ${viewMode === "day" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+                >
+                  Dag
+                </button>
+                <button
+                  onClick={() => setViewMode("week")}
+                  className={`px-3 py-1 text-sm rounded-md font-medium transition-colors ${viewMode === "week" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+                >
+                  Week
+                </button>
+              </div>
+            </div>
+          </div>
+          {/* Desktop toolbar */}
+          <div className="hidden md:flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" onClick={() => navigate("prev")} className="print:hidden">
                 <ChevronLeft className="h-4 w-4" />
@@ -835,12 +904,7 @@ export function DailyOverview() {
               </DropdownMenu>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={toggleAllSections}
-                    className="print:hidden"
-                  >
+                  <Button variant="ghost" size="icon" onClick={toggleAllSections} className="print:hidden">
                     {allCollapsed ? <ChevronsUpDown className="h-4 w-4" /> : <ChevronsDownUp className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger>
@@ -848,12 +912,7 @@ export function DailyOverview() {
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsFullscreen(f => !f)}
-                    className="print:hidden"
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => setIsFullscreen(f => !f)} className="print:hidden">
                     {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger>
@@ -885,6 +944,8 @@ export function DailyOverview() {
               </div>
             </div>
           </div>
+          {/* Print-only header label */}
+          <div className="hidden print:block text-lg font-semibold capitalize">{headerLabel}</div>
         </CardHeader>
         <CardContent onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
           {loading ? (
@@ -939,8 +1000,8 @@ export function DailyOverview() {
             </div>
 
             {/* === SEARCH + FILTER === */}
-            <div className="mb-4 print:hidden flex flex-wrap items-center gap-2">
-              <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <div className="mb-4 print:hidden flex flex-col md:flex-row md:items-center gap-2">
+              <div className="relative flex-1 min-w-0 md:max-w-sm">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Zoek op klant of taak..."
@@ -1088,7 +1149,7 @@ export function DailyOverview() {
                                       <span className={`font-medium text-xs uppercase tracking-wide text-muted-foreground ${o.status === "cancelled" ? "line-through" : ""}`}>Cilinders</span>
                                       <div className="flex items-center gap-1">
                                         {isNewItem(o.id) && <Badge variant="warning" className="text-[9px] px-1.5 py-0">Nieuw</Badge>}
-                                        <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("ambulance_trips", o.id, cycleStatus(o.status), setAmbulanceTrips)} />
+                                        <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("ambulance_trips", o.id, cycleStatus(o.status), setAmbulanceTrips)} isMobile={isMobile} onStatusSelect={(s) => handleQuickStatus("ambulance_trips", o.id, s, setAmbulanceTrips)} />
                                       </div>
                                     </div>
                                     {cylinderItems.length > 0 ? (
@@ -1181,7 +1242,7 @@ export function DailyOverview() {
                                           </div>
                                           <div className="flex items-center gap-1">
                                             {isNewItem(o.id) && <Badge variant="warning" className="text-[9px] px-1.5 py-0">Nieuw</Badge>}
-                                            <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("gas_cylinder_orders", o.id, cycleStatus(o.status), setGasOrders)} />
+                                            <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("gas_cylinder_orders", o.id, cycleStatus(o.status), setGasOrders)} isMobile={isMobile} onStatusSelect={(s) => handleQuickStatus("gas_cylinder_orders", o.id, s, setGasOrders)} />
                                           </div>
                                         </div>
                                         {o.notes && (
@@ -1216,7 +1277,7 @@ export function DailyOverview() {
                                               </div>
                                               <div className="flex items-center gap-1">
                                                 {isNewItem(o.id) && <Badge variant="warning" className="text-[9px] px-1.5 py-0">Nieuw</Badge>}
-                                                <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("gas_cylinder_orders", o.id, cycleStatus(o.status), setGasOrders)} />
+                                                <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("gas_cylinder_orders", o.id, cycleStatus(o.status), setGasOrders)} isMobile={isMobile} onStatusSelect={(s) => handleQuickStatus("gas_cylinder_orders", o.id, s, setGasOrders)} />
                                               </div>
                                             </div>
                                           </div>
@@ -1268,7 +1329,7 @@ export function DailyOverview() {
                                     </div>
                                     <div className="flex items-center gap-1">
                                       {isNewItem(o.id) && <Badge variant="warning" className="text-[9px] px-1.5 py-0">Nieuw</Badge>}
-                                      <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("dry_ice_orders", o.id, cycleStatus(o.status), setDryIceOrders)} />
+                                      <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("dry_ice_orders", o.id, cycleStatus(o.status), setDryIceOrders)} isMobile={isMobile} onStatusSelect={(s) => handleQuickStatus("dry_ice_orders", o.id, s, setDryIceOrders)} />
                                     </div>
                                   </div>
                                   {o.notes && (
@@ -1325,7 +1386,7 @@ export function DailyOverview() {
                                   </span>
                                   <div className="flex items-center gap-1 ml-auto">
                                     {isNewItem(t.id) && <Badge variant="warning" className="text-[9px] px-1.5 py-0">Nieuw</Badge>}
-                                    <StatusBadge status={t.status} onStatusChange={() => handleQuickStatus("tasks", t.id, cycleStatus(t.status), setTasks)} />
+                                    <StatusBadge status={t.status} onStatusChange={() => handleQuickStatus("tasks", t.id, cycleStatus(t.status), setTasks)} isMobile={isMobile} onStatusSelect={(s) => handleQuickStatus("tasks", t.id, s, setTasks)} />
                                   </div>
                                 </div>
                               </ContextMenuTrigger>
@@ -1406,6 +1467,33 @@ export function DailyOverview() {
           )}
         </CardContent>
       </Card>
+
+      {/* Mobile Admin FAB */}
+      {isMobile && isAdmin && (
+        <div className="fixed bottom-6 right-6 z-50 md:hidden print:hidden">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                className="h-14 w-14 rounded-full shadow-lg p-0"
+                aria-label="Nieuw toevoegen"
+              >
+                <Plus className="h-6 w-6" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top" className="mb-2">
+              <DropdownMenuItem onClick={() => setCreateAmbulanceOpen(true)}>
+                <Ambulance className="h-4 w-4 mr-2" /> Ambulance rit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCreateDryIceOpen(true)}>
+                <Snowflake className="h-4 w-4 mr-2" /> Droogijs order
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCreateTaskOpen(true)}>
+                <ClipboardList className="h-4 w-4 mr-2" /> Taak
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
 
       {/* Dialogs */}
       <DryIceOrderDialog
@@ -1499,7 +1587,7 @@ function Section({
       <div className="flex items-center gap-2 mb-2">
         <button
           onClick={onToggle}
-          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+          className="flex items-center gap-2 flex-1 min-w-0 text-left min-h-[44px] md:min-h-0"
         >
           <span className={color}>{icon}</span>
           <span className="text-sm font-medium">{label}</span>
@@ -1513,7 +1601,7 @@ function Section({
             <TooltipTrigger asChild>
               <button
                 onClick={onAdd}
-                className="print:hidden h-6 w-6 rounded-md flex items-center justify-center hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                className="print:hidden hidden md:flex h-6 w-6 rounded-md items-center justify-center hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
               >
                 <Plus className="h-3.5 w-3.5 text-muted-foreground" />
               </button>
@@ -1523,28 +1611,56 @@ function Section({
         )}
       </div>
       {!collapsed && (
-        <div className="divide-y divide-current/5 space-y-1.5">{children}</div>
+        <div className="divide-y divide-current/5 space-y-2 md:space-y-1.5">{children}</div>
       )}
     </div>
   );
 }
 
-const STATUS_CYCLE: string[] = ["pending", "in_progress", "completed"];
 
-function StatusBadge({ status, onStatusChange }: { status: string; onStatusChange?: () => void }) {
+function StatusBadge({ status, onStatusChange, isMobile, onStatusSelect }: {
+  status: string;
+  onStatusChange?: () => void;
+  isMobile?: boolean;
+  onStatusSelect?: (status: string) => void;
+}) {
   const variant =
     status === "completed" ? "success" :
     status === "in_progress" ? "info" :
     status === "cancelled" ? "destructive" :
     "secondary";
 
-  return (
+  const badge = (
     <Badge
       variant={variant}
-      className={`ml-auto text-[10px] shrink-0 ${onStatusChange ? "cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all" : ""}`}
-      onClick={onStatusChange ? (e: React.MouseEvent) => { e.stopPropagation(); onStatusChange(); } : undefined}
+      className={`ml-auto text-[10px] shrink-0 ${onStatusChange ? "cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all" : ""} ${isMobile ? "px-2.5 py-1 min-h-[28px] text-[11px]" : ""}`}
+      onClick={!isMobile && onStatusChange ? (e: React.MouseEvent) => { e.stopPropagation(); onStatusChange(); } : undefined}
     >
       {statusLabels[status] || status}
     </Badge>
   );
+
+  if (isMobile && onStatusSelect) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <span className="cursor-pointer" onClick={(e: React.MouseEvent) => e.stopPropagation()}>{badge}</span>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {STATUS_OPTIONS.map(({ value, label, icon: Icon }) => (
+            <DropdownMenuItem
+              key={value}
+              onClick={(e) => { e.stopPropagation(); onStatusSelect(value); }}
+              className={`min-h-[44px] ${status === value ? "font-semibold bg-accent" : ""}`}
+            >
+              <Icon className="h-4 w-4 mr-2" />
+              {label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
+  return badge;
 }
