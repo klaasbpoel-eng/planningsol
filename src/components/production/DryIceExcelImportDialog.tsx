@@ -69,11 +69,36 @@ export function DryIceExcelImportDialog({
   const [packagingOptions, setPackagingOptions] = useState<Packaging[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [selectedCustomerName, setSelectedCustomerName] = useState<string>("");
+  const [previewRows, setPreviewRows] = useState<string[][]>([
+    ["10-01-2025", "09 mm.", "240", "3", "720"],
+    ["11-01-2025", "03 mm.", "120", "2", "240"],
+    ["12-01-2025", "09 mm.", "360", "1", "360"],
+  ]);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
       fetchProductTypes();
       fetchPackaging();
+      // Fetch recent dry ice orders for preview
+      setPreviewLoading(true);
+      supabase
+        .from("dry_ice_orders")
+        .select("scheduled_date, quantity_kg, box_count, dry_ice_product_types(name), dry_ice_packaging(name, capacity_kg)")
+        .order("created_at", { ascending: false })
+        .limit(3)
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            setPreviewRows(data.map((o: any) => [
+              new Date(o.scheduled_date).toLocaleDateString("nl-NL", { day: "2-digit", month: "2-digit", year: "numeric" }),
+              (o.dry_ice_product_types as any)?.name || "–",
+              String((o.dry_ice_packaging as any)?.capacity_kg || "–"),
+              String(o.box_count || 1),
+              String(o.quantity_kg),
+            ]));
+          }
+          setPreviewLoading(false);
+        });
     }
   }, [open]);
 
@@ -479,11 +504,8 @@ export function DryIceExcelImportDialog({
               <ExcelFormatPreview
                 templateFileName="droogijs-template.xlsx"
                 headers={["Datum", "Diameter", "Inhoud (kg)", "Aantal", "Totaal kg"]}
-                rows={[
-                  ["10-01-2025", "09 mm.", "240", "3", "720"],
-                  ["11-01-2025", "03 mm.", "120", "2", "240"],
-                  ["12-01-2025", "09 mm.", "360", "1", "360"],
-                ]}
+                rows={previewRows}
+                loading={previewLoading}
                 note="Diameter = producttype (bijv. 09 mm. of 03 mm.). Inhoud = capaciteit verpakking in kg."
               />
             </div>

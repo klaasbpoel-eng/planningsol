@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import * as XLSX from "xlsx";
 import {
   Dialog,
@@ -62,6 +62,38 @@ export function ExcelImportDialog({
   const [step, setStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
   const [gasTypes, setGasTypes] = useState<GasType[]>([]);
   const [cylinderSizes, setCylinderSizes] = useState<string[]>([]);
+  const [previewRows, setPreviewRows] = useState<string[][]>([
+    ["15-01-2025", "Zuurstof", "50L", "12", "200", "M", "Ziekenhuis Emmen", "SOL Emmen"],
+    ["15-01-2025", "Argon", "50L", "8", "200", "T", "Staalwerk BV", "SOL Tilburg"],
+    ["16-01-2025", "CO2", "37.5KG", "5", "57", "T", "Brouwerij NL", "SOL Emmen"],
+  ]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Fetch recent orders for dynamic preview
+  useEffect(() => {
+    if (!open || step !== "upload") return;
+    setPreviewLoading(true);
+    supabase
+      .from("gas_cylinder_orders")
+      .select("scheduled_date, customer_name, cylinder_size, cylinder_count, pressure, gas_grade, location, gas_types(name)")
+      .order("created_at", { ascending: false })
+      .limit(3)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setPreviewRows(data.map((o: any) => [
+            new Date(o.scheduled_date).toLocaleDateString("nl-NL", { day: "2-digit", month: "2-digit", year: "numeric" }),
+            (o.gas_types as any)?.name || "–",
+            o.cylinder_size || "–",
+            String(o.cylinder_count),
+            String(o.pressure),
+            o.gas_grade === "medical" ? "M" : "T",
+            o.customer_name,
+            o.location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg",
+          ]));
+        }
+        setPreviewLoading(false);
+      });
+  }, [open, step]);
 
   // Fetch gas types when dialog opens
   const fetchGasTypes = async () => {
@@ -677,11 +709,8 @@ export function ExcelImportDialog({
               <ExcelFormatPreview
                 templateFileName="gascilinders-template.xlsx"
                 headers={["Datum", "Gassoort", "Maat", "Aantal", "Druk", "M/T", "Klant", "Locatie"]}
-                rows={[
-                  ["15-01-2025", "Zuurstof", "50L", "12", "200", "M", "Ziekenhuis Emmen", "SOL Emmen"],
-                  ["15-01-2025", "Argon", "50L", "8", "200", "T", "Staalwerk BV", "SOL Tilburg"],
-                  ["16-01-2025", "CO2", "37.5KG", "5", "57", "T", "Brouwerij NL", "SOL Emmen"],
-                ]}
+                rows={previewRows}
+                loading={previewLoading}
                 note="Kolomnamen worden automatisch herkend. M/T = Medical/Technical."
               />
             </div>
