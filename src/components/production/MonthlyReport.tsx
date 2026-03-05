@@ -307,12 +307,10 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
             <div className="bg-muted/30 rounded-lg p-2.5">
               <div className="text-lg font-bold">{formatNumber(data.totalDryIceKg, 0)} <span className="text-xs font-normal">kg</span></div>
               <div className="text-[11px] text-muted-foreground">Geproduceerd</div>
-              {prevData && <TrendBadge current={data.totalDryIceKg} previous={prevData.totalDryIceKg} />}
             </div>
             <div className="bg-muted/30 rounded-lg p-2.5">
               <div className="text-lg font-bold">{formatNumber(data.dryIceOrders, 0)}</div>
               <div className="text-[11px] text-muted-foreground">Orders</div>
-              {prevData && <TrendBadge current={data.dryIceOrders} previous={prevData.dryIceOrders} />}
             </div>
           </div>
         </div>
