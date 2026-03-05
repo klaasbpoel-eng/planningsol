@@ -1,25 +1,29 @@
 
 
-## Voorbeeldweergave toevoegen aan Excel Import dialogen
+## Dynamische voorbeelddata en verbeterde UI voor Excel Import previews
 
-Toevoegen van een visuele voorbeeldtabel in de upload-stap van alle drie Excel import dialogen, zodat gebruikers direct zien hoe hun bestand eruit moet zien.
+### Huidige situatie
+De voorbeeldtabellen tonen hardcoded data (bijv. "Zuurstof", "Ziekenhuis Emmen"). Dit is niet representatief voor de werkelijke data in het systeem.
 
-### Aanpassingen per dialoog
+### Aanpassingen
 
-**1. Gascilinders Import (`ExcelImportDialog.tsx`)**
-- Voorbeeldtabel met kolommen: Datum | Gassoort | Type vulling | Aantal | M/T | Klant | Locatie | Opmerkingen
-- 2-3 voorbeeldrijen met realistische data
+**1. Dynamische voorbeelddata uit de database**
+- **Gascilinders**: Bij openen van het dialoog de laatste 3 orders ophalen via `api.gasCylinderOrders.getAll()` en die als voorbeeldrijen tonen (datum, gassoort, maat, aantal, druk, M/T, klant, locatie)
+- **Droogijs**: Laatste 3 droogijs-orders ophalen via `api.dryIceOrders.getAll()` en tonen (datum, diameter, inhoud, aantal, totaal)
+- **Voorraad**: Laatste 3 stock items ophalen (als beschikbaar) of fallback naar hardcoded voorbeelden
 
-**2. Droogijs Import (`DryIceExcelImportDialog.tsx`)**
-- Voorbeeldtabel met kolommen: Datum | Diameter | Inhoud (kg) | Aantal | Totaal kg
-- 2-3 voorbeeldrijen
+Elke dialoog krijgt een `useEffect` die bij `open === true` een kleine query doet (max 3 rijen, lichtgewicht). Als er geen data is, worden de huidige hardcoded voorbeelden als fallback gebruikt.
 
-**3. Voorraad Import (`StockExcelImportDialog.tsx`)**
-- Voorbeeldtabel met kolommen: Artikelcode | Omschrijving | Gem. Verbruik | Voorraad | Verschil
-- 2-3 voorbeeldrijen
+**2. UI/UX verbeteringen ExcelFormatPreview**
+- Duidelijkere titel: "Zo moet je bestand eruitzien:" i.p.v. "Voorbeeld bestandsindeling"
+- Standaard open in plaats van ingeklapt (gebruikers missen het anders)
+- Groene checkmarks bij herkende kolomnamen
+- "Download template" knop prominenter maken met outline variant
+- Betere spacing en visuele scheiding tussen tabel en notitie
 
-### Implementatie
-- Onder de "Sleep een Excel bestand hierheen" tekst een inklapbaar `Collapsible` blok toevoegen met titel "Voorbeeld bestandsindeling"
-- Bevat een compacte tabel met voorbeelddata en een korte toelichting over ondersteunde formaten
-- Styling: `text-xs`, `bg-muted/30` achtergrond, subtiele border
+**Bestanden:**
+- `src/components/production/ExcelFormatPreview.tsx` — UI verbetering, standaard open
+- `src/components/production/ExcelImportDialog.tsx` — Ophalen recente gas-orders als voorbeelddata
+- `src/components/production/DryIceExcelImportDialog.tsx` — Ophalen recente droogijs-orders
+- `src/components/production/StockExcelImportDialog.tsx` — Fallback behouden (stock data structuur verschilt)
 
