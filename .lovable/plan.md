@@ -1,29 +1,45 @@
 
 
-## Dynamische voorbeelddata en verbeterde UI voor Excel Import previews
+## Uitbreiding Maandrapport met schakelbare secties
 
-### Huidige situatie
-De voorbeeldtabellen tonen hardcoded data (bijv. "Zuurstof", "Ziekenhuis Emmen"). Dit is niet representatief voor de werkelijke data in het systeem.
+### Overzicht
+Het maandrapport wordt uitgebreid met 4 nieuwe KPI-secties, elk individueel aan/uit te zetten via toggle-switches boven het rapport. Alle secties zijn standaard ingeschakeld.
 
-### Aanpassingen
+### Nieuwe secties (naast bestaande Cilinders, Droogijs, Top 5 klanten)
 
-**1. Dynamische voorbeelddata uit de database**
-- **Gascilinders**: Bij openen van het dialoog de laatste 3 orders ophalen via `api.gasCylinderOrders.getAll()` en die als voorbeeldrijen tonen (datum, gassoort, maat, aantal, druk, M/T, klant, locatie)
-- **Droogijs**: Laatste 3 droogijs-orders ophalen via `api.dryIceOrders.getAll()` en tonen (datum, diameter, inhoud, aantal, totaal)
-- **Voorraad**: Laatste 3 stock items ophalen (als beschikbaar) of fallback naar hardcoded voorbeelden
+1. **Efficiëntie (Voltooiingsgraad)** -- al beschikbaar in data (`efficiencyRate`), alleen UI toevoegen
+   - Progress bar met percentage per locatie
+   - Berekening: `completedCylinders / totalCylinders * 100`
 
-Elke dialoog krijgt een `useEffect` die bij `open === true` een kleine query doet (max 3 rijen, lichtgewicht). Als er geen data is, worden de huidige hardcoded voorbeelden als fallback gebruikt.
+2. **Gemiddeld cilinders per order** -- berekend uit bestaande data
+   - Enkel getal: `totalCylinders / cylinderOrders`
+   - Met trend t.o.v. vorige maand
 
-**2. UI/UX verbeteringen ExcelFormatPreview**
-- Duidelijkere titel: "Zo moet je bestand eruitzien:" i.p.v. "Voorbeeld bestandsindeling"
-- Standaard open in plaats van ingeklapt (gebruikers missen het anders)
-- Groene checkmarks bij herkende kolomnamen
-- "Download template" knop prominenter maken met outline variant
-- Betere spacing en visuele scheiding tussen tabel en notitie
+3. **Gassoort-verdeling (Top 3)** -- nieuwe query via `api.reports.getGasTypeDistribution()`
+   - Horizontale bars per gassoort met kleur en percentage
+   - Per locatie opgehaald
 
-**Bestanden:**
-- `src/components/production/ExcelFormatPreview.tsx` — UI verbetering, standaard open
-- `src/components/production/ExcelImportDialog.tsx` — Ophalen recente gas-orders als voorbeelddata
-- `src/components/production/DryIceExcelImportDialog.tsx` — Ophalen recente droogijs-orders
-- `src/components/production/StockExcelImportDialog.tsx` — Fallback behouden (stock data structuur verschilt)
+4. **Cilindergrootte-verdeling** -- nieuwe query direct op `gas_cylinder_orders` gegroepeerd op `cylinder_size`
+   - Compacte badges per grootte met aantallen
+
+### Toggle-mechanisme
+- Een rij met `Switch` toggles boven de locatie-kolommen
+- Secties: Cilinders | Efficiëntie | Gem. per order | Gassoorten | Grootteverdeling | Droogijs | Top 5 klanten
+- State opgeslagen in component (niet persistent, reset bij pagina-herlaad)
+- Elke sectie in `LocationColumn` wrapped met `{showX && (...)}`
+
+### Data-uitbreiding
+- `LocationKPI` interface uitbreiden met:
+  - `avgCylindersPerOrder: number`
+  - `gasTypeDistribution: { name: string; color: string; count: number }[]`
+  - `sizeDistribution: { size: string; count: number }[]`
+- `fetchLocationData` uitbreiden met 2 extra parallelle calls:
+  - `api.reports.getGasTypeDistribution(from, to, location, hideDigital)` (bestaat al)
+  - Direct Supabase query op `gas_cylinder_orders` gegroepeerd op `cylinder_size`
+
+### Export
+- `buildExportRows` uitbreiden met de nieuwe velden, maar alleen kolommen opnemen die ingeschakeld zijn
+
+### Bestand
+- Alleen `src/components/production/MonthlyReport.tsx` wijzigen
 
