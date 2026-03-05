@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -306,11 +307,24 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
     return Math.round(((current - previous) / previous) * 100);
   };
 
-  const TrendBadge = ({ current, previous }: { current: number; previous: number }) => {
+  const TrendBadge = ({ current, previous, label }: { current: number; previous: number; label?: string }) => {
     const trend = calcTrend(current, previous);
-    if (trend === 0) return <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground"><Minus className="h-3 w-3" />0%</span>;
-    if (trend > 0) return <span className="inline-flex items-center gap-0.5 text-[11px] text-green-600"><TrendingUp className="h-3 w-3" />+{trend}%</span>;
-    return <span className="inline-flex items-center gap-0.5 text-[11px] text-red-500"><TrendingDown className="h-3 w-3" />{trend}%</span>;
+    const tooltipText = `${label ? label + ": " : ""}${formatNumber(previous, 0)} → ${formatNumber(current, 0)}`;
+    const badge = trend === 0
+      ? <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground cursor-help"><Minus className="h-3 w-3" />0%</span>
+      : trend > 0
+        ? <span className="inline-flex items-center gap-0.5 text-[11px] text-green-600 cursor-help"><TrendingUp className="h-3 w-3" />+{trend}%</span>
+        : <span className="inline-flex items-center gap-0.5 text-[11px] text-red-500 cursor-help"><TrendingDown className="h-3 w-3" />{trend}%</span>;
+    return (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>{badge}</TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">
+            <p>{tooltipText}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
   };
 
   const SIZE_LABELS: Record<string, string> = {
