@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { ExcelFormatPreview } from "./ExcelFormatPreview";
 
 interface StockExcelImportDialogProps {
   open: boolean;
@@ -246,6 +247,15 @@ export function StockExcelImportDialog({
                   Selecteer bestand
                 </label>
               </Button>
+              <ExcelFormatPreview
+                headers={["Artikelcode", "Omschrijving", "Gem. Verbruik", "Voorraad", "Verschil"]}
+                rows={[
+                  ["O2-50L", "Zuurstof 50 liter", "25", "30", "+5"],
+                  ["AR-50L", "Argon 50 liter", "18", "12", "-6"],
+                  ["CO2-37K", "CO2 37.5 kg", "10", "10", "0"],
+                ]}
+                note="Kolomnamen worden automatisch herkend. Verschil wordt berekend als Voorraad − Gem. Verbruik indien niet opgegeven."
+              />
             </div>
           )}
 
