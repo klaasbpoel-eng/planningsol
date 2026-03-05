@@ -92,15 +92,32 @@ const TOGGLE_CONFIG: { key: keyof SectionToggles; label: string; icon: React.Rea
   { key: "topCustomers", label: "Top 5 klanten", icon: <Users className="h-3 w-3" /> },
 ];
 
+const TOGGLES_STORAGE_KEY = "monthly-report-section-toggles";
+
+const loadToggles = (): SectionToggles => {
+  try {
+    const stored = localStorage.getItem(TOGGLES_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return { ...DEFAULT_TOGGLES, ...parsed };
+    }
+  } catch {}
+  return DEFAULT_TOGGLES;
+};
+
 export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return format(now, "yyyy-MM");
   });
-  const [toggles, setToggles] = useState<SectionToggles>(DEFAULT_TOGGLES);
+  const [toggles, setToggles] = useState<SectionToggles>(loadToggles);
   const [showSettings, setShowSettings] = useState(false);
   const [trendMode, setTrendMode] = useState<"prev_month" | "prev_year">("prev_month");
+
+  useEffect(() => {
+    localStorage.setItem(TOGGLES_STORAGE_KEY, JSON.stringify(toggles));
+  }, [toggles]);
 
   const [emmenData, setEmmenData] = useState<LocationKPI | null>(null);
   const [tilburgData, setTilburgData] = useState<LocationKPI | null>(null);
