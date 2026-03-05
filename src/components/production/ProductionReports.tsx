@@ -77,6 +77,7 @@ const CumulativeCylinderSizeChart = lazy(() => import("./CumulativeCylinderSizeC
 const ProductionHeatMap = lazy(() => import("./ProductionHeatMap").then(m => ({ default: m.ProductionHeatMap })));
 const CustomerSegmentation = lazy(() => import("./CustomerSegmentation").then(m => ({ default: m.CustomerSegmentation })));
 const LocationComparisonReport = lazy(() => import("./LocationComparisonReport").then(m => ({ default: m.LocationComparisonReport })));
+const MonthlyReport = lazy(() => import("./MonthlyReport").then(m => ({ default: m.MonthlyReport })));
 
 
 
@@ -686,10 +687,15 @@ export function ProductionReports({
 
       {/* Detailed Tabs & Dashboard */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={cn("grid w-full max-w-4xl bg-muted/50 backdrop-blur-sm h-9", showDryIce ? "grid-cols-6" : "grid-cols-5")}>
+        <TabsList className={cn("grid w-full max-w-5xl bg-muted/50 backdrop-blur-sm h-9", showDryIce ? "grid-cols-7" : "grid-cols-6")}>
           <TabsTrigger value="overview" className="text-xs gap-1.5">
             <BarChart3 className="h-3 w-3" />
             <span className="hidden xs:inline">Dashboard</span>
+          </TabsTrigger>
+          <TabsTrigger value="monthly" className="text-xs gap-1.5">
+            <CalendarIcon className="h-3 w-3" />
+            <span className="hidden sm:inline">Maandrapport</span>
+            <span className="sm:hidden">Maand</span>
           </TabsTrigger>
           <TabsTrigger value="insights" className="text-xs gap-1.5">
             <Sparkles className="h-3 w-3" />
@@ -830,6 +836,13 @@ export function ProductionReports({
 
             {/* Additional Widgets Row could go here */}
           </div>
+        </TabsContent>
+
+        {/* Monthly Report */}
+        <TabsContent value="monthly" className="mt-4">
+          <Suspense fallback={<ChartLoadingFallback />}>
+            <MonthlyReport hideDigital={hideDigital} />
+          </Suspense>
         </TabsContent>
 
         {/* Other tabs content placeholders (using existing components) */}
