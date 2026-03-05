@@ -16,6 +16,7 @@ import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2 } from "luc
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { ExcelFormatPreview } from "./ExcelFormatPreview";
 
 interface ExcelImportDialogProps {
   open: boolean;
@@ -673,6 +674,15 @@ export function ExcelImportDialog({
               <p className="text-xs text-muted-foreground mt-3">
                 Ondersteunt .xlsx, .xls en .csv (puntkomma-gescheiden)
               </p>
+              <ExcelFormatPreview
+                headers={["Datum", "Gassoort", "Maat", "Aantal", "Druk", "M/T", "Klant", "Locatie"]}
+                rows={[
+                  ["15-01-2025", "Zuurstof", "50L", "12", "200", "M", "Ziekenhuis Emmen", "SOL Emmen"],
+                  ["15-01-2025", "Argon", "50L", "8", "200", "T", "Staalwerk BV", "SOL Tilburg"],
+                  ["16-01-2025", "CO2", "37.5KG", "5", "57", "T", "Brouwerij NL", "SOL Emmen"],
+                ]}
+                note="Kolomnamen worden automatisch herkend. M/T = Medical/Technical."
+              />
             </div>
           )}
 
