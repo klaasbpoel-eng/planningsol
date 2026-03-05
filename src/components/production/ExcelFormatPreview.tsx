@@ -1,15 +1,25 @@
 import { useState } from "react";
+import * as XLSX from "xlsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Eye } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ChevronDown, Download, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ExcelFormatPreviewProps {
   headers: string[];
   rows: string[][];
   note?: string;
+  templateFileName?: string;
 }
 
-export function ExcelFormatPreview({ headers, rows, note }: ExcelFormatPreviewProps) {
+function downloadTemplate(headers: string[], rows: string[][], fileName: string) {
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Template");
+  XLSX.writeFile(wb, fileName);
+}
+
+export function ExcelFormatPreview({ headers, rows, note, templateFileName = "template.xlsx" }: ExcelFormatPreviewProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -45,9 +55,23 @@ export function ExcelFormatPreview({ headers, rows, note }: ExcelFormatPreviewPr
               </tbody>
             </table>
           </div>
-          {note && (
-            <p className="text-[11px] text-muted-foreground mt-2">{note}</p>
-          )}
+          <div className="flex items-center justify-between mt-2">
+            {note && (
+              <p className="text-[11px] text-muted-foreground">{note}</p>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs gap-1 ml-auto shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                downloadTemplate(headers, rows, templateFileName);
+              }}
+            >
+              <Download className="h-3 w-3" />
+              Download template
+            </Button>
+          </div>
         </div>
       </CollapsibleContent>
     </Collapsible>

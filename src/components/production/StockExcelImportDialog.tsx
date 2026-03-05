@@ -248,6 +248,7 @@ export function StockExcelImportDialog({
                 </label>
               </Button>
               <ExcelFormatPreview
+                templateFileName="voorraad-template.xlsx"
                 headers={["Artikelcode", "Omschrijving", "Gem. Verbruik", "Voorraad", "Verschil"]}
                 rows={[
                   ["O2-50L", "Zuurstof 50 liter", "25", "30", "+5"],

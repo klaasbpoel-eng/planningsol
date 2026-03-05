@@ -477,6 +477,7 @@ export function DryIceExcelImportDialog({
                 </Button>
               </label>
               <ExcelFormatPreview
+                templateFileName="droogijs-template.xlsx"
                 headers={["Datum", "Diameter", "Inhoud (kg)", "Aantal", "Totaal kg"]}
                 rows={[
                   ["10-01-2025", "09 mm.", "240", "3", "720"],
