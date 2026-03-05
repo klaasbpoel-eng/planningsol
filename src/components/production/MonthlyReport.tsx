@@ -99,6 +99,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
   });
   const [toggles, setToggles] = useState<SectionToggles>(DEFAULT_TOGGLES);
   const [showSettings, setShowSettings] = useState(false);
+  const [trendMode, setTrendMode] = useState<"prev_month" | "prev_year">("prev_month");
 
   const [emmenData, setEmmenData] = useState<LocationKPI | null>(null);
   const [tilburgData, setTilburgData] = useState<LocationKPI | null>(null);
@@ -109,7 +110,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
   const monthDate = useMemo(() => new Date(selectedMonth + "-01"), [selectedMonth]);
   const fromDate = useMemo(() => format(startOfMonth(monthDate), "yyyy-MM-dd"), [monthDate]);
   const toDate = useMemo(() => format(endOfMonth(monthDate), "yyyy-MM-dd"), [monthDate]);
-  const prevMonthDate = useMemo(() => subMonths(monthDate, 1), [monthDate]);
+  const prevMonthDate = useMemo(() => subMonths(monthDate, trendMode === "prev_year" ? 12 : 1), [monthDate, trendMode]);
   const prevFromDate = useMemo(() => format(startOfMonth(prevMonthDate), "yyyy-MM-dd"), [prevMonthDate]);
   const prevToDate = useMemo(() => format(endOfMonth(prevMonthDate), "yyyy-MM-dd"), [prevMonthDate]);
 
@@ -371,7 +372,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
     if (toggles.cylinders) {
       cols.push({ header: "Cil. Orders", key: "cilinder_orders", width: 12 });
       cols.push({ header: "Totaal Cil.", key: "totaal_cilinders", width: 12 });
-      cols.push({ header: "Trend Cil.", key: "trend_cilinders", width: 10 });
+      cols.push({ header: trendMode === "prev_year" ? "Trend (jr)" : "Trend (mnd)", key: "trend_cilinders", width: 10 });
     }
     if (toggles.efficiency) {
       cols.push({ header: "Efficiëntie", key: "efficientie", width: 12 });
@@ -627,7 +628,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
               Maandrapport
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Overzicht van KPI's per locatie met vergelijking t.o.v. vorige maand
+              Overzicht van KPI's per locatie — vergelijking t.o.v. {trendMode === "prev_year" ? "dezelfde maand vorig jaar" : "vorige maand"}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -641,6 +642,15 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
                     {opt.label}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+            <Select value={trendMode} onValueChange={(v) => setTrendMode(v as "prev_month" | "prev_year")}>
+              <SelectTrigger className="w-[190px] h-9 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="prev_month">t.o.v. vorige maand</SelectItem>
+                <SelectItem value="prev_year">t.o.v. vorig jaar</SelectItem>
               </SelectContent>
             </Select>
             <Button
