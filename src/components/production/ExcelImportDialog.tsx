@@ -675,6 +675,7 @@ export function ExcelImportDialog({
                 Ondersteunt .xlsx, .xls en .csv (puntkomma-gescheiden)
               </p>
               <ExcelFormatPreview
+                templateFileName="gascilinders-template.xlsx"
                 headers={["Datum", "Gassoort", "Maat", "Aantal", "Druk", "M/T", "Klant", "Locatie"]}
                 rows={[
                   ["15-01-2025", "Zuurstof", "50L", "12", "200", "M", "Ziekenhuis Emmen", "SOL Emmen"],
