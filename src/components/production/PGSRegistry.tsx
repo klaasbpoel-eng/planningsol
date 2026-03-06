@@ -1051,7 +1051,7 @@ function SubstanceRow({
                 </div>
               </div>
               {substance.cylinder_breakdown && substance.cylinder_breakdown.length > 0 ? (
-                <ScrollArea className="max-h-[320px]">
+                <ScrollArea className="h-auto max-h-[400px] overflow-auto">
                   <div className="p-3">
                     <div className="space-y-1">
                       {substance.cylinder_breakdown.map((item, i) => (
