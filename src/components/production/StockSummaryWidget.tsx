@@ -8,6 +8,7 @@ import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Upload, M
 import { cn, formatNumber } from "@/lib/utils";
 import { getStockStatus, type StockStatus } from "./StockStatusBadge";
 import { StockExcelImportDialog, type StockItem } from "./StockExcelImportDialog";
+import { SOLInventoryImportDialog } from "./SOLInventoryImportDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { StockPrintView } from "./StockPrintView";
