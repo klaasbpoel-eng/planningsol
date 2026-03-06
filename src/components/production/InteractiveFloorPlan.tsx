@@ -641,23 +641,21 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
 
             {/* Showroom – curved path from Entrée to Kantoor Vivisol */}
             <path
-              d="M 640 770 L 640 720 Q 640 660 700 660 L 800 660 Q 840 660 840 620 L 840 605"
+              d="M 640 770 Q 840 770 840 605"
               fill="none"
               stroke="hsl(40 70% 50% / 0.15)"
               strokeWidth="42"
               strokeLinecap="round"
-              strokeLinejoin="round"
             />
             <path
-              d="M 640 770 L 640 720 Q 640 660 700 660 L 800 660 Q 840 660 840 620 L 840 605"
+              d="M 640 770 Q 840 770 840 605"
               fill="none"
               stroke="hsl(40 70% 50% / 0.4)"
               strokeWidth="1"
               strokeDasharray="6 4"
               strokeLinecap="round"
-              strokeLinejoin="round"
             />
-            <text x="735" y="644" textAnchor="middle" fill="hsl(40 70% 50% / 0.5)" fontSize="8" fontWeight="700" letterSpacing="3">SHOWROOM</text>
+            <text x="760" y="720" textAnchor="middle" fill="hsl(40 70% 50% / 0.5)" fontSize="8" fontWeight="700" letterSpacing="3" transform="rotate(-35, 760, 720)">SHOWROOM</text>
 
             {/* Grid (edit mode only) */}
             {editMode && (
