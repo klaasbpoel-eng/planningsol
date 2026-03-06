@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Upload, Maximize2, Minimize2, Printer, MapPin } from "lucide-react";
+import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Upload, Maximize2, Minimize2, Printer, MapPin, FileSpreadsheet } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
 import { getStockStatus, type StockStatus } from "./StockStatusBadge";
 import { StockExcelImportDialog, type StockItem } from "./StockExcelImportDialog";
