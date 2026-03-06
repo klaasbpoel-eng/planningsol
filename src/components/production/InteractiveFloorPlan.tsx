@@ -592,10 +592,10 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
               );
             })}
 
-            {/* Section labels */}
-            <text x="85" y="150" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="700" letterSpacing="1" opacity="0.4">DROOGIJS</text>
-            <text x="215" y="150" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="700" letterSpacing="1" opacity="0.4">VULSTATIONS</text>
-            <text x="730" y="150" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="700" letterSpacing="1" opacity="0.4">PALLETS 16 CIL</text>
+            {/* Section labels - binnen het kader */}
+            <text x="85" y="165" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="700" letterSpacing="1" opacity="0.4">DROOGIJS</text>
+            <text x="215" y="165" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="700" letterSpacing="1" opacity="0.4">VULSTATIONS</text>
+            <text x="730" y="165" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="700" letterSpacing="1" opacity="0.4">PALLETS 16 CIL</text>
           </svg>
         </div>
 
