@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Upload, FileSpreadsheet, CheckCircle2, Scale, ArrowRight } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle2, Scale, ArrowRight, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
@@ -120,14 +120,16 @@ export function SOLPGSImportDialog({
 }: SOLPGSImportDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const [matches, setMatches] = useState<PGSMatch[]>([]);
-  const [step, setStep] = useState<"upload" | "preview" | "done">("upload");
+  const [step, setStep] = useState<"upload" | "preview" | "done" | "error">("upload");
   const [updating, setUpdating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const resetState = () => {
     setFile(null);
     setMatches([]);
     setStep("upload");
     setUpdating(false);
+    setErrorMessage(null);
   };
 
   const handleClose = () => {
@@ -306,6 +308,8 @@ export function SOLPGSImportDialog({
       onUpdated();
     } catch (err) {
       console.error("Error updating PGS substances:", err);
+      setErrorMessage("Fout bij het bijwerken van PGS-gegevens. Controleer je rechten en probeer opnieuw.");
+      setStep("error");
       toast.error("Fout bij het bijwerken van PGS-gegevens");
     } finally {
       setUpdating(false);
@@ -430,8 +434,18 @@ export function SOLPGSImportDialog({
             <div className="flex flex-col items-center justify-center py-12">
               <CheckCircle2 className="h-16 w-16 text-green-500 mb-4" />
               <h3 className="text-lg font-semibold mb-2">PGS Register Bijgewerkt!</h3>
-              <p className="text-sm text-muted-foreground">
-                {matches.length} stoffen zijn bijgewerkt met de actuele voorraadgewichten.
+              <p className="text-sm text-muted-foreground text-center">
+                {matches.length} stoffen zijn succesvol bijgewerkt met de actuele voorraadgewichten uit het SOL inventarisbestand.
+              </p>
+            </div>
+          )}
+
+          {step === "error" && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <XCircle className="h-16 w-16 text-destructive mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Import Mislukt</h3>
+              <p className="text-sm text-muted-foreground text-center max-w-md">
+                {errorMessage}
               </p>
             </div>
           )}
@@ -452,6 +466,12 @@ export function SOLPGSImportDialog({
           )}
           {step === "done" && (
             <Button onClick={handleClose}>Sluiten</Button>
+          )}
+          {step === "error" && (
+            <>
+              <Button variant="outline" onClick={resetState}>Opnieuw proberen</Button>
+              <Button onClick={handleClose}>Sluiten</Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>
