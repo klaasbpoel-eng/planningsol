@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { getGasColor } from "@/constants/gasColors";
 import { LocationMap } from "./LocationMap";
 import { AerialSiteMap } from "./AerialSiteMap";
+import { InteractiveFloorPlan } from "./InteractiveFloorPlan";
 
 interface StorageZone {
     id: string;
@@ -318,8 +319,12 @@ export function SiteMap({ location }: SiteMapProps) {
     return (
         <div className="space-y-6">
         <LocationMap location={location} />
-        <Tabs defaultValue="layout" className="w-full">
+        <Tabs defaultValue="floorplan" className="w-full">
             <TabsList className="mb-4">
+                <TabsTrigger value="floorplan">
+                    <MapIcon className="h-4 w-4 mr-2" />
+                    Plattegrond
+                </TabsTrigger>
                 <TabsTrigger value="layout">
                     <MapIcon className="h-4 w-4 mr-2" />
                     Opslag Layout
@@ -329,6 +334,9 @@ export function SiteMap({ location }: SiteMapProps) {
                     Luchtfoto
                 </TabsTrigger>
             </TabsList>
+            <TabsContent value="floorplan">
+                <InteractiveFloorPlan />
+            </TabsContent>
             <TabsContent value="aerial">
                 <AerialSiteMap />
             </TabsContent>
