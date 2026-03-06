@@ -717,6 +717,18 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
           <ToggleGroupItem value="both" className="text-xs px-2.5 h-9">Beide</ToggleGroupItem>
         </ToggleGroup>
 
+        {unknownCount > 0 && (
+          <Button
+            variant={filterUnknown ? "default" : "outline"}
+            size="sm"
+            className="gap-1.5 h-9 text-xs"
+            onClick={() => setFilterUnknown(!filterUnknown)}
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+            Onbekend ({unknownCount})
+          </Button>
+        )}
+
         <div className="flex-1" />
 
         <div className="flex flex-wrap items-center gap-2">
@@ -978,6 +990,43 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
           onUpdated={fetchSubstances}
         />
       )}
+
+      {/* Link Gas Type Dialog */}
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="h-5 w-5 text-primary" />
+              Gastype koppelen
+            </DialogTitle>
+            <DialogDescription>
+              Koppel deze onbekende stof aan een bestaand gastype.
+              {linkingSubstance?.notes && (
+                <span className="block mt-2 text-xs bg-muted rounded-md px-3 py-2">
+                  <strong>Opmerking:</strong> {linkingSubstance.notes}
+                </span>
+              )}
+              {linkingSubstance?.un_number && (
+                <span className="block mt-1 text-xs">
+                  <strong>UN-nummer:</strong> {linkingSubstance.un_number}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select onValueChange={handleLinkGasType}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecteer een gastype..." />
+              </SelectTrigger>
+              <SelectContent>
+                {allGasTypes.map(gt => (
+                  <SelectItem key={gt.id} value={gt.id}>{gt.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1000,6 +1049,7 @@ interface SubstanceRowProps {
   onCancelEdit: () => void;
   onSaveEdit: () => void;
   onEditChange: (v: { max_allowed_kg: number; current_stock_kg: number }) => void;
+  onLinkGasType?: (substance: PGSSubstance) => void;
 }
 
 function SubstanceRow({
