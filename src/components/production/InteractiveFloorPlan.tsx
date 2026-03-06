@@ -119,6 +119,7 @@ const DEFAULT_ZONES: FloorZone[] = [
 ];
 
 const STORAGE_KEY = "floorplan-positions";
+const DEFAULTS_KEY = "floorplan-defaults";
 const GRID_SNAP = 10;
 const snap = (v: number) => Math.round(v / GRID_SNAP) * GRID_SNAP;
 
@@ -453,14 +454,29 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
 
   const handleSave = useCallback(() => {
     savePositions(zones, tanks);
+    // Save current state as new defaults
+    const zonePos: Record<string, any> = {};
+    zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y, w: z.w, h: z.h, label: z.label, sublabel: z.sublabel, details: z.details, type: z.type }; });
+    const tankPos: Record<string, any> = {};
+    tanks.forEach(t => { tankPos[t.id] = { cx: t.cx, cy: t.cy, r: t.r, label: t.label, sublabel: t.sublabel, details: t.details }; });
+    localStorage.setItem(DEFAULTS_KEY, JSON.stringify({ zones: zonePos, tanks: tankPos }));
     setEditMode(false);
     setHasChanges(false);
-    toast.success("Plattegrond opgeslagen");
+    toast.success("Plattegrond opgeslagen als nieuwe standaard");
   }, [zones, tanks]);
 
   const handleReset = useCallback(() => {
-    setZones([...DEFAULT_ZONES]);
-    setTanks([...DEFAULT_BULK_TANKS]);
+    // Reset to saved defaults, or original hardcoded defaults
+    const savedDefaults = localStorage.getItem(DEFAULTS_KEY);
+    if (savedDefaults) {
+      const defaults = JSON.parse(savedDefaults);
+      const restored = applyPositions([...DEFAULT_ZONES], [...DEFAULT_BULK_TANKS], defaults);
+      setZones(restored.zones);
+      setTanks(restored.tanks);
+    } else {
+      setZones([...DEFAULT_ZONES]);
+      setTanks([...DEFAULT_BULK_TANKS]);
+    }
     localStorage.removeItem(STORAGE_KEY);
     setHasChanges(false);
     toast.info("Plattegrond teruggezet naar standaard");
