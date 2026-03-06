@@ -38,6 +38,14 @@ interface PGSSubstance {
   current_stock_kg: number;
 }
 
+interface CylinderDetail {
+  description: string;
+  capacity: number;
+  countVol: number;
+  countLeeg: number;
+  weightKg: number;
+}
+
 interface PGSMatch {
   substanceId: string;
   gasName: string;
@@ -45,6 +53,7 @@ interface PGSMatch {
   calculatedKg: number;
   currentKg: number;
   maxKg: number;
+  breakdown: CylinderDetail[];
 }
 
 interface SOLPGSImportDialogProps {
@@ -71,6 +80,8 @@ function detectLocation(locationId: number | string): { location: "tilburg" | "e
   if (locId === 109) return { location: "tilburg", isFull: false };
   if (locId === 140) return { location: "emmen", isFull: true };
   if (locId === 139) return { location: "emmen", isFull: false };
+
+  // Fallback via DS_CENTER_DESCRIPTION handled at call site
   return null;
 }
 
