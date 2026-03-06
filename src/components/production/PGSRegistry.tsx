@@ -167,6 +167,7 @@ interface PGSSubstance {
   is_active: boolean;
   gevi_number: string | null;
   wms_classification: string | null;
+  storage_location: string | null;
   gas_type_name?: string;
   gas_type_color?: string;
 }
@@ -414,6 +415,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
       "H-zinnen": s.risk_phrases || "",
       "P-zinnen": s.safety_phrases || "",
       Locatie: s.location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg",
+      Opslagplaats: s.storage_location || "",
       Opmerkingen: s.notes || "",
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -559,7 +561,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     return sortDir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
   };
 
-  const colSpan = isAdmin ? 11 : 10;
+  const colSpan = isAdmin ? 12 : 11;
 
   if (loading) {
     return (
@@ -737,6 +739,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
                       </TableHead>
                       <TableHead className="text-right">Max (kg)</TableHead>
                       <TableHead className="text-right">Huidig (kg)</TableHead>
+                      <TableHead className="text-xs">Opslagplaats</TableHead>
                       {isAdmin && <TableHead className="w-16" />}
                     </TableRow>
                   </TableHeader>
@@ -1023,6 +1026,7 @@ function SubstanceRow({
             </span>
           )}
         </TableCell>
+        <TableCell className="text-xs text-muted-foreground">{substance.storage_location || "—"}</TableCell>
         {isAdmin && (
           <TableCell onClick={e => e.stopPropagation()}>
             {isEditing ? (
@@ -1084,6 +1088,7 @@ function SubstanceRow({
                       <div className="space-y-1.5 text-sm">
                         <DetailRow label="Opslagklasse" value={substance.storage_class} />
                         <DetailRow label="Locatie" value={substance.location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg"} />
+                        <DetailRow label="Opslagplaats" value={substance.storage_location} />
                         {substance.notes && <DetailRow label="Opmerking" value={substance.notes} />}
                       </div>
                     </div>

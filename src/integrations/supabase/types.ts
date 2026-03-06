@@ -1130,6 +1130,7 @@ export type Database = {
           risk_phrases: string | null
           safety_phrases: string | null
           storage_class: string | null
+          storage_location: string | null
           un_number: string | null
           updated_at: string
           updated_by: string | null
@@ -1151,6 +1152,7 @@ export type Database = {
           risk_phrases?: string | null
           safety_phrases?: string | null
           storage_class?: string | null
+          storage_location?: string | null
           un_number?: string | null
           updated_at?: string
           updated_by?: string | null
@@ -1172,6 +1174,7 @@ export type Database = {
           risk_phrases?: string | null
           safety_phrases?: string | null
           storage_class?: string | null
+          storage_location?: string | null
           un_number?: string | null
           updated_at?: string
           updated_by?: string | null
