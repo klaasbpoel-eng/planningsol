@@ -62,6 +62,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     sol_tilburg: [],
   });
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [solImportDialogOpen, setSolImportDialogOpen] = useState(false);
   const [locationManagerOpen, setLocationManagerOpen] = useState(false);
   const [fullscreenStatus, setFullscreenStatus] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | undefined>();
