@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { StatCard } from "@/components/ui/stat-card";
@@ -1032,60 +1033,82 @@ function SubstanceRow({
                 </div>
               </div>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-0" align="start">
-              <div className="p-3 border-b">
+            <PopoverContent className="w-[420px] p-0" align="end" side="left">
+              <div className="px-4 py-3 border-b bg-muted/30">
                 <h4 className="text-sm font-semibold flex items-center gap-2">
-                  <Container className="h-3.5 w-3.5 text-primary" />
-                  Cilinderoverzicht — {substance.gas_type_name}
+                  <Container className="h-4 w-4 text-primary" />
+                  Cilinderoverzicht
                 </h4>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  {substance.location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg"}
-                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <div
+                    className="w-2.5 h-2.5 rounded-full ring-1 ring-background"
+                    style={{ backgroundColor: substance.gas_type_color }}
+                  />
+                  <span className="text-xs font-medium text-foreground">{substance.gas_type_name}</span>
+                  <Badge variant="outline" className="text-[10px] py-0 px-1.5">
+                    {substance.location === "sol_emmen" ? "Emmen" : "Tilburg"}
+                  </Badge>
+                </div>
               </div>
               {substance.cylinder_breakdown && substance.cylinder_breakdown.length > 0 ? (
-                <div className="p-2">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-muted-foreground">
-                        <th className="text-left p-1 font-medium">Product</th>
-                        <th className="text-right p-1 font-medium">L</th>
-                        <th className="text-right p-1 font-medium">Vol</th>
-                        <th className="text-right p-1 font-medium">Leeg</th>
-                        <th className="text-right p-1 font-medium">kg</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                <ScrollArea className="max-h-[320px]">
+                  <div className="p-3">
+                    <div className="space-y-1">
                       {substance.cylinder_breakdown.map((item, i) => (
-                        <tr key={i} className="border-t border-border/50">
-                          <td className="p-1 max-w-[140px] truncate" title={item.description}>{item.description}</td>
-                          <td className="p-1 text-right text-muted-foreground">{item.capacity}</td>
-                          <td className="p-1 text-right font-medium text-green-600 dark:text-green-400">{item.countVol}</td>
-                          <td className="p-1 text-right text-orange-500">{item.countLeeg}</td>
-                          <td className="p-1 text-right font-semibold">{formatNumber(item.weightKg, 1)}</td>
-                        </tr>
+                        <div
+                          key={i}
+                          className="flex items-center gap-3 rounded-md px-2.5 py-1.5 hover:bg-muted/50 transition-colors text-xs"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-foreground font-medium leading-tight break-words">
+                              {item.description}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {item.capacity}L cilinder
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 flex-shrink-0 tabular-nums">
+                            <div className="text-center min-w-[28px]">
+                              <span className="font-semibold text-green-600 dark:text-green-400">{item.countVol}</span>
+                              <p className="text-[9px] text-muted-foreground leading-none mt-0.5">vol</p>
+                            </div>
+                            <div className="text-center min-w-[28px]">
+                              <span className="text-orange-500">{item.countLeeg}</span>
+                              <p className="text-[9px] text-muted-foreground leading-none mt-0.5">leeg</p>
+                            </div>
+                            <div className="text-right min-w-[48px]">
+                              <span className="font-semibold">{formatNumber(item.weightKg, 1)}</span>
+                              <p className="text-[9px] text-muted-foreground leading-none mt-0.5">kg</p>
+                            </div>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                    <tfoot className="border-t">
-                      <tr className="font-semibold">
-                        <td className="p-1" colSpan={2}>Totaal</td>
-                        <td className="p-1 text-right text-green-600 dark:text-green-400">
-                          {substance.cylinder_breakdown.reduce((s, i) => s + i.countVol, 0)}
-                        </td>
-                        <td className="p-1 text-right text-orange-500">
-                          {substance.cylinder_breakdown.reduce((s, i) => s + i.countLeeg, 0)}
-                        </td>
-                        <td className="p-1 text-right">
-                          {formatNumber(substance.cylinder_breakdown.reduce((s, i) => s + i.weightKg, 0), 1)}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
+                    </div>
+                  </div>
+                </ScrollArea>
               ) : (
-                <div className="p-4 text-center text-xs text-muted-foreground">
-                  Geen cilinderdata beschikbaar.
-                  <br />
-                  <span className="text-[10px]">Importeer een SOL Excel-bestand om cilinderdetails te zien.</span>
+                <div className="px-4 py-8 text-center">
+                  <Container className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground">Geen cilinderdata beschikbaar</p>
+                  <p className="text-[10px] text-muted-foreground/70 mt-1">
+                    Gebruik de SOL Import om cilinderdetails te laden
+                  </p>
+                </div>
+              )}
+              {substance.cylinder_breakdown && substance.cylinder_breakdown.length > 0 && (
+                <div className="px-4 py-2.5 border-t bg-muted/30 flex items-center justify-between text-xs">
+                  <span className="font-semibold text-foreground">Totaal</span>
+                  <div className="flex items-center gap-4 tabular-nums">
+                    <span className="font-semibold text-green-600 dark:text-green-400">
+                      {substance.cylinder_breakdown.reduce((s, i) => s + i.countVol, 0)} vol
+                    </span>
+                    <span className="text-orange-500">
+                      {substance.cylinder_breakdown.reduce((s, i) => s + i.countLeeg, 0)} leeg
+                    </span>
+                    <span className="font-bold">
+                      {formatNumber(substance.cylinder_breakdown.reduce((s, i) => s + i.weightKg, 0), 1)} kg
+                    </span>
+                  </div>
                 </div>
               )}
             </PopoverContent>
