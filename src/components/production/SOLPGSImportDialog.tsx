@@ -38,6 +38,14 @@ interface PGSSubstance {
   current_stock_kg: number;
 }
 
+interface CylinderDetail {
+  description: string;
+  capacity: number;
+  countVol: number;
+  countLeeg: number;
+  weightKg: number;
+}
+
 interface PGSMatch {
   substanceId: string;
   gasName: string;
@@ -45,6 +53,7 @@ interface PGSMatch {
   calculatedKg: number;
   currentKg: number;
   maxKg: number;
+  breakdown: CylinderDetail[];
 }
 
 interface SOLPGSImportDialogProps {
@@ -71,6 +80,8 @@ function detectLocation(locationId: number | string): { location: "tilburg" | "e
   if (locId === 109) return { location: "tilburg", isFull: false };
   if (locId === 140) return { location: "emmen", isFull: true };
   if (locId === 139) return { location: "emmen", isFull: false };
+
+  // Fallback via DS_CENTER_DESCRIPTION handled at call site
   return null;
 }
 
@@ -162,8 +173,14 @@ export function SOLPGSImportDialog({
           return;
         }
 
-        // Aggregate weights per gas keyword per location
-        const weightMap = new Map<string, { emmen: number; tilburg: number }>();
+        // Aggregate weights per gas keyword per location, with cylinder breakdown
+        interface LocData {
+          totalWeight: number;
+          cylinders: Map<string, CylinderDetail>; // key: description__capacity
+        }
+        const weightMap = new Map<string, { emmen: LocData; tilburg: LocData }>();
+
+        const getLocData = (): LocData => ({ totalWeight: 0, cylinders: new Map() });
 
         for (let i = headerIdx + 1; i < jsonData.length; i++) {
           const row = jsonData[i];
@@ -177,14 +194,34 @@ export function SOLPGSImportDialog({
           if (!contentDesc || contentDesc === "NULL" || isNaN(capacity) || capacity <= 0) continue;
 
           const locInfo = detectLocation(locationId);
-          if (!locInfo || !locInfo.isFull) continue; // Only count full cylinders
+          if (!locInfo) continue;
 
           const gasKeyword = extractGasKeyword(contentDesc || masterDesc);
-          const weight = detectGasWeight(contentDesc || masterDesc, capacity);
+          const weight = locInfo.isFull ? detectGasWeight(contentDesc || masterDesc, capacity) : 0;
 
-          const existing = weightMap.get(gasKeyword) || { emmen: 0, tilburg: 0 };
-          existing[locInfo.location] += weight;
-          weightMap.set(gasKeyword, existing);
+          if (!weightMap.has(gasKeyword)) {
+            weightMap.set(gasKeyword, { emmen: getLocData(), tilburg: getLocData() });
+          }
+          const entry = weightMap.get(gasKeyword)!;
+          const locData = entry[locInfo.location];
+          locData.totalWeight += weight;
+
+          // Track cylinder breakdown
+          const cylKey = `${contentDesc}__${capacity}`;
+          const cyl = locData.cylinders.get(cylKey) || {
+            description: contentDesc,
+            capacity,
+            countVol: 0,
+            countLeeg: 0,
+            weightKg: 0,
+          };
+          if (locInfo.isFull) {
+            cyl.countVol++;
+            cyl.weightKg += weight;
+          } else {
+            cyl.countLeeg++;
+          }
+          locData.cylinders.set(cylKey, cyl);
         }
 
         // Match aggregated weights to PGS substances
@@ -194,7 +231,6 @@ export function SOLPGSImportDialog({
           if (!substance.gas_type_name) continue;
           const normalizedName = normalizeGasName(substance.gas_type_name);
 
-          // Find best matching gas keyword
           let bestMatch: string | null = null;
           for (const [keyword] of weightMap) {
             if (normalizedName.includes(keyword) || keyword.includes(normalizedName)) {
@@ -205,14 +241,18 @@ export function SOLPGSImportDialog({
 
           if (!bestMatch) continue;
 
-          const weights = weightMap.get(bestMatch)!;
+          const entry = weightMap.get(bestMatch)!;
           const loc = substance.location === "sol_emmen" ? "emmen" : "tilburg";
 
-          // Filter by selected location tab
           if (locationTab !== "all" && substance.location !== locationTab) continue;
 
-          const calculatedKg = Math.round(weights[loc] * 10) / 10;
-          if (calculatedKg <= 0) continue;
+          const locData = entry[loc];
+          const calculatedKg = Math.round(locData.totalWeight * 10) / 10;
+          if (calculatedKg <= 0 && locData.cylinders.size === 0) continue;
+
+          const breakdown = Array.from(locData.cylinders.values())
+            .map(c => ({ ...c, weightKg: Math.round(c.weightKg * 10) / 10 }))
+            .sort((a, b) => a.description.localeCompare(b.description) || a.capacity - b.capacity);
 
           pgsMatches.push({
             substanceId: substance.id,
@@ -221,6 +261,7 @@ export function SOLPGSImportDialog({
             calculatedKg,
             currentKg: substance.current_stock_kg,
             maxKg: substance.max_allowed_kg,
+            breakdown,
           });
         }
 
@@ -252,6 +293,7 @@ export function SOLPGSImportDialog({
           .from("pgs_substances")
           .update({
             current_stock_kg: match.calculatedKg,
+            cylinder_breakdown: JSON.parse(JSON.stringify(match.breakdown)),
             updated_at: new Date().toISOString(),
           })
           .eq("id", match.substanceId);

@@ -1118,6 +1118,7 @@ export type Database = {
           cas_number: string | null
           created_at: string
           current_stock_kg: number
+          cylinder_breakdown: Json | null
           gas_type_id: string | null
           gevi_number: string | null
           hazard_symbols: string[] | null
@@ -1140,6 +1141,7 @@ export type Database = {
           cas_number?: string | null
           created_at?: string
           current_stock_kg?: number
+          cylinder_breakdown?: Json | null
           gas_type_id?: string | null
           gevi_number?: string | null
           hazard_symbols?: string[] | null
@@ -1162,6 +1164,7 @@ export type Database = {
           cas_number?: string | null
           created_at?: string
           current_stock_kg?: number
+          cylinder_breakdown?: Json | null
           gas_type_id?: string | null
           gevi_number?: string | null
           hazard_symbols?: string[] | null

@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { StatCard } from "@/components/ui/stat-card";
@@ -152,6 +153,14 @@ function getExportSymbols(symbols: string[], mode: PictogramMode): string {
   return [...symbols, ...new Set(adrs)].join(", ");
 }
 
+interface CylinderBreakdownItem {
+  description: string;
+  capacity: number;
+  countVol: number;
+  countLeeg: number;
+  weightKg: number;
+}
+
 interface PGSSubstance {
   id: string;
   gas_type_id: string | null;
@@ -170,6 +179,7 @@ interface PGSSubstance {
   gevi_number: string | null;
   wms_classification: string | null;
   storage_location: string | null;
+  cylinder_breakdown?: CylinderBreakdownItem[];
   gas_type_name?: string;
   gas_type_color?: string;
 }
@@ -265,6 +275,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
       setSubstances((data || []).map(s => ({
         ...s,
         hazard_symbols: s.hazard_symbols || [],
+        cylinder_breakdown: (Array.isArray(s.cylinder_breakdown) ? s.cylinder_breakdown : []) as unknown as CylinderBreakdownItem[],
         gas_type_name: s.gas_type_id ? stripPurity(gasTypeMap[s.gas_type_id]?.name) || "Onbekend" : "Onbekend",
         gas_type_color: s.gas_type_id ? getGasColor(stripPurity(gasTypeMap[s.gas_type_id]?.name) || "", gasTypeMap[s.gas_type_id]?.color || "#6b7280") : "#6b7280",
       })));
@@ -997,27 +1008,88 @@ function SubstanceRow({
         </TableCell>
         <TableCell className="text-xs font-mono text-muted-foreground">{substance.gevi_number || "—"}</TableCell>
         <TableCell className="text-xs text-muted-foreground">{substance.wms_classification || "—"}</TableCell>
-        <TableCell className="w-36">
-          <div className="space-y-1">
-            <Progress
-              value={Math.min(pct, 100)}
-              className={cn(
-                "h-2 rounded-full",
-                isCritical && "[&>div]:bg-destructive",
-                isWarning && !isCritical && "[&>div]:bg-orange-500",
-                !isWarning && "[&>div]:bg-emerald-500"
+        <TableCell className="w-36" onClick={e => e.stopPropagation()}>
+          <Popover>
+            <PopoverTrigger asChild>
+              <div className="space-y-1 cursor-pointer hover:opacity-80 transition-opacity">
+                <Progress
+                  value={Math.min(pct, 100)}
+                  className={cn(
+                    "h-2 rounded-full",
+                    isCritical && "[&>div]:bg-destructive",
+                    isWarning && !isCritical && "[&>div]:bg-orange-500",
+                    !isWarning && "[&>div]:bg-emerald-500"
+                  )}
+                />
+                <div className="flex items-center justify-between">
+                  <span className={cn(
+                    "text-[10px] font-medium",
+                    isCritical ? "text-destructive" : isWarning ? "text-orange-500" : "text-muted-foreground"
+                  )}>
+                    {formatNumber(pct, 0)}%
+                  </span>
+                  {isCritical && <AlertTriangle className="h-3 w-3 text-destructive" />}
+                </div>
+              </div>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="start">
+              <div className="p-3 border-b">
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  <Container className="h-3.5 w-3.5 text-primary" />
+                  Cilinderoverzicht — {substance.gas_type_name}
+                </h4>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {substance.location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg"}
+                </p>
+              </div>
+              {substance.cylinder_breakdown && substance.cylinder_breakdown.length > 0 ? (
+                <div className="p-2">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-muted-foreground">
+                        <th className="text-left p-1 font-medium">Product</th>
+                        <th className="text-right p-1 font-medium">L</th>
+                        <th className="text-right p-1 font-medium">Vol</th>
+                        <th className="text-right p-1 font-medium">Leeg</th>
+                        <th className="text-right p-1 font-medium">kg</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {substance.cylinder_breakdown.map((item, i) => (
+                        <tr key={i} className="border-t border-border/50">
+                          <td className="p-1 max-w-[140px] truncate" title={item.description}>{item.description}</td>
+                          <td className="p-1 text-right text-muted-foreground">{item.capacity}</td>
+                          <td className="p-1 text-right font-medium text-green-600 dark:text-green-400">{item.countVol}</td>
+                          <td className="p-1 text-right text-orange-500">{item.countLeeg}</td>
+                          <td className="p-1 text-right font-semibold">{formatNumber(item.weightKg, 1)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="border-t">
+                      <tr className="font-semibold">
+                        <td className="p-1" colSpan={2}>Totaal</td>
+                        <td className="p-1 text-right text-green-600 dark:text-green-400">
+                          {substance.cylinder_breakdown.reduce((s, i) => s + i.countVol, 0)}
+                        </td>
+                        <td className="p-1 text-right text-orange-500">
+                          {substance.cylinder_breakdown.reduce((s, i) => s + i.countLeeg, 0)}
+                        </td>
+                        <td className="p-1 text-right">
+                          {formatNumber(substance.cylinder_breakdown.reduce((s, i) => s + i.weightKg, 0), 1)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-4 text-center text-xs text-muted-foreground">
+                  Geen cilinderdata beschikbaar.
+                  <br />
+                  <span className="text-[10px]">Importeer een SOL Excel-bestand om cilinderdetails te zien.</span>
+                </div>
               )}
-            />
-            <div className="flex items-center justify-between">
-              <span className={cn(
-                "text-[10px] font-medium",
-                isCritical ? "text-destructive" : isWarning ? "text-orange-500" : "text-muted-foreground"
-              )}>
-                {formatNumber(pct, 0)}%
-              </span>
-              {isCritical && <AlertTriangle className="h-3 w-3 text-destructive" />}
-            </div>
-          </div>
+            </PopoverContent>
+          </Popover>
         </TableCell>
         <TableCell className="text-right" onClick={e => e.stopPropagation()}>
           {isEditing ? (

@@ -1,0 +1,1 @@
+ALTER TABLE public.pgs_substances ADD COLUMN IF NOT EXISTS cylinder_breakdown jsonb DEFAULT '[]'::jsonb;
