@@ -1033,7 +1033,7 @@ function SubstanceRow({
                 </div>
               </div>
             </PopoverTrigger>
-            <PopoverContent className="w-[420px] p-0" align="end" side="left">
+            <PopoverContent className="w-[520px] p-0" align="end" side="left">
               <div className="px-4 py-3 border-b bg-muted/30">
                 <h4 className="text-sm font-semibold flex items-center gap-2">
                   <Container className="h-4 w-4 text-primary" />
