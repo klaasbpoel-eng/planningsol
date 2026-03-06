@@ -49,7 +49,6 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { SOLPGSImportDialog } from "./SOLPGSImportDialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { SearchableSelect } from "@/components/ui/searchable-select";
 
 // GHS pictogram config with diamond styling
 const GHS_CONFIG: Record<string, { label: string; src: string }> = {
