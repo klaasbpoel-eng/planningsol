@@ -105,6 +105,8 @@ const DEFAULT_ZONES: FloorZone[] = [
 ];
 
 const STORAGE_KEY = "floorplan-positions";
+const GRID_SNAP = 10;
+const snap = (v: number) => Math.round(v / GRID_SNAP) * GRID_SNAP;
 
 function loadPositions(): { zones: Record<string, { x: number; y: number }>; tanks: Record<string, { cx: number; cy: number }> } | null {
   try {
@@ -204,11 +206,11 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       const newY = svgPt.y - dragOffset.current.y;
 
       if (dragType === "zone") {
-        setZones(prev => prev.map(z => z.id === draggingId ? { ...z, x: Math.round(newX), y: Math.round(newY) } : z));
+        setZones(prev => prev.map(z => z.id === draggingId ? { ...z, x: snap(newX), y: snap(newY) } : z));
       } else {
-        setTanks(prev => prev.map(t => t.id === draggingId ? { ...t, cx: Math.round(newX + dragOffset.current.x - (svgPt.x - newX - dragOffset.current.x)), cy: Math.round(newY + dragOffset.current.y - (svgPt.y - newY - dragOffset.current.y)) } : t));
-        // Simpler: just set cx/cy directly
-        setTanks(prev => prev.map(t => t.id === draggingId ? { ...t, cx: Math.round(svgPt.x - dragOffset.current.x), cy: Math.round(svgPt.y - dragOffset.current.y) } : t));
+        const snappedCx = snap(svgPt.x - dragOffset.current.x);
+        const snappedCy = snap(svgPt.y - dragOffset.current.y);
+        setTanks(prev => prev.map(t => t.id === draggingId ? { ...t, cx: snappedCx, cy: snappedCy } : t));
       }
       setHasChanges(true);
       return;
@@ -250,8 +252,8 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
           const overlapping = zones.find(z => z.id !== draggingId && rectsOverlap(dragged, z));
           if (overlapping) {
             setZones(prev => prev.map(z => {
-              if (z.id === draggingId) return { ...z, x: overlapping.x, y: overlapping.y };
-              if (z.id === overlapping.id) return { ...z, x: dragged.x, y: dragged.y };
+              if (z.id === draggingId) return { ...z, x: snap(overlapping.x), y: snap(overlapping.y) };
+              if (z.id === overlapping.id) return { ...z, x: snap(dragged.x), y: snap(dragged.y) };
               return z;
             }));
             toast.info(`${dragged.label} ↔ ${overlapping.label} gewisseld`);
@@ -263,8 +265,8 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             const zoneCenterY = dragged.y + dragged.h / 2;
             const newZoneX = overlappingTank.cx - dragged.w / 2;
             const newZoneY = overlappingTank.cy - dragged.h / 2;
-            setZones(prev => prev.map(z => z.id === draggingId ? { ...z, x: Math.round(newZoneX), y: Math.round(newZoneY) } : z));
-            setTanks(prev => prev.map(t => t.id === overlappingTank.id ? { ...t, cx: Math.round(zoneCenterX), cy: Math.round(zoneCenterY) } : t));
+            setZones(prev => prev.map(z => z.id === draggingId ? { ...z, x: snap(newZoneX), y: snap(newZoneY) } : z));
+            setTanks(prev => prev.map(t => t.id === overlappingTank.id ? { ...t, cx: snap(zoneCenterX), cy: snap(zoneCenterY) } : t));
             toast.info(`${dragged.label} ↔ ${overlappingTank.label} gewisseld`);
           }
         }
@@ -275,8 +277,8 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
           const overlapping = tanks.find(t => t.id !== draggingId && circlesOverlap(dragged, t));
           if (overlapping) {
             setTanks(prev => prev.map(t => {
-              if (t.id === draggingId) return { ...t, cx: overlapping.cx, cy: overlapping.cy };
-              if (t.id === overlapping.id) return { ...t, cx: dragged.cx, cy: dragged.cy };
+              if (t.id === draggingId) return { ...t, cx: snap(overlapping.cx), cy: snap(overlapping.cy) };
+              if (t.id === overlapping.id) return { ...t, cx: snap(dragged.cx), cy: snap(dragged.cy) };
               return t;
             }));
             toast.info(`${dragged.label} ↔ ${overlapping.label} gewisseld`);
@@ -286,8 +288,8 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
           if (overlappingZone && !overlapping) {
             const zoneCenterX = overlappingZone.x + overlappingZone.w / 2;
             const zoneCenterY = overlappingZone.y + overlappingZone.h / 2;
-            setTanks(prev => prev.map(t => t.id === draggingId ? { ...t, cx: Math.round(zoneCenterX), cy: Math.round(zoneCenterY) } : t));
-            setZones(prev => prev.map(z => z.id === overlappingZone.id ? { ...z, x: Math.round(dragged.cx - z.w / 2), y: Math.round(dragged.cy - z.h / 2) } : z));
+            setTanks(prev => prev.map(t => t.id === draggingId ? { ...t, cx: snap(zoneCenterX), cy: snap(zoneCenterY) } : t));
+            setZones(prev => prev.map(z => z.id === overlappingZone.id ? { ...z, x: snap(dragged.cx - z.w / 2), y: snap(dragged.cy - z.h / 2) } : z));
             toast.info(`${dragged.label} ↔ ${overlappingZone.label} gewisseld`);
           }
         }
@@ -493,10 +495,10 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             {/* Grid (edit mode only) */}
             {editMode && (
               <>
-                {Array.from({ length: Math.floor(SVG_WIDTH / 50) }, (_, i) => (i + 1) * 50).map(x => (
+                {Array.from({ length: Math.floor(SVG_WIDTH / GRID_SNAP) }, (_, i) => (i + 1) * GRID_SNAP).filter(x => x % 50 === 0).map(x => (
                   <line key={`eg${x}`} x1={x} y1="0" x2={x} y2={SVG_HEIGHT} stroke="hsl(var(--primary) / 0.08)" strokeWidth="0.5" />
                 ))}
-                {Array.from({ length: Math.floor(SVG_HEIGHT / 50) }, (_, i) => (i + 1) * 50).map(y => (
+                {Array.from({ length: Math.floor(SVG_HEIGHT / GRID_SNAP) }, (_, i) => (i + 1) * GRID_SNAP).filter(y => y % 50 === 0).map(y => (
                   <line key={`egh${y}`} x1="0" y1={y} x2={SVG_WIDTH} y2={y} stroke="hsl(var(--primary) / 0.08)" strokeWidth="0.5" />
                 ))}
               </>
