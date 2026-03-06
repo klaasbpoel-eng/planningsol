@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 // Zone types with colors
-const ZONE_TYPES = {
+const DEFAULT_ZONE_TYPES = {
   vulstation: { label: "Vulstation", color: "hsl(var(--primary))", bg: "hsl(var(--primary) / 0.15)", border: "hsl(var(--primary) / 0.4)" },
   opslag_gas: { label: "Gasopslag", color: "hsl(200 80% 50%)", bg: "hsl(200 80% 50% / 0.12)", border: "hsl(200 80% 50% / 0.4)" },
   opslag_droogijs: { label: "Droogijs", color: "hsl(190 90% 45%)", bg: "hsl(190 90% 45% / 0.12)", border: "hsl(190 90% 45% / 0.4)" },
@@ -18,7 +18,17 @@ const ZONE_TYPES = {
   medisch: { label: "Medische gassen", color: "hsl(350 70% 55%)", bg: "hsl(350 70% 55% / 0.12)", border: "hsl(350 70% 55% / 0.4)" },
 } as const;
 
-type ZoneType = keyof typeof ZONE_TYPES;
+type ZoneTypeConfig = { label: string; color: string; bg: string; border: string };
+const ZONE_TYPE_LABELS_KEY = "floorplan-zone-type-labels";
+
+function loadZoneTypeLabels(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(ZONE_TYPE_LABELS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+type ZoneType = keyof typeof DEFAULT_ZONE_TYPES;
 
 interface FloorZone {
   id: string;
@@ -178,6 +188,26 @@ interface InteractiveFloorPlanProps {
 export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const saved = loadPositions();
   const initial = applyPositions([...DEFAULT_ZONES], [...DEFAULT_BULK_TANKS], saved);
+
+  // Build ZONE_TYPES with custom labels
+  const savedLabels = loadZoneTypeLabels();
+  const [zoneTypeLabels, setZoneTypeLabels] = useState<Record<string, string>>(savedLabels);
+  const ZONE_TYPES = Object.fromEntries(
+    Object.entries(DEFAULT_ZONE_TYPES).map(([key, val]) => [
+      key,
+      { ...val, label: zoneTypeLabels[key] || val.label },
+    ])
+  ) as Record<ZoneType, ZoneTypeConfig>;
+
+  const handleZoneTypeLabelEdit = useCallback((key: string, newLabel: string) => {
+    if (!newLabel) return;
+    setZoneTypeLabels(prev => {
+      const updated = { ...prev, [key]: newLabel };
+      localStorage.setItem(ZONE_TYPE_LABELS_KEY, JSON.stringify(updated));
+      return updated;
+    });
+    toast.success("Categorienaam bijgewerkt");
+  }, []);
 
   const [zones, setZones] = useState<FloorZone[]>(initial.zones);
   const [tanks, setTanks] = useState<BulkTank[]>(initial.tanks);
@@ -527,7 +557,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
 
         {/* Legend / Filter */}
         {!editMode && (
-          <div className="flex flex-wrap gap-1.5 mt-3">
+          <div className="flex flex-wrap gap-1.5 mt-3 items-center">
             <Badge
               variant={filterType === "all" ? "default" : "outline"}
               className="cursor-pointer text-[10px] px-2 py-0.5"
@@ -543,8 +573,13 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                 style={filterType === key ? { backgroundColor: val.color, color: "#fff" } : {}}
                 onClick={() => setFilterType(key as ZoneType)}
               >
-                <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: val.color }} />
-                {val.label}
+                <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: val.color }} />
+                <EditableText
+                  value={val.label}
+                  onSave={(v) => handleZoneTypeLabelEdit(key, v)}
+                  className="text-[10px]"
+                  placeholder="Categorie..."
+                />
               </Badge>
             ))}
           </div>
