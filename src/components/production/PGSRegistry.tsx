@@ -165,6 +165,8 @@ interface PGSSubstance {
   safety_phrases: string | null;
   notes: string | null;
   is_active: boolean;
+  gevi_number: string | null;
+  wms_classification: string | null;
   gas_type_name?: string;
   gas_type_color?: string;
 }
@@ -185,25 +187,8 @@ interface BulkTank {
   storage_class: string | null;
   is_active: boolean;
   notes: string | null;
-  gas_type_name?: string;
-  gas_type_color?: string;
-}
-
-interface PGSSubstance {
-  id: string;
-  gas_type_id: string | null;
-  location: string;
-  pgs_guideline: string;
-  max_allowed_kg: number;
-  current_stock_kg: number;
-  storage_class: string | null;
-  hazard_symbols: string[];
-  un_number: string | null;
-  cas_number: string | null;
-  risk_phrases: string | null;
-  safety_phrases: string | null;
-  notes: string | null;
-  is_active: boolean;
+  gevi_number: string | null;
+  wms_classification: string | null;
   gas_type_name?: string;
   gas_type_color?: string;
 }
@@ -421,6 +406,8 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
       "CAS Nummer": s.cas_number || "",
       "Opslagklasse": s.storage_class || "",
       "Pictogrammen": getExportSymbols(s.hazard_symbols || [], pictogramMode),
+      "GEVI": s.gevi_number || "",
+      "WMS": s.wms_classification || "",
       "Max. Toegestaan (kg)": s.max_allowed_kg,
       "Huidige Voorraad (kg)": s.current_stock_kg,
       "Bezetting (%)": s.max_allowed_kg > 0 ? Math.round((s.current_stock_kg / s.max_allowed_kg) * 100) : 0,
@@ -458,7 +445,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
 
     // Table
     const pictoLabel = pictogramMode === "adr" ? "ADR" : pictogramMode === "both" ? "GHS/ADR" : "GHS";
-    const head = [["Gas", "PGS", "UN", "CAS", pictoLabel, "Opslagkl.", "Max (kg)", "Huidig (kg)", "Bez. (%)", "H-zinnen", "P-zinnen", "Locatie"]];
+    const head = [["Gas", "PGS", "UN", "CAS", pictoLabel, "GEVI", "WMS", "Opslagkl.", "Max (kg)", "Huidig (kg)", "Bez. (%)", "H-zinnen", "P-zinnen", "Locatie"]];
     const body = processedSubstances.map(s => {
       const pct = s.max_allowed_kg > 0 ? Math.round((s.current_stock_kg / s.max_allowed_kg) * 100) : 0;
       return [
@@ -467,6 +454,8 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
         s.un_number || "—",
         s.cas_number || "—",
         getExportSymbols(s.hazard_symbols || [], pictogramMode),
+        s.gevi_number || "—",
+        s.wms_classification || "—",
         s.storage_class || "—",
         formatNumber(s.max_allowed_kg, 0),
         formatNumber(s.current_stock_kg, 0),
@@ -570,7 +559,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     return sortDir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
   };
 
-  const colSpan = isAdmin ? 9 : 8;
+  const colSpan = isAdmin ? 11 : 10;
 
   if (loading) {
     return (
@@ -738,6 +727,8 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
                         <span className="inline-flex items-center gap-1">UN <SortIcon field="un" /></span>
                       </TableHead>
                       <TableHead>{pictogramMode === "adr" ? "ADR" : pictogramMode === "both" ? "GHS / ADR" : "GHS"}</TableHead>
+                      <TableHead className="text-xs">GEVI</TableHead>
+                      <TableHead className="text-xs">WMS</TableHead>
                       <TableHead
                         className="cursor-pointer select-none group"
                         onClick={() => handleSort("pct")}
@@ -982,6 +973,8 @@ function SubstanceRow({
             <HazardPictograms symbols={substance.hazard_symbols || []} mode={pictogramMode} />
           </div>
         </TableCell>
+        <TableCell className="text-xs font-mono text-muted-foreground">{substance.gevi_number || "—"}</TableCell>
+        <TableCell className="text-xs text-muted-foreground">{substance.wms_classification || "—"}</TableCell>
         <TableCell className="w-36">
           <div className="space-y-1">
             <Progress
@@ -1076,6 +1069,8 @@ function SubstanceRow({
                         <DetailRow label="UN-nummer" value={substance.un_number} mono />
                         <DetailRow label="CAS-nummer" value={substance.cas_number} mono />
                         <DetailRow label="PGS-richtlijn" value={substance.pgs_guideline} />
+                        <DetailRow label="GEVI-nummer" value={substance.gevi_number} mono />
+                        <DetailRow label="WMS-klasse" value={substance.wms_classification} />
                       </div>
                     </div>
 
