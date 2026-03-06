@@ -15,6 +15,7 @@ const ProductionReports = lazy(() => import("./ProductionReports").then(m => ({ 
 const DryIcePlanning = lazy(() => import("./DryIcePlanning").then(m => ({ default: m.DryIcePlanning })));
 const GasMixtureRecipemaker = lazy(() => import("./GasMixtureRecipemaker"));
 const SiteMap = lazy(() => import("./SiteMap").then(m => ({ default: m.SiteMap })));
+const PGSRegistry = lazy(() => import("./PGSRegistry").then(m => ({ default: m.PGSRegistry })));
 
 
 // ... (existing code)
@@ -475,9 +476,9 @@ export function ProductionPlanning({
         <TabsList className={cn(
           "w-full max-w-5xl grid bg-muted/50 backdrop-blur-sm overflow-x-auto h-auto p-1",
           showAdvancedTabs && showRecipemaker
-            ? "grid-cols-4 sm:grid-cols-8"
+            ? "grid-cols-4 sm:grid-cols-9"
             : showAdvancedTabs
-              ? "grid-cols-4 sm:grid-cols-7"
+              ? "grid-cols-4 sm:grid-cols-8"
               : showRecipemaker
                 ? "grid-cols-4 sm:grid-cols-5"
                 : "grid-cols-3 sm:grid-cols-4"
@@ -529,6 +530,16 @@ export function ProductionPlanning({
             <span className="hidden sm:inline">Plattegrond</span>
             <span className="sm:hidden">Kaart</span>
           </TabsTrigger>
+          {showAdvancedTabs && (
+            <TabsTrigger
+              value="pgs-register"
+              className="data-[state=active]:bg-red-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+            >
+              <ShieldAlert className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">PGS Register</span>
+              <span className="sm:hidden">PGS</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
 
@@ -584,6 +595,17 @@ export function ProductionPlanning({
             <SiteMap location={selectedLocation} />
           </Suspense>
         </TabsContent>
+
+        {showAdvancedTabs && (
+          <TabsContent value="pgs-register" className="mt-6">
+            <Suspense fallback={<TabLoadingFallback />}>
+              <PGSRegistry
+                location={selectedLocation}
+                isAdmin={showRecipemaker}
+              />
+            </Suspense>
+          </TabsContent>
+        )}
       </Tabs>
     </div >
   );
