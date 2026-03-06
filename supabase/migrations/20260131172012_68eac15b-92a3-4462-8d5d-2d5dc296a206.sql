@@ -1,4 +1,5 @@
 -- Recreate gas_cylinder_orders table
+DROP TABLE IF EXISTS public.gas_cylinder_orders CASCADE;
 CREATE TABLE public.gas_cylinder_orders (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   order_number TEXT NOT NULL,

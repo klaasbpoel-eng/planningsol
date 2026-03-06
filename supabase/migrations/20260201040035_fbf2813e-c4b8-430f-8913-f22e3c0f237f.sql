@@ -27,10 +27,19 @@ CREATE TABLE IF NOT EXISTS public.gas_cylinder_orders (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
+-- Add location column if missing (table may already exist without it)
+ALTER TABLE public.gas_cylinder_orders
+  ADD COLUMN IF NOT EXISTS location public.production_location NOT NULL DEFAULT 'sol_emmen'::production_location;
+
 -- Enable RLS
 ALTER TABLE public.gas_cylinder_orders ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies
+-- Create RLS policies (drop first to allow re-running)
+DROP POLICY IF EXISTS "Admins can view all gas cylinder orders" ON public.gas_cylinder_orders;
+DROP POLICY IF EXISTS "Admins can create gas cylinder orders" ON public.gas_cylinder_orders;
+DROP POLICY IF EXISTS "Admins can update gas cylinder orders" ON public.gas_cylinder_orders;
+DROP POLICY IF EXISTS "Admins can delete gas cylinder orders" ON public.gas_cylinder_orders;
+DROP POLICY IF EXISTS "Users can view assigned or created gas cylinder orders" ON public.gas_cylinder_orders;
 CREATE POLICY "Admins can view all gas cylinder orders"
 ON public.gas_cylinder_orders FOR SELECT
 USING (is_admin());
@@ -60,6 +69,7 @@ CREATE INDEX IF NOT EXISTS idx_gas_cylinder_orders_location ON public.gas_cylind
 CREATE INDEX IF NOT EXISTS idx_gas_cylinder_orders_status ON public.gas_cylinder_orders(status);
 
 -- Create trigger for updated_at
+DROP TRIGGER IF EXISTS update_gas_cylinder_orders_updated_at ON public.gas_cylinder_orders;
 CREATE TRIGGER update_gas_cylinder_orders_updated_at
 BEFORE UPDATE ON public.gas_cylinder_orders
 FOR EACH ROW
