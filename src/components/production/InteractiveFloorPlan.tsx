@@ -279,6 +279,36 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     setDragType("tank");
   }, [editMode, tanks, toSVG]);
 
+  const ALIGN_THRESHOLD = 8; // pixels threshold for snapping to alignment
+
+  const alignSnap = useCallback((id: string, rawX: number, rawY: number): { x: number; y: number; guideX: number | null; guideY: number | null } => {
+    let x = snap(rawX);
+    let y = snap(rawY);
+    let guideX: number | null = null;
+    let guideY: number | null = null;
+    const dragged = zones.find(z => z.id === id);
+    if (!dragged) return { x, y, guideX, guideY };
+
+    for (const z of zones) {
+      if (z.id === id) continue;
+      // Snap left edges
+      if (Math.abs(x - z.x) < ALIGN_THRESHOLD) { x = z.x; guideX = x; }
+      // Snap right edges
+      if (Math.abs((x + dragged.w) - (z.x + z.w)) < ALIGN_THRESHOLD) { x = z.x + z.w - dragged.w; guideX = x + dragged.w; }
+      // Snap left to right
+      if (Math.abs(x - (z.x + z.w)) < ALIGN_THRESHOLD) { x = z.x + z.w; guideX = x; }
+      // Snap top edges
+      if (Math.abs(y - z.y) < ALIGN_THRESHOLD) { y = z.y; guideY = y; }
+      // Snap bottom edges
+      if (Math.abs((y + dragged.h) - (z.y + z.h)) < ALIGN_THRESHOLD) { y = z.y + z.h - dragged.h; guideY = y + dragged.h; }
+      // Snap top to bottom
+      if (Math.abs(y - (z.y + z.h)) < ALIGN_THRESHOLD) { y = z.y + z.h; guideY = y; }
+    }
+    return { x, y, guideX, guideY };
+  }, [zones]);
+
+  const [alignGuides, setAlignGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
+
   const handleSvgMouseMove = useCallback((e: React.MouseEvent) => {
     if (draggingId && dragType) {
       const svgPt = toSVG(e);
@@ -287,11 +317,14 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       const newY = svgPt.y - dragOffset.current.y;
 
       if (dragType === "zone") {
-        setZones(prev => prev.map(z => z.id === draggingId ? { ...z, x: snap(newX), y: snap(newY) } : z));
+        const { x, y, guideX, guideY } = alignSnap(draggingId, newX, newY);
+        setZones(prev => prev.map(z => z.id === draggingId ? { ...z, x, y } : z));
+        setAlignGuides({ x: guideX, y: guideY });
       } else {
         const snappedCx = snap(svgPt.x - dragOffset.current.x);
         const snappedCy = snap(svgPt.y - dragOffset.current.y);
         setTanks(prev => prev.map(t => t.id === draggingId ? { ...t, cx: snappedCx, cy: snappedCy } : t));
+        setAlignGuides({ x: null, y: null });
       }
       setHasChanges(true);
       return;
@@ -301,7 +334,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     if (isPanning) {
       setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
     }
-  }, [draggingId, dragType, isPanning, panStart, toSVG]);
+  }, [draggingId, dragType, isPanning, panStart, toSVG, alignSnap]);
 
   // Check overlap between two rectangles
   const rectsOverlap = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => {
@@ -380,6 +413,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     setDraggingId(null);
     setDragType(null);
     setIsPanning(false);
+    setAlignGuides({ x: null, y: null });
   }, [draggingId, dragType, editMode, zones, tanks]);
 
   // Inline text editing
@@ -696,6 +730,14 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   <line key={`egh${y}`} x1="0" y1={y} x2={SVG_WIDTH} y2={y} stroke="hsl(var(--primary) / 0.08)" strokeWidth="0.5" />
                 ))}
               </>
+            )}
+
+            {/* Alignment guide lines */}
+            {draggingId && alignGuides.x !== null && (
+              <line x1={alignGuides.x} y1="0" x2={alignGuides.x} y2={SVG_HEIGHT} stroke="hsl(var(--primary))" strokeWidth="0.75" strokeDasharray="4 3" opacity="0.6" />
+            )}
+            {draggingId && alignGuides.y !== null && (
+              <line x1="0" y1={alignGuides.y} x2={SVG_WIDTH} y2={alignGuides.y} stroke="hsl(var(--primary))" strokeWidth="0.75" strokeDasharray="4 3" opacity="0.6" />
             )}
 
             {/* Bulk tanks */}
