@@ -118,10 +118,10 @@ function loadPositions(): { zones: Record<string, { x: number; y: number; label?
 }
 
 function savePositions(zones: FloorZone[], tanks: BulkTank[]) {
-  const zonePos: Record<string, { x: number; y: number; label: string; sublabel?: string }> = {};
-  zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y, label: z.label, sublabel: z.sublabel }; });
-  const tankPos: Record<string, { cx: number; cy: number; label: string; sublabel?: string }> = {};
-  tanks.forEach(t => { tankPos[t.id] = { cx: t.cx, cy: t.cy, label: t.label, sublabel: t.sublabel }; });
+  const zonePos: Record<string, { x: number; y: number; label: string; sublabel?: string; details?: string }> = {};
+  zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y, label: z.label, sublabel: z.sublabel, details: z.details }; });
+  const tankPos: Record<string, { cx: number; cy: number; label: string; sublabel?: string; details?: string }> = {};
+  tanks.forEach(t => { tankPos[t.id] = { cx: t.cx, cy: t.cy, label: t.label, sublabel: t.sublabel, details: t.details }; });
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ zones: zonePos, tanks: tankPos }));
 }
 
@@ -130,6 +130,45 @@ function applyPositions(zones: FloorZone[], tanks: BulkTank[], saved: ReturnType
   const newZones = zones.map(z => saved.zones[z.id] ? { ...z, ...saved.zones[z.id] } : z);
   const newTanks = tanks.map(t => saved.tanks[t.id] ? { ...t, ...saved.tanks[t.id] } : t);
   return { zones: newZones, tanks: newTanks };
+}
+
+function EditableText({ value, onSave, className, placeholder }: {
+  value: string;
+  onSave: (v: string) => void;
+  className?: string;
+  placeholder?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(value);
+
+  useEffect(() => { setText(value); }, [value]);
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        className={cn("bg-transparent border-b border-primary outline-none w-full", className)}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => { onSave(text.trim()); setEditing(false); }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { onSave(text.trim()); setEditing(false); }
+          if (e.key === "Escape") { setText(value); setEditing(false); }
+        }}
+        placeholder={placeholder}
+      />
+    );
+  }
+
+  return (
+    <span
+      className={cn("cursor-pointer hover:border-b hover:border-dashed hover:border-muted-foreground/50 transition-colors", className, !value && "italic opacity-50")}
+      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      title="Klik om te bewerken"
+    >
+      {value || placeholder}
+    </span>
+  );
 }
 
 interface InteractiveFloorPlanProps {
@@ -686,37 +725,67 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
           </svg>
         </div>
 
-        {/* Detail panel (view mode only) */}
-        {!editMode && (selectedZoneData || selectedTankData) && (
-          <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-72 bg-background/95 backdrop-blur-md border rounded-lg p-3 shadow-lg animate-in slide-in-from-bottom-2">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: selectedZoneData ? ZONE_TYPES[selectedZoneData.type].color : ZONE_TYPES.opslag_bulk.color }} />
-                  <span className="font-semibold text-sm">{selectedZoneData?.label || selectedTankData?.label}</span>
+        {/* Detail panel */}
+        {(selectedZoneData || selectedTankData) && (() => {
+          const item = selectedZoneData || selectedTankData;
+          const isZone = !!selectedZoneData;
+          const color = selectedZoneData ? ZONE_TYPES[selectedZoneData.type].color : ZONE_TYPES.opslag_bulk.color;
+          const typeLabel = selectedZoneData ? ZONE_TYPES[selectedZoneData.type].label : ZONE_TYPES.opslag_bulk.label;
+
+          const handleDetailEdit = (field: "label" | "sublabel" | "details", value: string) => {
+            const updatedZones = isZone
+              ? zones.map(z => z.id === selectedZone ? { ...z, [field]: value || undefined } : z)
+              : zones;
+            const updatedTanks = !isZone
+              ? tanks.map(t => t.id === selectedZone ? { ...t, [field]: value || undefined } : t)
+              : tanks;
+            if (isZone) setZones(updatedZones);
+            else setTanks(updatedTanks);
+            savePositions(updatedZones, updatedTanks);
+            toast.success("Tekst bijgewerkt");
+          };
+
+          return (
+            <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 bg-background/95 backdrop-blur-md border rounded-lg p-3 shadow-lg animate-in slide-in-from-bottom-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                    <EditableText
+                      value={item?.label || ""}
+                      onSave={(v) => handleDetailEdit("label", v)}
+                      className="font-semibold text-sm"
+                      placeholder="Label..."
+                    />
+                  </div>
+                  <div className="ml-4.5">
+                    <EditableText
+                      value={item?.sublabel || ""}
+                      onSave={(v) => handleDetailEdit("sublabel", v)}
+                      className="text-xs text-muted-foreground"
+                      placeholder="+ sublabel toevoegen"
+                    />
+                  </div>
                 </div>
-                {(selectedZoneData?.sublabel || selectedTankData?.sublabel) && (
-                  <p className="text-xs text-muted-foreground ml-4.5">{selectedZoneData?.sublabel || selectedTankData?.sublabel}</p>
-                )}
+                <Badge variant="outline" className="text-[10px] shrink-0" style={{ borderColor: color, color }}>
+                  {typeLabel}
+                </Badge>
               </div>
-              <Badge variant="outline" className="text-[10px] shrink-0" style={{
-                borderColor: selectedZoneData ? ZONE_TYPES[selectedZoneData.type].color : ZONE_TYPES.opslag_bulk.color,
-                color: selectedZoneData ? ZONE_TYPES[selectedZoneData.type].color : ZONE_TYPES.opslag_bulk.color,
-              }}>
-                {selectedZoneData ? ZONE_TYPES[selectedZoneData.type].label : ZONE_TYPES.opslag_bulk.label}
-              </Badge>
+              <div className="mt-2 flex items-start gap-1.5">
+                <Info className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground" />
+                <EditableText
+                  value={(selectedZoneData as FloorZone)?.details || (selectedTankData as BulkTank)?.details || ""}
+                  onSave={(v) => handleDetailEdit("details", v)}
+                  className="text-xs text-muted-foreground"
+                  placeholder="+ details toevoegen"
+                />
+              </div>
+              <Button variant="ghost" size="sm" className="mt-2 w-full text-xs h-7" onClick={() => setSelectedZone(null)}>
+                Sluiten
+              </Button>
             </div>
-            {(selectedZoneData?.details || selectedTankData?.details) && (
-              <p className="text-xs text-muted-foreground mt-2 flex items-start gap-1.5">
-                <Info className="h-3 w-3 mt-0.5 shrink-0" />
-                {selectedZoneData?.details || selectedTankData?.details}
-              </p>
-            )}
-            <Button variant="ghost" size="sm" className="mt-2 w-full text-xs h-7" onClick={() => setSelectedZone(null)}>
-              Sluiten
-            </Button>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Hover tooltip */}
         {hoveredZone && !selectedZone && !draggingId && (() => {
