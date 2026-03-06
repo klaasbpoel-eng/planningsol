@@ -74,14 +74,23 @@ function detectGasWeight(description: string, capacity: number): number {
   return Math.round(capacity * 0.240 * 10) / 10;
 }
 
-function detectLocation(locationId: number | string): { location: "tilburg" | "emmen"; isFull: boolean } | null {
+function detectLocation(locationId: number | string, dsCenterDesc?: string): { location: "tilburg" | "emmen"; isFull: boolean } | null {
   const locId = Number(locationId);
   if (locId === 110) return { location: "tilburg", isFull: true };
   if (locId === 109) return { location: "tilburg", isFull: false };
   if (locId === 140) return { location: "emmen", isFull: true };
   if (locId === 139) return { location: "emmen", isFull: false };
 
-  // Fallback via DS_CENTER_DESCRIPTION handled at call site
+  // Fallback via DS_CENTER_DESCRIPTION
+  if (dsCenterDesc) {
+    const lower = dsCenterDesc.toLowerCase();
+    const isEmmen = lower.includes("emmen");
+    const isTilburg = lower.includes("tilburg");
+    const isEmpty = lower.includes("leeg") || lower.includes("empty");
+    if (isEmmen) return { location: "emmen", isFull: !isEmpty };
+    if (isTilburg) return { location: "tilburg", isFull: !isEmpty };
+  }
+
   return null;
 }
 
@@ -165,6 +174,7 @@ export function SOLPGSImportDialog({
               if (c === "mastercodedescription") colMap.masterCodeDescription = idx;
               if (c === "capacity") colMap.capacity = idx;
               if (c === "locationid") colMap.locationId = idx;
+              if (c === "ds_center_description") colMap.dsCenterDescription = idx;
             });
             break;
           }
@@ -192,14 +202,31 @@ export function SOLPGSImportDialog({
           const masterDesc = String(row[colMap.masterCodeDescription] || "").trim();
           const capacity = parseFloat(String(row[colMap.capacity] || "0"));
           const locationId = String(row[colMap.locationId] || "");
+          const dsCenterDesc = colMap.dsCenterDescription !== undefined
+            ? String(row[colMap.dsCenterDescription] || "").trim()
+            : "";
 
-          if (!contentDesc || contentDesc === "NULL" || isNaN(capacity) || capacity <= 0) continue;
+          if (isNaN(capacity) || capacity <= 0) continue;
 
-          const locInfo = detectLocation(locationId);
+          // Use contentDescription if available, otherwise fall back to masterCodeDescription
+          const hasContent = contentDesc && contentDesc !== "NULL";
+          const descForGas = hasContent ? contentDesc : masterDesc;
+          if (!descForGas || descForGas === "NULL") continue;
+
+          // Detect empty status from MasterCodeDescription or DS_CENTER_DESCRIPTION
+          const masterIndicatesEmpty = masterDesc.toLowerCase().includes("(leeg)");
+          const dsIndicatesEmpty = dsCenterDesc.toLowerCase().includes("leeg") || dsCenterDesc.toLowerCase().includes("empty");
+
+          const locInfo = detectLocation(locationId, dsCenterDesc);
           if (!locInfo) continue;
 
-          const gasKeyword = extractGasKeyword(contentDesc || masterDesc);
-          const weight = locInfo.isFull ? detectGasWeight(contentDesc || masterDesc, capacity) : 0;
+          // Override isFull if master or DS description indicates empty
+          if (masterIndicatesEmpty || dsIndicatesEmpty) {
+            locInfo.isFull = false;
+          }
+
+          const gasKeyword = extractGasKeyword(descForGas);
+          const weight = locInfo.isFull ? detectGasWeight(descForGas, capacity) : 0;
 
           if (!weightMap.has(gasKeyword)) {
             weightMap.set(gasKeyword, { emmen: getLocData(), tilburg: getLocData() });
@@ -209,9 +236,9 @@ export function SOLPGSImportDialog({
           locData.totalWeight += weight;
 
           // Track cylinder breakdown
-          const cylKey = `${contentDesc}__${capacity}`;
+          const cylKey = `${descForGas}__${capacity}`;
           const cyl = locData.cylinders.get(cylKey) || {
-            description: contentDesc,
+            description: descForGas,
             capacity,
             countVol: 0,
             countLeeg: 0,
