@@ -293,7 +293,7 @@ export function SOLPGSImportDialog({
           .from("pgs_substances")
           .update({
             current_stock_kg: match.calculatedKg,
-            cylinder_breakdown: match.breakdown as unknown as Record<string, unknown>[],
+            cylinder_breakdown: JSON.parse(JSON.stringify(match.breakdown)),
             updated_at: new Date().toISOString(),
           })
           .eq("id", match.substanceId);
