@@ -4,10 +4,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Upload, Maximize2, Minimize2, Printer, MapPin } from "lucide-react";
+import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Upload, Maximize2, Minimize2, Printer, MapPin, FileSpreadsheet } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
 import { getStockStatus, type StockStatus } from "./StockStatusBadge";
 import { StockExcelImportDialog, type StockItem } from "./StockExcelImportDialog";
+import { SOLInventoryImportDialog } from "./SOLInventoryImportDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { StockPrintView } from "./StockPrintView";
@@ -61,6 +62,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     sol_tilburg: [],
   });
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [solImportDialogOpen, setSolImportDialogOpen] = useState(false);
   const [locationManagerOpen, setLocationManagerOpen] = useState(false);
   const [fullscreenStatus, setFullscreenStatus] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | undefined>();
@@ -294,6 +296,17 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
                 <Upload className="h-3.5 w-3.5" />
               </Button>
             )}
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setSolImportDialogOpen(true)}
+                title={`SOL inventaris importeren voor ${importLocationLabel}`}
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </span>
         </CardDescription>
       </CardHeader>
@@ -303,6 +316,13 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
         onOpenChange={setImportDialogOpen}
         onImported={handleImported}
         locationLabel={importLocationLabel}
+      />
+      <SOLInventoryImportDialog
+        open={solImportDialogOpen}
+        onOpenChange={setSolImportDialogOpen}
+        onImported={handleImported}
+        locationLabel={importLocationLabel}
+        targetLocation={selectedLocation === "all" ? "sol_emmen" : selectedLocation}
       />
       <StockFillingLocationManager
         open={locationManagerOpen}
