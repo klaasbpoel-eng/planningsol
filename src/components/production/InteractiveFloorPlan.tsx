@@ -45,9 +45,9 @@ interface BulkTank {
 const DEFAULT_BULK_TANKS: BulkTank[] = [
   { id: "tank_lin", cx: 95, cy: 95, r: 28, label: "LIN", sublabel: "N₂ vloeibaar", details: "Vloeibare stikstof tank – 32.000 kg" },
   { id: "tank_lox", cx: 160, cy: 95, r: 28, label: "LOX", sublabel: "O₂ vloeibaar", details: "Vloeibare zuurstof tank – 30.000 kg" },
-  { id: "tank_lar", cx: 225, cy: 95, r: 22, label: "LAR", sublabel: "Ar vloeibaar", details: "Vloeibaar argon tank – 12.000 kg" },
-  { id: "tank_lco2_1", cx: 285, cy: 95, r: 28, label: "LCO₂", sublabel: "CO₂ vloeibaar", details: "Vloeibaar CO₂ tank 1 – 22.000 kg" },
-  { id: "tank_lco2_2", cx: 350, cy: 95, r: 28, label: "LCO₂", sublabel: "CO₂ vloeibaar", details: "Vloeibaar CO₂ tank 2 – 22.000 kg" },
+  { id: "tank_lar", cx: 225, cy: 95, r: 28, label: "LAR", sublabel: "Ar vloeibaar", details: "Vloeibaar argon tank – 12.000 kg" },
+  { id: "tank_lco2_1", cx: 290, cy: 95, r: 28, label: "LCO₂", sublabel: "CO₂ vloeibaar", details: "Vloeibaar CO₂ tank 1 – 22.000 kg" },
+  { id: "tank_lco2_2", cx: 355, cy: 95, r: 28, label: "LCO₂", sublabel: "CO₂ vloeibaar", details: "Vloeibaar CO₂ tank 2 – 22.000 kg" },
 ];
 
 const DEFAULT_ZONES: FloorZone[] = [
