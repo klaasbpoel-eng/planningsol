@@ -37,6 +37,9 @@ import {
   Container,
   CalendarClock,
   FileSpreadsheet,
+  Link2,
+  HelpCircle,
+  Filter,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatNumber } from "@/lib/utils";
@@ -45,6 +48,7 @@ import { getGasColor } from "@/constants/gasColors";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { SOLPGSImportDialog } from "./SOLPGSImportDialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // GHS pictogram config with diamond styling
 const GHS_CONFIG: Record<string, { label: string; src: string }> = {
@@ -235,6 +239,10 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     return (localStorage.getItem("pgs-pictogram-mode") as PictogramMode) || "ghs";
   });
   const [solImportOpen, setSolImportOpen] = useState(false);
+  const [filterUnknown, setFilterUnknown] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkingSubstance, setLinkingSubstance] = useState<PGSSubstance | null>(null);
+  const [allGasTypes, setAllGasTypes] = useState<{ id: string; name: string }[]>([]);
 
   const handlePictogramModeChange = (value: string) => {
     if (value) {
@@ -325,6 +333,38 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     fetchSubstances();
     fetchBulkTanks();
   }, [fetchSubstances, fetchBulkTanks]);
+
+  // Fetch all gas types for linking dialog
+  useEffect(() => {
+    const fetchGasTypes = async () => {
+      const { data } = await supabase.from("gas_types").select("id, name").eq("is_active", true).order("name");
+      if (data) setAllGasTypes(data);
+    };
+    fetchGasTypes();
+  }, []);
+
+  const openLinkDialog = (substance: PGSSubstance) => {
+    setLinkingSubstance(substance);
+    setLinkDialogOpen(true);
+  };
+
+  const handleLinkGasType = async (gasTypeId: string) => {
+    if (!linkingSubstance) return;
+    try {
+      const { error } = await supabase
+        .from("pgs_substances")
+        .update({ gas_type_id: gasTypeId, updated_at: new Date().toISOString() })
+        .eq("id", linkingSubstance.id);
+      if (error) throw error;
+      toast.success("Gastype succesvol gekoppeld");
+      setLinkDialogOpen(false);
+      setLinkingSubstance(null);
+      fetchSubstances();
+    } catch (err) {
+      console.error("Error linking gas type:", err);
+      toast.error("Fout bij koppelen gastype");
+    }
+  };
 
   // Realtime subscription for bulk tanks
   useEffect(() => {
@@ -535,6 +575,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
 
   const processedSubstances = useMemo(() => {
     let result = substances.filter(s => {
+      if (filterUnknown && s.gas_type_name !== "Onbekend") return false;
       if (filterGuideline !== "all" && s.pgs_guideline !== filterGuideline) return false;
       if (filterStorageClass !== "all" && s.storage_class !== filterStorageClass) return false;
       if (searchQuery) {
@@ -543,7 +584,8 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
         const matchUN = s.un_number?.toLowerCase().includes(q);
         const matchCAS = s.cas_number?.toLowerCase().includes(q);
         const matchPGS = s.pgs_guideline.toLowerCase().includes(q);
-        if (!matchName && !matchUN && !matchCAS && !matchPGS) return false;
+        const matchNotes = s.notes?.toLowerCase().includes(q);
+        if (!matchName && !matchUN && !matchCAS && !matchPGS && !matchNotes) return false;
       }
       return true;
     });
@@ -560,9 +602,10 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     });
 
     return result;
-  }, [substances, filterGuideline, filterStorageClass, searchQuery, sortField, sortDir]);
+  }, [substances, filterGuideline, filterStorageClass, filterUnknown, searchQuery, sortField, sortDir]);
 
   // KPI stats
+  const unknownCount = useMemo(() => substances.filter(s => s.gas_type_name === "Onbekend").length, [substances]);
   const stats = useMemo(() => {
     const total = substances.length;
     const ok = substances.filter(s => getPct(s) < 80).length;
@@ -672,6 +715,18 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
           <ToggleGroupItem value="adr" className="text-xs px-2.5 h-9">ADR</ToggleGroupItem>
           <ToggleGroupItem value="both" className="text-xs px-2.5 h-9">Beide</ToggleGroupItem>
         </ToggleGroup>
+
+        {unknownCount > 0 && (
+          <Button
+            variant={filterUnknown ? "default" : "outline"}
+            size="sm"
+            className="gap-1.5 h-9 text-xs"
+            onClick={() => setFilterUnknown(!filterUnknown)}
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+            Onbekend ({unknownCount})
+          </Button>
+        )}
 
         <div className="flex-1" />
 
@@ -792,6 +847,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
                           onSaveEdit={() => saveEdit(substance.id)}
                           onEditChange={setEditValues}
                           pictogramMode={pictogramMode}
+                          onLinkGasType={isAdmin ? openLinkDialog : undefined}
                         />
                       );
                     })}
@@ -934,6 +990,43 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
           onUpdated={fetchSubstances}
         />
       )}
+
+      {/* Link Gas Type Dialog */}
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="h-5 w-5 text-primary" />
+              Gastype koppelen
+            </DialogTitle>
+            <DialogDescription>
+              Koppel deze onbekende stof aan een bestaand gastype.
+              {linkingSubstance?.notes && (
+                <span className="block mt-2 text-xs bg-muted rounded-md px-3 py-2">
+                  <strong>Opmerking:</strong> {linkingSubstance.notes}
+                </span>
+              )}
+              {linkingSubstance?.un_number && (
+                <span className="block mt-1 text-xs">
+                  <strong>UN-nummer:</strong> {linkingSubstance.un_number}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select onValueChange={handleLinkGasType}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecteer een gastype..." />
+              </SelectTrigger>
+              <SelectContent>
+                {allGasTypes.map(gt => (
+                  <SelectItem key={gt.id} value={gt.id}>{gt.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -956,13 +1049,15 @@ interface SubstanceRowProps {
   onCancelEdit: () => void;
   onSaveEdit: () => void;
   onEditChange: (v: { max_allowed_kg: number; current_stock_kg: number }) => void;
+  onLinkGasType?: (substance: PGSSubstance) => void;
 }
 
 function SubstanceRow({
   substance, pct, isWarning, isCritical, isExpanded, isEditing, isEven,
-  isAdmin, editValues, colSpan, pictogramMode, onToggle, onStartEdit, onCancelEdit, onSaveEdit, onEditChange,
+  isAdmin, editValues, colSpan, pictogramMode, onToggle, onStartEdit, onCancelEdit, onSaveEdit, onEditChange, onLinkGasType,
 }: SubstanceRowProps) {
   const pgsClass = PGS_COLORS[substance.pgs_guideline] || "bg-muted text-muted-foreground border-border";
+  const isUnknown = substance.gas_type_name === "Onbekend";
 
   return (
     <>
@@ -988,7 +1083,42 @@ function SubstanceRow({
               className="w-3 h-3 rounded-full flex-shrink-0 ring-2 ring-background shadow-sm"
               style={{ backgroundColor: substance.gas_type_color }}
             />
-            <span className="font-semibold text-sm">{substance.gas_type_name}</span>
+            <span className={cn("font-semibold text-sm", isUnknown && "text-orange-500 dark:text-orange-400")}>
+              {substance.gas_type_name}
+            </span>
+            {isUnknown && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-orange-400/50 bg-orange-500/10 text-orange-600 dark:text-orange-400 gap-1">
+                    <AlertTriangle className="h-2.5 w-2.5" />
+                    Niet gekoppeld
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-xs">
+                  <p className="font-medium">Geen gastype gekoppeld</p>
+                  <p className="text-muted-foreground mt-0.5">
+                    Deze stof kon niet automatisch worden gematcht bij de SOL import.
+                    {substance.notes && <span className="block mt-1"><strong>Info:</strong> {substance.notes}</span>}
+                    {substance.un_number && <span className="block"><strong>UN:</strong> {substance.un_number}</span>}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {isUnknown && isAdmin && onLinkGasType && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 text-primary hover:text-primary"
+                    onClick={(e) => { e.stopPropagation(); onLinkGasType(substance); }}
+                  >
+                    <Link2 className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">Koppel aan gastype</TooltipContent>
+              </Tooltip>
+            )}
             {substance.location && (
               <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal">
                 {substance.location === "sol_emmen" ? "Emmen" : "Tilburg"}
@@ -1174,6 +1304,22 @@ function SubstanceRow({
                 className="overflow-hidden"
               >
                 <div className="px-6 py-4 bg-muted/20 space-y-4">
+                  {/* Unknown substance alert */}
+                  {isUnknown && (
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-500/10 border border-orange-400/30">
+                      <HelpCircle className="h-4 w-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                      <div className="text-xs space-y-1">
+                        <p className="font-semibold text-orange-600 dark:text-orange-400">Onbekende stof — niet gekoppeld aan een gastype</p>
+                        <p className="text-muted-foreground">
+                          Deze stof kon niet automatisch worden gematcht tijdens de SOL import. 
+                          Gebruik de koppelknop (<Link2 className="h-3 w-3 inline" />) om deze stof aan een bestaand gastype te koppelen.
+                        </p>
+                        {substance.notes && (
+                          <p className="text-foreground"><strong>Opmerking:</strong> {substance.notes}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {/* Three sections */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Identification */}
