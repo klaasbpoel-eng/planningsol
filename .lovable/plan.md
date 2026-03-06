@@ -1,27 +1,35 @@
 
+# Showroom als ronde vorm van Entrée naar Kantoor Vivisol
 
-## Plan: SOL Excel data koppelen aan PGS Register
+## Wat wordt aangepast
 
-### Wat
-De SOL Excel importfunctie (die al cilinders aggregeert en gewichten berekent) uitbreiden zodat de berekende gewichten automatisch de `current_stock_kg` velden in het PGS Register updaten. Hierdoor worden de "Huidig (kg)" kolom en bezettingspercentages automatisch gevuld.
+De huidige showroom is een rechthoekig blokje (zone `showroom` op x:595, y:610, w:130, h:28). In werkelijkheid loopt de showroom in een boog/ronde vorm van de Entrée (x:540, y:750) richting het Kantoor bij de Vivisol opslag (x:808, y:565).
 
-### Hoe
+## Plan
 
-**1. Matching-logica toevoegen aan SOLInventoryImportDialog**
-Na het aggregeren van de Excel data, de geïmporteerde gastypen matchen met `pgs_substances` records:
-- Match op gasnaam: de `ContentDescription` uit Excel (bijv. "Zuurstof", "Argon", "Stikstof") vergelijken met de `gas_type_name` van PGS substances
-- Per gematchte substance: de totale gewichten (`totalWeightKg`) van alle gematchte productrijen optellen
-- Database update: `pgs_substances.current_stock_kg` updaten via Supabase voor de juiste locatie
+1. **Verwijder de huidige rechthoekige showroom-zone** uit `DEFAULT_ZONES`
 
-**2. Extra stap in het importproces**
-Na de bestaande preview een "PGS Register bijwerken" optie tonen:
-- Tabel met per PGS-substance: gasnaam, berekend gewicht uit Excel, huidige waarde in database, max toegestaan
-- Gebruiker kan bevestigen voordat de update wordt doorgevoerd
+2. **Voeg een gebogen SVG-pad toe als achtergrond** in de SVG-rendering (naast de bestaande achtergrondblokken), die een afgeronde L-bocht of boogvorm tekent van de Entrée (rechtsonder bij kantoren) omhoog naar het Vivisol-kantoor (rechtsboven). Dit wordt een `<path>` element met een kwadratische of cubische bezier-curve, met een gestippelde rand en licht gekleurde vulling, gelabeld "SHOWROOM".
 
-**3. Aanpassingen aan bestanden**
-- `SOLInventoryImportDialog.tsx`: Na import, optioneel PGS substances updaten op basis van geaggregeerde gewichten per gastype + locatie
-- `PGSRegistry.tsx`: Een "SOL Import" knop toevoegen in de header die de `SOLInventoryImportDialog` opent met een callback om na import de substances te herladen
+3. **Voeg de showroom-zone terug als een aangepast element** dat het gebogen pad visueel volgt. Omdat zones nu rechthoekig zijn, splits ik de showroom op in 2-3 kleinere zones die samen de boog vormen:
+   - `showroom_onder`: Horizontaal stuk naast de Entrée (ca. x:640, y:740, w:120, h:48)
+   - `showroom_midden`: Verticaal/schuin stuk (ca. x:730, y:640, w:80, h:100) 
+   - `showroom_boven`: Horizontaal stuk bij Vivisol opslag (ca. x:750, y:600, w:140, h:40)
+   
+   Of beter: een enkel decoratief SVG-pad als achtergrond met label, en de showroom-zone als een enkel dragbaar element op een representatieve positie.
 
-### Matching-strategie
-De gasnaam uit de Excel `ContentDescription` wordt genormaliseerd (lowercase, zuiverheidsgraden strippen) en vergeleken met de `gas_type_name` van de PGS substances. Gewichten worden per gastype gesommeerd over alle cilindergroottes, zodat bijv. alle Zuurstof-cilinders (5L, 10L, 50L) opgeteld de `current_stock_kg` voor "Zuurstof" vormen.
+**Gekozen aanpak**: Een decoratief gebogen SVG-pad als achtergrondvorm (niet-dragbaar, puur visueel) dat de ronde loop van de showroom toont, plus de bestaande showroom-zone die als klikbaar element op het midden van het pad blijft staan.
 
+## Technische details
+
+**Bestand**: `src/components/production/InteractiveFloorPlan.tsx`
+
+- Voeg na de bestaande achtergrondblokken (rond lijn 640) een SVG `<path>` toe met een gebogen vorm:
+  - Start bij Entrée-gebied (ca. 640, 760)
+  - Bocht naar rechts en omhoog
+  - Eindigt bij Vivisol kantoor (ca. 810, 600)
+  - Styling: gevulde achtergrond (`hsl(40 70% 50% / 0.08)`), gestippelde rand, label "SHOWROOM"
+
+- Pas de bestaande `showroom` zone-positie en afmetingen aan zodat deze centraal op het pad ligt
+
+- De boog wordt getekend met een `quadratic bezier` curve in SVG (`Q` commando) om een natuurlijke ronde hoek te maken
