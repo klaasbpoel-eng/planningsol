@@ -576,6 +576,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
 
   const processedSubstances = useMemo(() => {
     let result = substances.filter(s => {
+      if (filterUnknown && s.gas_type_name !== "Onbekend") return false;
       if (filterGuideline !== "all" && s.pgs_guideline !== filterGuideline) return false;
       if (filterStorageClass !== "all" && s.storage_class !== filterStorageClass) return false;
       if (searchQuery) {
@@ -584,7 +585,8 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
         const matchUN = s.un_number?.toLowerCase().includes(q);
         const matchCAS = s.cas_number?.toLowerCase().includes(q);
         const matchPGS = s.pgs_guideline.toLowerCase().includes(q);
-        if (!matchName && !matchUN && !matchCAS && !matchPGS) return false;
+        const matchNotes = s.notes?.toLowerCase().includes(q);
+        if (!matchName && !matchUN && !matchCAS && !matchPGS && !matchNotes) return false;
       }
       return true;
     });
@@ -601,9 +603,10 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     });
 
     return result;
-  }, [substances, filterGuideline, filterStorageClass, searchQuery, sortField, sortDir]);
+  }, [substances, filterGuideline, filterStorageClass, filterUnknown, searchQuery, sortField, sortDir]);
 
   // KPI stats
+  const unknownCount = useMemo(() => substances.filter(s => s.gas_type_name === "Onbekend").length, [substances]);
   const stats = useMemo(() => {
     const total = substances.length;
     const ok = substances.filter(s => getPct(s) < 80).length;
