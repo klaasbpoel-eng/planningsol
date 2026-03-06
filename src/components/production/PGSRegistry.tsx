@@ -848,6 +848,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
                           onSaveEdit={() => saveEdit(substance.id)}
                           onEditChange={setEditValues}
                           pictogramMode={pictogramMode}
+                          onLinkGasType={isAdmin ? openLinkDialog : undefined}
                         />
                       );
                     })}
@@ -1304,6 +1305,22 @@ function SubstanceRow({
                 className="overflow-hidden"
               >
                 <div className="px-6 py-4 bg-muted/20 space-y-4">
+                  {/* Unknown substance alert */}
+                  {isUnknown && (
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-500/10 border border-orange-400/30">
+                      <HelpCircle className="h-4 w-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                      <div className="text-xs space-y-1">
+                        <p className="font-semibold text-orange-600 dark:text-orange-400">Onbekende stof — niet gekoppeld aan een gastype</p>
+                        <p className="text-muted-foreground">
+                          Deze stof kon niet automatisch worden gematcht tijdens de SOL import. 
+                          Gebruik de koppelknop (<Link2 className="h-3 w-3 inline" />) om deze stof aan een bestaand gastype te koppelen.
+                        </p>
+                        {substance.notes && (
+                          <p className="text-foreground"><strong>Opmerking:</strong> {substance.notes}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {/* Three sections */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Identification */}
