@@ -110,6 +110,8 @@ const DEFAULT_ZONES: FloorZone[] = [
   { id: "o2_med_300", x: 495, y: 655, w: 75, h: 58, label: "O₂ med.", sublabel: "300 bar", type: "medisch", details: "Medische zuurstof 300 bar" },
   { id: "lucht_synth", x: 575, y: 655, w: 75, h: 58, label: "Lucht", sublabel: "Synth./Med.", type: "medisch", details: "Synthetische en medische lucht" },
   { id: "showroom", x: 720, y: 680, w: 60, h: 24, label: "Showroom", type: "kantoor" },
+  { id: "showroom_start", x: 630, y: 750, w: 10, h: 10, label: "", type: "kantoor" },
+  { id: "showroom_end", x: 848, y: 595, w: 10, h: 10, label: "", type: "kantoor" },
   { id: "kantoren", x: 340, y: 740, w: 300, h: 48, label: "K A N T O R E N", type: "kantoor", details: "Kantoorruimtes medewerkers" },
   { id: "entree", x: 540, y: 750, w: 90, h: 38, label: "Entrée", type: "kantoor" },
   { id: "uitsorteer", x: 750, y: 610, w: 220, h: 48, label: "Uitsorteerplatform", sublabel: "Lege cilinders", type: "logistiek", details: "Sorteerplatform voor lege cilinders" },
@@ -639,18 +641,16 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             <rect x="585" y="555" width={310} height={55} rx="4" fill="hsl(var(--muted) / 0.1)" stroke="hsl(var(--border) / 0.3)" strokeWidth="1" strokeDasharray="4 4" />
             <text x="600" y="553" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">VIVISOL</text>
 
-            {/* Showroom – curved path anchored to showroom zone */}
+            {/* Showroom – curved path with draggable endpoints */}
             {(() => {
               const sr = zones.find(z => z.id === "showroom");
-              const entreeZone = zones.find(z => z.id === "entree");
-              const kantoorZone = zones.find(z => z.id === "kantoor_vivisol");
-              if (!sr || !entreeZone || !kantoorZone) return null;
-              // Start: right edge of Entrée, End: bottom of Kantoor Vivisol
-              const sx = entreeZone.x + entreeZone.w;
-              const sy = entreeZone.y + entreeZone.h / 2;
-              const ex = kantoorZone.x + kantoorZone.w / 2;
-              const ey = kantoorZone.y + kantoorZone.h;
-              // Showroom zone center as control influence
+              const startZone = zones.find(z => z.id === "showroom_start");
+              const endZone = zones.find(z => z.id === "showroom_end");
+              if (!sr || !startZone || !endZone) return null;
+              const sx = startZone.x + startZone.w / 2;
+              const sy = startZone.y + startZone.h / 2;
+              const ex = endZone.x + endZone.w / 2;
+              const ey = endZone.y + endZone.h / 2;
               const cx = sr.x + sr.w / 2;
               const cy = sr.y + sr.h / 2;
               const d = `M ${sx} ${sy} C ${cx} ${sy} ${ex} ${cy} ${ex} ${ey}`;
@@ -662,6 +662,18 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   <path d={d} fill="none" stroke="hsl(40 70% 50% / 0.12)" strokeWidth="44" strokeLinecap="round" />
                   <path d={d} fill="none" stroke="hsl(40 70% 50% / 0.35)" strokeWidth="1" strokeDasharray="6 4" strokeLinecap="round" />
                   <text x={mx} y={my} textAnchor="middle" fill="hsl(40 70% 50% / 0.5)" fontSize="8" fontWeight="700" letterSpacing="3" transform={`rotate(${angle}, ${mx}, ${my})`}>SHOWROOM</text>
+                  {editMode && (
+                    <>
+                      <circle cx={sx} cy={sy} r="6" fill="hsl(40 70% 50%)" opacity="0.7" stroke="#fff" strokeWidth="1.5"
+                        className="cursor-grab" onMouseDown={(e) => handleZoneDragStart(e, "showroom_start")}>
+                        <title>Sleep: startpunt boog (Entrée-zijde)</title>
+                      </circle>
+                      <circle cx={ex} cy={ey} r="6" fill="hsl(40 70% 50%)" opacity="0.7" stroke="#fff" strokeWidth="1.5"
+                        className="cursor-grab" onMouseDown={(e) => handleZoneDragStart(e, "showroom_end")}>
+                        <title>Sleep: eindpunt boog (Kantoor-zijde)</title>
+                      </circle>
+                    </>
+                  )}
                 </g>
               );
             })()}
@@ -715,7 +727,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             })}
 
             {/* Zones */}
-            {filteredZones.map((zone) => {
+            {filteredZones.filter(z => !z.id.startsWith("showroom_start") && !z.id.startsWith("showroom_end")).map((zone) => {
               const zt = ZONE_TYPES[zone.type];
               const isSelected = selectedZone === zone.id;
               const isHovered = hoveredZone === zone.id;
