@@ -1,64 +1,48 @@
 
 
-## PGS Registratie Gevaarlijke Stoffen
+## Plan: PGS Register UI/UX professionaliseren
 
-### Wat is dit?
-Een nieuwe module voor het bijhouden van een PGS-register (Publicatiereeks Gevaarlijke Stoffen) van aanwezige gevaarlijke stoffen op de productielocaties, gekoppeld aan de bestaande gastypes in het systeem.
+### Verbeteringen
 
-### Aanpak
+**1. Samenvattingskaarten bovenaan (KPI strip)**
+Vier stat-cards boven de tabel met:
+- Totaal geregistreerde stoffen
+- Stoffen met status OK (groen)
+- Stoffen >80% bezetting (oranje waarschuwing)
+- Stoffen >95% bezetting (rood kritiek)
 
-**1. Database: nieuwe tabel `pgs_substances`**
-Slaat per locatie de registratie op van gevaarlijke stoffen met PGS-classificatie:
+Gebruikt bestaande `stat-card` component of mini-cards met iconen en kleuren.
 
-| Kolom | Type | Beschrijving |
-|-------|------|-------------|
-| id | uuid PK | |
-| gas_type_id | uuid FK → gas_types | Koppeling aan bestaand gastype |
-| location | production_location | sol_emmen / sol_tilburg |
-| pgs_guideline | text | PGS-richtlijn (bijv. "PGS 9", "PGS 16") |
-| max_allowed_kg | numeric | Maximaal toegestane hoeveelheid |
-| current_stock_kg | numeric | Huidige voorraad (handmatig of berekend) |
-| storage_class | text | ADR/opslagklasse |
-| hazard_symbols | text[] | GHS-pictogrammen (GHS02, GHS04, etc.) |
-| un_number | text | UN-nummer (bijv. "UN1013") |
-| cas_number | text | CAS-nummer |
-| risk_phrases | text | H-zinnen |
-| safety_phrases | text | P-zinnen |
-| notes | text | |
-| is_active | boolean | |
-| updated_by | uuid | |
-| created_at / updated_at | timestamptz | |
+**2. GHS-pictogrammen verbeteren**
+Huidige vierkante gekleurde blokjes vervangen door diamantvormige (45° geroteerde) badges — conform de officiële GHS-standaard. Rode rand voor gevaar, witte achtergrond met gekleurde symboolindicator.
 
-RLS: admin volledige toegang, operators/supervisors readonly op hun locatie.
+**3. Verbeterde tabelweergave**
+- Alternating row colors voor betere leesbaarheid
+- Sticky header zodat de kolomkoppen zichtbaar blijven bij scrollen
+- Subtielere rij-expansie animatie via framer-motion `AnimatePresence`
+- Betere visuele hiërarchie: gastype groter/duidelijker, PGS-badge met kleurcodering per richtlijn
 
-**2. Seed data** via insert tool — vooraf ingevulde PGS-classificaties voor gangbare gassen:
-- Zuurstof → PGS 9 (oxiderende gassen), UN1072, GHS03+GHS04
-- Stikstof → PGS 9, UN1066, GHS04
-- Argon → PGS 9, UN1006, GHS04
-- CO₂ → PGS 9, UN1013, GHS04
-- Acetyleen → PGS 16 (brandbare gassen), UN1001, GHS02+GHS04
-- Waterstof → PGS 16, UN1049, GHS02+GHS04
-- Propaan → PGS 16, UN1978, GHS02+GHS04
-- Helium → PGS 9, UN1046, GHS04
+**4. Zoekfunctie toevoegen**
+Tekstzoekveld om op gasnaam, UN-nummer of CAS-nummer te filteren.
 
-**3. Nieuw component: `PGSRegistry.tsx`**
-- Overzichtstabel per locatie met:
-  - Gasnaam, PGS-richtlijn, UN-nummer, GHS-pictogrammen (als gekleurde badges)
-  - Huidige voorraad vs. maximaal toegestaan (progress bar, rood bij >80%)
-  - H-zinnen en P-zinnen in expandable rows
-- Filtermogelijkheden op PGS-richtlijn en opslagklasse
-- Admin: inline-edit voor max_allowed_kg en current_stock_kg
-- Export naar Excel/PDF voor inspectiedoeleinden
+**5. Sorteerbare kolommen**
+Klikbare kolomkoppen om te sorteren op gasnaam, PGS-richtlijn, bezettingspercentage, etc. Visuele sort-indicator (pijltje).
 
-**4. Integratie**
-- Nieuw tabblad "PGS Register" toevoegen in `ProductionPlanning.tsx` (naast Plattegrond)
-  - Icoon: `ShieldAlert` (al geïmporteerd)
-  - Alleen zichtbaar voor admin/supervisor (`showAdvancedTabs`)
-- Eventueel ook een dashboard-waarschuwing als een stof >80% van de max is
+**6. Verbeterde expanded row details**
+De collapsible details per stof mooier structureren met:
+- Gegroepeerde secties (Identificatie, Opslag, Veiligheid) met subtiele scheidingslijnen
+- H-zinnen en P-zinnen als aparte badges/chips in plaats van plain text
+- Kleurcodering: H-zinnen rood, P-zinnen blauw
+
+**7. Locatie-tabs of segmented control**
+Als er data voor beide locaties is, een tabstrip bovenaan: "Alle locaties" / "SOL Emmen" / "SOL Tilburg" — in plaats van alleen het filter-dropdown.
+
+**8. Lege state verbeteren**
+Professionelere empty state met icoon en beschrijvende tekst + actie-knop.
 
 ### Bestanden
-- **Database**: 1 migratie voor `pgs_substances` tabel + RLS
-- **Data**: insert van seed data voor bekende gassen
-- **Nieuw**: `src/components/production/PGSRegistry.tsx`
-- **Wijzigen**: `src/components/production/ProductionPlanning.tsx` (tab toevoegen)
+- Alleen `src/components/production/PGSRegistry.tsx`
+
+### Aanpak
+Eén bestand, alle verbeteringen in één pass. Geen database-wijzigingen nodig.
 
