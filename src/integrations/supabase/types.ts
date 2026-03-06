@@ -130,6 +130,77 @@ export type Database = {
         }
         Relationships: []
       }
+      bulk_storage_tanks: {
+        Row: {
+          capacity_kg: number
+          created_at: string
+          current_level_kg: number
+          gas_type_id: string | null
+          hazard_symbols: string[] | null
+          id: string
+          is_active: boolean
+          last_inspection_date: string | null
+          location: Database["public"]["Enums"]["production_location"]
+          next_inspection_date: string | null
+          notes: string | null
+          pgs_guideline: string
+          storage_class: string | null
+          tank_name: string
+          tank_number: string | null
+          un_number: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          capacity_kg?: number
+          created_at?: string
+          current_level_kg?: number
+          gas_type_id?: string | null
+          hazard_symbols?: string[] | null
+          id?: string
+          is_active?: boolean
+          last_inspection_date?: string | null
+          location?: Database["public"]["Enums"]["production_location"]
+          next_inspection_date?: string | null
+          notes?: string | null
+          pgs_guideline?: string
+          storage_class?: string | null
+          tank_name: string
+          tank_number?: string | null
+          un_number?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          capacity_kg?: number
+          created_at?: string
+          current_level_kg?: number
+          gas_type_id?: string | null
+          hazard_symbols?: string[] | null
+          id?: string
+          is_active?: boolean
+          last_inspection_date?: string | null
+          location?: Database["public"]["Enums"]["production_location"]
+          next_inspection_date?: string | null
+          notes?: string | null
+          pgs_guideline?: string
+          storage_class?: string | null
+          tank_name?: string
+          tank_number?: string | null
+          un_number?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_storage_tanks_gas_type_id_fkey"
+            columns: ["gas_type_id"]
+            isOneToOne: false
+            referencedRelation: "gas_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_locations: {
         Row: {
           created_at: string
