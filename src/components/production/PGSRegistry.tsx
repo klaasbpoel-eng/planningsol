@@ -912,6 +912,16 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
           {processedSubstances.length} van {substances.length} stof(fen)
         </p>
       )}
+
+      {isAdmin && (
+        <SOLPGSImportDialog
+          open={solImportOpen}
+          onOpenChange={setSolImportOpen}
+          substances={substances}
+          locationTab={locationTab}
+          onUpdated={fetchSubstances}
+        />
+      )}
     </div>
   );
 }
