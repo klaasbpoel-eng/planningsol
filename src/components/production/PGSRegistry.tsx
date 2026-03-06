@@ -746,7 +746,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Alle richtlijnen</SelectItem>
-              {guidelines.map(g => (
+              {guidelines.filter(g => g && g.trim() !== "").map(g => (
                 <SelectItem key={g} value={g}>{g}</SelectItem>
               ))}
             </SelectContent>
@@ -758,7 +758,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Alle klassen</SelectItem>
-                {storageClasses.map(sc => (
+                {storageClasses.filter(sc => sc && sc.trim() !== "").map(sc => (
                   <SelectItem key={sc!} value={sc!}>{sc}</SelectItem>
                 ))}
               </SelectContent>
