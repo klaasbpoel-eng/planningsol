@@ -30,6 +30,8 @@ import {
   MapPin,
   Flame,
   Activity,
+  Container,
+  CalendarClock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatNumber } from "@/lib/utils";
@@ -106,6 +108,45 @@ interface PGSSubstance {
   gas_type_color?: string;
 }
 
+interface BulkTank {
+  id: string;
+  tank_name: string;
+  tank_number: string | null;
+  gas_type_id: string | null;
+  location: string;
+  capacity_kg: number;
+  current_level_kg: number;
+  last_inspection_date: string | null;
+  next_inspection_date: string | null;
+  pgs_guideline: string;
+  un_number: string | null;
+  hazard_symbols: string[];
+  storage_class: string | null;
+  is_active: boolean;
+  notes: string | null;
+  gas_type_name?: string;
+  gas_type_color?: string;
+}
+
+interface PGSSubstance {
+  id: string;
+  gas_type_id: string | null;
+  location: string;
+  pgs_guideline: string;
+  max_allowed_kg: number;
+  current_stock_kg: number;
+  storage_class: string | null;
+  hazard_symbols: string[];
+  un_number: string | null;
+  cas_number: string | null;
+  risk_phrases: string | null;
+  safety_phrases: string | null;
+  notes: string | null;
+  is_active: boolean;
+  gas_type_name?: string;
+  gas_type_color?: string;
+}
+
 interface PGSRegistryProps {
   location: string;
   isAdmin?: boolean;
@@ -126,6 +167,9 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [locationTab, setLocationTab] = useState(initialLocation);
+  const [bulkTanks, setBulkTanks] = useState<BulkTank[]>([]);
+  const [editingBulkId, setEditingBulkId] = useState<string | null>(null);
+  const [bulkEditValue, setBulkEditValue] = useState(0);
 
   const fetchSubstances = useCallback(async () => {
     setLoading(true);
@@ -171,9 +215,43 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     }
   }, [locationTab]);
 
+  const fetchBulkTanks = useCallback(async () => {
+    try {
+      let query = supabase
+        .from("bulk_storage_tanks")
+        .select("*")
+        .eq("is_active", true)
+        .order("tank_name", { ascending: true });
+
+      if (locationTab !== "all") {
+        query = query.eq("location", locationTab as "sol_emmen" | "sol_tilburg");
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const gasTypeIds = [...new Set((data || []).map(t => t.gas_type_id).filter(Boolean))];
+      let gasTypeMap: Record<string, { name: string; color: string }> = {};
+      if (gasTypeIds.length > 0) {
+        const { data: gasTypes } = await supabase.from("gas_types").select("id, name, color").in("id", gasTypeIds);
+        if (gasTypes) gasTypeMap = Object.fromEntries(gasTypes.map(gt => [gt.id, { name: gt.name, color: gt.color }]));
+      }
+
+      setBulkTanks((data || []).map(t => ({
+        ...t,
+        hazard_symbols: t.hazard_symbols || [],
+        gas_type_name: t.gas_type_id ? gasTypeMap[t.gas_type_id]?.name || "Onbekend" : "Onbekend",
+        gas_type_color: t.gas_type_id ? gasTypeMap[t.gas_type_id]?.color || "#6b7280" : "#6b7280",
+      })));
+    } catch (err) {
+      console.error("Error fetching bulk tanks:", err);
+    }
+  }, [locationTab]);
+
   useEffect(() => {
     fetchSubstances();
-  }, [fetchSubstances]);
+    fetchBulkTanks();
+  }, [fetchSubstances, fetchBulkTanks]);
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => {
@@ -216,6 +294,27 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
       fetchSubstances();
     } catch (err) {
       console.error("Error saving:", err);
+      toast.error("Fout bij opslaan");
+    }
+  };
+
+  const startBulkEdit = (tank: BulkTank) => {
+    setEditingBulkId(tank.id);
+    setBulkEditValue(tank.current_level_kg);
+  };
+
+  const saveBulkEdit = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("bulk_storage_tanks")
+        .update({ current_level_kg: bulkEditValue, updated_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+      toast.success("Tankniveau opgeslagen");
+      setEditingBulkId(null);
+      fetchBulkTanks();
+    } catch (err) {
+      console.error("Error saving bulk:", err);
       toast.error("Fout bij opslaan");
     }
   };
@@ -586,6 +685,116 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
           )}
         </CardContent>
       </Card>
+
+      {/* Bulk Storage Tanks */}
+      {bulkTanks.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Container className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold text-foreground">Bulkopslag</h3>
+            <Badge variant="secondary" className="text-[10px]">{bulkTanks.length} tank(s)</Badge>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {bulkTanks.map(tank => {
+              const pct = tank.capacity_kg > 0 ? (tank.current_level_kg / tank.capacity_kg) * 100 : 0;
+              const isLow = pct < 20;
+              const isBulkEditing = editingBulkId === tank.id;
+              const inspectionOverdue = tank.next_inspection_date && new Date(tank.next_inspection_date) < new Date();
+
+              return (
+                <Card key={tank.id} className={cn("overflow-hidden transition-all", inspectionOverdue && "ring-1 ring-orange-400/50")}>
+                  <CardContent className="p-4 space-y-3">
+                    {/* Tank header */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full ring-2 ring-background shadow-sm flex-shrink-0"
+                          style={{ backgroundColor: tank.gas_type_color }}
+                        />
+                        <div>
+                          <p className="font-semibold text-sm leading-tight">{tank.tank_name}</p>
+                          <p className="text-[10px] text-muted-foreground font-mono">{tank.tank_number}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {tank.hazard_symbols.map(sym => (
+                          <GHSDiamond key={sym} symbol={sym} />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Level bar */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-muted-foreground">Niveau</span>
+                        <span className={cn("font-medium", isLow ? "text-orange-500" : "text-foreground")}>
+                          {formatNumber(pct, 0)}%
+                        </span>
+                      </div>
+                      <Progress
+                        value={Math.min(pct, 100)}
+                        className={cn(
+                          "h-2.5 rounded-full",
+                          isLow ? "[&>div]:bg-orange-500" : pct > 80 ? "[&>div]:bg-emerald-500" : "[&>div]:bg-primary"
+                        )}
+                      />
+                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                        {isBulkEditing ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={bulkEditValue}
+                              onChange={e => setBulkEditValue(Number(e.target.value))}
+                              className="h-6 w-20 text-[11px] text-right"
+                            />
+                            <span>/ {formatNumber(tank.capacity_kg, 0)} kg</span>
+                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => saveBulkEdit(tank.id)}>
+                              <Check className="h-3 w-3 text-emerald-500" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setEditingBulkId(null)}>
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <span>{formatNumber(tank.current_level_kg, 0)} kg</span>
+                            <div className="flex items-center gap-1">
+                              <span>/ {formatNumber(tank.capacity_kg, 0)} kg</span>
+                              {isAdmin && (
+                                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => startBulkEdit(tank)}>
+                                  <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+                                </Button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Meta info */}
+                    <Separator className="opacity-50" />
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+                      <span className="flex items-center gap-0.5">
+                        <Badge variant="outline" className={cn("text-[9px] px-1 py-0 border", PGS_COLORS[tank.pgs_guideline] || "")}>
+                          {tank.pgs_guideline}
+                        </Badge>
+                      </span>
+                      {tank.un_number && <span className="font-mono">{tank.un_number}</span>}
+                      {tank.next_inspection_date && (
+                        <span className={cn("flex items-center gap-0.5", inspectionOverdue && "text-orange-500 font-medium")}>
+                          <CalendarClock className="h-2.5 w-2.5" />
+                          Keuring: {new Date(tank.next_inspection_date).toLocaleDateString("nl-NL")}
+                        </span>
+                      )}
+                      <span>{tank.location === "sol_emmen" ? "Emmen" : "Tilburg"}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Footer count */}
       {processedSubstances.length > 0 && (
