@@ -714,31 +714,43 @@ export function DailyOverview() {
     matchesAny([t.profiles?.full_name, t.time_off_types?.name])
   ), [timeOff, matchesAny]);
 
-  // === PROGRESS STATS ===
+  // === PROGRESS STATS (scoped to displayed dateRange, not full queryRange) ===
   const progressStats = useMemo(() => {
+    const displayFrom = format(dateRange.from, "yyyy-MM-dd");
+    const displayTo = format(dateRange.to, "yyyy-MM-dd");
+
+    const inRange = (date: string) => date >= displayFrom && date <= displayTo;
+    const inRangeTimeOff = (start: string, end: string) => start <= displayTo && end >= displayFrom;
+
+    const visibleAmbulance = filteredAmbulance.filter(o => inRange(o.scheduled_date));
+    const visibleGas = filteredGas.filter(o => inRange(o.scheduled_date));
+    const visibleDryIce = filteredDryIce.filter(o => inRange(o.scheduled_date));
+    const visibleTasks = filteredTasks.filter(t => inRange(t.due_date));
+    const visibleTimeOff = filteredTimeOff.filter(t => inRangeTimeOff(t.start_date, t.end_date));
+
     const allItems = [
-      ...filteredAmbulance.map(o => ({ status: o.status })),
-      ...filteredGas.map(o => ({ status: o.status })),
-      ...filteredDryIce.map(o => ({ status: o.status })),
-      ...filteredTasks.map(t => ({ status: t.status })),
+      ...visibleAmbulance.map(o => ({ status: o.status })),
+      ...visibleGas.map(o => ({ status: o.status })),
+      ...visibleDryIce.map(o => ({ status: o.status })),
+      ...visibleTasks.map(t => ({ status: t.status })),
     ];
     const total = allItems.length;
     const completed = allItems.filter(i => i.status === "completed").length;
-    const totalDryIceKg = filteredDryIce.reduce((sum, o) => sum + Number(o.quantity_kg), 0);
-    const totalCylinders = filteredGas.reduce((sum, o) => sum + o.cylinder_count, 0);
+    const totalDryIceKg = visibleDryIce.reduce((sum, o) => sum + Number(o.quantity_kg), 0);
+    const totalCylinders = visibleGas.reduce((sum, o) => sum + o.cylinder_count, 0);
     return {
       total,
       completed,
       percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
-      ambulanceCount: filteredAmbulance.length,
-      gasCount: filteredGas.length,
-      dryIceCount: filteredDryIce.length,
+      ambulanceCount: visibleAmbulance.length,
+      gasCount: visibleGas.length,
+      dryIceCount: visibleDryIce.length,
       totalDryIceKg,
       totalCylinders,
-      taskCount: filteredTasks.length,
-      timeOffCount: filteredTimeOff.length,
+      taskCount: visibleTasks.length,
+      timeOffCount: visibleTimeOff.length,
     };
-  }, [filteredAmbulance, filteredGas, filteredDryIce, filteredTasks, filteredTimeOff]);
+  }, [filteredAmbulance, filteredGas, filteredDryIce, filteredTasks, filteredTimeOff, dateRange]);
 
   // Overdue stats
   const overdueStats = useMemo(() => {
