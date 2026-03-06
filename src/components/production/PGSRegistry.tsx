@@ -18,6 +18,7 @@ import {
   ChevronRight,
   ChevronUp,
   Download,
+  FileText,
   AlertTriangle,
   ShieldAlert,
   ShieldCheck,
@@ -33,6 +34,8 @@ import {
 import { toast } from "sonner";
 import { cn, formatNumber } from "@/lib/utils";
 import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 // GHS pictogram config with diamond styling
 const GHS_CONFIG: Record<string, { color: string; label: string; icon: string }> = {
@@ -240,6 +243,90 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     toast.success("Excel geëxporteerd");
   };
 
+  const exportToPDF = () => {
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("nl-NL", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const timeStr = now.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+    const locLabel = locationTab === "all" ? "Alle locaties" : locationTab === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg";
+
+    // Header
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("PGS Register — Gevaarlijke Stoffen", 14, 18);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Locatie: ${locLabel}  |  Datum: ${dateStr}  |  Tijd: ${timeStr}`, 14, 24);
+    doc.text(`Aantal stoffen: ${processedSubstances.length}  |  Waarschuwingen: ${stats.warning}  |  Kritiek: ${stats.critical}`, 14, 29);
+
+    // Separator line
+    doc.setDrawColor(200);
+    doc.line(14, 31, 283, 31);
+
+    // Table
+    const head = [["Gas", "PGS", "UN", "CAS", "GHS", "Opslagkl.", "Max (kg)", "Huidig (kg)", "Bez. (%)", "H-zinnen", "P-zinnen", "Locatie"]];
+    const body = processedSubstances.map(s => {
+      const pct = s.max_allowed_kg > 0 ? Math.round((s.current_stock_kg / s.max_allowed_kg) * 100) : 0;
+      return [
+        s.gas_type_name || "",
+        s.pgs_guideline,
+        s.un_number || "—",
+        s.cas_number || "—",
+        (s.hazard_symbols || []).join(", "),
+        s.storage_class || "—",
+        formatNumber(s.max_allowed_kg, 0),
+        formatNumber(s.current_stock_kg, 0),
+        `${pct}%`,
+        s.risk_phrases || "—",
+        s.safety_phrases || "—",
+        s.location === "sol_emmen" ? "Emmen" : "Tilburg",
+      ];
+    });
+
+    autoTable(doc, {
+      startY: 34,
+      head,
+      body,
+      theme: "grid",
+      headStyles: { fillColor: [41, 50, 65], fontSize: 7, fontStyle: "bold", halign: "left" },
+      bodyStyles: { fontSize: 7, cellPadding: 1.5 },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      columnStyles: {
+        0: { cellWidth: 28 },
+        6: { halign: "right" },
+        7: { halign: "right" },
+        8: { halign: "center" },
+      },
+      didParseCell: (data) => {
+        // Color critical/warning rows
+        if (data.section === "body" && data.column.index === 8) {
+          const val = parseInt(data.cell.text[0] || "0");
+          if (val >= 95) {
+            data.cell.styles.textColor = [220, 38, 38];
+            data.cell.styles.fontStyle = "bold";
+          } else if (val >= 80) {
+            data.cell.styles.textColor = [234, 88, 12];
+            data.cell.styles.fontStyle = "bold";
+          }
+        }
+      },
+      margin: { left: 14, right: 14 },
+    });
+
+    // Footer
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(7);
+      doc.setTextColor(150);
+      doc.text(`PGS Register — ${dateStr} — Pagina ${i} van ${pageCount}`, 14, doc.internal.pageSize.height - 8);
+      doc.text("Vertrouwelijk — Alleen voor intern gebruik en inspectiedoeleinden", doc.internal.pageSize.width - 14, doc.internal.pageSize.height - 8, { align: "right" });
+    }
+
+    doc.save(`PGS_Register_${now.toISOString().slice(0, 10)}.pdf`);
+    toast.success("PDF geëxporteerd");
+  };
+
   // Derived data
   const guidelines = useMemo(() => [...new Set(substances.map(s => s.pgs_guideline))].sort(), [substances]);
   const storageClasses = useMemo(() => [...new Set(substances.map(s => s.storage_class).filter(Boolean))].sort(), [substances]);
@@ -321,10 +408,16 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
             <p className="text-xs text-muted-foreground">Gevaarlijke stoffen conform PGS-richtlijnen</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={exportToExcel} className="gap-1.5">
-          <Download className="h-4 w-4" />
-          Excel Export
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={exportToPDF} className="gap-1.5">
+            <FileText className="h-4 w-4" />
+            PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportToExcel} className="gap-1.5">
+            <Download className="h-4 w-4" />
+            Excel
+          </Button>
+        </div>
       </div>
 
       {/* KPI strip */}
