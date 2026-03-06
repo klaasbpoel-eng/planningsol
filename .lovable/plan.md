@@ -1,35 +1,59 @@
 
-# Showroom als ronde vorm van Entrée naar Kantoor Vivisol
 
-## Wat wordt aangepast
+## Plan: SOL Voorraad Excel Import Functie
 
-De huidige showroom is een rechthoekig blokje (zone `showroom` op x:595, y:610, w:130, h:28). In werkelijkheid loopt de showroom in een boog/ronde vorm van de Entrée (x:540, y:750) richting het Kantoor bij de Vivisol opslag (x:808, y:565).
+### Analyse van het Excel-bestand
 
-## Plan
+Het geuploadde bestand `Voorraad_SOL.xlsx` bevat **individuele cilinderregistraties** (7600+ rijen) met per rij een barcode, geen geaggregeerde tellingen. De relevante kolommen zijn:
 
-1. **Verwijder de huidige rechthoekige showroom-zone** uit `DEFAULT_ZONES`
+| Kolom | Voorbeeld | Doel |
+|---|---|---|
+| `ContentCode` | `X00054-09` | Product/gastype identificatie |
+| `ContentDescription` | `Zuurstof Medicinaal Gasv. SOL in Cylinders integrated` | Gasnaam + verpakking |
+| `MasterCodeDescription` | `Cylinders aluminium Zuurstof medisch(Leeg)` | Alternatieve beschrijving |
+| `Capacity` | `5`, `10`, `50` | Liter inhoud cilinder |
+| `ContainerTypeDescr` | `Cylinders integrated 200 Bar`, `Bundles` | Type container |
+| `DS_CENTER_DESCRIPTION` | `vol SOL Nederland-Tilburg`, `warehouse distribution gas NLE NTG-Depot NTG Emmen` | Locatie + status (vol/leeg) |
+| `LocationId` | `109`=leeg Tilburg, `110`=vol Tilburg, `139`=leeg Emmen, `140`=vol Emmen | Locatie-ID |
 
-2. **Voeg een gebogen SVG-pad toe als achtergrond** in de SVG-rendering (naast de bestaande achtergrondblokken), die een afgeronde L-bocht of boogvorm tekent van de Entrée (rechtsonder bij kantoren) omhoog naar het Vivisol-kantoor (rechtsboven). Dit wordt een `<path>` element met een kwadratische of cubische bezier-curve, met een gestippelde rand en licht gekleurde vulling, gelabeld "SHOWROOM".
+### Wat er gebouwd wordt
 
-3. **Voeg de showroom-zone terug als een aangepast element** dat het gebogen pad visueel volgt. Omdat zones nu rechthoekig zijn, splits ik de showroom op in 2-3 kleinere zones die samen de boog vormen:
-   - `showroom_onder`: Horizontaal stuk naast de Entrée (ca. x:640, y:740, w:120, h:48)
-   - `showroom_midden`: Verticaal/schuin stuk (ca. x:730, y:640, w:80, h:100) 
-   - `showroom_boven`: Horizontaal stuk bij Vivisol opslag (ca. x:750, y:600, w:140, h:40)
-   
-   Of beter: een enkel decoratief SVG-pad als achtergrond met label, en de showroom-zone als een enkel dragbaar element op een representatieve positie.
+Een nieuwe importdialoog `SOLInventoryImportDialog` die:
 
-**Gekozen aanpak**: Een decoratief gebogen SVG-pad als achtergrondvorm (niet-dragbaar, puur visueel) dat de ronde loop van de showroom toont, plus de bestaande showroom-zone die als klikbaar element op het midden van het pad blijft staan.
+1. **Excel parsed** en individuele cilinderrijen herkent aan de kolomstructuur (ContentCode, Capacity, DS_CENTER_DESCRIPTION)
+2. **Groepeert** per `ContentCode` + `Capacity` en **telt** het aantal cilinders → dit wordt de `numberOnStock`
+3. **Locatie bepaalt** op basis van `DS_CENTER_DESCRIPTION`:
+   - Bevat "Tilburg" → SOL Tilburg
+   - Bevat "Emmen" of "NTG" → SOL Emmen
+4. **Vol/leeg splitst** op basis van "vol"/"leeg"/"warehouse distribution" in de beschrijving
+5. **Gewichten berekent** per gastype via een mapping op basis van `ContentDescription` en `Capacity` (bijv. O₂ 50L cilinder = ~10kg gas), conform de bestaande logica in het systeem
+6. **Preview toont** met geaggregeerde tellingen per gastype, capaciteit, locatie en gewicht
+7. **Importeert** naar de bestaande `StockItem[]` structuur die de `StockSummaryWidget` al gebruikt
 
-## Technische details
+### Technische aanpak
 
-**Bestand**: `src/components/production/InteractiveFloorPlan.tsx`
+**Nieuw bestand:** `src/components/production/SOLInventoryImportDialog.tsx`
+- Hergebruikt de bestaande `StockExcelImportDialog` patronen (upload → preview → import stappen)
+- Aggregatielogica: `Map<string, { count, description, capacity, location }>` gegroepeerd op `ContentCode`
+- Gewichtmapping: lookup-tabel voor standaard cilindergewichten per gastype en capaciteit
+- Output: `StockItem[]` compatibel met bestaande `handleImported`
 
-- Voeg na de bestaande achtergrondblokken (rond lijn 640) een SVG `<path>` toe met een gebogen vorm:
-  - Start bij Entrée-gebied (ca. 640, 760)
-  - Bocht naar rechts en omhoog
-  - Eindigt bij Vivisol kantoor (ca. 810, 600)
-  - Styling: gevulde achtergrond (`hsl(40 70% 50% / 0.08)`), gestippelde rand, label "SHOWROOM"
+**Aanpassing:** `src/components/production/StockSummaryWidget.tsx`
+- Extra importknop "SOL Inventaris Importeren" naast de bestaande Excel import
+- Roept dezelfde `handleImported` aan
 
-- Pas de bestaande `showroom` zone-positie en afmetingen aan zodat deze centraal op het pad ligt
+**Gewichtmapping** (ingebouwd in de component):
+```text
+ContentCode → gastype herkenning uit ContentDescription:
+  "Zuurstof"     → O₂ gewicht per liter capaciteit
+  "Stikstof"     → N₂ gewicht per liter capaciteit  
+  "Argon"        → Ar gewicht per liter capaciteit
+  "Acetyleen"    → C₂H₂ gewicht per liter capaciteit
+  "Kooldioxide"  → CO₂ gewicht per liter capaciteit
+  "Helium"       → He gewicht per liter capaciteit
+  etc.
+```
 
-- De boog wordt getekend met een `quadratic bezier` curve in SVG (`Q` commando) om een natuurlijke ronde hoek te maken
+### Geen database-wijzigingen nodig
+De bestaande `stock_products` tabel en `StockItem` interface worden hergebruikt.
+
