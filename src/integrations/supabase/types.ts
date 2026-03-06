@@ -136,6 +136,7 @@ export type Database = {
           created_at: string
           current_level_kg: number
           gas_type_id: string | null
+          gevi_number: string | null
           hazard_symbols: string[] | null
           id: string
           is_active: boolean
@@ -150,12 +151,14 @@ export type Database = {
           un_number: string | null
           updated_at: string
           updated_by: string | null
+          wms_classification: string | null
         }
         Insert: {
           capacity_kg?: number
           created_at?: string
           current_level_kg?: number
           gas_type_id?: string | null
+          gevi_number?: string | null
           hazard_symbols?: string[] | null
           id?: string
           is_active?: boolean
@@ -170,12 +173,14 @@ export type Database = {
           un_number?: string | null
           updated_at?: string
           updated_by?: string | null
+          wms_classification?: string | null
         }
         Update: {
           capacity_kg?: number
           created_at?: string
           current_level_kg?: number
           gas_type_id?: string | null
+          gevi_number?: string | null
           hazard_symbols?: string[] | null
           id?: string
           is_active?: boolean
@@ -190,6 +195,7 @@ export type Database = {
           un_number?: string | null
           updated_at?: string
           updated_by?: string | null
+          wms_classification?: string | null
         }
         Relationships: [
           {
@@ -1113,6 +1119,7 @@ export type Database = {
           created_at: string
           current_stock_kg: number
           gas_type_id: string | null
+          gevi_number: string | null
           hazard_symbols: string[] | null
           id: string
           is_active: boolean
@@ -1126,12 +1133,14 @@ export type Database = {
           un_number: string | null
           updated_at: string
           updated_by: string | null
+          wms_classification: string | null
         }
         Insert: {
           cas_number?: string | null
           created_at?: string
           current_stock_kg?: number
           gas_type_id?: string | null
+          gevi_number?: string | null
           hazard_symbols?: string[] | null
           id?: string
           is_active?: boolean
@@ -1145,12 +1154,14 @@ export type Database = {
           un_number?: string | null
           updated_at?: string
           updated_by?: string | null
+          wms_classification?: string | null
         }
         Update: {
           cas_number?: string | null
           created_at?: string
           current_stock_kg?: number
           gas_type_id?: string | null
+          gevi_number?: string | null
           hazard_symbols?: string[] | null
           id?: string
           is_active?: boolean
@@ -1164,6 +1175,7 @@ export type Database = {
           un_number?: string | null
           updated_at?: string
           updated_by?: string | null
+          wms_classification?: string | null
         }
         Relationships: [
           {
