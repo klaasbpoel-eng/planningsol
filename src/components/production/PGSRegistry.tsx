@@ -37,6 +37,9 @@ import {
   Container,
   CalendarClock,
   FileSpreadsheet,
+  Link2,
+  HelpCircle,
+  Filter,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatNumber } from "@/lib/utils";
