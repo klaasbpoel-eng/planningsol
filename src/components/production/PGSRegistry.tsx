@@ -335,6 +335,38 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     fetchBulkTanks();
   }, [fetchSubstances, fetchBulkTanks]);
 
+  // Fetch all gas types for linking dialog
+  useEffect(() => {
+    const fetchGasTypes = async () => {
+      const { data } = await supabase.from("gas_types").select("id, name").eq("is_active", true).order("name");
+      if (data) setAllGasTypes(data);
+    };
+    fetchGasTypes();
+  }, []);
+
+  const openLinkDialog = (substance: PGSSubstance) => {
+    setLinkingSubstance(substance);
+    setLinkDialogOpen(true);
+  };
+
+  const handleLinkGasType = async (gasTypeId: string) => {
+    if (!linkingSubstance) return;
+    try {
+      const { error } = await supabase
+        .from("pgs_substances")
+        .update({ gas_type_id: gasTypeId, updated_at: new Date().toISOString() })
+        .eq("id", linkingSubstance.id);
+      if (error) throw error;
+      toast.success("Gastype succesvol gekoppeld");
+      setLinkDialogOpen(false);
+      setLinkingSubstance(null);
+      fetchSubstances();
+    } catch (err) {
+      console.error("Error linking gas type:", err);
+      toast.error("Fout bij koppelen gastype");
+    }
+  };
+
   // Realtime subscription for bulk tanks
   useEffect(() => {
     const channel = supabase
