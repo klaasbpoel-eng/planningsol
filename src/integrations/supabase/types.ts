@@ -1036,6 +1036,74 @@ export type Database = {
           },
         ]
       }
+      pgs_substances: {
+        Row: {
+          cas_number: string | null
+          created_at: string
+          current_stock_kg: number
+          gas_type_id: string | null
+          hazard_symbols: string[] | null
+          id: string
+          is_active: boolean
+          location: Database["public"]["Enums"]["production_location"]
+          max_allowed_kg: number
+          notes: string | null
+          pgs_guideline: string
+          risk_phrases: string | null
+          safety_phrases: string | null
+          storage_class: string | null
+          un_number: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          cas_number?: string | null
+          created_at?: string
+          current_stock_kg?: number
+          gas_type_id?: string | null
+          hazard_symbols?: string[] | null
+          id?: string
+          is_active?: boolean
+          location?: Database["public"]["Enums"]["production_location"]
+          max_allowed_kg?: number
+          notes?: string | null
+          pgs_guideline?: string
+          risk_phrases?: string | null
+          safety_phrases?: string | null
+          storage_class?: string | null
+          un_number?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          cas_number?: string | null
+          created_at?: string
+          current_stock_kg?: number
+          gas_type_id?: string | null
+          hazard_symbols?: string[] | null
+          id?: string
+          is_active?: boolean
+          location?: Database["public"]["Enums"]["production_location"]
+          max_allowed_kg?: number
+          notes?: string | null
+          pgs_guideline?: string
+          risk_phrases?: string | null
+          safety_phrases?: string | null
+          storage_class?: string | null
+          un_number?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pgs_substances_gas_type_id_fkey"
+            columns: ["gas_type_id"]
+            isOneToOne: false
+            referencedRelation: "gas_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           article_code: string
