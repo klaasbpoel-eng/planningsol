@@ -38,6 +38,7 @@ import {
 import { toast } from "sonner";
 import { cn, formatNumber } from "@/lib/utils";
 import * as XLSX from "xlsx";
+import { getGasColor } from "@/constants/gasColors";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -276,7 +277,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
         ...s,
         hazard_symbols: s.hazard_symbols || [],
         gas_type_name: s.gas_type_id ? stripPurity(gasTypeMap[s.gas_type_id]?.name) || "Onbekend" : "Onbekend",
-        gas_type_color: s.gas_type_id ? gasTypeMap[s.gas_type_id]?.color || "#6b7280" : "#6b7280",
+        gas_type_color: s.gas_type_id ? getGasColor(stripPurity(gasTypeMap[s.gas_type_id]?.name) || "", gasTypeMap[s.gas_type_id]?.color || "#6b7280") : "#6b7280",
       })));
     } catch (err) {
       console.error("Error fetching PGS data:", err);
@@ -312,7 +313,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
         ...t,
         hazard_symbols: t.hazard_symbols || [],
         gas_type_name: t.gas_type_id ? stripPurity(gasTypeMap[t.gas_type_id]?.name) || "Onbekend" : "Onbekend",
-        gas_type_color: t.gas_type_id ? gasTypeMap[t.gas_type_id]?.color || "#6b7280" : "#6b7280",
+        gas_type_color: t.gas_type_id ? getGasColor(stripPurity(gasTypeMap[t.gas_type_id]?.name) || "", gasTypeMap[t.gas_type_id]?.color || "#6b7280") : "#6b7280",
       })));
     } catch (err) {
       console.error("Error fetching bulk tanks:", err);
