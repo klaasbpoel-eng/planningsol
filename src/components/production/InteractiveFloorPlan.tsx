@@ -220,11 +220,84 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     }
   }, [draggingId, dragType, isPanning, panStart, toSVG]);
 
+  // Check overlap between two rectangles
+  const rectsOverlap = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  };
+
+  // Check overlap between circle and rect
+  const circleRectOverlap = (c: { cx: number; cy: number; r: number }, r: { x: number; y: number; w: number; h: number }) => {
+    const closestX = Math.max(r.x, Math.min(c.cx, r.x + r.w));
+    const closestY = Math.max(r.y, Math.min(c.cy, r.y + r.h));
+    const dx = c.cx - closestX;
+    const dy = c.cy - closestY;
+    return (dx * dx + dy * dy) < (c.r * c.r);
+  };
+
+  // Check overlap between two circles
+  const circlesOverlap = (a: { cx: number; cy: number; r: number }, b: { cx: number; cy: number; r: number }) => {
+    const dx = a.cx - b.cx;
+    const dy = a.cy - b.cy;
+    return Math.sqrt(dx * dx + dy * dy) < (a.r + b.r);
+  };
+
   const handleSvgMouseUp = useCallback(() => {
+    if (draggingId && dragType && editMode) {
+      if (dragType === "zone") {
+        const dragged = zones.find(z => z.id === draggingId);
+        if (dragged) {
+          // Check zone-zone overlap → swap positions
+          const overlapping = zones.find(z => z.id !== draggingId && rectsOverlap(dragged, z));
+          if (overlapping) {
+            setZones(prev => prev.map(z => {
+              if (z.id === draggingId) return { ...z, x: overlapping.x, y: overlapping.y };
+              if (z.id === overlapping.id) return { ...z, x: dragged.x, y: dragged.y };
+              return z;
+            }));
+            toast.info(`${dragged.label} ↔ ${overlapping.label} gewisseld`);
+          }
+          // Check zone-tank overlap → swap center/position
+          const overlappingTank = tanks.find(t => circleRectOverlap(t, dragged));
+          if (overlappingTank && !overlapping) {
+            const zoneCenterX = dragged.x + dragged.w / 2;
+            const zoneCenterY = dragged.y + dragged.h / 2;
+            const newZoneX = overlappingTank.cx - dragged.w / 2;
+            const newZoneY = overlappingTank.cy - dragged.h / 2;
+            setZones(prev => prev.map(z => z.id === draggingId ? { ...z, x: Math.round(newZoneX), y: Math.round(newZoneY) } : z));
+            setTanks(prev => prev.map(t => t.id === overlappingTank.id ? { ...t, cx: Math.round(zoneCenterX), cy: Math.round(zoneCenterY) } : t));
+            toast.info(`${dragged.label} ↔ ${overlappingTank.label} gewisseld`);
+          }
+        }
+      } else if (dragType === "tank") {
+        const dragged = tanks.find(t => t.id === draggingId);
+        if (dragged) {
+          // Check tank-tank overlap → swap
+          const overlapping = tanks.find(t => t.id !== draggingId && circlesOverlap(dragged, t));
+          if (overlapping) {
+            setTanks(prev => prev.map(t => {
+              if (t.id === draggingId) return { ...t, cx: overlapping.cx, cy: overlapping.cy };
+              if (t.id === overlapping.id) return { ...t, cx: dragged.cx, cy: dragged.cy };
+              return t;
+            }));
+            toast.info(`${dragged.label} ↔ ${overlapping.label} gewisseld`);
+          }
+          // Check tank-zone overlap → swap
+          const overlappingZone = zones.find(z => circleRectOverlap(dragged, z));
+          if (overlappingZone && !overlapping) {
+            const zoneCenterX = overlappingZone.x + overlappingZone.w / 2;
+            const zoneCenterY = overlappingZone.y + overlappingZone.h / 2;
+            setTanks(prev => prev.map(t => t.id === draggingId ? { ...t, cx: Math.round(zoneCenterX), cy: Math.round(zoneCenterY) } : t));
+            setZones(prev => prev.map(z => z.id === overlappingZone.id ? { ...z, x: Math.round(dragged.cx - z.w / 2), y: Math.round(dragged.cy - z.h / 2) } : z));
+            toast.info(`${dragged.label} ↔ ${overlappingZone.label} gewisseld`);
+          }
+        }
+      }
+      setHasChanges(true);
+    }
     setDraggingId(null);
     setDragType(null);
     setIsPanning(false);
-  }, []);
+  }, [draggingId, dragType, editMode, zones, tanks]);
 
   const handleBgMouseDown = useCallback((e: React.MouseEvent) => {
     if ((e.target as SVGElement).closest("[data-zone]")) return;
