@@ -476,9 +476,6 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             <rect x="15" y="15" width={SVG_WIDTH - 30} height={140} rx="4" fill="hsl(var(--muted) / 0.2)" stroke="hsl(var(--border) / 0.3)" strokeWidth="1" strokeDasharray="6 3" />
             <text x={SVG_WIDTH / 2} y="32" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="9" fontWeight="700" letterSpacing="2" opacity="0.4">BUITENTERREIN – BULKTANKS</text>
 
-            {/* Overdekt gebied - alles van productiehal t/m kantoren */}
-            <rect x="10" y="140" width={SVG_WIDTH - 20} height={640} rx="6" fill="hsl(var(--card) / 0.3)" stroke="hsl(var(--border) / 0.5)" strokeWidth="1.5" strokeDasharray="8 4" />
-            <text x={SVG_WIDTH / 2} y="155" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="9" fontWeight="700" letterSpacing="2" opacity="0.35">OVERDEKT</text>
 
             {/* Main building */}
             <rect x="20" y="175" width={SVG_WIDTH - 40} height="370" rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
