@@ -318,7 +318,7 @@ export function SiteMap({ location }: SiteMapProps) {
 
     return (
         <div className="space-y-6">
-        <LocationMap location={location} />
+        
         <Tabs defaultValue="floorplan" className="w-full">
             <TabsList className="mb-4">
                 <TabsTrigger value="floorplan">
