@@ -110,7 +110,7 @@ const STORAGE_KEY = "floorplan-positions";
 const GRID_SNAP = 10;
 const snap = (v: number) => Math.round(v / GRID_SNAP) * GRID_SNAP;
 
-function loadPositions(): { zones: Record<string, { x: number; y: number }>; tanks: Record<string, { cx: number; cy: number }> } | null {
+function loadPositions(): { zones: Record<string, { x: number; y: number; label?: string; sublabel?: string }>; tanks: Record<string, { cx: number; cy: number; label?: string; sublabel?: string }> } | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -118,10 +118,10 @@ function loadPositions(): { zones: Record<string, { x: number; y: number }>; tan
 }
 
 function savePositions(zones: FloorZone[], tanks: BulkTank[]) {
-  const zonePos: Record<string, { x: number; y: number }> = {};
-  zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y }; });
-  const tankPos: Record<string, { cx: number; cy: number }> = {};
-  tanks.forEach(t => { tankPos[t.id] = { cx: t.cx, cy: t.cy }; });
+  const zonePos: Record<string, { x: number; y: number; label: string; sublabel?: string }> = {};
+  zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y, label: z.label, sublabel: z.sublabel }; });
+  const tankPos: Record<string, { cx: number; cy: number; label: string; sublabel?: string }> = {};
+  tanks.forEach(t => { tankPos[t.id] = { cx: t.cx, cy: t.cy, label: t.label, sublabel: t.sublabel }; });
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ zones: zonePos, tanks: tankPos }));
 }
 
@@ -154,8 +154,12 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragType, setDragType] = useState<"zone" | "tank" | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<"label" | "sublabel" | null>(null);
+  const [editingValue, setEditingValue] = useState("");
 
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const SVG_WIDTH = 1000;
   const SVG_HEIGHT = 820;
@@ -306,6 +310,69 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     setIsPanning(false);
   }, [draggingId, dragType, editMode, zones, tanks]);
 
+  // Inline text editing
+  const handleStartEdit = useCallback((id: string, field: "label" | "sublabel", currentValue: string) => {
+    if (!editMode) return;
+    setEditingId(id);
+    setEditingField(field);
+    setEditingValue(currentValue);
+  }, [editMode]);
+
+  const handleFinishEdit = useCallback(() => {
+    if (!editingId || !editingField) return;
+    const val = editingValue.trim();
+    if (!val && editingField === "label") {
+      setEditingId(null);
+      setEditingField(null);
+      return;
+    }
+    const isZone = zones.some(z => z.id === editingId);
+    const isTank = tanks.some(t => t.id === editingId);
+    if (isZone) {
+      setZones(prev => prev.map(z => z.id === editingId ? { ...z, [editingField]: val || undefined } : z));
+    } else if (isTank) {
+      setTanks(prev => prev.map(t => t.id === editingId ? { ...t, [editingField]: val || undefined } : t));
+    }
+    setHasChanges(true);
+    setEditingId(null);
+    setEditingField(null);
+  }, [editingId, editingField, editingValue, zones, tanks]);
+
+  const getEditOverlayStyle = useCallback((): React.CSSProperties => {
+    if (!editingId || !svgRef.current || !containerRef.current) return { display: "none" };
+    const zone = zones.find(z => z.id === editingId);
+    const tank = tanks.find(t => t.id === editingId);
+    if (!zone && !tank) return { display: "none" };
+
+    const svgRect = svgRef.current.getBoundingClientRect();
+    const containerRect = containerRef.current.getBoundingClientRect();
+
+    let svgX: number, svgY: number, svgW: number;
+    if (zone) {
+      svgX = zone.x;
+      svgY = editingField === "sublabel" ? zone.y + zone.h / 2 + 2 : zone.y + (zone.sublabel ? zone.h / 2 - 14 : zone.h / 2 - 8);
+      svgW = zone.w;
+    } else {
+      svgX = tank!.cx - tank!.r;
+      svgY = editingField === "sublabel" ? tank!.cy + 2 : tank!.cy - 14;
+      svgW = tank!.r * 2;
+    }
+
+    const scaleX = svgRect.width / SVG_WIDTH;
+    const scaleY = svgRect.height / SVG_HEIGHT;
+    const screenX = svgRect.left - containerRect.left + svgX * scaleX;
+    const screenY = svgRect.top - containerRect.top + svgY * scaleY;
+    const screenW = svgW * scaleX;
+
+    return {
+      position: "absolute" as const,
+      left: screenX,
+      top: screenY,
+      width: Math.max(screenW, 60),
+      zIndex: 50,
+    };
+  }, [editingId, editingField, zones, tanks]);
+
   const handleBgMouseDown = useCallback((e: React.MouseEvent) => {
     if ((e.target as SVGElement).closest("[data-zone]")) return;
     if (editMode) return; // Don't pan while editing, only drag zones
@@ -374,7 +441,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             </CardTitle>
             <CardDescription className="text-xs">
               {editMode
-                ? "Sleep zones naar de gewenste positie • Klik op Opslaan als je klaar bent"
+                ? "Sleep zones naar de gewenste positie • Dubbelklik op tekst om te bewerken • Klik op Opslaan als je klaar bent"
                 : "Klik op een zone voor details • Scroll om te zoomen • Sleep om te pannen"
               }
             </CardDescription>
@@ -445,7 +512,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
         )}
       </CardHeader>
 
-      <CardContent className="p-0 relative">
+      <CardContent className="p-0 relative" ref={containerRef}>
         <div
           className={cn(
             "overflow-hidden select-none",
@@ -533,8 +600,14 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                     style={{ transition: isDragging ? "none" : "all 0.15s ease", filter: isHovered ? `drop-shadow(0 2px 8px ${tc.color}40)` : "none" }}
                   />
                   <circle cx={tank.cx} cy={tank.cy} r={tank.r * 0.55} fill="none" stroke={tc.border} strokeWidth="0.5" strokeDasharray="3 2" />
-                  <text x={tank.cx} y={tank.cy - 3} textAnchor="middle" dominantBaseline="middle" fill={tc.color} fontSize="9" fontWeight="700" style={{ pointerEvents: "none" }}>{tank.label}</text>
-                  <text x={tank.cx} y={tank.cy + 9} textAnchor="middle" dominantBaseline="middle" fill="hsl(var(--muted-foreground))" fontSize="6.5" style={{ pointerEvents: "none" }}>{tank.sublabel}</text>
+                  <text x={tank.cx} y={tank.cy - 3} textAnchor="middle" dominantBaseline="middle" fill={tc.color} fontSize="9" fontWeight="700"
+                    style={{ pointerEvents: editMode ? "auto" : "none", cursor: editMode ? "text" : "default" }}
+                    onDoubleClick={(e) => { e.stopPropagation(); handleStartEdit(tank.id, "label", tank.label); }}
+                  >{tank.label}</text>
+                  <text x={tank.cx} y={tank.cy + 9} textAnchor="middle" dominantBaseline="middle" fill="hsl(var(--muted-foreground))" fontSize="6.5"
+                    style={{ pointerEvents: editMode ? "auto" : "none", cursor: editMode ? "text" : "default" }}
+                    onDoubleClick={(e) => { e.stopPropagation(); handleStartEdit(tank.id, "sublabel", tank.sublabel || ""); }}
+                  >{tank.sublabel}</text>
                   {editMode && <circle cx={tank.cx} cy={tank.cy - tank.r - 6} r="4" fill="hsl(var(--primary))" opacity="0.6"><title>Sleep om te verplaatsen</title></circle>}
                 </g>
               );
@@ -571,15 +644,27 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                     y={zone.y + (zone.sublabel ? zone.h / 2 - 5 : zone.h / 2 + 1)}
                     textAnchor="middle" dominantBaseline="middle"
                     fill={zt.color} fontSize={zone.w < 80 ? 9 : 10} fontWeight="600"
-                    style={{ pointerEvents: "none" }}
+                    style={{ pointerEvents: editMode ? "auto" : "none", cursor: editMode ? "text" : "default" }}
+                    onDoubleClick={(e) => { e.stopPropagation(); handleStartEdit(zone.id, "label", zone.label); }}
                   >{zone.label}</text>
                   {zone.sublabel && (
                     <text
                       x={zone.x + zone.w / 2} y={zone.y + zone.h / 2 + 9}
                       textAnchor="middle" dominantBaseline="middle"
                       fill="hsl(var(--muted-foreground))" fontSize={zone.w < 80 ? 7 : 8}
-                      style={{ pointerEvents: "none" }}
+                      style={{ pointerEvents: editMode ? "auto" : "none", cursor: editMode ? "text" : "default" }}
+                      onDoubleClick={(e) => { e.stopPropagation(); handleStartEdit(zone.id, "sublabel", zone.sublabel || ""); }}
                     >{zone.sublabel}</text>
+                  )}
+                  {/* Double-click hint to add sublabel */}
+                  {editMode && !zone.sublabel && (
+                    <text
+                      x={zone.x + zone.w / 2} y={zone.y + zone.h / 2 + 9}
+                      textAnchor="middle" dominantBaseline="middle"
+                      fill="hsl(var(--muted-foreground))" fontSize={zone.w < 80 ? 6 : 7} opacity="0.3"
+                      style={{ pointerEvents: "auto", cursor: "text" }}
+                      onDoubleClick={(e) => { e.stopPropagation(); handleStartEdit(zone.id, "sublabel", ""); }}
+                    >+ sublabel</text>
                   )}
                   {/* Edit mode drag indicator */}
                   {editMode && (
@@ -648,6 +733,24 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             </div>
           );
         })()}
+
+        {/* Inline text editor overlay */}
+        {editMode && editingId && (
+          <div style={getEditOverlayStyle()}>
+            <input
+              autoFocus
+              className="w-full bg-background border border-primary rounded px-1.5 py-0.5 text-xs text-center shadow-lg outline-none focus:ring-1 focus:ring-primary"
+              value={editingValue}
+              onChange={(e) => setEditingValue(e.target.value)}
+              onBlur={handleFinishEdit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleFinishEdit();
+                if (e.key === "Escape") { setEditingId(null); setEditingField(null); }
+              }}
+              placeholder={editingField === "sublabel" ? "Sublabel..." : "Label..."}
+            />
+          </div>
+        )}
 
         {/* Unsaved changes indicator */}
         {editMode && hasChanges && (
