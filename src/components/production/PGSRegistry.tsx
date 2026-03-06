@@ -1054,9 +1054,10 @@ interface SubstanceRowProps {
 
 function SubstanceRow({
   substance, pct, isWarning, isCritical, isExpanded, isEditing, isEven,
-  isAdmin, editValues, colSpan, pictogramMode, onToggle, onStartEdit, onCancelEdit, onSaveEdit, onEditChange,
+  isAdmin, editValues, colSpan, pictogramMode, onToggle, onStartEdit, onCancelEdit, onSaveEdit, onEditChange, onLinkGasType,
 }: SubstanceRowProps) {
   const pgsClass = PGS_COLORS[substance.pgs_guideline] || "bg-muted text-muted-foreground border-border";
+  const isUnknown = substance.gas_type_name === "Onbekend";
 
   return (
     <>
@@ -1082,7 +1083,42 @@ function SubstanceRow({
               className="w-3 h-3 rounded-full flex-shrink-0 ring-2 ring-background shadow-sm"
               style={{ backgroundColor: substance.gas_type_color }}
             />
-            <span className="font-semibold text-sm">{substance.gas_type_name}</span>
+            <span className={cn("font-semibold text-sm", isUnknown && "text-orange-500 dark:text-orange-400")}>
+              {substance.gas_type_name}
+            </span>
+            {isUnknown && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-orange-400/50 bg-orange-500/10 text-orange-600 dark:text-orange-400 gap-1">
+                    <AlertTriangle className="h-2.5 w-2.5" />
+                    Niet gekoppeld
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-xs">
+                  <p className="font-medium">Geen gastype gekoppeld</p>
+                  <p className="text-muted-foreground mt-0.5">
+                    Deze stof kon niet automatisch worden gematcht bij de SOL import.
+                    {substance.notes && <span className="block mt-1"><strong>Info:</strong> {substance.notes}</span>}
+                    {substance.un_number && <span className="block"><strong>UN:</strong> {substance.un_number}</span>}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {isUnknown && isAdmin && onLinkGasType && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 text-primary hover:text-primary"
+                    onClick={(e) => { e.stopPropagation(); onLinkGasType(substance); }}
+                  >
+                    <Link2 className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">Koppel aan gastype</TooltipContent>
+              </Tooltip>
+            )}
             {substance.location && (
               <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal">
                 {substance.location === "sol_emmen" ? "Emmen" : "Tilburg"}
