@@ -170,6 +170,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
   const [bulkTanks, setBulkTanks] = useState<BulkTank[]>([]);
   const [editingBulkId, setEditingBulkId] = useState<string | null>(null);
   const [bulkEditValue, setBulkEditValue] = useState(0);
+  const [bulkEditCapacity, setBulkEditCapacity] = useState(0);
 
   const fetchSubstances = useCallback(async () => {
     setLoading(true);
@@ -253,6 +254,24 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     fetchBulkTanks();
   }, [fetchSubstances, fetchBulkTanks]);
 
+  // Realtime subscription for bulk tanks
+  useEffect(() => {
+    const channel = supabase
+      .channel("bulk-tanks-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bulk_storage_tanks" },
+        () => {
+          fetchBulkTanks();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchBulkTanks]);
+
   const toggleRow = (id: string) => {
     setExpandedRows(prev => {
       const next = new Set(prev);
@@ -301,18 +320,22 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
   const startBulkEdit = (tank: BulkTank) => {
     setEditingBulkId(tank.id);
     setBulkEditValue(tank.current_level_kg);
+    setBulkEditCapacity(tank.capacity_kg);
   };
 
   const saveBulkEdit = async (id: string) => {
     try {
       const { error } = await supabase
         .from("bulk_storage_tanks")
-        .update({ current_level_kg: bulkEditValue, updated_at: new Date().toISOString() })
+        .update({
+          current_level_kg: bulkEditValue,
+          capacity_kg: bulkEditCapacity,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", id);
       if (error) throw error;
-      toast.success("Tankniveau opgeslagen");
+      toast.success("Tank bijgewerkt");
       setEditingBulkId(null);
-      fetchBulkTanks();
     } catch (err) {
       console.error("Error saving bulk:", err);
       toast.error("Fout bij opslaan");
@@ -740,20 +763,35 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
                       />
                       <div className="flex justify-between text-[10px] text-muted-foreground">
                         {isBulkEditing ? (
-                          <div className="flex items-center gap-1">
-                            <Input
-                              type="number"
-                              value={bulkEditValue}
-                              onChange={e => setBulkEditValue(Number(e.target.value))}
-                              className="h-6 w-20 text-[11px] text-right"
-                            />
-                            <span>/ {formatNumber(tank.capacity_kg, 0)} kg</span>
-                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => saveBulkEdit(tank.id)}>
-                              <Check className="h-3 w-3 text-emerald-500" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setEditingBulkId(null)}>
-                              <X className="h-3 w-3" />
-                            </Button>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5 text-[11px]">
+                              <span className="text-muted-foreground w-12">Niveau:</span>
+                              <Input
+                                type="number"
+                                value={bulkEditValue}
+                                onChange={e => setBulkEditValue(Number(e.target.value))}
+                                className="h-6 w-20 text-[11px] text-right"
+                              />
+                              <span className="text-muted-foreground">kg</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[11px]">
+                              <span className="text-muted-foreground w-12">Cap.:</span>
+                              <Input
+                                type="number"
+                                value={bulkEditCapacity}
+                                onChange={e => setBulkEditCapacity(Number(e.target.value))}
+                                className="h-6 w-20 text-[11px] text-right"
+                              />
+                              <span className="text-muted-foreground">kg</span>
+                            </div>
+                            <div className="flex gap-1 justify-end">
+                              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => saveBulkEdit(tank.id)}>
+                                <Check className="h-3 w-3 text-emerald-500" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setEditingBulkId(null)}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </div>
                         ) : (
                           <>
