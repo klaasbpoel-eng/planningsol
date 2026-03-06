@@ -48,6 +48,8 @@ import { getGasColor } from "@/constants/gasColors";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { SOLPGSImportDialog } from "./SOLPGSImportDialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 // GHS pictogram config with diamond styling
 const GHS_CONFIG: Record<string, { label: string; src: string }> = {
@@ -238,6 +240,10 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     return (localStorage.getItem("pgs-pictogram-mode") as PictogramMode) || "ghs";
   });
   const [solImportOpen, setSolImportOpen] = useState(false);
+  const [filterUnknown, setFilterUnknown] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkingSubstance, setLinkingSubstance] = useState<PGSSubstance | null>(null);
+  const [allGasTypes, setAllGasTypes] = useState<{ id: string; name: string }[]>([]);
 
   const handlePictogramModeChange = (value: string) => {
     if (value) {
