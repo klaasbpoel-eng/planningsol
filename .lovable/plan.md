@@ -1,48 +1,42 @@
 
 
-## Plan: PGS Register UI/UX professionaliseren
+## Plan: GHS/ADR pictogram keuze voor gebruiker
 
-### Verbeteringen
-
-**1. Samenvattingskaarten bovenaan (KPI strip)**
-Vier stat-cards boven de tabel met:
-- Totaal geregistreerde stoffen
-- Stoffen met status OK (groen)
-- Stoffen >80% bezetting (oranje waarschuwing)
-- Stoffen >95% bezetting (rood kritiek)
-
-Gebruikt bestaande `stat-card` component of mini-cards met iconen en kleuren.
-
-**2. GHS-pictogrammen verbeteren**
-Huidige vierkante gekleurde blokjes vervangen door diamantvormige (45° geroteerde) badges — conform de officiële GHS-standaard. Rode rand voor gevaar, witte achtergrond met gekleurde symboolindicator.
-
-**3. Verbeterde tabelweergave**
-- Alternating row colors voor betere leesbaarheid
-- Sticky header zodat de kolomkoppen zichtbaar blijven bij scrollen
-- Subtielere rij-expansie animatie via framer-motion `AnimatePresence`
-- Betere visuele hiërarchie: gastype groter/duidelijker, PGS-badge met kleurcodering per richtlijn
-
-**4. Zoekfunctie toevoegen**
-Tekstzoekveld om op gasnaam, UN-nummer of CAS-nummer te filteren.
-
-**5. Sorteerbare kolommen**
-Klikbare kolomkoppen om te sorteren op gasnaam, PGS-richtlijn, bezettingspercentage, etc. Visuele sort-indicator (pijltje).
-
-**6. Verbeterde expanded row details**
-De collapsible details per stof mooier structureren met:
-- Gegroepeerde secties (Identificatie, Opslag, Veiligheid) met subtiele scheidingslijnen
-- H-zinnen en P-zinnen als aparte badges/chips in plaats van plain text
-- Kleurcodering: H-zinnen rood, P-zinnen blauw
-
-**7. Locatie-tabs of segmented control**
-Als er data voor beide locaties is, een tabstrip bovenaan: "Alle locaties" / "SOL Emmen" / "SOL Tilburg" — in plaats van alleen het filter-dropdown.
-
-**8. Lege state verbeteren**
-Professionelere empty state met icoon en beschrijvende tekst + actie-knop.
-
-### Bestanden
-- Alleen `src/components/production/PGSRegistry.tsx`
+### Wat verandert er
+Een toggle bovenaan het PGS Register waarmee de gebruiker kan kiezen welke pictogrammen getoond worden: **GHS**, **ADR**, of **Beide**. De keuze wordt opgeslagen in `localStorage` zodat deze behouden blijft.
 
 ### Aanpak
-Eén bestand, alle verbeteringen in één pass. Geen database-wijzigingen nodig.
+
+**1. ADR SVG-bestanden toevoegen** (`public/adr/`)
+Officiële ADR-labels als SVG downloaden van Wikimedia Commons:
+- `ADR_2.1.svg` — Brandbare gassen
+- `ADR_2.2.svg` — Niet-brandbare, niet-giftige gassen
+- `ADR_2.3.svg` — Giftige gassen
+- `ADR_3.svg` — Brandbare vloeistoffen
+- `ADR_5.1.svg` — Oxiderende stoffen
+- `ADR_6.1.svg` — Giftige stoffen
+- `ADR_8.svg` — Bijtende stoffen
+- `ADR_9.svg` — Diverse gevaarlijke stoffen
+
+**2. ADR_CONFIG mapping toevoegen**
+Naast de bestaande `GHS_CONFIG` een `ADR_CONFIG` object aanmaken, plus een mapping-tabel `GHS_TO_ADR` die de vertaling maakt (bijv. `GHS04` → `ADR 2.2`, `GHS03` → `ADR 5.1`).
+
+**3. ToggleGroup selector toevoegen**
+Een `ToggleGroup` (single select) met drie opties: "GHS", "ADR", "Beide". Wordt geplaatst naast de bestaande filters bovenaan het register. State wordt opgeslagen via `localStorage`.
+
+**4. Pictogram-rendercomponent aanpassen**
+De huidige `GHSDiamond` component wordt vervangen door een `HazardPictogram` component die op basis van de toggle-keuze:
+- **GHS**: het GHS-pictogram toont (huidige gedrag)
+- **ADR**: het bijbehorende ADR-label toont via de mapping
+- **Beide**: beide pictogrammen naast elkaar toont
+
+**5. Export aanpassen**
+De Excel/PDF export past de kolomnaam en waarden aan op basis van de huidige selectie.
+
+### Bestanden
+- `public/adr/*.svg` — nieuwe ADR SVG-assets (8 bestanden)
+- `src/components/production/PGSRegistry.tsx` — toggle + aangepaste pictogramcomponent
+
+### Geen database-wijzigingen nodig
+De `hazard_symbols` kolom blijft GHS-codes bevatten. De ADR-weergave is puur een UI-vertaling.
 
