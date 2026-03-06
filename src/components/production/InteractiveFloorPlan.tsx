@@ -109,7 +109,7 @@ const DEFAULT_ZONES: FloorZone[] = [
   { id: "o2_med_200", x: 415, y: 655, w: 75, h: 58, label: "O₂ med.", sublabel: "200 bar", type: "medisch", details: "Medische zuurstof 200 bar" },
   { id: "o2_med_300", x: 495, y: 655, w: 75, h: 58, label: "O₂ med.", sublabel: "300 bar", type: "medisch", details: "Medische zuurstof 300 bar" },
   { id: "lucht_synth", x: 575, y: 655, w: 75, h: 58, label: "Lucht", sublabel: "Synth./Med.", type: "medisch", details: "Synthetische en medische lucht" },
-  { id: "showroom", x: 595, y: 610, w: 130, h: 28, label: "Showroom", type: "kantoor" },
+  { id: "showroom", x: 720, y: 680, w: 60, h: 24, label: "Showroom", type: "kantoor" },
   { id: "kantoren", x: 340, y: 740, w: 300, h: 48, label: "K A N T O R E N", type: "kantoor", details: "Kantoorruimtes medewerkers" },
   { id: "entree", x: 540, y: 750, w: 90, h: 38, label: "Entrée", type: "kantoor" },
   { id: "uitsorteer", x: 750, y: 610, w: 220, h: 48, label: "Uitsorteerplatform", sublabel: "Lege cilinders", type: "logistiek", details: "Sorteerplatform voor lege cilinders" },
@@ -638,6 +638,26 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             {/* Vivisol wing */}
             <rect x="585" y="555" width={310} height={55} rx="4" fill="hsl(var(--muted) / 0.1)" stroke="hsl(var(--border) / 0.3)" strokeWidth="1" strokeDasharray="4 4" />
             <text x="600" y="553" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">VIVISOL</text>
+
+            {/* Showroom – curved path from Entrée to Kantoor Vivisol */}
+            <path
+              d="M 640 770 L 640 720 Q 640 660 700 660 L 800 660 Q 840 660 840 620 L 840 605"
+              fill="none"
+              stroke="hsl(40 70% 50% / 0.15)"
+              strokeWidth="42"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M 640 770 L 640 720 Q 640 660 700 660 L 800 660 Q 840 660 840 620 L 840 605"
+              fill="none"
+              stroke="hsl(40 70% 50% / 0.4)"
+              strokeWidth="1"
+              strokeDasharray="6 4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <text x="735" y="644" textAnchor="middle" fill="hsl(40 70% 50% / 0.5)" fontSize="8" fontWeight="700" letterSpacing="3">SHOWROOM</text>
 
             {/* Grid (edit mode only) */}
             {editMode && (
