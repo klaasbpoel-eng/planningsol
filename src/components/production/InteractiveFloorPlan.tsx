@@ -171,6 +171,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   }, []);
 
   const dragOffset = useRef({ x: 0, y: 0 });
+  const dragStartPos = useRef<{ x: number; y: number; cx: number; cy: number }>({ x: 0, y: 0, cx: 0, cy: 0 });
 
   const handleZoneDragStart = useCallback((e: React.MouseEvent, zoneId: string) => {
     if (!editMode) return;
@@ -181,6 +182,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     const zone = zones.find(z => z.id === zoneId);
     if (!zone) return;
     dragOffset.current = { x: svgPt.x - zone.x, y: svgPt.y - zone.y };
+    dragStartPos.current = { x: zone.x, y: zone.y, cx: 0, cy: 0 };
     setDraggingId(zoneId);
     setDragType("zone");
   }, [editMode, zones, toSVG]);
@@ -194,6 +196,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     const tank = tanks.find(t => t.id === tankId);
     if (!tank) return;
     dragOffset.current = { x: svgPt.x - tank.cx, y: svgPt.y - tank.cy };
+    dragStartPos.current = { x: 0, y: 0, cx: tank.cx, cy: tank.cy };
     setDraggingId(tankId);
     setDragType("tank");
   }, [editMode, tanks, toSVG]);
@@ -253,7 +256,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
           if (overlapping) {
             setZones(prev => prev.map(z => {
               if (z.id === draggingId) return { ...z, x: snap(overlapping.x), y: snap(overlapping.y) };
-              if (z.id === overlapping.id) return { ...z, x: snap(dragged.x), y: snap(dragged.y) };
+              if (z.id === overlapping.id) return { ...z, x: snap(dragStartPos.current.x), y: snap(dragStartPos.current.y) };
               return z;
             }));
             toast.info(`${dragged.label} ↔ ${overlapping.label} gewisseld`);
@@ -261,12 +264,12 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
           // Check zone-tank overlap → swap center/position
           const overlappingTank = tanks.find(t => circleRectOverlap(t, dragged));
           if (overlappingTank && !overlapping) {
-            const zoneCenterX = dragged.x + dragged.w / 2;
-            const zoneCenterY = dragged.y + dragged.h / 2;
+            const startCenterX = dragStartPos.current.x + dragged.w / 2;
+            const startCenterY = dragStartPos.current.y + dragged.h / 2;
             const newZoneX = overlappingTank.cx - dragged.w / 2;
             const newZoneY = overlappingTank.cy - dragged.h / 2;
             setZones(prev => prev.map(z => z.id === draggingId ? { ...z, x: snap(newZoneX), y: snap(newZoneY) } : z));
-            setTanks(prev => prev.map(t => t.id === overlappingTank.id ? { ...t, cx: snap(zoneCenterX), cy: snap(zoneCenterY) } : t));
+            setTanks(prev => prev.map(t => t.id === overlappingTank.id ? { ...t, cx: snap(startCenterX), cy: snap(startCenterY) } : t));
             toast.info(`${dragged.label} ↔ ${overlappingTank.label} gewisseld`);
           }
         }
@@ -278,7 +281,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
           if (overlapping) {
             setTanks(prev => prev.map(t => {
               if (t.id === draggingId) return { ...t, cx: snap(overlapping.cx), cy: snap(overlapping.cy) };
-              if (t.id === overlapping.id) return { ...t, cx: snap(dragged.cx), cy: snap(dragged.cy) };
+              if (t.id === overlapping.id) return { ...t, cx: snap(dragStartPos.current.cx), cy: snap(dragStartPos.current.cy) };
               return t;
             }));
             toast.info(`${dragged.label} ↔ ${overlapping.label} gewisseld`);
@@ -289,7 +292,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             const zoneCenterX = overlappingZone.x + overlappingZone.w / 2;
             const zoneCenterY = overlappingZone.y + overlappingZone.h / 2;
             setTanks(prev => prev.map(t => t.id === draggingId ? { ...t, cx: snap(zoneCenterX), cy: snap(zoneCenterY) } : t));
-            setZones(prev => prev.map(z => z.id === overlappingZone.id ? { ...z, x: snap(dragged.cx - z.w / 2), y: snap(dragged.cy - z.h / 2) } : z));
+            setZones(prev => prev.map(z => z.id === overlappingZone.id ? { ...z, x: snap(dragStartPos.current.cx - z.w / 2), y: snap(dragStartPos.current.cy - z.h / 2) } : z));
             toast.info(`${dragged.label} ↔ ${overlappingZone.label} gewisseld`);
           }
         }
