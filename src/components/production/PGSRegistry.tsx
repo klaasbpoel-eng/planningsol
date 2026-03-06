@@ -54,6 +54,16 @@ const GHS_CONFIG: Record<string, { label: string; src: string }> = {
 };
 
 // PGS guideline color mapping
+/** Strip purity grades (e.g. "4.8", "5.0", "E.P.") from gas names for PGS display */
+function stripPurity(name?: string): string {
+  if (!name) return "";
+  return name
+    .replace(/\s+\d+\.\d+$/, "")           // "Argon 4.8" → "Argon"
+    .replace(/\s+E\.P\.$/, "")              // "Kooldioxide E.P." → "Kooldioxide"
+    .replace(/\s+(Industrieel|Koeltechnisch|Medicinaal\b.*|MD APC)$/i, "") // "Kooldioxide Industrieel" → "Kooldioxide"
+    .trim();
+}
+
 const PGS_COLORS: Record<string, string> = {
   "PGS 9": "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
   "PGS 16": "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30",
@@ -196,7 +206,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
       setSubstances((data || []).map(s => ({
         ...s,
         hazard_symbols: s.hazard_symbols || [],
-        gas_type_name: s.gas_type_id ? gasTypeMap[s.gas_type_id]?.name || "Onbekend" : "Onbekend",
+        gas_type_name: s.gas_type_id ? stripPurity(gasTypeMap[s.gas_type_id]?.name) || "Onbekend" : "Onbekend",
         gas_type_color: s.gas_type_id ? gasTypeMap[s.gas_type_id]?.color || "#6b7280" : "#6b7280",
       })));
     } catch (err) {
@@ -232,7 +242,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
       setBulkTanks((data || []).map(t => ({
         ...t,
         hazard_symbols: t.hazard_symbols || [],
-        gas_type_name: t.gas_type_id ? gasTypeMap[t.gas_type_id]?.name || "Onbekend" : "Onbekend",
+        gas_type_name: t.gas_type_id ? stripPurity(gasTypeMap[t.gas_type_id]?.name) || "Onbekend" : "Onbekend",
         gas_type_color: t.gas_type_id ? gasTypeMap[t.gas_type_id]?.color || "#6b7280" : "#6b7280",
       })));
     } catch (err) {
