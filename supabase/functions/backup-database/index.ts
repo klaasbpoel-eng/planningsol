@@ -1,12 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://planning.solnederland.nl",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const TABLES = [
+  // Reference data (no FK deps)
   "gas_type_categories",
   "gas_types",
   "cylinder_sizes",
@@ -15,9 +16,33 @@ const TABLES = [
   "task_types",
   "time_off_types",
   "app_settings",
+  "products",
+  "stock_products",
+  "gas_mixture_recipes",
+  // Customers + related
   "customers",
+  "customer_locations",
+  "customer_products",
+  // Orders
   "gas_cylinder_orders",
   "dry_ice_orders",
+  "orders",
+  "order_items",
+  "internal_orders",
+  "internal_order_items",
+  // Ambulance
+  "ambulance_trips",
+  "ambulance_trip_customers",
+  // Toolbox
+  "toolboxes",
+  "toolbox_sections",
+  "toolbox_sessions",
+  "toolbox_session_participants",
+  "toolbox_completions",
+  // HR / planning (reference profiles — exported as-is)
+  "tasks",
+  "time_off_requests",
+  "employee_leave_balances",
 ];
 
 async function fetchAllRows(

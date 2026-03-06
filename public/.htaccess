@@ -1,3 +1,20 @@
+# Security headers
+<IfModule mod_headers.c>
+  # Prevent clickjacking
+  Header always set X-Frame-Options "DENY"
+  # Prevent MIME-type sniffing
+  Header always set X-Content-Type-Options "nosniff"
+  # No referrer info leaked to external sites
+  Header always set Referrer-Policy "no-referrer"
+  # XSS protection (legacy browsers)
+  Header always set X-XSS-Protection "1; mode=block"
+  # Force HTTPS for 1 year
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  # Prevent search engine indexing via header
+  Header always set X-Robots-Tag "noindex, nofollow"
+</IfModule>
+
+# SPA routing — redirect all requests to index.html
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /

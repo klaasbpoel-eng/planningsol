@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 
 supabase/.temp
+
+# Environment variables (contain credentials)
+.env
+.env.local
+.env.*.local
