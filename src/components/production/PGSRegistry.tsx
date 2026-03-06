@@ -34,6 +34,7 @@ import {
   Activity,
   Container,
   CalendarClock,
+  FileSpreadsheet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatNumber } from "@/lib/utils";
@@ -41,6 +42,7 @@ import * as XLSX from "xlsx";
 import { getGasColor } from "@/constants/gasColors";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { SOLPGSImportDialog } from "./SOLPGSImportDialog";
 
 // GHS pictogram config with diamond styling
 const GHS_CONFIG: Record<string, { label: string; src: string }> = {
@@ -221,6 +223,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
   const [pictogramMode, setPictogramMode] = useState<PictogramMode>(() => {
     return (localStorage.getItem("pgs-pictogram-mode") as PictogramMode) || "ghs";
   });
+  const [solImportOpen, setSolImportOpen] = useState(false);
 
   const handlePictogramModeChange = (value: string) => {
     if (value) {
@@ -602,6 +605,12 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
             <Download className="h-4 w-4" />
             Excel
           </Button>
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={() => setSolImportOpen(true)} className="gap-1.5">
+              <FileSpreadsheet className="h-4 w-4" />
+              SOL Import
+            </Button>
+          )}
         </div>
       </div>
 
