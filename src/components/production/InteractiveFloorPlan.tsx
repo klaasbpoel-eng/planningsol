@@ -666,18 +666,6 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   <path d={d} fill="none" stroke="hsl(40 70% 50% / 0.12)" strokeWidth="44" strokeLinecap="round" />
                   <path d={d} fill="none" stroke="hsl(40 70% 50% / 0.35)" strokeWidth="1" strokeDasharray="6 4" strokeLinecap="round" />
                   <text x={mx} y={my} textAnchor="middle" fill="hsl(40 70% 50% / 0.5)" fontSize="8" fontWeight="700" letterSpacing="3" transform={`rotate(${angle}, ${mx}, ${my})`}>SHOWROOM</text>
-                  {editMode && (
-                    <>
-                      <circle cx={sx} cy={sy} r="6" fill="hsl(40 70% 50%)" opacity="0.7" stroke="#fff" strokeWidth="1.5"
-                        className="cursor-grab" onMouseDown={(e) => handleZoneDragStart(e, "showroom_start")}>
-                        <title>Sleep: startpunt boog (Entrée-zijde)</title>
-                      </circle>
-                      <circle cx={ex} cy={ey} r="6" fill="hsl(40 70% 50%)" opacity="0.7" stroke="#fff" strokeWidth="1.5"
-                        className="cursor-grab" onMouseDown={(e) => handleZoneDragStart(e, "showroom_end")}>
-                        <title>Sleep: eindpunt boog (Kantoor-zijde)</title>
-                      </circle>
-                    </>
-                  )}
                 </g>
               );
             })()}
@@ -800,6 +788,32 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             <text x="85" y="165" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="700" letterSpacing="1" opacity="0.4">DROOGIJS</text>
             <text x="215" y="165" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="700" letterSpacing="1" opacity="0.4">VULSTATIONS</text>
             <text x="730" y="165" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="700" letterSpacing="1" opacity="0.4">PALLETS 16 CIL</text>
+
+            {/* Showroom arc drag handles – rendered last so they're on top */}
+            {editMode && (() => {
+              const startZone = zones.find(z => z.id === "showroom_start");
+              const endZone = zones.find(z => z.id === "showroom_end");
+              const defaultStart = { x: 630, y: 750, w: 10, h: 10 };
+              const defaultEnd = { x: 848, y: 595, w: 10, h: 10 };
+              const sz = startZone || defaultStart;
+              const ez = endZone || defaultEnd;
+              const sx = sz.x + sz.w / 2;
+              const sy = sz.y + sz.h / 2;
+              const ex = ez.x + ez.w / 2;
+              const ey = ez.y + ez.h / 2;
+              return (
+                <g>
+                  <circle cx={sx} cy={sy} r="8" fill="hsl(40 70% 50%)" opacity="0.8" stroke="#fff" strokeWidth="2"
+                    className="cursor-grab" onMouseDown={(e) => handleZoneDragStart(e, "showroom_start")}>
+                    <title>Sleep: startpunt boog (Entrée-zijde)</title>
+                  </circle>
+                  <circle cx={ex} cy={ey} r="8" fill="hsl(40 70% 50%)" opacity="0.8" stroke="#fff" strokeWidth="2"
+                    className="cursor-grab" onMouseDown={(e) => handleZoneDragStart(e, "showroom_end")}>
+                    <title>Sleep: eindpunt boog (Kantoor-zijde)</title>
+                  </circle>
+                </g>
+              );
+            })()}
           </svg>
         </div>
 
