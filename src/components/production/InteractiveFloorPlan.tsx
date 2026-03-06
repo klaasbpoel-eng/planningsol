@@ -642,21 +642,26 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             {/* Showroom – curved path anchored to showroom zone */}
             {(() => {
               const sr = zones.find(z => z.id === "showroom");
-              if (!sr) return null;
+              const entreeZone = zones.find(z => z.id === "entree");
+              const kantoorZone = zones.find(z => z.id === "kantoor_vivisol");
+              if (!sr || !entreeZone || !kantoorZone) return null;
+              // Start: right edge of Entrée, End: bottom of Kantoor Vivisol
+              const sx = entreeZone.x + entreeZone.w;
+              const sy = entreeZone.y + entreeZone.h / 2;
+              const ex = kantoorZone.x + kantoorZone.w / 2;
+              const ey = kantoorZone.y + kantoorZone.h;
+              // Showroom zone center as control influence
               const cx = sr.x + sr.w / 2;
               const cy = sr.y + sr.h / 2;
-              // Arc from bottom-left to top-right, centered on showroom zone
-              const sx = cx - 100;
-              const sy = cy + 70;
-              const ex = cx + 10;
-              const ey = cy - 80;
-              const d = `M ${sx} ${sy} C ${sx + 80} ${sy} ${ex} ${ey + 80} ${ex} ${ey}`;
-              const angle = -70;
+              const d = `M ${sx} ${sy} C ${cx} ${sy} ${ex} ${cy} ${ex} ${ey}`;
+              const mx = (sx + ex) / 2;
+              const my = (sy + ey) / 2;
+              const angle = Math.atan2(ey - sy, ex - sx) * (180 / Math.PI);
               return (
                 <g>
                   <path d={d} fill="none" stroke="hsl(40 70% 50% / 0.12)" strokeWidth="44" strokeLinecap="round" />
                   <path d={d} fill="none" stroke="hsl(40 70% 50% / 0.35)" strokeWidth="1" strokeDasharray="6 4" strokeLinecap="round" />
-                  <text x={cx - 30} y={cy} textAnchor="middle" fill="hsl(40 70% 50% / 0.5)" fontSize="8" fontWeight="700" letterSpacing="3" transform={`rotate(${angle}, ${cx - 30}, ${cy})`}>SHOWROOM</text>
+                  <text x={mx} y={my} textAnchor="middle" fill="hsl(40 70% 50% / 0.5)" fontSize="8" fontWeight="700" letterSpacing="3" transform={`rotate(${angle}, ${mx}, ${my})`}>SHOWROOM</text>
                 </g>
               );
             })()}
