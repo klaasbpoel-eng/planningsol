@@ -317,6 +317,13 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
         onImported={handleImported}
         locationLabel={importLocationLabel}
       />
+      <SOLInventoryImportDialog
+        open={solImportDialogOpen}
+        onOpenChange={setSolImportDialogOpen}
+        onImported={handleImported}
+        locationLabel={importLocationLabel}
+        targetLocation={selectedLocation === "all" ? "sol_emmen" : selectedLocation}
+      />
       <StockFillingLocationManager
         open={locationManagerOpen}
         onOpenChange={setLocationManagerOpen}
