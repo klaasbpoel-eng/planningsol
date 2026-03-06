@@ -296,6 +296,17 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
                 <Upload className="h-3.5 w-3.5" />
               </Button>
             )}
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setSolImportDialogOpen(true)}
+                title={`SOL inventaris importeren voor ${importLocationLabel}`}
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </span>
         </CardDescription>
       </CardHeader>
