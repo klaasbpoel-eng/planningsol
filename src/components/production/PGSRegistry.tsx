@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Separator } from "@/components/ui/separator";
@@ -53,14 +54,41 @@ const GHS_CONFIG: Record<string, { label: string; src: string }> = {
   GHS09: { label: "Milieugevaarlijk", src: "/ghs/GHS09.svg" },
 };
 
+// ADR transport label config
+const ADR_CONFIG: Record<string, { label: string; src: string }> = {
+  "ADR 2.1": { label: "Brandbare gassen", src: "/adr/ADR_2.1.svg" },
+  "ADR 2.2": { label: "Niet-brandbare gassen", src: "/adr/ADR_2.2.svg" },
+  "ADR 2.3": { label: "Giftige gassen", src: "/adr/ADR_2.3.svg" },
+  "ADR 3":   { label: "Brandbare vloeistoffen", src: "/adr/ADR_3.svg" },
+  "ADR 5.1": { label: "Oxiderende stoffen", src: "/adr/ADR_5.1.svg" },
+  "ADR 6.1": { label: "Giftige stoffen", src: "/adr/ADR_6.1.svg" },
+  "ADR 8":   { label: "Bijtende stoffen", src: "/adr/ADR_8.svg" },
+  "ADR 9":   { label: "Diverse gevaarlijke stoffen", src: "/adr/ADR_9.svg" },
+};
+
+// Mapping from GHS codes to ADR codes
+const GHS_TO_ADR: Record<string, string[]> = {
+  GHS01: [],
+  GHS02: ["ADR 2.1", "ADR 3"],
+  GHS03: ["ADR 5.1"],
+  GHS04: ["ADR 2.2"],
+  GHS05: ["ADR 8"],
+  GHS06: ["ADR 6.1"],
+  GHS07: [],
+  GHS08: [],
+  GHS09: ["ADR 9"],
+};
+
+type PictogramMode = "ghs" | "adr" | "both";
+
 // PGS guideline color mapping
 /** Strip purity grades (e.g. "4.8", "5.0", "E.P.") from gas names for PGS display */
 function stripPurity(name?: string): string {
   if (!name) return "";
   return name
-    .replace(/\s+\d+\.\d+$/, "")           // "Argon 4.8" → "Argon"
-    .replace(/\s+E\.P\.$/, "")              // "Kooldioxide E.P." → "Kooldioxide"
-    .replace(/\s+(Industrieel|Koeltechnisch|Medicinaal\b.*|MD APC)$/i, "") // "Kooldioxide Industrieel" → "Kooldioxide"
+    .replace(/\s+\d+\.\d+$/, "")
+    .replace(/\s+E\.P\.$/, "")
+    .replace(/\s+(Industrieel|Koeltechnisch|Medicinaal\b.*|MD APC)$/i, "")
     .trim();
 }
 
@@ -70,24 +98,55 @@ const PGS_COLORS: Record<string, string> = {
   "PGS 15": "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
 };
 
-function GHSDiamond({ symbol }: { symbol: string }) {
-  const config = GHS_CONFIG[symbol];
-  if (!config) return null;
-
+/** Renders a single pictogram (GHS or ADR) with tooltip */
+function PictogramIcon({ code, config }: { code: string; config: { label: string; src: string } }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <img
           src={config.src}
-          alt={`${symbol} — ${config.label}`}
+          alt={`${code} — ${config.label}`}
           className="w-8 h-8 cursor-default"
         />
       </TooltipTrigger>
       <TooltipContent side="top" className="text-xs font-medium">
-        {symbol} — {config.label}
+        {code} — {config.label}
       </TooltipContent>
     </Tooltip>
   );
+}
+
+/** Renders hazard pictograms based on the selected display mode */
+function HazardPictograms({ symbols, mode }: { symbols: string[]; mode: PictogramMode }) {
+  const elements: React.ReactNode[] = [];
+  for (const sym of symbols) {
+    if ((mode === "ghs" || mode === "both") && GHS_CONFIG[sym]) {
+      elements.push(<PictogramIcon key={`ghs-${sym}`} code={sym} config={GHS_CONFIG[sym]} />);
+    }
+    if (mode === "adr" || mode === "both") {
+      const adrCodes = GHS_TO_ADR[sym] || [];
+      for (const adr of adrCodes) {
+        if (ADR_CONFIG[adr]) {
+          elements.push(<PictogramIcon key={`adr-${sym}-${adr}`} code={adr} config={ADR_CONFIG[adr]} />);
+        }
+      }
+    }
+  }
+  if (elements.length === 0 && mode === "adr") {
+    return <span className="text-[10px] text-muted-foreground italic">—</span>;
+  }
+  return <>{elements}</>;
+}
+
+/** Helper to get pictogram labels for export */
+function getExportSymbols(symbols: string[], mode: PictogramMode): string {
+  if (mode === "ghs") return symbols.join(", ");
+  if (mode === "adr") {
+    const adrs = symbols.flatMap(s => GHS_TO_ADR[s] || []);
+    return [...new Set(adrs)].join(", ") || "—";
+  }
+  const adrs = symbols.flatMap(s => GHS_TO_ADR[s] || []);
+  return [...symbols, ...new Set(adrs)].join(", ");
 }
 
 interface PGSSubstance {
@@ -172,6 +231,16 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
   const [editingBulkId, setEditingBulkId] = useState<string | null>(null);
   const [bulkEditValue, setBulkEditValue] = useState(0);
   const [bulkEditCapacity, setBulkEditCapacity] = useState(0);
+  const [pictogramMode, setPictogramMode] = useState<PictogramMode>(() => {
+    return (localStorage.getItem("pgs-pictogram-mode") as PictogramMode) || "ghs";
+  });
+
+  const handlePictogramModeChange = (value: string) => {
+    if (value) {
+      setPictogramMode(value as PictogramMode);
+      localStorage.setItem("pgs-pictogram-mode", value);
+    }
+  };
 
   const fetchSubstances = useCallback(async () => {
     setLoading(true);
@@ -350,7 +419,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
       "UN Nummer": s.un_number || "",
       "CAS Nummer": s.cas_number || "",
       "Opslagklasse": s.storage_class || "",
-      "GHS Symbolen": (s.hazard_symbols || []).join(", "),
+      "Pictogrammen": getExportSymbols(s.hazard_symbols || [], pictogramMode),
       "Max. Toegestaan (kg)": s.max_allowed_kg,
       "Huidige Voorraad (kg)": s.current_stock_kg,
       "Bezetting (%)": s.max_allowed_kg > 0 ? Math.round((s.current_stock_kg / s.max_allowed_kg) * 100) : 0,
@@ -387,7 +456,8 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     doc.line(14, 31, 283, 31);
 
     // Table
-    const head = [["Gas", "PGS", "UN", "CAS", "GHS", "Opslagkl.", "Max (kg)", "Huidig (kg)", "Bez. (%)", "H-zinnen", "P-zinnen", "Locatie"]];
+    const pictoLabel = pictogramMode === "adr" ? "ADR" : pictogramMode === "both" ? "GHS/ADR" : "GHS";
+    const head = [["Gas", "PGS", "UN", "CAS", pictoLabel, "Opslagkl.", "Max (kg)", "Huidig (kg)", "Bez. (%)", "H-zinnen", "P-zinnen", "Locatie"]];
     const body = processedSubstances.map(s => {
       const pct = s.max_allowed_kg > 0 ? Math.round((s.current_stock_kg / s.max_allowed_kg) * 100) : 0;
       return [
@@ -395,7 +465,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
         s.pgs_guideline,
         s.un_number || "—",
         s.cas_number || "—",
-        (s.hazard_symbols || []).join(", "),
+        getExportSymbols(s.hazard_symbols || [], pictogramMode),
         s.storage_class || "—",
         formatNumber(s.max_allowed_kg, 0),
         formatNumber(s.current_stock_kg, 0),
@@ -584,6 +654,12 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
           </TabsList>
         </Tabs>
 
+        <ToggleGroup type="single" value={pictogramMode} onValueChange={handlePictogramModeChange} variant="outline" size="sm">
+          <ToggleGroupItem value="ghs" className="text-xs px-2.5 h-9">GHS</ToggleGroupItem>
+          <ToggleGroupItem value="adr" className="text-xs px-2.5 h-9">ADR</ToggleGroupItem>
+          <ToggleGroupItem value="both" className="text-xs px-2.5 h-9">Beide</ToggleGroupItem>
+        </ToggleGroup>
+
         <div className="flex-1" />
 
         <div className="flex flex-wrap items-center gap-2">
@@ -660,7 +736,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
                       >
                         <span className="inline-flex items-center gap-1">UN <SortIcon field="un" /></span>
                       </TableHead>
-                      <TableHead>GHS</TableHead>
+                      <TableHead>{pictogramMode === "adr" ? "ADR" : pictogramMode === "both" ? "GHS / ADR" : "GHS"}</TableHead>
                       <TableHead
                         className="cursor-pointer select-none group"
                         onClick={() => handleSort("pct")}
@@ -699,6 +775,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
                           onCancelEdit={cancelEdit}
                           onSaveEdit={() => saveEdit(substance.id)}
                           onEditChange={setEditValues}
+                          pictogramMode={pictogramMode}
                         />
                       );
                     })}
@@ -741,9 +818,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        {tank.hazard_symbols.map(sym => (
-                          <GHSDiamond key={sym} symbol={sym} />
-                        ))}
+                        <HazardPictograms symbols={tank.hazard_symbols} mode={pictogramMode} />
                       </div>
                     </div>
 
@@ -849,6 +924,7 @@ interface SubstanceRowProps {
   isAdmin: boolean;
   editValues: { max_allowed_kg: number; current_stock_kg: number };
   colSpan: number;
+  pictogramMode: PictogramMode;
   onToggle: () => void;
   onStartEdit: () => void;
   onCancelEdit: () => void;
@@ -858,7 +934,7 @@ interface SubstanceRowProps {
 
 function SubstanceRow({
   substance, pct, isWarning, isCritical, isExpanded, isEditing, isEven,
-  isAdmin, editValues, colSpan, onToggle, onStartEdit, onCancelEdit, onSaveEdit, onEditChange,
+  isAdmin, editValues, colSpan, pictogramMode, onToggle, onStartEdit, onCancelEdit, onSaveEdit, onEditChange,
 }: SubstanceRowProps) {
   const pgsClass = PGS_COLORS[substance.pgs_guideline] || "bg-muted text-muted-foreground border-border";
 
@@ -902,9 +978,7 @@ function SubstanceRow({
         <TableCell className="text-sm font-mono text-muted-foreground">{substance.un_number || "—"}</TableCell>
         <TableCell onClick={e => e.stopPropagation()}>
           <div className="flex gap-1.5 items-center">
-            {(substance.hazard_symbols || []).map(sym => (
-              <GHSDiamond key={sym} symbol={sym} />
-            ))}
+            <HazardPictograms symbols={substance.hazard_symbols || []} mode={pictogramMode} />
           </div>
         </TableCell>
         <TableCell className="w-36">
