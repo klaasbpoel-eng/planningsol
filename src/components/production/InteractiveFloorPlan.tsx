@@ -51,57 +51,57 @@ const DEFAULT_BULK_TANKS: BulkTank[] = [
 ];
 
 const DEFAULT_ZONES: FloorZone[] = [
-  { id: "droogijs1", x: 30, y: 160, w: 110, h: 100, label: "Droogijs", sublabel: "Productie", type: "opslag_droogijs", details: "Droogijsproductie-installatie" },
-  { id: "droogijs_cont", x: 30, y: 268, w: 110, h: 80, label: "Droogijs", sublabel: "Containers (schoon)", type: "opslag_droogijs", details: "Schone droogijs containers" },
-  { id: "vs3a", x: 30, y: 356, w: 110, h: 42, label: "Vulstation 3A", sublabel: "Trolley 40x", type: "vulstation", details: "Trolley vulstation, 40 posities" },
-  { id: "vs3b", x: 30, y: 404, w: 110, h: 42, label: "Vulstation 3B", sublabel: "Trolley 40x", type: "vulstation", details: "Trolley vulstation, 40 posities" },
-  { id: "opslag_ruimte", x: 30, y: 452, w: 110, h: 42, label: "Opslag ruimte", type: "logistiek" },
-  { id: "boiler", x: 30, y: 500, w: 110, h: 35, label: "Boiler ruimte", type: "technisch" },
-  { id: "non_conform", x: 150, y: 160, w: 100, h: 42, label: "Non conform", type: "logistiek", details: "Non-conforme cilinders" },
-  { id: "vs4a", x: 150, y: 208, w: 130, h: 42, label: "Vulstation 4A", sublabel: "O₂ 300B Trolley", type: "vulstation", details: "Zuurstof 300 bar trolley vulstation" },
-  { id: "vs4b", x: 150, y: 256, w: 130, h: 42, label: "Vulstation 4B", sublabel: "O₂ 300B Pakket", type: "vulstation", details: "Zuurstof 300 bar pakket vulstation" },
-  { id: "vs1a", x: 150, y: 306, w: 130, h: 42, label: "Vulstation 1A", sublabel: "Zuurstof Rek 1", type: "vulstation", details: "Zuurstof vulrek 1" },
-  { id: "vs1b", x: 150, y: 354, w: 130, h: 42, label: "Vulstation 1B", sublabel: "Zuurstof Rek 2", type: "vulstation", details: "Zuurstof vulrek 2" },
-  { id: "vs2a", x: 150, y: 404, w: 130, h: 42, label: "Vulstation 2A", sublabel: "Trolley 26x", type: "vulstation", details: "Trolley vulstation, 26 posities" },
-  { id: "vs2b", x: 150, y: 452, w: 130, h: 42, label: "Vulstation 2B", sublabel: "Pakket quarantaine", type: "vulstation", details: "Pakket vulstation met quarantaine zone" },
-  { id: "co2_vulling", x: 290, y: 160, w: 90, h: 52, label: "CO₂ vulling", sublabel: "Pakket", type: "opslag_gas", details: "CO₂ vulstation (pakketvulling)" },
-  { id: "ar_mix_trolley", x: 290, y: 220, w: 90, h: 46, label: "Ar-Mix", sublabel: "Trolley 200 Bar", type: "opslag_gas", details: "Argon/Mix trolleys 200 bar" },
-  { id: "ar_mix_pakket", x: 290, y: 272, w: 90, h: 46, label: "Ar-Mix", sublabel: "Pakket 200 Bar", type: "opslag_gas", details: "Argon/Mix pakketten 200 bar" },
-  { id: "ar_mix_300", x: 290, y: 324, w: 90, h: 46, label: "Ar-Mix", sublabel: "300 Bar pakket", type: "opslag_gas", details: "Argon/Mix pakketten 300 bar" },
-  { id: "o2_trolley", x: 388, y: 160, w: 72, h: 52, label: "Zuurstof", sublabel: "Trolley", type: "opslag_gas" },
-  { id: "o2_pakket", x: 388, y: 220, w: 72, h: 46, label: "Zuurstof", sublabel: "Pakket", type: "opslag_gas" },
-  { id: "elektra", x: 468, y: 160, w: 72, h: 42, label: "Elektra", type: "technisch" },
-  { id: "lab", x: 468, y: 208, w: 110, h: 52, label: "Laboratorium", type: "technisch", details: "Kwaliteitscontrole laboratorium" },
-  { id: "ar_mix_300bar", x: 468, y: 268, w: 110, h: 42, label: "Argon/Mix", sublabel: "300 Bar", type: "opslag_gas" },
-  { id: "ar_mix_200_du", x: 468, y: 316, w: 110, h: 42, label: "Argon/Mix", sublabel: "200 bar – DU", type: "opslag_gas", details: "Duitse specificatie" },
-  { id: "ar_mix_200_nl", x: 468, y: 364, w: 110, h: 42, label: "Argon/Mix", sublabel: "200 bar – NL", type: "opslag_gas", details: "Nederlandse specificatie" },
-  { id: "o2_16cil", x: 595, y: 160, w: 80, h: 65, label: "O₂", sublabel: "16 Cil · 300 bar", type: "opslag_gas", details: "Zuurstof 16 cilinder pallet, 300 bar" },
-  { id: "n2_16cil", x: 680, y: 160, w: 80, h: 65, label: "N₂", sublabel: "16 Cil", type: "opslag_gas", details: "Stikstof 16 cilinder pallet" },
-  { id: "o2_16cil_200a", x: 765, y: 160, w: 80, h: 65, label: "O₂", sublabel: "16 Cil · 200 bar", type: "opslag_gas", details: "Zuurstof 16 cilinder pallet, 200 bar" },
-  { id: "o2_16cil_200b", x: 850, y: 160, w: 80, h: 65, label: "O₂", sublabel: "16 Cil · 200 bar", type: "opslag_gas" },
-  { id: "voorraad", x: 850, y: 235, w: 120, h: 38, label: "Voorraad", type: "logistiek", details: "Voorraadopslag cilinders" },
-  { id: "cil_vol", x: 850, y: 278, w: 120, h: 32, label: "Cilinders vol", type: "logistiek" },
-  { id: "voeding", x: 850, y: 315, w: 120, h: 32, label: "Voeding", type: "technisch" },
-  { id: "magazijn", x: 850, y: 440, w: 120, h: 55, label: "Magazijn", type: "logistiek" },
-  { id: "wc_douche", x: 468, y: 440, w: 80, h: 38, label: "WC / Douche", type: "kantoor" },
-  { id: "werkplaats", x: 555, y: 440, w: 120, h: 38, label: "Werkplaats", type: "technisch" },
-  { id: "schoonmaak", x: 30, y: 545, w: 130, h: 38, label: "Schoonmaak", sublabel: "Cilinders", type: "technisch", details: "Chloortabletten, desinfectie spuit" },
-  { id: "te_vullen", x: 168, y: 545, w: 110, h: 38, label: "Te Vullen", type: "logistiek" },
-  { id: "retour_tilburg", x: 286, y: 545, w: 120, h: 38, label: "Retour Tilburg", type: "logistiek", details: "Cilinders retour naar Tilburg" },
-  { id: "ontvangst", x: 30, y: 590, w: 80, h: 38, label: "Ontvangst", type: "logistiek" },
-  { id: "vivisol_sluis", x: 595, y: 545, w: 110, h: 38, label: "Vivisol Sluis", type: "medisch" },
-  { id: "vivisol_opslag", x: 710, y: 545, w: 90, h: 38, label: "Vivisol", sublabel: "Opslag", type: "medisch" },
-  { id: "kantoor_vivisol", x: 808, y: 545, w: 80, h: 38, label: "Kantoor", type: "kantoor" },
-  { id: "neophyr", x: 120, y: 635, w: 75, h: 58, label: "Neophyr", sublabel: "Argon MD", type: "medisch", details: "Neophyr / Argon medisch / Spec. Mengsels" },
-  { id: "carbogeen_30", x: 200, y: 635, w: 65, h: 58, label: "Carbogeen", sublabel: "30", type: "medisch" },
-  { id: "carbogeen_5", x: 270, y: 635, w: 65, h: 58, label: "Carbogeen", sublabel: "5", type: "medisch" },
-  { id: "carbogeen_40", x: 340, y: 635, w: 65, h: 58, label: "Carbogeen", sublabel: "40", type: "medisch" },
-  { id: "o2_med_200", x: 415, y: 635, w: 75, h: 58, label: "O₂ med.", sublabel: "200 bar", type: "medisch", details: "Medische zuurstof 200 bar" },
-  { id: "o2_med_300", x: 495, y: 635, w: 75, h: 58, label: "O₂ med.", sublabel: "300 bar", type: "medisch", details: "Medische zuurstof 300 bar" },
-  { id: "lucht_synth", x: 575, y: 635, w: 75, h: 58, label: "Lucht", sublabel: "Synth./Med.", type: "medisch", details: "Synthetische en medische lucht" },
-  { id: "showroom", x: 595, y: 590, w: 130, h: 28, label: "Showroom", type: "kantoor" },
-  { id: "kantoren", x: 340, y: 720, w: 300, h: 48, label: "K A N T O R E N", type: "kantoor", details: "Kantoorruimtes medewerkers" },
-  { id: "entree", x: 540, y: 730, w: 90, h: 38, label: "Entrée", type: "kantoor" },
+  { id: "droogijs1", x: 30, y: 180, w: 110, h: 100, label: "Droogijs", sublabel: "Productie", type: "opslag_droogijs", details: "Droogijsproductie-installatie" },
+  { id: "droogijs_cont", x: 30, y: 288, w: 110, h: 80, label: "Droogijs", sublabel: "Containers (schoon)", type: "opslag_droogijs", details: "Schone droogijs containers" },
+  { id: "vs3a", x: 30, y: 376, w: 110, h: 42, label: "Vulstation 3A", sublabel: "Trolley 40x", type: "vulstation", details: "Trolley vulstation, 40 posities" },
+  { id: "vs3b", x: 30, y: 424, w: 110, h: 42, label: "Vulstation 3B", sublabel: "Trolley 40x", type: "vulstation", details: "Trolley vulstation, 40 posities" },
+  { id: "opslag_ruimte", x: 30, y: 472, w: 110, h: 42, label: "Opslag ruimte", type: "logistiek" },
+  { id: "boiler", x: 30, y: 520, w: 110, h: 35, label: "Boiler ruimte", type: "technisch" },
+  { id: "non_conform", x: 150, y: 180, w: 100, h: 42, label: "Non conform", type: "logistiek", details: "Non-conforme cilinders" },
+  { id: "vs4a", x: 150, y: 228, w: 130, h: 42, label: "Vulstation 4A", sublabel: "O₂ 300B Trolley", type: "vulstation", details: "Zuurstof 300 bar trolley vulstation" },
+  { id: "vs4b", x: 150, y: 276, w: 130, h: 42, label: "Vulstation 4B", sublabel: "O₂ 300B Pakket", type: "vulstation", details: "Zuurstof 300 bar pakket vulstation" },
+  { id: "vs1a", x: 150, y: 326, w: 130, h: 42, label: "Vulstation 1A", sublabel: "Zuurstof Rek 1", type: "vulstation", details: "Zuurstof vulrek 1" },
+  { id: "vs1b", x: 150, y: 374, w: 130, h: 42, label: "Vulstation 1B", sublabel: "Zuurstof Rek 2", type: "vulstation", details: "Zuurstof vulrek 2" },
+  { id: "vs2a", x: 150, y: 424, w: 130, h: 42, label: "Vulstation 2A", sublabel: "Trolley 26x", type: "vulstation", details: "Trolley vulstation, 26 posities" },
+  { id: "vs2b", x: 150, y: 472, w: 130, h: 42, label: "Vulstation 2B", sublabel: "Pakket quarantaine", type: "vulstation", details: "Pakket vulstation met quarantaine zone" },
+  { id: "co2_vulling", x: 290, y: 180, w: 90, h: 52, label: "CO₂ vulling", sublabel: "Pakket", type: "opslag_gas", details: "CO₂ vulstation (pakketvulling)" },
+  { id: "ar_mix_trolley", x: 290, y: 240, w: 90, h: 46, label: "Ar-Mix", sublabel: "Trolley 200 Bar", type: "opslag_gas", details: "Argon/Mix trolleys 200 bar" },
+  { id: "ar_mix_pakket", x: 290, y: 292, w: 90, h: 46, label: "Ar-Mix", sublabel: "Pakket 200 Bar", type: "opslag_gas", details: "Argon/Mix pakketten 200 bar" },
+  { id: "ar_mix_300", x: 290, y: 344, w: 90, h: 46, label: "Ar-Mix", sublabel: "300 Bar pakket", type: "opslag_gas", details: "Argon/Mix pakketten 300 bar" },
+  { id: "o2_trolley", x: 388, y: 180, w: 72, h: 52, label: "Zuurstof", sublabel: "Trolley", type: "opslag_gas" },
+  { id: "o2_pakket", x: 388, y: 240, w: 72, h: 46, label: "Zuurstof", sublabel: "Pakket", type: "opslag_gas" },
+  { id: "elektra", x: 468, y: 180, w: 72, h: 42, label: "Elektra", type: "technisch" },
+  { id: "lab", x: 468, y: 228, w: 110, h: 52, label: "Laboratorium", type: "technisch", details: "Kwaliteitscontrole laboratorium" },
+  { id: "ar_mix_300bar", x: 468, y: 288, w: 110, h: 42, label: "Argon/Mix", sublabel: "300 Bar", type: "opslag_gas" },
+  { id: "ar_mix_200_du", x: 468, y: 336, w: 110, h: 42, label: "Argon/Mix", sublabel: "200 bar – DU", type: "opslag_gas", details: "Duitse specificatie" },
+  { id: "ar_mix_200_nl", x: 468, y: 384, w: 110, h: 42, label: "Argon/Mix", sublabel: "200 bar – NL", type: "opslag_gas", details: "Nederlandse specificatie" },
+  { id: "o2_16cil", x: 595, y: 180, w: 80, h: 65, label: "O₂", sublabel: "16 Cil · 300 bar", type: "opslag_gas", details: "Zuurstof 16 cilinder pallet, 300 bar" },
+  { id: "n2_16cil", x: 680, y: 180, w: 80, h: 65, label: "N₂", sublabel: "16 Cil", type: "opslag_gas", details: "Stikstof 16 cilinder pallet" },
+  { id: "o2_16cil_200a", x: 765, y: 180, w: 80, h: 65, label: "O₂", sublabel: "16 Cil · 200 bar", type: "opslag_gas", details: "Zuurstof 16 cilinder pallet, 200 bar" },
+  { id: "o2_16cil_200b", x: 850, y: 180, w: 80, h: 65, label: "O₂", sublabel: "16 Cil · 200 bar", type: "opslag_gas" },
+  { id: "voorraad", x: 850, y: 255, w: 120, h: 38, label: "Voorraad", type: "logistiek", details: "Voorraadopslag cilinders" },
+  { id: "cil_vol", x: 850, y: 298, w: 120, h: 32, label: "Cilinders vol", type: "logistiek" },
+  { id: "voeding", x: 850, y: 335, w: 120, h: 32, label: "Voeding", type: "technisch" },
+  { id: "magazijn", x: 850, y: 460, w: 120, h: 55, label: "Magazijn", type: "logistiek" },
+  { id: "wc_douche", x: 468, y: 460, w: 80, h: 38, label: "WC / Douche", type: "kantoor" },
+  { id: "werkplaats", x: 555, y: 460, w: 120, h: 38, label: "Werkplaats", type: "technisch" },
+  { id: "schoonmaak", x: 30, y: 565, w: 130, h: 38, label: "Schoonmaak", sublabel: "Cilinders", type: "technisch", details: "Chloortabletten, desinfectie spuit" },
+  { id: "te_vullen", x: 168, y: 565, w: 110, h: 38, label: "Te Vullen", type: "logistiek" },
+  { id: "retour_tilburg", x: 286, y: 565, w: 120, h: 38, label: "Retour Tilburg", type: "logistiek", details: "Cilinders retour naar Tilburg" },
+  { id: "ontvangst", x: 30, y: 610, w: 80, h: 38, label: "Ontvangst", type: "logistiek" },
+  { id: "vivisol_sluis", x: 595, y: 565, w: 110, h: 38, label: "Vivisol Sluis", type: "medisch" },
+  { id: "vivisol_opslag", x: 710, y: 565, w: 90, h: 38, label: "Vivisol", sublabel: "Opslag", type: "medisch" },
+  { id: "kantoor_vivisol", x: 808, y: 565, w: 80, h: 38, label: "Kantoor", type: "kantoor" },
+  { id: "neophyr", x: 120, y: 655, w: 75, h: 58, label: "Neophyr", sublabel: "Argon MD", type: "medisch", details: "Neophyr / Argon medisch / Spec. Mengsels" },
+  { id: "carbogeen_30", x: 200, y: 655, w: 65, h: 58, label: "Carbogeen", sublabel: "30", type: "medisch" },
+  { id: "carbogeen_5", x: 270, y: 655, w: 65, h: 58, label: "Carbogeen", sublabel: "5", type: "medisch" },
+  { id: "carbogeen_40", x: 340, y: 655, w: 65, h: 58, label: "Carbogeen", sublabel: "40", type: "medisch" },
+  { id: "o2_med_200", x: 415, y: 655, w: 75, h: 58, label: "O₂ med.", sublabel: "200 bar", type: "medisch", details: "Medische zuurstof 200 bar" },
+  { id: "o2_med_300", x: 495, y: 655, w: 75, h: 58, label: "O₂ med.", sublabel: "300 bar", type: "medisch", details: "Medische zuurstof 300 bar" },
+  { id: "lucht_synth", x: 575, y: 655, w: 75, h: 58, label: "Lucht", sublabel: "Synth./Med.", type: "medisch", details: "Synthetische en medische lucht" },
+  { id: "showroom", x: 595, y: 610, w: 130, h: 28, label: "Showroom", type: "kantoor" },
+  { id: "kantoren", x: 340, y: 740, w: 300, h: 48, label: "K A N T O R E N", type: "kantoor", details: "Kantoorruimtes medewerkers" },
+  { id: "entree", x: 540, y: 750, w: 90, h: 38, label: "Entrée", type: "kantoor" },
 ];
 
 const STORAGE_KEY = "floorplan-positions";
@@ -156,7 +156,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const svgRef = useRef<SVGSVGElement>(null);
 
   const SVG_WIDTH = 1000;
-  const SVG_HEIGHT = 800;
+  const SVG_HEIGHT = 820;
 
   // Convert mouse event to SVG coordinates
   const toSVG = useCallback((e: React.MouseEvent): { x: number; y: number } | null => {
@@ -478,23 +478,23 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
 
 
             {/* Main building - hele overdekte gebied */}
-            <rect x="20" y="150" width={SVG_WIDTH - 40} height={625} rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
+            <rect x="20" y="150" width={SVG_WIDTH - 40} height={655} rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
             <text x="35" y="148" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">PRODUCTIEHAL</text>
 
             {/* Medical bunker */}
-            <rect x="110" y="625" width={550} height={72} rx="4" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="1.5" />
-            <text x="115" y="623" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">CILINDERBUNKER – MEDISCHE GASSEN</text>
+            <rect x="110" y="645" width={550} height={72} rx="4" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="1.5" />
+            <text x="115" y="643" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">CILINDERBUNKER – MEDISCHE GASSEN</text>
 
             {/* Office wing */}
-            <rect x="330" y="710" width={320} height={58} rx="4" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="1.5" />
+            <rect x="330" y="730" width={320} height={58} rx="4" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="1.5" />
 
             {/* Logistics strip */}
-            <rect x="20" y="535" width={420} height={100} rx="4" fill="hsl(var(--muted) / 0.1)" stroke="hsl(var(--border) / 0.3)" strokeWidth="1" strokeDasharray="4 4" />
-            <text x="35" y="533" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">LOGISTIEK & SCHOONMAAK</text>
+            <rect x="20" y="555" width={420} height={100} rx="4" fill="hsl(var(--muted) / 0.1)" stroke="hsl(var(--border) / 0.3)" strokeWidth="1" strokeDasharray="4 4" />
+            <text x="35" y="553" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">LOGISTIEK & SCHOONMAAK</text>
 
             {/* Vivisol wing */}
-            <rect x="585" y="535" width={310} height={55} rx="4" fill="hsl(var(--muted) / 0.1)" stroke="hsl(var(--border) / 0.3)" strokeWidth="1" strokeDasharray="4 4" />
-            <text x="600" y="533" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">VIVISOL</text>
+            <rect x="585" y="555" width={310} height={55} rx="4" fill="hsl(var(--muted) / 0.1)" stroke="hsl(var(--border) / 0.3)" strokeWidth="1" strokeDasharray="4 4" />
+            <text x="600" y="553" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">VIVISOL</text>
 
             {/* Grid (edit mode only) */}
             {editMode && (
