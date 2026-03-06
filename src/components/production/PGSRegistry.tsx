@@ -41,16 +41,16 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 // GHS pictogram config with diamond styling
-const GHS_CONFIG: Record<string, { color: string; label: string; icon: string }> = {
-  GHS01: { color: "hsl(24 95% 53%)", label: "Explosief", icon: "01" },
-  GHS02: { color: "hsl(0 84% 60%)", label: "Ontvlambaar", icon: "02" },
-  GHS03: { color: "hsl(45 93% 47%)", label: "Oxiderend", icon: "03" },
-  GHS04: { color: "hsl(217 91% 60%)", label: "Samengeperst gas", icon: "04" },
-  GHS05: { color: "hsl(271 81% 56%)", label: "Corrosief", icon: "05" },
-  GHS06: { color: "hsl(0 72% 38%)", label: "Giftig", icon: "06" },
-  GHS07: { color: "hsl(24 95% 64%)", label: "Schadelijk", icon: "07" },
-  GHS08: { color: "hsl(330 81% 60%)", label: "Gezondheidsgevaar", icon: "08" },
-  GHS09: { color: "hsl(160 84% 39%)", label: "Milieugevaarlijk", icon: "09" },
+const GHS_CONFIG: Record<string, { label: string; src: string }> = {
+  GHS01: { label: "Explosief", src: "/ghs/GHS01.svg" },
+  GHS02: { label: "Ontvlambaar", src: "/ghs/GHS02.svg" },
+  GHS03: { label: "Oxiderend", src: "/ghs/GHS03.svg" },
+  GHS04: { label: "Samengeperst gas", src: "/ghs/GHS04.svg" },
+  GHS05: { label: "Corrosief", src: "/ghs/GHS05.svg" },
+  GHS06: { label: "Giftig", src: "/ghs/GHS06.svg" },
+  GHS07: { label: "Schadelijk", src: "/ghs/GHS07.svg" },
+  GHS08: { label: "Gezondheidsgevaar", src: "/ghs/GHS08.svg" },
+  GHS09: { label: "Milieugevaarlijk", src: "/ghs/GHS09.svg" },
 };
 
 // PGS guideline color mapping
@@ -67,21 +67,11 @@ function GHSDiamond({ symbol }: { symbol: string }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div
-          className="relative w-7 h-7 cursor-default"
-          style={{ transform: "rotate(45deg)" }}
-        >
-          <div
-            className="absolute inset-0 border-2 bg-background"
-            style={{ borderColor: config.color }}
-          />
-          <span
-            className="absolute inset-0 flex items-center justify-center text-[9px] font-black"
-            style={{ transform: "rotate(-45deg)", color: config.color }}
-          >
-            {config.icon}
-          </span>
-        </div>
+        <img
+          src={config.src}
+          alt={`${symbol} — ${config.label}`}
+          className="w-8 h-8 cursor-default"
+        />
       </TooltipTrigger>
       <TooltipContent side="top" className="text-xs font-medium">
         {symbol} — {config.label}
