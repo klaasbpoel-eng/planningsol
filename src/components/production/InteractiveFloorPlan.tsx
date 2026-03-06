@@ -719,7 +719,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             })}
 
             {/* Zones */}
-            {filteredZones.filter(z => !z.id.startsWith("showroom_start") && !z.id.startsWith("showroom_end")).map((zone) => {
+            {filteredZones.filter(z => !z.id.startsWith("showroom")).map((zone) => {
               const zt = ZONE_TYPES[zone.type];
               const isSelected = selectedZone === zone.id;
               const isHovered = hoveredZone === zone.id;
