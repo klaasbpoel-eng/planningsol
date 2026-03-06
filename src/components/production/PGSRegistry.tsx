@@ -275,6 +275,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
       setSubstances((data || []).map(s => ({
         ...s,
         hazard_symbols: s.hazard_symbols || [],
+        cylinder_breakdown: (Array.isArray(s.cylinder_breakdown) ? s.cylinder_breakdown : []) as CylinderBreakdownItem[],
         gas_type_name: s.gas_type_id ? stripPurity(gasTypeMap[s.gas_type_id]?.name) || "Onbekend" : "Onbekend",
         gas_type_color: s.gas_type_id ? getGasColor(stripPurity(gasTypeMap[s.gas_type_id]?.name) || "", gasTypeMap[s.gas_type_id]?.color || "#6b7280") : "#6b7280",
       })));
