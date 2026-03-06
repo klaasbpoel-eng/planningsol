@@ -639,29 +639,24 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             <rect x="585" y="555" width={310} height={55} rx="4" fill="hsl(var(--muted) / 0.1)" stroke="hsl(var(--border) / 0.3)" strokeWidth="1" strokeDasharray="4 4" />
             <text x="600" y="553" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">VIVISOL</text>
 
-            {/* Showroom – curved path from Entrée to Kantoor Vivisol */}
+            {/* Showroom – curved path anchored to showroom zone */}
             {(() => {
-              const entreeZone = zones.find(z => z.id === "entree");
-              const kantoorZone = zones.find(z => z.id === "kantoor_vivisol");
-              if (!entreeZone || !kantoorZone) return null;
-              const sx = entreeZone.x + entreeZone.w;
-              const sy = entreeZone.y + entreeZone.h / 2;
-              const ex = kantoorZone.x + kantoorZone.w / 2;
-              const ey = kantoorZone.y + kantoorZone.h;
-              // Cubic bezier for a smooth round arc
-              const c1x = sx + 60;
-              const c1y = sy;
-              const c2x = ex;
-              const c2y = ey + 60;
-              const d = `M ${sx} ${sy} C ${c1x} ${c1y} ${c2x} ${c2y} ${ex} ${ey}`;
-              const mx = (sx + ex) / 2 + 30;
-              const my = (sy + ey) / 2 + 20;
-              const angle = Math.atan2(ey - sy, ex - sx) * (180 / Math.PI);
+              const sr = zones.find(z => z.id === "showroom");
+              if (!sr) return null;
+              const cx = sr.x + sr.w / 2;
+              const cy = sr.y + sr.h / 2;
+              // Arc from bottom-left to top-right, centered on showroom zone
+              const sx = cx - 100;
+              const sy = cy + 70;
+              const ex = cx + 10;
+              const ey = cy - 80;
+              const d = `M ${sx} ${sy} C ${sx + 80} ${sy} ${ex} ${ey + 80} ${ex} ${ey}`;
+              const angle = -70;
               return (
                 <g>
                   <path d={d} fill="none" stroke="hsl(40 70% 50% / 0.12)" strokeWidth="44" strokeLinecap="round" />
                   <path d={d} fill="none" stroke="hsl(40 70% 50% / 0.35)" strokeWidth="1" strokeDasharray="6 4" strokeLinecap="round" />
-                  <text x={mx} y={my} textAnchor="middle" fill="hsl(40 70% 50% / 0.5)" fontSize="8" fontWeight="700" letterSpacing="3" transform={`rotate(${angle}, ${mx}, ${my})`}>SHOWROOM</text>
+                  <text x={cx - 30} y={cy} textAnchor="middle" fill="hsl(40 70% 50% / 0.5)" fontSize="8" fontWeight="700" letterSpacing="3" transform={`rotate(${angle}, ${cx - 30}, ${cy})`}>SHOWROOM</text>
                 </g>
               );
             })()}
