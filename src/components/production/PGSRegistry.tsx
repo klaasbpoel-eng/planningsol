@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -763,26 +764,18 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
                       />
                       <div className="flex justify-between text-[10px] text-muted-foreground">
                         {isBulkEditing ? (
-                          <div className="space-y-1.5">
-                            <div className="flex items-center gap-1.5 text-[11px]">
-                              <span className="text-muted-foreground w-12">Niveau:</span>
-                              <Input
-                                type="number"
-                                value={bulkEditValue}
-                                onChange={e => setBulkEditValue(Number(e.target.value))}
-                                className="h-6 w-20 text-[11px] text-right"
-                              />
-                              <span className="text-muted-foreground">kg</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-[11px]">
-                              <span className="text-muted-foreground w-12">Cap.:</span>
-                              <Input
-                                type="number"
-                                value={bulkEditCapacity}
-                                onChange={e => setBulkEditCapacity(Number(e.target.value))}
-                                className="h-6 w-20 text-[11px] text-right"
-                              />
-                              <span className="text-muted-foreground">kg</span>
+                          <div className="space-y-2 w-full">
+                            <Slider
+                              value={[bulkEditValue]}
+                              min={0}
+                              max={bulkEditCapacity}
+                              step={Math.max(1, Math.round(bulkEditCapacity / 100))}
+                              onValueChange={([v]) => setBulkEditValue(v)}
+                              className="w-full"
+                            />
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-medium tabular-nums">{formatNumber(bulkEditValue, 0)} kg</span>
+                              <span className="text-muted-foreground">/ {formatNumber(bulkEditCapacity, 0)} kg</span>
                             </div>
                             <div className="flex gap-1 justify-end">
                               <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => saveBulkEdit(tank.id)}>
