@@ -103,6 +103,7 @@ const DEFAULT_ZONES: FloorZone[] = [
   { id: "kantoren", x: 340, y: 740, w: 300, h: 48, label: "K A N T O R E N", type: "kantoor", details: "Kantoorruimtes medewerkers" },
   { id: "entree", x: 540, y: 750, w: 90, h: 38, label: "Entrée", type: "kantoor" },
   { id: "uitsorteer", x: 750, y: 610, w: 220, h: 48, label: "Uitsorteerplatform", sublabel: "Lege cilinders", type: "logistiek", details: "Sorteerplatform voor lege cilinders" },
+  { id: "uitsorteer_vol", x: 750, y: 665, w: 220, h: 48, label: "Uitsorteerplatform", sublabel: "Volle cilinders · Order pick", type: "logistiek", details: "Sorteerplatform voor volle cilinders, gebruikt voor order picken" },
 ];
 
 const STORAGE_KEY = "floorplan-positions";
