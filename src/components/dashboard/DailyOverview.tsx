@@ -47,6 +47,7 @@ import {
   Plus,
   Filter,
   MoreVertical,
+  CalendarDays,
 } from "lucide-react";
 import {
   format,
@@ -738,6 +739,11 @@ export function DailyOverview() {
     const completed = allItems.filter(i => i.status === "completed").length;
     const totalDryIceKg = visibleDryIce.reduce((sum, o) => sum + Number(o.quantity_kg), 0);
     const totalCylinders = visibleGas.reduce((sum, o) => sum + o.cylinder_count, 0);
+    const upcomingCount =
+      (filteredAmbulance.length - visibleAmbulance.length) +
+      (filteredGas.length - visibleGas.length) +
+      (filteredDryIce.length - visibleDryIce.length) +
+      (filteredTasks.length - visibleTasks.length);
     return {
       total,
       completed,
@@ -749,6 +755,7 @@ export function DailyOverview() {
       totalCylinders,
       taskCount: visibleTasks.length,
       timeOffCount: visibleTimeOff.length,
+      upcomingCount,
     };
   }, [filteredAmbulance, filteredGas, filteredDryIce, filteredTasks, filteredTimeOff, dateRange]);
 
@@ -1059,6 +1066,16 @@ export function DailyOverview() {
                   ].filter(Boolean).join(", ")}
                 </AlertDescription>
               </Alert>
+            )}
+            {progressStats.upcomingCount > 0 && viewMode === "day" && !lookaheadActive && (
+              <div className="mb-3 print:hidden flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+                <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Er {progressStats.upcomingCount === 1 ? "staat" : "staan"} nog{" "}
+                  <span className="font-medium text-foreground">{progressStats.upcomingCount} {progressStats.upcomingCount === 1 ? "item" : "items"}</span>{" "}
+                  gepland in de komende dagen — klik ▶ of schakel naar weekweergave.
+                </span>
+              </div>
             )}
             <div className="space-y-4">
               {lookaheadActive && viewMode === "day" && (

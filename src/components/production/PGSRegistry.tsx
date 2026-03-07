@@ -40,6 +40,7 @@ import {
   Link2,
   HelpCircle,
   Filter,
+  Calculator,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatNumber } from "@/lib/utils";
@@ -99,6 +100,45 @@ function stripPurity(name?: string): string {
     .replace(/\s+E\.P\.$/, "")
     .replace(/\s+(Industrieel|Koeltechnisch|Medicinaal\b.*|MD APC)$/i, "")
     .trim();
+}
+
+/**
+ * Returns kg of gas per liter of cylinder water volume.
+ * - Compressed gases: real gas density at 200 bar fill pressure, 15 °C
+ * - Liquefied/dissolved gases: standard fill ratio (independent of pressure)
+ * Returns null for unknown gas types → user must enter kg/cilinder manually.
+ */
+function getGasKgPerLiter(gasName: string): number | null {
+  // Normalize: lowercase, strip everything after first word boundary that looks like purity
+  const n = gasName.toLowerCase().trim();
+
+  // ── Liquefied / dissolved gases (fill ratio, kg gas per L water volume) ──
+  if (n.includes("acetyleen") || n.includes("acetylene"))  return 0.15;  // dissolved in acetone
+  if (n.includes("kooldioxide") || n.includes("co2"))       return 0.75;  // EU fill ratio
+  if (n.includes("lachgas") || n.includes("distikstofoxide") || n.includes("n2o")) return 0.67;
+  if (n.includes("ammoniak") || n.includes("ammonia"))      return 0.60;
+  if (n.includes("propaan") || n.includes("propane"))        return 0.43;
+  if (n.includes("butaan") || n.includes("butane"))          return 0.51;
+  if (n.includes("chloor") || n.includes("chlorine"))        return 1.25;
+  if (n.includes("zwaveldioxide") || n.includes("so2"))      return 1.23;
+  if (n.includes("dimethylether") || n.includes("dme"))      return 0.58;
+
+  // ── Compressed gases at 200 bar, 15 °C (real gas densities, kg/L) ──
+  if (n.includes("argon"))                                   return 0.343;
+  if (n.includes("helium"))                                  return 0.0325;
+  if (n.startsWith("stikstof") || n === "stikstof" || n.includes("nitrogen") || n.includes("n2"))  return 0.233;
+  if (n.includes("zuurstof") || n.includes("oxygen") || n.includes("o2"))    return 0.276;
+  if (n.includes("waterstof") || n.includes("hydrogen") || n.includes("h2")) return 0.0164;
+  if (n.includes("methaan") || n.includes("methane"))        return 0.149;
+  if (n.includes("ethaan") || n.includes("ethane"))          return 0.318;  // supercritical at 200 bar
+  if (n.includes("lucht") || n.includes("perslucht") || n.includes("air"))  return 0.242;
+  if (n.includes("neon"))                                    return 0.083;
+  if (n.includes("krypton"))                                 return 0.710;
+  if (n.includes("xenon"))                                   return 1.19;
+  if (n.includes("koolmonoxide") || n.includes("co ") || n === "co") return 0.234;
+  if (n.includes("fluoride") || n.includes("hf"))            return null;  // corrosive, varies
+
+  return null; // unknown → manual input
 }
 
 const PGS_COLORS: Record<string, string> = {
@@ -243,6 +283,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkingSubstance, setLinkingSubstance] = useState<PGSSubstance | null>(null);
   const [allGasTypes, setAllGasTypes] = useState<{ id: string; name: string }[]>([]);
+  const [cylinderSizes, setCylinderSizes] = useState<Array<{ id: string; name: string; capacity_liters: number | null }>>([]);
 
   const handlePictogramModeChange = (value: string) => {
     if (value) {
@@ -366,6 +407,14 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     }
   };
 
+  useEffect(() => {
+    supabase
+      .from("cylinder_sizes")
+      .select("id, name, capacity_liters")
+      .eq("is_active", true)
+      .order("sort_order")
+      .then(({ data }) => { if (data) setCylinderSizes(data); });
+  }, []);
   // Realtime subscription for bulk tanks
   useEffect(() => {
     const channel = supabase
@@ -848,6 +897,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
                           onEditChange={setEditValues}
                           pictogramMode={pictogramMode}
                           onLinkGasType={isAdmin ? openLinkDialog : undefined}
+                          cylinderSizes={cylinderSizes}
                         />
                       );
                     })}
@@ -1044,6 +1094,7 @@ interface SubstanceRowProps {
   editValues: { max_allowed_kg: number; current_stock_kg: number };
   colSpan: number;
   pictogramMode: PictogramMode;
+  cylinderSizes: Array<{ id: string; name: string; capacity_liters: number | null }>;
   onToggle: () => void;
   onStartEdit: () => void;
   onCancelEdit: () => void;
@@ -1054,10 +1105,29 @@ interface SubstanceRowProps {
 
 function SubstanceRow({
   substance, pct, isWarning, isCritical, isExpanded, isEditing, isEven,
-  isAdmin, editValues, colSpan, pictogramMode, onToggle, onStartEdit, onCancelEdit, onSaveEdit, onEditChange, onLinkGasType,
+  isAdmin, editValues, colSpan, pictogramMode, cylinderSizes, onToggle, onStartEdit, onCancelEdit, onSaveEdit, onEditChange, onLinkGasType,
 }: SubstanceRowProps) {
   const pgsClass = PGS_COLORS[substance.pgs_guideline] || "bg-muted text-muted-foreground border-border";
   const isUnknown = substance.gas_type_name === "Onbekend";
+  const [showCalc, setShowCalc] = useState(false);
+  // count per size; kgPerCyl only used when gas type is unknown
+  const [cylEntries, setCylEntries] = useState<Record<string, { count: string; kgPerCyl: string }>>({});
+
+  // Auto kg/L from gas type lookup (null = manual entry needed)
+  const gasKgPerLiter = getGasKgPerLiter(substance.gas_type_name || "");
+
+  const calcTotal = cylinderSizes.reduce((sum, size) => {
+    const e = cylEntries[size.id];
+    const count = parseFloat(e?.count || "0") || 0;
+    const kgPerCyl =
+      gasKgPerLiter !== null && size.capacity_liters != null
+        ? size.capacity_liters * gasKgPerLiter
+        : parseFloat(e?.kgPerCyl || "0") || 0;
+    return sum + count * kgPerCyl;
+  }, 0);
+
+  const setCylEntry = (id: string, field: "count" | "kgPerCyl", val: string) =>
+    setCylEntries(prev => ({ ...prev, [id]: { ...(prev[id] || { count: "", kgPerCyl: "" }), [field]: val } }));
 
   return (
     <>
@@ -1258,12 +1328,29 @@ function SubstanceRow({
         </TableCell>
         <TableCell className="text-right" onClick={e => e.stopPropagation()}>
           {isEditing ? (
-            <Input
-              type="number"
-              value={editValues.current_stock_kg}
-              onChange={e => onEditChange({ ...editValues, current_stock_kg: Number(e.target.value) })}
-              className="h-7 w-24 text-right text-sm ml-auto"
-            />
+            <div className="flex items-center justify-end gap-1">
+              <Input
+                type="number"
+                value={editValues.current_stock_kg}
+                onChange={e => onEditChange({ ...editValues, current_stock_kg: Number(e.target.value) })}
+                className="h-7 w-20 text-right text-sm"
+              />
+              {cylinderSizes.length > 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={showCalc ? "secondary" : "ghost"}
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => setShowCalc(v => !v)}
+                    >
+                      <Calculator className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">Bereken via cilinders</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
           ) : (
             <span className={cn("text-sm tabular-nums", isWarning && "font-bold text-destructive")}>
               {formatNumber(substance.current_stock_kg, 0)}
@@ -1290,6 +1377,114 @@ function SubstanceRow({
           </TableCell>
         )}
       </TableRow>
+
+      {/* Cylinder calculator panel */}
+      <AnimatePresence>
+        {isEditing && showCalc && (
+          <TableRow className="hover:bg-transparent">
+            <TableCell colSpan={colSpan} className="p-0 border-b border-border/20">
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.15, ease: "easeInOut" }}
+                className="overflow-hidden"
+              >
+                <div className="px-6 py-3 bg-blue-50/60 dark:bg-blue-950/20 border-l-2 border-blue-400/50">
+                  <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-1.5">
+                    <Calculator className="h-3.5 w-3.5" />
+                    Bereken voorraad via cilinders
+                    {gasKgPerLiter !== null && (
+                      <span className="ml-1 font-normal text-[10px] text-blue-500 dark:text-blue-400">
+                        ({substance.gas_type_name} — {gasKgPerLiter} kg/L · 200 bar)
+                      </span>
+                    )}
+                  </p>
+                  <div className="space-y-1.5">
+                    {/* Header */}
+                    <div className="grid grid-cols-[130px_56px_96px_16px_80px_16px_76px] gap-1.5 text-[10px] text-muted-foreground font-medium uppercase tracking-wide pb-1 border-b border-border/30">
+                      <span>Maat</span>
+                      <span>Inhoud</span>
+                      <span className="text-center">kg/cilinder</span>
+                      <span />
+                      <span className="text-center">Aantal</span>
+                      <span />
+                      <span className="text-right">Subtotaal</span>
+                    </div>
+                    {cylinderSizes.map(size => {
+                      const e = cylEntries[size.id] || { count: "", kgPerCyl: "" };
+                      const autoKgPerCyl =
+                        gasKgPerLiter !== null && size.capacity_liters != null
+                          ? size.capacity_liters * gasKgPerLiter
+                          : null;
+                      const kgPerCyl = autoKgPerCyl ?? (parseFloat(e.kgPerCyl) || 0);
+                      const count = parseFloat(e.count) || 0;
+                      const sub = count * kgPerCyl;
+                      return (
+                        <div key={size.id} className="grid grid-cols-[130px_56px_96px_16px_80px_16px_76px] gap-1.5 items-center">
+                          <span className="text-xs font-medium">{size.name}</span>
+                          <span className="text-xs text-muted-foreground tabular-nums">
+                            {size.capacity_liters ? `${size.capacity_liters} L` : "—"}
+                          </span>
+                          {/* kg per cylinder — auto or manual */}
+                          {autoKgPerCyl !== null ? (
+                            <span className="text-xs text-center tabular-nums text-emerald-700 dark:text-emerald-400 font-medium">
+                              {autoKgPerCyl % 1 === 0 ? autoKgPerCyl.toFixed(0) : autoKgPerCyl.toFixed(2)} kg
+                            </span>
+                          ) : (
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              placeholder="kg/cil."
+                              value={e.kgPerCyl}
+                              onChange={ev => setCylEntry(size.id, "kgPerCyl", ev.target.value)}
+                              className="h-6 text-xs text-center px-1"
+                            />
+                          )}
+                          <span className="text-[10px] text-muted-foreground text-center">×</span>
+                          <Input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={e.count}
+                            onChange={ev => setCylEntry(size.id, "count", ev.target.value)}
+                            className="h-6 text-xs text-center px-1"
+                          />
+                          <span className="text-[10px] text-muted-foreground text-center">=</span>
+                          <span className={cn(
+                            "text-xs text-right tabular-nums",
+                            sub > 0 ? "text-foreground font-medium" : "text-muted-foreground"
+                          )}>
+                            {sub > 0 ? `${sub % 1 === 0 ? sub.toFixed(0) : sub.toFixed(1)} kg` : "—"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center justify-between pt-2 border-t border-border/30 mt-1">
+                      <span className="text-sm font-semibold">
+                        Totaal: <span className="text-blue-700 dark:text-blue-300">{calcTotal % 1 === 0 ? calcTotal.toFixed(0) : calcTotal.toFixed(1)} kg</span>
+                      </span>
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs gap-1.5"
+                        disabled={calcTotal === 0}
+                        onClick={() => {
+                          onEditChange({ ...editValues, current_stock_kg: Math.round(calcTotal * 10) / 10 });
+                          setShowCalc(false);
+                        }}
+                      >
+                        <Check className="h-3 w-3" />
+                        Gebruik {calcTotal % 1 === 0 ? calcTotal.toFixed(0) : calcTotal.toFixed(1)} kg
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </TableCell>
+          </TableRow>
+        )}
+      </AnimatePresence>
 
       {/* Expanded details */}
       <AnimatePresence>

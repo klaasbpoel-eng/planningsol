@@ -15,6 +15,7 @@ import { BarcodeGenerator } from "@/components/barcode/BarcodeGenerator";
 import VrijgavesPage from "./pages/VrijgavesPage";
 import DailyOverviewPage from "./pages/DailyOverviewPage";
 import { CommandPalette } from "@/components/command-palette";
+import SqlSyncTasksPage from "./pages/SqlSyncTasksPage";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ const App = () => (
               <Route path="/barcode" element={<BarcodeGenerator />} />
               <Route path="/vrijgaves" element={<VrijgavesPage />} />
               <Route path="/dagoverzicht" element={<DailyOverviewPage />} />
+              <Route path="/sync-instellingen" element={<SqlSyncTasksPage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
