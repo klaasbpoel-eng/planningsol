@@ -25,8 +25,12 @@ const sqlConfig = {
         idleTimeoutMillis: 30000
     },
     options: {
-        encrypt: false, // Zet op true in productie als je een certificaat hebt
-        trustServerCertificate: true // OK voor lokaal
+        encrypt: false,               // VPN's hikken vaak op geforceerde encryptie als het certificaat lokaal is
+        trustServerCertificate: true, // Nodig voor zelfgetekende of ontbrekende certificaten over VPN
+        enableArithAbort: true,
+        cryptoCredentialsDetails: {
+            minVersion: 'TLSv1'       // Oude SQL servers over VPN ondersteunen soms geen TLS 1.2
+        }
     }
 };
 
