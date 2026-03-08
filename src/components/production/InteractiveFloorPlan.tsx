@@ -709,37 +709,69 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       const s = resizeZoneStart.current;
       
       // Collect existing widths & heights from other zones for size-snapping
-      const SIZE_SNAP_THRESHOLD = 8;
+      const SIZE_SNAP_THRESHOLD = 15;
       const otherZones = zones.filter(z => z.id !== resizingZoneId);
       const existingWidths = [...new Set(otherZones.map(z => z.w))];
       const existingHeights = [...new Set(otherZones.map(z => z.h))];
       
-      const snapToSize = (val: number, existingSizes: number[]) => {
-        const gridSnapped = snap(val);
+      const snapToSize = (val: number, existingSizes: number[]): { value: number; snappedTo: number | null } => {
+        let bestDist = Infinity;
+        let bestSize: number | null = null;
         for (const sz of existingSizes) {
-          if (Math.abs(val - sz) < SIZE_SNAP_THRESHOLD) return sz;
+          const dist = Math.abs(val - sz);
+          if (dist < SIZE_SNAP_THRESHOLD && dist < bestDist) {
+            bestDist = dist;
+            bestSize = sz;
+          }
         }
-        return gridSnapped;
+        return bestSize !== null 
+          ? { value: bestSize, snappedTo: bestSize } 
+          : { value: snap(val), snappedTo: null };
       };
       
       let newX = s.x, newY = s.y, newW = s.w, newH = s.h;
+      let snappedW: number | null = null;
+      let snappedH: number | null = null;
+      
       if (resizingCorner === "se") {
-        newW = Math.max(40, snapToSize(svgPt.x - s.x, existingWidths));
-        newH = Math.max(20, snapToSize(svgPt.y - s.y, existingHeights));
+        const wSnap = snapToSize(svgPt.x - s.x, existingWidths);
+        const hSnap = snapToSize(svgPt.y - s.y, existingHeights);
+        newW = Math.max(40, wSnap.value); snappedW = wSnap.snappedTo;
+        newH = Math.max(20, hSnap.value); snappedH = hSnap.snappedTo;
       } else if (resizingCorner === "sw") {
-        newW = Math.max(40, snapToSize(s.x + s.w - svgPt.x, existingWidths));
+        const wSnap = snapToSize(s.x + s.w - svgPt.x, existingWidths);
+        const hSnap = snapToSize(svgPt.y - s.y, existingHeights);
+        newW = Math.max(40, wSnap.value); snappedW = wSnap.snappedTo;
         newX = s.x + s.w - newW;
-        newH = Math.max(20, snapToSize(svgPt.y - s.y, existingHeights));
+        newH = Math.max(20, hSnap.value); snappedH = hSnap.snappedTo;
       } else if (resizingCorner === "ne") {
-        newW = Math.max(40, snapToSize(svgPt.x - s.x, existingWidths));
-        newH = Math.max(20, snapToSize(s.y + s.h - svgPt.y, existingHeights));
+        const wSnap = snapToSize(svgPt.x - s.x, existingWidths);
+        const hSnap = snapToSize(s.y + s.h - svgPt.y, existingHeights);
+        newW = Math.max(40, wSnap.value); snappedW = wSnap.snappedTo;
+        newH = Math.max(20, hSnap.value); snappedH = hSnap.snappedTo;
         newY = s.y + s.h - newH;
       } else if (resizingCorner === "nw") {
-        newW = Math.max(40, snapToSize(s.x + s.w - svgPt.x, existingWidths));
+        const wSnap = snapToSize(s.x + s.w - svgPt.x, existingWidths);
+        const hSnap = snapToSize(s.y + s.h - svgPt.y, existingHeights);
+        newW = Math.max(40, wSnap.value); snappedW = wSnap.snappedTo;
         newX = s.x + s.w - newW;
-        newH = Math.max(20, snapToSize(s.y + s.h - svgPt.y, existingHeights));
+        newH = Math.max(20, hSnap.value); snappedH = hSnap.snappedTo;
         newY = s.y + s.h - newH;
       }
+      
+      // Find the source zone(s) we're snapping to for visual guides
+      let guideZoneW: { x: number; y: number; w: number; h: number } | null = null;
+      let guideZoneH: { x: number; y: number; w: number; h: number } | null = null;
+      if (snappedW !== null) {
+        const match = otherZones.find(z => z.w === snappedW);
+        if (match) guideZoneW = match;
+      }
+      if (snappedH !== null) {
+        const match = otherZones.find(z => z.h === snappedH);
+        if (match) guideZoneH = match;
+      }
+      setResizeGuides({ w: guideZoneW, h: guideZoneH });
+      
       setZones(prev => prev.map(z => z.id === resizingZoneId ? { ...z, x: newX, y: newY, w: newW, h: newH } : z));
       setHasChanges(true);
       return;
