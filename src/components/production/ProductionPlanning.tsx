@@ -69,6 +69,9 @@ export function ProductionPlanning({
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hideDigital, setHideDigital] = useState(false);
+  const [statsCollapsed, setStatsCollapsed] = useState(() => {
+    try { return localStorage.getItem("production-stats-collapsed") === "true"; } catch { return false; }
+  });
 
   // Date range state for dashboard sync with reports
   const [dateRange, setDateRange] = useState<DateRange>({
