@@ -1102,11 +1102,15 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
               const isHovered = hoveredZone === zone.id;
               const isDragging = draggingId === zone.id;
               const dimmed = filterType !== "all" && zone.type !== filterType;
+              const rot = zone.rotation || 0;
+              const cx = zone.x + zone.w / 2;
+              const cy = zone.y + zone.h / 2;
 
               return (
                 <g
                   key={zone.id}
                   data-zone={zone.id}
+                  transform={rot ? `rotate(${rot} ${cx} ${cy})` : undefined}
                   className={editMode ? "cursor-grab" : "cursor-pointer"}
                   style={{ opacity: dimmed ? 0.25 : isDragging ? 0.7 : 1 }}
                   onClick={(e) => { if (!editMode) { e.stopPropagation(); setSelectedZone(s => s === zone.id ? null : zone.id); } }}
@@ -1138,7 +1142,6 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                       onDoubleClick={(e) => { e.stopPropagation(); handleStartEdit(zone.id, "sublabel", zone.sublabel || ""); }}
                     >{zone.sublabel}</text>
                   )}
-                  {/* Double-click hint to add sublabel */}
                   {editMode && !zone.sublabel && (
                     <text
                       x={zone.x + zone.w / 2} y={zone.y + zone.h / 2 + 9}
@@ -1148,12 +1151,74 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                       onDoubleClick={(e) => { e.stopPropagation(); handleStartEdit(zone.id, "sublabel", ""); }}
                     >+ sublabel</text>
                   )}
-                  {/* Edit mode drag indicator */}
+                  {/* Edit mode: drag indicator */}
                   {editMode && (
                     <g style={{ pointerEvents: "none" }}>
-                      <rect x={zone.x + zone.w / 2 - 8} y={zone.y - 6} width="16" height="8" rx="3" fill="hsl(var(--primary))" opacity="0.6" />
-                      <line x1={zone.x + zone.w / 2 - 3} y1={zone.y - 3.5} x2={zone.x + zone.w / 2 + 3} y2={zone.y - 3.5} stroke="hsl(var(--primary-foreground))" strokeWidth="1" opacity="0.8" />
-                      <line x1={zone.x + zone.w / 2 - 3} y1={zone.y - 1} x2={zone.x + zone.w / 2 + 3} y2={zone.y - 1} stroke="hsl(var(--primary-foreground))" strokeWidth="1" opacity="0.8" />
+                      <rect x={zone.x + zone.w / 2 - 8} y={zone.y + 2} width="16" height="8" rx="3" fill="hsl(var(--primary))" opacity="0.4" />
+                      <line x1={zone.x + zone.w / 2 - 3} y1={zone.y + 4.5} x2={zone.x + zone.w / 2 + 3} y2={zone.y + 4.5} stroke="hsl(var(--primary-foreground))" strokeWidth="1" opacity="0.6" />
+                      <line x1={zone.x + zone.w / 2 - 3} y1={zone.y + 7} x2={zone.x + zone.w / 2 + 3} y2={zone.y + 7} stroke="hsl(var(--primary-foreground))" strokeWidth="1" opacity="0.6" />
+                    </g>
+                  )}
+                  {/* Edit mode: corner resize handles */}
+                  {editMode && (isSelected || isHovered) && (
+                    <>
+                      {(["nw", "ne", "sw", "se"] as const).map(corner => {
+                        const hx = corner.includes("w") ? zone.x : zone.x + zone.w;
+                        const hy = corner.includes("n") ? zone.y : zone.y + zone.h;
+                        const cursorMap = { nw: "nwse-resize", ne: "nesw-resize", sw: "nesw-resize", se: "nwse-resize" };
+                        return (
+                          <g key={corner}>
+                            <rect
+                              x={hx - 6} y={hy - 6} width={12} height={12}
+                              fill="transparent" style={{ cursor: cursorMap[corner] }}
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                resizeZoneStart.current = { x: zone.x, y: zone.y, w: zone.w, h: zone.h };
+                                setResizingZoneId(zone.id);
+                                setResizingCorner(corner);
+                              }}
+                            />
+                            <rect
+                              x={hx - 3} y={hy - 3} width={6} height={6} rx="1"
+                              fill="hsl(var(--primary))" stroke="hsl(var(--background))" strokeWidth="1"
+                              style={{ pointerEvents: "none" }}
+                            />
+                          </g>
+                        );
+                      })}
+                    </>
+                  )}
+                  {/* Edit mode: rotation handle */}
+                  {editMode && (isSelected || isHovered) && (
+                    <g>
+                      <line
+                        x1={cx} y1={zone.y - 4} x2={cx} y2={zone.y - 20}
+                        stroke="hsl(var(--primary) / 0.4)" strokeWidth="1.5"
+                        style={{ pointerEvents: "none" }}
+                      />
+                      <circle
+                        cx={cx} cy={zone.y - 22} r="5"
+                        fill="hsl(var(--primary))" stroke="hsl(var(--background))" strokeWidth="1.5"
+                        style={{ cursor: "grab" }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          const svgPt = toSVG(e);
+                          if (!svgPt) return;
+                          const angle = Math.atan2(svgPt.y - cy, svgPt.x - cx) * (180 / Math.PI);
+                          rotateZoneStart.current = { angle, rotation: zone.rotation || 0 };
+                          setRotatingZoneId(zone.id);
+                        }}
+                      />
+                      {/* Rotation degree indicator */}
+                      {rot !== 0 && (
+                        <text
+                          x={cx + 10} y={zone.y - 22}
+                          fill="hsl(var(--primary))" fontSize="7" fontWeight="600"
+                          dominantBaseline="middle"
+                        >{rot}°</text>
+                      )}
                     </g>
                   )}
                   {!editMode && isSelected && <circle cx={zone.x + zone.w - 8} cy={zone.y + 8} r="4" fill={zt.color} />}
@@ -1172,7 +1237,6 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                       </g>
                     );
                   })()}
-                  {/* Flame icon for flammable zones */}
                   {zone.type === "opslag_brandbaar" && zone.id !== "buiten_brandbaar" && (
                     <g>
                       <image href="/ghs/GHS02.svg" x={zone.x + zone.w - 18} y={zone.y + 2} width="16" height="16" opacity="0.7" />
