@@ -1380,7 +1380,37 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
               <line x1="0" y1={alignGuides.y} x2={SVG_WIDTH} y2={alignGuides.y} stroke="hsl(var(--primary))" strokeWidth="0.75" strokeDasharray="4 3" opacity="0.6" />
             )}
 
-            {/* Bulk tanks */}
+            {/* Resize size-snap guide lines */}
+            {resizingZoneId && resizeGuides.w && (() => {
+              const src = resizeGuides.w;
+              const resizing = zones.find(z => z.id === resizingZoneId);
+              if (!resizing) return null;
+              return (
+                <g>
+                  {/* Highlight the matched zone's width */}
+                  <rect x={src.x} y={src.y} width={src.w} height={src.h} fill="none" stroke="hsl(var(--primary))" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.5" />
+                  {/* Width dimension line on source */}
+                  <line x1={src.x} y1={src.y - 4} x2={src.x + src.w} y2={src.y - 4} stroke="hsl(var(--primary))" strokeWidth="0.75" opacity="0.6" />
+                  <text x={src.x + src.w / 2} y={src.y - 7} textAnchor="middle" fill="hsl(var(--primary))" fontSize="7" fontWeight="600" opacity="0.7">{Math.round(src.w)}</text>
+                </g>
+              );
+            })()}
+            {resizingZoneId && resizeGuides.h && (() => {
+              const src = resizeGuides.h;
+              const resizing = zones.find(z => z.id === resizingZoneId);
+              if (!resizing) return null;
+              // Only draw if not already drawn by width guide
+              if (resizeGuides.w && resizeGuides.w.x === src.x && resizeGuides.w.y === src.y) return null;
+              return (
+                <g>
+                  <rect x={src.x} y={src.y} width={src.w} height={src.h} fill="none" stroke="hsl(var(--primary))" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.5" />
+                  {/* Height dimension line on source */}
+                  <line x1={src.x - 4} y1={src.y} x2={src.x - 4} y2={src.y + src.h} stroke="hsl(var(--primary))" strokeWidth="0.75" opacity="0.6" />
+                  <text x={src.x - 7} y={src.y + src.h / 2} textAnchor="middle" fill="hsl(var(--primary))" fontSize="7" fontWeight="600" opacity="0.7" transform={`rotate(-90, ${src.x - 7}, ${src.y + src.h / 2})`}>{Math.round(src.h)}</text>
+                </g>
+              );
+            })()}
+
             {showTanks && tanks.map((tank) => {
               const isSelected = selectedZone === tank.id;
               const isHovered = hoveredZone === tank.id;
