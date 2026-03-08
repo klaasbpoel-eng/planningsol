@@ -894,6 +894,8 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
 
   const handleBgMouseDown = useCallback((e: React.MouseEvent) => {
     if ((e.target as SVGElement).closest("[data-zone]")) return;
+    // Deselect when clicking empty space
+    setSelectedZone(null);
     if (editMode) return; // Don't pan while editing, only drag zones
     setIsPanning(true);
     setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
