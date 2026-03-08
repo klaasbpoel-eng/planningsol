@@ -175,7 +175,7 @@ export function Header({
                 </h1>
                 <Badge
                   variant="outline"
-                  className={`text-xs ${ROLE_COLORS[role] || ROLE_COLORS.user}`}
+                  className={`text-xs hidden md:inline-flex ${ROLE_COLORS[role] || ROLE_COLORS.user}`}
                 >
                   {ROLE_LABELS[role] || "Gebruiker"}
                 </Badge>
