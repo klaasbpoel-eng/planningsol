@@ -803,7 +803,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             <rect x="0" y="0" width={SVG_WIDTH} height={SVG_HEIGHT} fill="hsl(var(--background))" rx="8" />
 
             {/* Terrain */}
-            <rect x="15" y="40" width={SVG_WIDTH - 30} height={terrainHeight} rx="4" fill="hsl(var(--muted) / 0.15)" stroke="hsl(var(--border) / 0.15)" strokeWidth="0.5" strokeDasharray="8 4" />
+            <rect x="15" y="40" width={SVG_WIDTH - 30} height={terrainHeight} rx="4" fill="hsl(var(--muted) / 0.08)" stroke="hsl(var(--border) / 0.4)" strokeWidth="1" strokeDasharray="6 3" />
             <text x={SVG_WIDTH / 2} y="57" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="9" fontWeight="700" letterSpacing="2" opacity="0.3">BUITENTERREIN – BULKTANKS</text>
 
             {/* Terrain resize handle (edit mode only) */}
@@ -812,9 +812,12 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                 className="cursor-ns-resize"
                 onMouseDown={(e) => { e.stopPropagation(); setResizingTerrain(true); }}
               >
-                <rect x={SVG_WIDTH / 2 - 30} y={40 + terrainHeight - 3} width={60} height={6} rx="3" fill="hsl(var(--primary) / 0.5)" />
-                <line x1={SVG_WIDTH / 2 - 10} y1={40 + terrainHeight - 1} x2={SVG_WIDTH / 2 + 10} y2={40 + terrainHeight - 1} stroke="hsl(var(--primary-foreground))" strokeWidth="0.8" opacity="0.7" />
-                <line x1={SVG_WIDTH / 2 - 10} y1={40 + terrainHeight + 1} x2={SVG_WIDTH / 2 + 10} y2={40 + terrainHeight + 1} stroke="hsl(var(--primary-foreground))" strokeWidth="0.8" opacity="0.7" />
+                {/* Invisible wide hit area */}
+                <rect x="15" y={40 + terrainHeight - 10} width={SVG_WIDTH - 30} height={20} fill="transparent" />
+                {/* Visible pill handle */}
+                <rect x={SVG_WIDTH / 2 - 40} y={40 + terrainHeight - 4} width={80} height={8} rx="4" fill="hsl(var(--primary) / 0.6)" />
+                <line x1={SVG_WIDTH / 2 - 15} y1={40 + terrainHeight - 1} x2={SVG_WIDTH / 2 + 15} y2={40 + terrainHeight - 1} stroke="hsl(var(--primary-foreground))" strokeWidth="1" opacity="0.8" />
+                <line x1={SVG_WIDTH / 2 - 15} y1={40 + terrainHeight + 1.5} x2={SVG_WIDTH / 2 + 15} y2={40 + terrainHeight + 1.5} stroke="hsl(var(--primary-foreground))" strokeWidth="1" opacity="0.8" />
               </g>
             )}
 
