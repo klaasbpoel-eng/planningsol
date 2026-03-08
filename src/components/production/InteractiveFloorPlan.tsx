@@ -938,6 +938,27 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                     </g>
                   )}
                   {!editMode && isSelected && <circle cx={zone.x + zone.w - 8} cy={zone.y + 8} r="4" fill={zt.color} />}
+                  {/* Inventory occupancy bar */}
+                  {showInventory && !editMode && (() => {
+                    const inv = getZoneInventory(zone.id);
+                    if (!inv) return null;
+                    const barW = zone.w - 8;
+                    const fillW = Math.min((inv.pct / 100) * barW, barW);
+                    const col = getOccupancyColor(inv.pct);
+                    return (
+                      <g>
+                        <rect x={zone.x + 4} y={zone.y + zone.h - 8} width={barW} height={4} rx="2" fill="hsl(var(--muted) / 0.3)" />
+                        <rect x={zone.x + 4} y={zone.y + zone.h - 8} width={fillW} height={4} rx="2" fill={col} />
+                        <text x={zone.x + zone.w - 4} y={zone.y + zone.h - 10} textAnchor="end" fill={col} fontSize="6" fontWeight="700">{inv.pct}%</text>
+                      </g>
+                    );
+                  })()}
+                  {/* Flame icon for flammable zones */}
+                  {zone.type === "opslag_brandbaar" && zone.id !== "buiten_brandbaar" && (
+                    <g>
+                      <image href="/ghs/GHS02.svg" x={zone.x + zone.w - 18} y={zone.y + 2} width="16" height="16" opacity="0.7" />
+                    </g>
+                  )}
                 </g>
               );
             })}
