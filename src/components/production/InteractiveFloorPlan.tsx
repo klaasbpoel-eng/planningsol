@@ -1547,7 +1547,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   {ctxZone?.sublabel && <div className="text-[10px] text-muted-foreground truncate">{ctxZone.sublabel}</div>}
                 </div>
 
-                {/* Tab switcher */}
+                {/* Tab switcher - only show gas tab for opslag_vol */}
                 <div className="flex border-b border-border">
                   <button
                     className={cn("flex-1 text-[11px] py-1.5 font-medium transition-colors", contextMenuTab === "type" ? "text-primary border-b-2 border-primary bg-primary/5" : "text-muted-foreground hover:text-foreground")}
@@ -1555,13 +1555,15 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   >
                     Zone type
                   </button>
-                  <button
-                    className={cn("flex-1 text-[11px] py-1.5 font-medium transition-colors", contextMenuTab === "gas" ? "text-primary border-b-2 border-primary bg-primary/5" : "text-muted-foreground hover:text-foreground")}
-                    onClick={() => setContextMenuTab("gas")}
-                  >
-                    Gassoort
-                    {currentGas && <span className="ml-1 w-2 h-2 rounded-full inline-block" style={{ backgroundColor: getGasColor(currentGas) }} />}
-                  </button>
+                  {ctxZone?.type === "opslag_vol" && (
+                    <button
+                      className={cn("flex-1 text-[11px] py-1.5 font-medium transition-colors", contextMenuTab === "gas" ? "text-primary border-b-2 border-primary bg-primary/5" : "text-muted-foreground hover:text-foreground")}
+                      onClick={() => setContextMenuTab("gas")}
+                    >
+                      Gassoort
+                      {currentGas && <span className="ml-1 w-2 h-2 rounded-full inline-block" style={{ backgroundColor: getGasColor(currentGas) }} />}
+                    </button>
+                  )}
                 </div>
 
                 {/* Tab content */}
