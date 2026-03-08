@@ -1,10 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://planning.solnederland.nl",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 const BATCH_SIZE = 999;
 
@@ -179,6 +174,8 @@ function escapeColumnName(name: string): string {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -215,7 +212,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Single table export per call to avoid CPU timeout
     const { table, includeHeader, includeFooter } = await req.json();
 
     if (!table || !TABLE_SQLS[table]) {
@@ -238,13 +234,11 @@ Deno.serve(async (req) => {
       lines.push("");
     }
 
-    // CREATE TABLE
     lines.push(`-- Table: ${table}`);
     lines.push(`DROP TABLE IF EXISTS \`${table}\`;`);
     lines.push(TABLE_SQLS[table].replace("IF NOT EXISTS ", ""));
     lines.push("");
 
-    // Fetch all rows in batches
     let offset = 0;
     let totalRows = 0;
 
@@ -265,7 +259,6 @@ Deno.serve(async (req) => {
       const columns = Object.keys(rows[0]);
       const columnList = columns.map(escapeColumnName).join(", ");
 
-      // Batch inserts in groups of 50 rows
       for (let i = 0; i < rows.length; i += 50) {
         const batch = rows.slice(i, i + 50);
         const valueRows = batch.map((row) => {

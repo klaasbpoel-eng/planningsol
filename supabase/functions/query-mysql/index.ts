@@ -1,10 +1,6 @@
 import { Client } from "https://deno.land/x/mysql@v2.12.1/mod.ts";
-
-const corsHeaders = {
-    "Access-Control-Allow-Origin": "https://planning.solnederland.nl",
-    "Access-Control-Allow-Headers":
-        "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 function sanitizeHost(raw: string): string {
     let h = raw.trim();
@@ -15,6 +11,8 @@ function sanitizeHost(raw: string): string {
 }
 
 Deno.serve(async (req) => {
+    const corsHeaders = getCorsHeaders(req);
+
     if (req.method === "OPTIONS") {
         return new Response(null, { headers: corsHeaders });
     }
@@ -22,7 +20,35 @@ Deno.serve(async (req) => {
     try {
         const authHeader = req.headers.get("Authorization");
         if (!authHeader?.startsWith("Bearer ")) {
-            throw new Error("Missing or invalid Authorization header");
+            return new Response(JSON.stringify({ error: "Unauthorized" }), {
+                status: 401,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
+        // Admin-only check
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+        const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+            global: { headers: { Authorization: authHeader } },
+        });
+
+        const token = authHeader.replace("Bearer ", "");
+        const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(token);
+        if (claimsErr || !claimsData?.claims) {
+            return new Response(JSON.stringify({ error: "Unauthorized" }), {
+                status: 401,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
+        const { data: isAdmin } = await userClient.rpc("is_admin");
+        if (!isAdmin) {
+            return new Response(JSON.stringify({ error: "Alleen admins kunnen SQL queries uitvoeren" }), {
+                status: 403,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
         }
 
         const { host, port, user, password, database, query, params } = await req.json();

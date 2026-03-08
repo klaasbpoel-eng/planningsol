@@ -1,39 +1,17 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://planning.solnederland.nl",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 const VALID_TABLES = [
-  "gas_type_categories",
-  "gas_types",
-  "cylinder_sizes",
-  "dry_ice_packaging",
-  "dry_ice_product_types",
-  "task_types",
-  "time_off_types",
-  "app_settings",
-  "customers",
-  "gas_cylinder_orders",
-  "dry_ice_orders",
+  "gas_type_categories", "gas_types", "cylinder_sizes", "dry_ice_packaging",
+  "dry_ice_product_types", "task_types", "time_off_types", "app_settings",
+  "customers", "gas_cylinder_orders", "dry_ice_orders",
 ];
 
-// Delete in reverse dependency order
 const DELETE_ORDER = [
-  "gas_cylinder_orders",
-  "dry_ice_orders",
-  "customers",
-  "app_settings",
-  "time_off_types",
-  "task_types",
-  "dry_ice_product_types",
-  "dry_ice_packaging",
-  "cylinder_sizes",
-  "gas_types",
-  "gas_type_categories",
+  "gas_cylinder_orders", "dry_ice_orders", "customers", "app_settings",
+  "time_off_types", "task_types", "dry_ice_product_types", "dry_ice_packaging",
+  "cylinder_sizes", "gas_types", "gas_type_categories",
 ];
 
 async function verifyAdmin(req: Request) {
@@ -63,6 +41,8 @@ async function verifyAdmin(req: Request) {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -78,7 +58,6 @@ Deno.serve(async (req) => {
 
     try {
       if (action === "clear") {
-        // Delete all data in reverse dependency order
         for (const table of DELETE_ORDER) {
           await sql.unsafe(`DELETE FROM public.${table}`);
         }
@@ -107,14 +86,13 @@ Deno.serve(async (req) => {
 
         const columns = Object.keys(rows[0]);
         const batchSize = 500;
-
         let totalInserted = 0;
+
         for (let i = 0; i < rows.length; i += batchSize) {
           const batch = rows.slice(i, i + batchSize);
           const placeholders = batch
-            .map(
-              (_: unknown, rowIdx: number) =>
-                `(${columns.map((_: string, colIdx: number) => `$${rowIdx * columns.length + colIdx + 1}`).join(", ")})`
+            .map((_: unknown, rowIdx: number) =>
+              `(${columns.map((_: string, colIdx: number) => `$${rowIdx * columns.length + colIdx + 1}`).join(", ")})`
             )
             .join(", ");
 

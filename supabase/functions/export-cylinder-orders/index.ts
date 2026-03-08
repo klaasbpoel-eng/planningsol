@@ -1,10 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://planning.solnederland.nl",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 const BATCH_SIZE = 999;
 
@@ -26,6 +21,8 @@ const locationLabels: Record<string, string> = {
 };
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -34,7 +31,6 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Verify the user is authenticated and is admin
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Niet geautoriseerd" }), {
@@ -47,7 +43,6 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Check if user is admin
     const { data: roleCheck, error: roleError } = await userClient.rpc("is_admin");
     if (roleError || !roleCheck) {
       return new Response(JSON.stringify({ error: "Alleen admins kunnen exporteren" }), {
@@ -56,41 +51,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use service role to fetch all data
     const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
       db: { schema: 'public' },
       global: { headers: { 'x-my-custom-header': 'export' } },
     });
 
-    // Parse optional filters from query params
     const url = new URL(req.url);
     const locationFilter = url.searchParams.get("location");
     const yearFilter = url.searchParams.get("year");
 
-    // Fetch gas types for name lookup
     const { data: gasTypes } = await adminClient
       .from("gas_types")
       .select("id, name");
     const gasTypeMap = new Map((gasTypes || []).map((gt: { id: string; name: string }) => [gt.id, gt.name]));
 
-    // CSV header
     const BOM = "\uFEFF";
     const csvHeader = [
-      "Ordernummer",
-      "Klant",
-      "Gastype",
-      "Kwaliteit",
-      "Cilindergrootte",
-      "Aantal",
-      "Druk (bar)",
-      "Datum",
-      "Status",
-      "Locatie",
-      "Opmerkingen",
+      "Ordernummer", "Klant", "Gastype", "Kwaliteit", "Cilindergrootte",
+      "Aantal", "Druk (bar)", "Datum", "Status", "Locatie", "Opmerkingen",
     ].join(";");
 
     const csvRows: string[] = [csvHeader];
-
     let offset = 0;
     let hasMore = true;
 
@@ -101,59 +82,33 @@ Deno.serve(async (req) => {
         .order("scheduled_date", { ascending: false })
         .range(offset, offset + BATCH_SIZE - 1);
 
-      if (locationFilter) {
-        query = query.eq("location", locationFilter);
-      }
+      if (locationFilter) query = query.eq("location", locationFilter);
       if (yearFilter) {
         const year = parseInt(yearFilter);
-        query = query
-          .gte("scheduled_date", `${year}-01-01`)
-          .lte("scheduled_date", `${year}-12-31`);
+        query = query.gte("scheduled_date", `${year}-01-01`).lte("scheduled_date", `${year}-12-31`);
       }
 
       const { data, error } = await query;
-
-      if (error) {
-        console.error("Error fetching batch:", error);
-        throw error;
-      }
-
-      if (!data || data.length === 0) {
-        hasMore = false;
-        break;
-      }
+      if (error) throw error;
+      if (!data || data.length === 0) { hasMore = false; break; }
 
       for (const row of data) {
-        const gasTypeName = row.gas_type_id
-          ? gasTypeMap.get(row.gas_type_id) || row.gas_type
-          : row.gas_type;
-
-        const csvRow = [
-          row.order_number,
-          row.customer_name,
-          gasTypeName,
-          gradeLabels[row.gas_grade] || row.gas_grade,
-          row.cylinder_size,
-          row.cylinder_count,
-          row.pressure,
-          row.scheduled_date,
+        const gasTypeName = row.gas_type_id ? gasTypeMap.get(row.gas_type_id) || row.gas_type : row.gas_type;
+        csvRows.push([
+          row.order_number, row.customer_name, gasTypeName,
+          gradeLabels[row.gas_grade] || row.gas_grade, row.cylinder_size,
+          row.cylinder_count, row.pressure, row.scheduled_date,
           statusLabels[row.status] || row.status,
           locationLabels[row.location] || row.location,
           (row.notes || "").replace(/[\r\n;]/g, " "),
-        ].join(";");
-
-        csvRows.push(csvRow);
+        ].join(";"));
       }
 
       offset += data.length;
-
-      if (data.length < BATCH_SIZE) {
-        hasMore = false;
-      }
+      if (data.length < BATCH_SIZE) hasMore = false;
     }
 
     const csvContent = BOM + csvRows.join("\r\n");
-
     const filename = `gascilinder-orders${yearFilter ? `-${yearFilter}` : ""}${locationFilter ? `-${locationFilter}` : ""}-${new Date().toISOString().split("T")[0]}.csv`;
 
     return new Response(csvContent, {
