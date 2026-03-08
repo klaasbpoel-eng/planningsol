@@ -463,7 +463,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     if (isPanning) {
       setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
     }
-  }, [draggingId, dragType, isPanning, panStart, toSVG, alignSnap, resizingTerrain]);
+  }, [draggingId, dragType, isPanning, panStart, toSVG, alignSnap, resizingTerrain, resizingCanvas, canvasWidth, canvasHeight]);
 
   // Check overlap between two rectangles
   const rectsOverlap = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => {
@@ -552,7 +552,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     setDragType(null);
     setIsPanning(false);
     setAlignGuides({ x: null, y: null });
-  }, [draggingId, dragType, editMode, zones, tanks]);
+  }, [draggingId, dragType, editMode, zones, tanks, resizingCanvas, resizingTerrain, canvasWidth, canvasHeight, terrainHeight]);
 
   // Inline text editing
   const handleStartEdit = useCallback((id: string, field: "label" | "sublabel", currentValue: string) => {
