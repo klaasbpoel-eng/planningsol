@@ -55,11 +55,11 @@ interface BulkTank {
 }
 
 const DEFAULT_BULK_TANKS: BulkTank[] = [
-  { id: "tank_lin", cx: 95, cy: 95, r: 28, label: "LIN", sublabel: "N₂ vloeibaar", details: "Vloeibare stikstof tank – 32.000 kg" },
-  { id: "tank_lox", cx: 160, cy: 95, r: 28, label: "LOX", sublabel: "O₂ vloeibaar", details: "Vloeibare zuurstof tank – 30.000 kg" },
-  { id: "tank_lar", cx: 225, cy: 95, r: 28, label: "LAR", sublabel: "Ar vloeibaar", details: "Vloeibaar argon tank – 12.000 kg" },
-  { id: "tank_lco2_1", cx: 290, cy: 95, r: 28, label: "LCO₂", sublabel: "CO₂ vloeibaar", details: "Vloeibaar CO₂ tank 1 – 22.000 kg" },
-  { id: "tank_lco2_2", cx: 355, cy: 95, r: 28, label: "LCO₂", sublabel: "CO₂ vloeibaar", details: "Vloeibaar CO₂ tank 2 – 22.000 kg" },
+  { id: "tank_lin", cx: 95, cy: 130, r: 28, label: "LIN", sublabel: "N₂ vloeibaar", details: "Vloeibare stikstof tank – 32.000 kg" },
+  { id: "tank_lox", cx: 160, cy: 130, r: 28, label: "LOX", sublabel: "O₂ vloeibaar", details: "Vloeibare zuurstof tank – 30.000 kg" },
+  { id: "tank_lar", cx: 225, cy: 130, r: 28, label: "LAR", sublabel: "Ar vloeibaar", details: "Vloeibaar argon tank – 12.000 kg" },
+  { id: "tank_lco2_1", cx: 290, cy: 130, r: 28, label: "LCO₂", sublabel: "CO₂ vloeibaar", details: "Vloeibaar CO₂ tank 1 – 22.000 kg" },
+  { id: "tank_lco2_2", cx: 355, cy: 130, r: 28, label: "LCO₂", sublabel: "CO₂ vloeibaar", details: "Vloeibaar CO₂ tank 2 – 22.000 kg" },
 ];
 
 const DEFAULT_ZONES: FloorZone[] = [
@@ -328,7 +328,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const SVG_WIDTH = 1100;
-  const SVG_HEIGHT = 860;
+  const SVG_HEIGHT = 900;
 
   // Convert mouse event to SVG coordinates
   const toSVG = useCallback((e: React.MouseEvent): { x: number; y: number } | null => {
@@ -785,13 +785,13 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             <rect x="0" y="0" width={SVG_WIDTH} height={SVG_HEIGHT} fill="hsl(var(--background))" rx="8" />
 
             {/* Terrain */}
-            <rect x="15" y="15" width={SVG_WIDTH - 30} height={170} rx="4" fill="hsl(var(--muted) / 0.2)" stroke="hsl(var(--border) / 0.3)" strokeWidth="1" strokeDasharray="6 3" />
-            <text x={SVG_WIDTH / 2} y="32" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="9" fontWeight="700" letterSpacing="2" opacity="0.4">BUITENTERREIN – BULKTANKS</text>
+            <rect x="15" y="40" width={SVG_WIDTH - 30} height={180} rx="4" fill="hsl(var(--muted) / 0.2)" stroke="hsl(var(--border) / 0.3)" strokeWidth="1" strokeDasharray="6 3" />
+            <text x={SVG_WIDTH / 2} y="57" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="9" fontWeight="700" letterSpacing="2" opacity="0.4">BUITENTERREIN – BULKTANKS</text>
 
 
             {/* Main building - hele overdekte gebied */}
-            <rect x="20" y="180" width={SVG_WIDTH - 40} height={655} rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
-            <text x="35" y="178" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">PRODUCTIEHAL</text>
+            <rect x="20" y="220" width={SVG_WIDTH - 40} height={655} rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
+            <text x="35" y="218" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">PRODUCTIEHAL</text>
 
             {/* Medical bunker */}
             <rect x="110" y="645" width={550} height={72} rx="4" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="1.5" />
