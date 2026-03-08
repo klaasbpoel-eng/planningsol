@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { MapPin, ZoomIn, ZoomOut, Move, Maximize2, Minimize2, Info, Pencil, Save, RotateCcw, GripVertical, Flame, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { getGasColor } from "@/constants/gasColors";
 
 // Zone types with colors
 const DEFAULT_ZONE_TYPES = {
