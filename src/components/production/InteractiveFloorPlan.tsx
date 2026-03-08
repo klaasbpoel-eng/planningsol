@@ -408,6 +408,16 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const [alignGuides, setAlignGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
 
   const handleSvgMouseMove = useCallback((e: React.MouseEvent) => {
+    // Terrain resize
+    if (resizingTerrain) {
+      const svgPt = toSVG(e);
+      if (!svgPt) return;
+      const newH = Math.max(100, Math.min(400, snap(svgPt.y - 40)));
+      setTerrainHeight(newH);
+      setHasChanges(true);
+      return;
+    }
+
     if (draggingId && dragType) {
       const svgPt = toSVG(e);
       if (!svgPt) return;
@@ -432,7 +442,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     if (isPanning) {
       setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
     }
-  }, [draggingId, dragType, isPanning, panStart, toSVG, alignSnap]);
+  }, [draggingId, dragType, isPanning, panStart, toSVG, alignSnap, resizingTerrain]);
 
   // Check overlap between two rectangles
   const rectsOverlap = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => {
