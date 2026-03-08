@@ -441,6 +441,8 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       const pct = Math.round((substance.current_stock_kg / substance.max_allowed_kg) * 100);
       return { current: substance.current_stock_kg, max: substance.max_allowed_kg, pct, gasName: zone.gasType };
     }
+    // For vulstation zones, never show inventory
+    if (zone?.type === "vulstation") return null;
     // For other zones, use hardcoded mapping
     const gasName = ZONE_GAS_MAPPING[zoneId];
     if (!gasName) return null;
