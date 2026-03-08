@@ -1134,12 +1134,12 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             {editMode && (
               <>
                 {/* Left edge */}
-                <g className="cursor-ew-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("left"); }}>
+                <g className="cursor-ew-resize" onMouseDown={(e) => { e.stopPropagation(); resizeStartRef.current = { clientX: e.clientX, clientY: e.clientY, offsetX: canvasOffsetX, offsetY: canvasOffsetY }; setResizingCanvas("left"); }}>
                   <rect x={canvasOffsetX} y={SVG_HEIGHT / 2 - 30} width={12} height={60} fill="transparent" />
                   <rect x={canvasOffsetX + 2} y={SVG_HEIGHT / 2 - 20} width={4} height={40} rx="2" fill="hsl(var(--primary) / 0.5)" />
                 </g>
                 {/* Top edge */}
-                <g className="cursor-ns-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("top"); }}>
+                <g className="cursor-ns-resize" onMouseDown={(e) => { e.stopPropagation(); resizeStartRef.current = { clientX: e.clientX, clientY: e.clientY, offsetX: canvasOffsetX, offsetY: canvasOffsetY }; setResizingCanvas("top"); }}>
                   <rect x={SVG_WIDTH / 2 - 30} y={canvasOffsetY} width={60} height={12} fill="transparent" />
                   <rect x={SVG_WIDTH / 2 - 20} y={canvasOffsetY + 2} width={40} height={4} rx="2" fill="hsl(var(--primary) / 0.5)" />
                 </g>
