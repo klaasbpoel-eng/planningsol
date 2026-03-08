@@ -118,6 +118,11 @@ const DEFAULT_ZONES: FloorZone[] = [
   { id: "entree", x: 540, y: 750, w: 90, h: 38, label: "Entrée", type: "kantoor" },
   { id: "uitsorteer", x: 750, y: 610, w: 220, h: 48, label: "Uitsorteerplatform", sublabel: "Lege cilinders", type: "logistiek", details: "Sorteerplatform voor lege cilinders" },
   { id: "uitsorteer_vol", x: 750, y: 665, w: 220, h: 48, label: "Uitsorteerplatform", sublabel: "Volle cilinders · Order pick", type: "logistiek", details: "Sorteerplatform voor volle cilinders, gebruikt voor order picken" },
+  // Buitenopslag brandbare gassen (rechtsbovenin)
+  { id: "buiten_brandbaar", x: 620, y: 30, w: 350, h: 110, label: "Buitenopslag", sublabel: "Brandbare gassen", type: "opslag_brandbaar", details: "Buitenopslag voor brandbare gassen – ADR/PGS 15 conform" },
+  { id: "buiten_acetyleen", x: 630, y: 50, w: 100, h: 75, label: "Acetyleen", sublabel: "C₂H₂", type: "opslag_brandbaar", details: "UN1001 · Klasse 2.1 · GHS02/GHS04" },
+  { id: "buiten_waterstof", x: 740, y: 50, w: 100, h: 75, label: "Waterstof", sublabel: "H₂", type: "opslag_brandbaar", details: "UN1049 · Klasse 2.1 · GHS02/GHS04" },
+  { id: "buiten_methaan", x: 850, y: 50, w: 100, h: 75, label: "Methaan", sublabel: "CH₄", type: "opslag_brandbaar", details: "UN1971 · Klasse 2.1 · GHS02/GHS04" },
 ];
 
 const STORAGE_KEY = "floorplan-positions";
