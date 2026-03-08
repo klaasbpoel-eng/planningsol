@@ -487,6 +487,11 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   };
 
   const handleSvgMouseUp = useCallback(() => {
+    if (resizingCanvas) {
+      localStorage.setItem("floorplan-canvas-width", String(canvasWidth));
+      localStorage.setItem("floorplan-canvas-height", String(canvasHeight));
+      setResizingCanvas(null);
+    }
     if (resizingTerrain) {
       localStorage.setItem("floorplan-terrain-height", String(terrainHeight));
       setResizingTerrain(false);
