@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, ZoomIn, ZoomOut, Move, Maximize2, Minimize2, Info, Pencil, Save, RotateCcw, GripVertical } from "lucide-react";
+import { MapPin, ZoomIn, ZoomOut, Move, Maximize2, Minimize2, Info, Pencil, Save, RotateCcw, GripVertical, Flame, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -12,6 +13,7 @@ const DEFAULT_ZONE_TYPES = {
   opslag_gas: { label: "Gasopslag", color: "hsl(200 80% 50%)", bg: "hsl(200 80% 50% / 0.12)", border: "hsl(200 80% 50% / 0.4)" },
   opslag_droogijs: { label: "Droogijs", color: "hsl(190 90% 45%)", bg: "hsl(190 90% 45% / 0.12)", border: "hsl(190 90% 45% / 0.4)" },
   opslag_bulk: { label: "Bulkopslag", color: "hsl(280 60% 55%)", bg: "hsl(280 60% 55% / 0.12)", border: "hsl(280 60% 55% / 0.4)" },
+  opslag_brandbaar: { label: "Brandbaar", color: "hsl(25 90% 50%)", bg: "hsl(25 90% 50% / 0.12)", border: "hsl(25 90% 50% / 0.4)" },
   kantoor: { label: "Kantoor/Faciliteiten", color: "hsl(40 70% 50%)", bg: "hsl(40 70% 50% / 0.10)", border: "hsl(40 70% 50% / 0.35)" },
   technisch: { label: "Technisch", color: "hsl(0 60% 50%)", bg: "hsl(0 60% 50% / 0.10)", border: "hsl(0 60% 50% / 0.35)" },
   logistiek: { label: "Logistiek", color: "hsl(140 50% 45%)", bg: "hsl(140 50% 45% / 0.12)", border: "hsl(140 50% 45% / 0.4)" },
