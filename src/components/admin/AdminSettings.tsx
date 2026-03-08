@@ -1,5 +1,5 @@
 import { CategoryManagement } from "./CategoryManagement";
-import { PowerAutomateSync } from "./PowerAutomateSync";
+import { ExternalDataSync } from "./PowerAutomateSync";
 import { LeaveTypeManagement } from "./LeaveTypeManagement";
 import { GasCylinderSettings } from "./GasCylinderSettings";
 import { DryIceSettings } from "./DryIceSettings";
