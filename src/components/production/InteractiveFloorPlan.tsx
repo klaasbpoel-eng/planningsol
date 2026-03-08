@@ -1626,6 +1626,21 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                         }}
                       >
 ...
+                        <span className="w-3 h-3 rounded-sm flex-shrink-0 border border-border bg-muted" />
+                        <span className="italic text-muted-foreground">Geen / Automatisch</span>
+                        {!currentGas && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
+                      </button>
+                      {/* Gas type list */}
+                      {filteredGasTypes.map((gt) => {
+                        const isActive = currentGas === gt.name;
+                        const gasColor = getGasColor(gt.name);
+                        return (
+                          <button
+                            key={gt.id}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
+                              isActive && "bg-accent font-semibold"
+                            )}
                             onClick={() => {
                               setZones(prev => {
                                 const updated = prev.map(z => z.id === contextMenu.zoneId ? { ...z, gasType: gt.name } : z);
