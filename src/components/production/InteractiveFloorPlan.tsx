@@ -433,12 +433,18 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
         setCanvasHeight(Math.max(600, snap(svgPt.y + 10)));
       }
       if (resizingCanvas === "left") {
-        const newOffset = Math.min(0, snap(svgPt.x - 10));
-        setCanvasOffsetX(newOffset);
+        const svgRect = svgRef.current!.getBoundingClientRect();
+        const pxPerSvgUnit = svgRect.width / (SVG_WIDTH - canvasOffsetX);
+        const deltaPx = e.clientX - resizeStartRef.current.clientX;
+        const deltaSvg = deltaPx / pxPerSvgUnit;
+        setCanvasOffsetX(Math.min(0, snap(resizeStartRef.current.offsetX + deltaSvg)));
       }
       if (resizingCanvas === "top") {
-        const newOffset = Math.min(0, snap(svgPt.y - 10));
-        setCanvasOffsetY(newOffset);
+        const svgRect = svgRef.current!.getBoundingClientRect();
+        const pxPerSvgUnit = svgRect.height / (SVG_HEIGHT - canvasOffsetY);
+        const deltaPx = e.clientY - resizeStartRef.current.clientY;
+        const deltaSvg = deltaPx / pxPerSvgUnit;
+        setCanvasOffsetY(Math.min(0, snap(resizeStartRef.current.offsetY + deltaSvg)));
       }
       setHasChanges(true);
       return;
