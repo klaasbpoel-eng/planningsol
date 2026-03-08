@@ -676,9 +676,15 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                 </Button>
               </div>
             ) : (
-              <Button size="sm" variant="outline" className="h-7 text-xs gap-1 mr-2" onClick={() => setEditMode(true)}>
-                <Pencil className="h-3 w-3" /> Indeling aanpassen
-              </Button>
+              <div className="flex items-center gap-1 mr-2">
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setEditMode(true)}>
+                  <Pencil className="h-3 w-3" /> Indeling aanpassen
+                </Button>
+                <Button size="sm" variant={showInventory ? "default" : "outline"} className="h-7 text-xs gap-1" onClick={() => setShowInventory(v => !v)}>
+                  {showInventory ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                  Voorraad
+                </Button>
+              </div>
             )}
 
             {/* Zoom controls */}
