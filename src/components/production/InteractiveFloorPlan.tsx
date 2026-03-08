@@ -139,8 +139,8 @@ function loadPositions(): { zones: Record<string, { x: number; y: number; label?
 }
 
 function savePositions(zones: FloorZone[], tanks: BulkTank[]) {
-  const zonePos: Record<string, { x: number; y: number; w: number; h: number; label: string; sublabel?: string; details?: string; rotation?: number }> = {};
-  zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y, w: z.w, h: z.h, label: z.label, sublabel: z.sublabel, details: z.details, rotation: z.rotation }; });
+  const zonePos: Record<string, { x: number; y: number; w: number; h: number; label: string; sublabel?: string; details?: string; rotation?: number; type?: string }> = {};
+  zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y, w: z.w, h: z.h, label: z.label, sublabel: z.sublabel, details: z.details, rotation: z.rotation, type: z.type }; });
   const tankPos: Record<string, { cx: number; cy: number; label: string; sublabel?: string; details?: string }> = {};
   tanks.forEach(t => { tankPos[t.id] = { cx: t.cx, cy: t.cy, label: t.label, sublabel: t.sublabel, details: t.details }; });
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ zones: zonePos, tanks: tankPos }));
