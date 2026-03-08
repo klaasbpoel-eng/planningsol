@@ -431,6 +431,14 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       if (resizingCanvas === "bottom" || resizingCanvas === "corner") {
         setCanvasHeight(Math.max(600, snap(svgPt.y + 10)));
       }
+      if (resizingCanvas === "left") {
+        const newOffset = Math.min(0, snap(svgPt.x - 10));
+        setCanvasOffsetX(newOffset);
+      }
+      if (resizingCanvas === "top") {
+        const newOffset = Math.min(0, snap(svgPt.y - 10));
+        setCanvasOffsetY(newOffset);
+      }
       setHasChanges(true);
       return;
     }
@@ -496,6 +504,8 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     if (resizingCanvas) {
       localStorage.setItem("floorplan-canvas-width", String(canvasWidth));
       localStorage.setItem("floorplan-canvas-height", String(canvasHeight));
+      localStorage.setItem("floorplan-canvas-offset-x", String(canvasOffsetX));
+      localStorage.setItem("floorplan-canvas-offset-y", String(canvasOffsetY));
       setResizingCanvas(null);
     }
     if (resizingTerrain) {
@@ -823,7 +833,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
         >
           <svg
             ref={svgRef}
-            viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
+            viewBox={`${canvasOffsetX} ${canvasOffsetY} ${SVG_WIDTH - canvasOffsetX} ${SVG_HEIGHT - canvasOffsetY}`}
             className="w-full h-full"
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
