@@ -338,8 +338,8 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const SVG_WIDTH = 1100;
-  const SVG_HEIGHT = 900;
+  const SVG_WIDTH = canvasWidth;
+  const SVG_HEIGHT = canvasHeight;
 
   // Convert mouse event to SVG coordinates
   const toSVG = useCallback((e: React.MouseEvent): { x: number; y: number } | null => {
