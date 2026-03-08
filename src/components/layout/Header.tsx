@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck, BookOpen, Clock, Search, ScanBarcode, FileUp } from "lucide-react";
+import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck, BookOpen, Clock, Search, ScanBarcode, FileUp, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "react-router-dom";
+import { format } from "date-fns";
+import { nl } from "date-fns/locale";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import siteLogo from "@/assets/site_logo.png";
@@ -190,6 +192,21 @@ export function Header({
 
         {/* Right side - Actions */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Today quick-link */}
+          {!isMobile && (
+            <Link to="/dagoverzicht">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hidden md:flex items-center gap-1.5 text-muted-foreground hover:text-foreground h-8 px-2.5"
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium capitalize">
+                  {format(new Date(), "EEE d MMM", { locale: nl })}
+                </span>
+              </Button>
+            </Link>
+          )}
           {!isMobile && (
             <Button
               variant="outline"

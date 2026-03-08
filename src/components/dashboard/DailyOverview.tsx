@@ -70,6 +70,8 @@ import { CreateTaskDialog } from "@/components/calendar/CreateTaskDialog";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { KeyboardShortcutsDialog } from "@/components/dashboard/KeyboardShortcutsDialog";
+import { RefreshCw } from "lucide-react";
 
 type ViewMode = "day" | "week";
 type StatusFilter = "all" | "open" | "completed";
@@ -498,15 +500,21 @@ export function DailyOverview() {
     fetchData();
   }, [fetchData]);
 
-  // Realtime subscriptions
+  // Realtime subscriptions with visual feedback
+  const [realtimeFlash, setRealtimeFlash] = useState(false);
   useEffect(() => {
+    const onRealtimeUpdate = () => {
+      fetchData();
+      setRealtimeFlash(true);
+      setTimeout(() => setRealtimeFlash(false), 2000);
+    };
     const channel = supabase
       .channel('daily-overview-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_off_requests' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dry_ice_orders' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'gas_cylinder_orders' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ambulance_trips' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, onRealtimeUpdate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_off_requests' }, onRealtimeUpdate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dry_ice_orders' }, onRealtimeUpdate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'gas_cylinder_orders' }, onRealtimeUpdate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ambulance_trips' }, onRealtimeUpdate)
       .subscribe();
 
     return () => {
@@ -621,13 +629,20 @@ export function DailyOverview() {
     setter: React.Dispatch<React.SetStateAction<any[]>>,
   ) => {
     const prev = (table === "ambulance_trips" ? ambulanceTrips : table === "gas_cylinder_orders" ? gasOrders : table === "dry_ice_orders" ? dryIceOrders : tasks) as any[];
+    const oldItem = prev.find(i => i.id === id);
+    const oldStatus = oldItem?.status;
     setter((items: any[]) => items.map(i => i.id === id ? { ...i, status: newStatus } : i));
     const { error } = await supabase.from(table).update({ status: newStatus }).eq("id", id);
     if (error) {
       setter(prev);
       toast.error("Status wijzigen mislukt");
     } else {
-      toast.success("Status bijgewerkt");
+      toast.success("Status bijgewerkt", {
+        action: oldStatus ? {
+          label: "Ongedaan maken",
+          onClick: () => handleQuickStatus(table, id, oldStatus, setter),
+        } : undefined,
+      });
     }
   };
 
@@ -938,6 +953,12 @@ export function DailyOverview() {
                 </TooltipTrigger>
                 <TooltipContent>{isFullscreen ? "Fullscreen sluiten" : "Fullscreen"}</TooltipContent>
               </Tooltip>
+              <KeyboardShortcutsDialog />
+              {realtimeFlash && (
+                <span className="inline-flex items-center gap-1 text-xs text-primary animate-pulse">
+                  <RefreshCw className="h-3 w-3" /> Bijgewerkt
+                </span>
+              )}
               {hasNewItems && (
                 <Tooltip>
                   <TooltipTrigger asChild>

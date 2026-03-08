@@ -10,7 +10,7 @@ import { ToolboxLogbook } from "@/components/admin/ToolboxLogbook";
 import { AdminSidebar } from "@/components/admin/layout/AdminSidebar";
 import { DailyOverview } from "@/components/dashboard/DailyOverview";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { BrandedLoader } from "@/components/ui/branded-loader";
 import { parseISO, isWithinInterval, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 import type { RolePermissions, AppRole } from "@/hooks/useUserPermissions";
@@ -152,11 +152,7 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
   }, [requests, filters]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <BrandedLoader />;
   }
 
   return (
@@ -169,7 +165,10 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
 
         {/* Main Content Area */}
         <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full">
-          {/* Mobile Header for Sidebar Trigger is handled inside AdminSidebar via SheetTrigger */}
+          {/* Mobile: show sidebar trigger prominently */}
+          <div className="md:hidden mb-4">
+            <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+          </div>
 
           <div className="max-w-6xl mx-auto w-full space-y-6">
             {activeTab === 'requests' && <DailyOverview />}

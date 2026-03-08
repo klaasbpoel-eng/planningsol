@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
-import { Loader2 } from "lucide-react";
+import { BrandedLoader } from "@/components/ui/branded-loader";
 import type { User } from "@supabase/supabase-js";
 import type { AppRole, RolePermissions, ProductionLocation } from "@/hooks/useUserPermissions";
 
@@ -42,11 +42,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }, []);
 
   if (loading || permissionsLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <BrandedLoader />;
   }
 
   if (!user) {

@@ -3,6 +3,8 @@ import { PageTransition } from "@/components/ui/page-transition";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useLocation, Link } from "react-router-dom";
 import type { AppRole } from "@/hooks/useUserPermissions";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { WifiOff, Wifi } from "lucide-react";
 
 const ROUTE_LABELS: Record<string, string> = {
   "": "Home",
@@ -41,6 +43,7 @@ export function PageLayout({
   breadcrumbs,
 }: PageLayoutProps) {
   const location = useLocation();
+  const { isOnline, wasOffline } = useOnlineStatus();
 
   // Auto-generate breadcrumbs from route if not provided
   const autoBreadcrumbs = (() => {
@@ -66,6 +69,20 @@ export function PageLayout({
           Ga naar hoofdinhoud
         </a>
         <Header userEmail={userEmail} role={role} isAdmin={isAdmin} onSwitchView={onSwitchView} />
+
+        {/* Offline / Reconnected banner */}
+        {!isOnline && (
+          <div className="bg-destructive text-destructive-foreground text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 animate-in slide-in-from-top">
+            <WifiOff className="h-4 w-4" />
+            Geen internetverbinding — wijzigingen worden niet opgeslagen
+          </div>
+        )}
+        {isOnline && wasOffline && (
+          <div className="bg-green-600 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 animate-in slide-in-from-top">
+            <Wifi className="h-4 w-4" />
+            Verbinding hersteld
+          </div>
+        )}
 
         <main id="main-content" className={`flex-1 w-full container mx-auto px-4 py-8 ${className}`}>
           {autoBreadcrumbs.length > 0 && (
