@@ -944,6 +944,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     setDragType(null);
     setIsPanning(false);
     setAlignGuides({ x: null, y: null });
+    setResizeGuides({ w: null, h: null });
   }, [draggingId, dragType, editMode, zones, tanks, resizingCanvas, resizingTerrain, canvasWidth, canvasHeight, canvasOffsetX, canvasOffsetY, terrainHeight, resizingZoneId, rotatingZoneId]);
 
   // Inline text editing
