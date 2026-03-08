@@ -342,6 +342,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   }, [bulkTankData]);
 
   const svgRef = useRef<SVGSVGElement>(null);
+  const resizeStartRef = useRef<{ clientX: number; clientY: number; offsetX: number; offsetY: number }>({ clientX: 0, clientY: 0, offsetX: 0, offsetY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
   const SVG_WIDTH = canvasWidth;
@@ -432,12 +433,18 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
         setCanvasHeight(Math.max(600, snap(svgPt.y + 10)));
       }
       if (resizingCanvas === "left") {
-        const newOffset = Math.min(0, snap(svgPt.x - 10));
-        setCanvasOffsetX(newOffset);
+        const svgRect = svgRef.current!.getBoundingClientRect();
+        const pxPerSvgUnit = svgRect.width / (SVG_WIDTH - canvasOffsetX);
+        const deltaPx = e.clientX - resizeStartRef.current.clientX;
+        const deltaSvg = deltaPx / pxPerSvgUnit;
+        setCanvasOffsetX(Math.min(0, snap(resizeStartRef.current.offsetX + deltaSvg)));
       }
       if (resizingCanvas === "top") {
-        const newOffset = Math.min(0, snap(svgPt.y - 10));
-        setCanvasOffsetY(newOffset);
+        const svgRect = svgRef.current!.getBoundingClientRect();
+        const pxPerSvgUnit = svgRect.height / (SVG_HEIGHT - canvasOffsetY);
+        const deltaPx = e.clientY - resizeStartRef.current.clientY;
+        const deltaSvg = deltaPx / pxPerSvgUnit;
+        setCanvasOffsetY(Math.min(0, snap(resizeStartRef.current.offsetY + deltaSvg)));
       }
       setHasChanges(true);
       return;
@@ -1127,12 +1134,12 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             {editMode && (
               <>
                 {/* Left edge */}
-                <g className="cursor-ew-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("left"); }}>
+                <g className="cursor-ew-resize" onMouseDown={(e) => { e.stopPropagation(); resizeStartRef.current = { clientX: e.clientX, clientY: e.clientY, offsetX: canvasOffsetX, offsetY: canvasOffsetY }; setResizingCanvas("left"); }}>
                   <rect x={canvasOffsetX} y={SVG_HEIGHT / 2 - 30} width={12} height={60} fill="transparent" />
                   <rect x={canvasOffsetX + 2} y={SVG_HEIGHT / 2 - 20} width={4} height={40} rx="2" fill="hsl(var(--primary) / 0.5)" />
                 </g>
                 {/* Top edge */}
-                <g className="cursor-ns-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("top"); }}>
+                <g className="cursor-ns-resize" onMouseDown={(e) => { e.stopPropagation(); resizeStartRef.current = { clientX: e.clientX, clientY: e.clientY, offsetX: canvasOffsetX, offsetY: canvasOffsetY }; setResizingCanvas("top"); }}>
                   <rect x={SVG_WIDTH / 2 - 30} y={canvasOffsetY} width={60} height={12} fill="transparent" />
                   <rect x={SVG_WIDTH / 2 - 20} y={canvasOffsetY + 2} width={40} height={4} rx="2" fill="hsl(var(--primary) / 0.5)" />
                 </g>
