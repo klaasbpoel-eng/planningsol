@@ -1503,6 +1503,42 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
           </div>
         )}
 
+        {/* Zone type context menu */}
+        {contextMenu && editMode && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)} onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }} />
+            <div
+              className="absolute z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[180px] select-text"
+              style={{ left: contextMenu.screenX, top: contextMenu.screenY }}
+            >
+              <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Zone type wijzigen</div>
+              {(Object.entries(ZONE_TYPES) as [ZoneType, ZoneTypeConfig][]).map(([key, zt]) => {
+                const zone = zones.find(z => z.id === contextMenu.zoneId);
+                const isActive = zone?.type === key;
+                return (
+                  <button
+                    key={key}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
+                      isActive && "bg-accent font-semibold"
+                    )}
+                    onClick={() => {
+                      setZones(prev => prev.map(z => z.id === contextMenu.zoneId ? { ...z, type: key } : z));
+                      setHasChanges(true);
+                      setContextMenu(null);
+                      toast.success(`Type gewijzigd naar "${zt.label}"`);
+                    }}
+                  >
+                    <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: zt.color }} />
+                    <span style={{ color: isActive ? zt.color : undefined }}>{zt.label}</span>
+                    {isActive && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+
         {/* Unsaved changes indicator */}
         {editMode && hasChanges && (
           <div className="absolute bottom-2 left-2 text-[10px] text-muted-foreground bg-background/80 rounded px-2 py-1">
