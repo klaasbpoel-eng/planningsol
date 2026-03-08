@@ -70,6 +70,8 @@ import { CreateTaskDialog } from "@/components/calendar/CreateTaskDialog";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { KeyboardShortcutsDialog } from "@/components/dashboard/KeyboardShortcutsDialog";
+import { RefreshCw } from "lucide-react";
 
 type ViewMode = "day" | "week";
 type StatusFilter = "all" | "open" | "completed";
