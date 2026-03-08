@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Bell, Check, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,28 +17,30 @@ import type { Database } from "@/integrations/supabase/types";
 import { EmptyState } from "@/components/ui/empty-state";
 
 type Notification = Database["public"]["Tables"]["notifications"]["Row"];
+type FilterTab = "all" | "unread";
 
 export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const navigate = useNavigate();
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
+  const filteredNotifications = useMemo(() => {
+    if (filterTab === "unread") return notifications.filter(n => !n.is_read);
+    return notifications;
+  }, [notifications, filterTab]);
+
   useEffect(() => {
     fetchNotifications();
 
-    // Set up realtime subscription
     const channel = supabase
       .channel("notifications-changes")
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "notifications",
-        },
+        { event: "*", schema: "public", table: "notifications" },
         (payload) => {
           if (payload.eventType === "INSERT") {
             setNotifications((prev) => [payload.new as Notification, ...prev]);
@@ -148,19 +150,50 @@ export function NotificationBell() {
           )}
         </div>
 
+        {/* Filter tabs */}
+        <div className="flex border-b px-3">
+          <button
+            onClick={() => setFilterTab("all")}
+            className={cn(
+              "px-3 py-2 text-sm font-medium border-b-2 transition-colors -mb-px",
+              filterTab === "all"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Alles
+          </button>
+          <button
+            onClick={() => setFilterTab("unread")}
+            className={cn(
+              "px-3 py-2 text-sm font-medium border-b-2 transition-colors -mb-px flex items-center gap-1.5",
+              filterTab === "unread"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Ongelezen
+            {unreadCount > 0 && (
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+        </div>
+
         <ScrollArea className="h-[300px]">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
             </div>
-          ) : notifications.length === 0 ? (
+          ) : filteredNotifications.length === 0 ? (
             <EmptyState
               variant="notifications"
               size="sm"
             />
           ) : (
             <div className="divide-y">
-              {notifications.map((notification) => (
+              {filteredNotifications.map((notification) => (
                 <div
                   key={notification.id}
                   onClick={() => handleNotificationClick(notification)}

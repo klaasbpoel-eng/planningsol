@@ -192,6 +192,21 @@ export function Header({
 
         {/* Right side - Actions */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Today quick-link */}
+          {!isMobile && (
+            <Link to="/dagoverzicht">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hidden md:flex items-center gap-1.5 text-muted-foreground hover:text-foreground h-8 px-2.5"
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium capitalize">
+                  {format(new Date(), "EEE d MMM", { locale: nl })}
+                </span>
+              </Button>
+            </Link>
+          )}
           {!isMobile && (
             <Button
               variant="outline"

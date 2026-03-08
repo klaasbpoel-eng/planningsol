@@ -953,6 +953,12 @@ export function DailyOverview() {
                 </TooltipTrigger>
                 <TooltipContent>{isFullscreen ? "Fullscreen sluiten" : "Fullscreen"}</TooltipContent>
               </Tooltip>
+              <KeyboardShortcutsDialog />
+              {realtimeFlash && (
+                <span className="inline-flex items-center gap-1 text-xs text-primary animate-pulse">
+                  <RefreshCw className="h-3 w-3" /> Bijgewerkt
+                </span>
+              )}
               {hasNewItems && (
                 <Tooltip>
                   <TooltipTrigger asChild>
