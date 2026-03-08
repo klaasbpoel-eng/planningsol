@@ -9,6 +9,7 @@ import {
     Users,
     Settings,
     Menu,
+    Database,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
