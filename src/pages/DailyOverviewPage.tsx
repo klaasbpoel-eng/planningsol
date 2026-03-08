@@ -5,7 +5,8 @@ import { PendingApproval } from "@/components/auth/PendingApproval";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
 import { PageLayout } from "@/components/layout/PageLayout";
-import { Loader2, CalendarDays } from "lucide-react";
+import { BrandedLoader } from "@/components/ui/branded-loader";
+import { CalendarDays } from "lucide-react";
 import { DailyOverview } from "@/components/dashboard/DailyOverview";
 import type { User } from "@supabase/supabase-js";
 
