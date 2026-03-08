@@ -274,6 +274,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [autoFitDone, setAutoFitDone] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
@@ -347,6 +348,27 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
 
   const SVG_WIDTH = canvasWidth;
   const SVG_HEIGHT = canvasHeight;
+
+  // Auto-fit zoom to fill container on mount and fullscreen toggle
+  useEffect(() => {
+    const fit = () => {
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const vbW = SVG_WIDTH - canvasOffsetX;
+      const vbH = SVG_HEIGHT - canvasOffsetY;
+      const containerAspect = rect.width / rect.height;
+      const svgAspect = vbW / vbH;
+      const fitZoom = containerAspect > svgAspect
+        ? (containerAspect / svgAspect) * 0.97
+        : (svgAspect / containerAspect) * 0.97;
+      setZoom(Math.min(Math.max(fitZoom, 1), 3));
+      setPan({ x: 0, y: 0 });
+    };
+    const timer = setTimeout(fit, 80);
+    return () => clearTimeout(timer);
+  }, [isFullscreen, SVG_WIDTH, SVG_HEIGHT, canvasOffsetX, canvasOffsetY]);
 
   // Convert mouse event to SVG coordinates
   const toSVG = useCallback((e: React.MouseEvent): { x: number; y: number } | null => {

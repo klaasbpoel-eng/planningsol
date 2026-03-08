@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_sync_data: {
+        Row: {
+          external_id: string | null
+          id: string
+          row_data: Json
+          synced_at: string
+          table_name: string
+          updated_at: string
+        }
+        Insert: {
+          external_id?: string | null
+          id?: string
+          row_data: Json
+          synced_at?: string
+          table_name: string
+          updated_at?: string
+        }
+        Update: {
+          external_id?: string | null
+          id?: string
+          row_data?: Json
+          synced_at?: string
+          table_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      access_sync_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          rows_received: number
+          rows_upserted: number
+          source_ip: string | null
+          status: string
+          table_name: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          rows_received?: number
+          rows_upserted?: number
+          source_ip?: string | null
+          status?: string
+          table_name: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          rows_received?: number
+          rows_upserted?: number
+          source_ip?: string | null
+          status?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
       ambulance_trip_customers: {
         Row: {
           created_at: string
