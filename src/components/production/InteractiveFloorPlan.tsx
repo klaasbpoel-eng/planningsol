@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { MapPin, ZoomIn, ZoomOut, Move, Maximize2, Minimize2, Info, Pencil, Save, RotateCcw, GripVertical, Flame, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { getGasColor } from "@/constants/gasColors";
 
 // Zone types with colors
 const DEFAULT_ZONE_TYPES = {
@@ -43,6 +44,7 @@ interface FloorZone {
   type: ZoneType;
   details?: string;
   rotation?: number;
+  gasType?: string; // linked gas type name for inventory overlay
 }
 
 interface BulkTank {
@@ -139,8 +141,8 @@ function loadPositions(): { zones: Record<string, { x: number; y: number; label?
 }
 
 function savePositions(zones: FloorZone[], tanks: BulkTank[]) {
-  const zonePos: Record<string, { x: number; y: number; w: number; h: number; label: string; sublabel?: string; details?: string; rotation?: number; type?: string }> = {};
-  zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y, w: z.w, h: z.h, label: z.label, sublabel: z.sublabel, details: z.details, rotation: z.rotation, type: z.type }; });
+  const zonePos: Record<string, { x: number; y: number; w: number; h: number; label: string; sublabel?: string; details?: string; rotation?: number; type?: string; gasType?: string }> = {};
+  zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y, w: z.w, h: z.h, label: z.label, sublabel: z.sublabel, details: z.details, rotation: z.rotation, type: z.type, gasType: z.gasType }; });
   const tankPos: Record<string, { cx: number; cy: number; label: string; sublabel?: string; details?: string }> = {};
   tanks.forEach(t => { tankPos[t.id] = { cx: t.cx, cy: t.cy, label: t.label, sublabel: t.sublabel, details: t.details }; });
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ zones: zonePos, tanks: tankPos }));
@@ -342,15 +344,24 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     fetchInventory();
   }, []);
 
+  // Fetch available gas types for the selector
+  const [availableGasTypes, setAvailableGasTypes] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    supabase.from("gas_types").select("id, name").eq("is_active", true).order("name").then(({ data }) => {
+      if (data) setAvailableGasTypes(data);
+    });
+  }, []);
+
   // Helper to get PGS data for a zone by gas name
   const getZoneInventory = useCallback((zoneId: string) => {
-    const gasName = ZONE_GAS_MAPPING[zoneId];
+    const zone = zones.find(z => z.id === zoneId);
+    const gasName = zone?.gasType || ZONE_GAS_MAPPING[zoneId];
     if (!gasName) return null;
     const substance = pgsData.find(p => p.gas_types?.name?.toLowerCase().includes(gasName.toLowerCase()));
     if (!substance || substance.max_allowed_kg <= 0) return null;
     const pct = Math.round((substance.current_stock_kg / substance.max_allowed_kg) * 100);
-    return { current: substance.current_stock_kg, max: substance.max_allowed_kg, pct };
-  }, [pgsData]);
+    return { current: substance.current_stock_kg, max: substance.max_allowed_kg, pct, gasName };
+  }, [pgsData, zones]);
 
   // Helper to get bulk tank data
   const getTankInventory = useCallback((tankId: string) => {
@@ -1508,7 +1519,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
           <>
             <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)} onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }} />
             <div
-              className="absolute z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[180px] select-text"
+              className="absolute z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[200px] max-h-[400px] overflow-y-auto select-text"
               style={{ left: contextMenu.screenX, top: contextMenu.screenY }}
             >
               <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Zone type wijzigen</div>
@@ -1535,6 +1546,55 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   </button>
                 );
               })}
+              <div className="my-1 border-t border-border" />
+              <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Gassoort (voorraad)</div>
+              {(() => {
+                const zone = zones.find(z => z.id === contextMenu.zoneId);
+                const currentGas = zone?.gasType;
+                return (
+                  <>
+                    <button
+                      className={cn(
+                        "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
+                        !currentGas && "bg-accent font-semibold"
+                      )}
+                      onClick={() => {
+                        setZones(prev => prev.map(z => z.id === contextMenu.zoneId ? { ...z, gasType: undefined } : z));
+                        setHasChanges(true);
+                        setContextMenu(null);
+                        toast.success("Gassoort verwijderd");
+                      }}
+                    >
+                      <span className="w-3 h-3 rounded-sm flex-shrink-0 border border-border bg-muted" />
+                      <span className="italic text-muted-foreground">Geen / Automatisch</span>
+                      {!currentGas && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
+                    </button>
+                    {availableGasTypes.map((gt) => {
+                      const isActive = currentGas === gt.name;
+                      const gasColor = getGasColor(gt.name);
+                      return (
+                        <button
+                          key={gt.id}
+                          className={cn(
+                            "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
+                            isActive && "bg-accent font-semibold"
+                          )}
+                          onClick={() => {
+                            setZones(prev => prev.map(z => z.id === contextMenu.zoneId ? { ...z, gasType: gt.name } : z));
+                            setHasChanges(true);
+                            setContextMenu(null);
+                            toast.success(`Gassoort ingesteld op "${gt.name}"`);
+                          }}
+                        >
+                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: gasColor }} />
+                          <span>{gt.name}</span>
+                          {isActive && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
+                        </button>
+                      );
+                    })}
+                  </>
+                );
+              })()}
               <div className="my-1 border-t border-border" />
               <button
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-destructive/10 transition-colors text-left text-destructive"
