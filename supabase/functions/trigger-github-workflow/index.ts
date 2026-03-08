@@ -1,12 +1,9 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://planning.solnederland.nl",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -20,7 +17,6 @@ Deno.serve(async (req) => {
       throw new Error("Server configuratie fout: GITHUB_PAT ontbreekt");
     }
 
-    // Verify the user is authenticated and is admin
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Niet geautoriseerd" }), {
@@ -33,7 +29,6 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Check if user is admin
     const { data: roleCheck, error: roleError } = await userClient.rpc("is_admin");
     if (roleError || !roleCheck) {
       return new Response(JSON.stringify({ error: "Alleen admins kunnen deployen" }), {
@@ -42,11 +37,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Parse request body for inputs
     const { primary_source } = await req.json().catch(() => ({}));
 
-    // Trigger GitHub Workflow
-    // Using 'deploy-directadmin.yml' as the workflow filename
     console.log(`Triggering GitHub Workflow with primary_source: ${primary_source || 'default'}...`);
     const res = await fetch(
       "https://api.github.com/repos/klaasbpoel-eng/planningsol/actions/workflows/deploy-directadmin.yml/dispatches",
@@ -59,9 +51,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           ref: "main",
-          inputs: {
-            primary_source: primary_source || "cloud",
-          }
+          inputs: { primary_source: primary_source || "cloud" },
         }),
       }
     );
