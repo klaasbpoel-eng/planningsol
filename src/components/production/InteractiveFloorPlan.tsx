@@ -139,8 +139,8 @@ function loadPositions(): { zones: Record<string, { x: number; y: number; label?
 }
 
 function savePositions(zones: FloorZone[], tanks: BulkTank[]) {
-  const zonePos: Record<string, { x: number; y: number; w: number; h: number; label: string; sublabel?: string; details?: string; rotation?: number }> = {};
-  zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y, w: z.w, h: z.h, label: z.label, sublabel: z.sublabel, details: z.details, rotation: z.rotation }; });
+  const zonePos: Record<string, { x: number; y: number; w: number; h: number; label: string; sublabel?: string; details?: string; rotation?: number; type?: string }> = {};
+  zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y, w: z.w, h: z.h, label: z.label, sublabel: z.sublabel, details: z.details, rotation: z.rotation, type: z.type }; });
   const tankPos: Record<string, { cx: number; cy: number; label: string; sublabel?: string; details?: string }> = {};
   tanks.forEach(t => { tankPos[t.id] = { cx: t.cx, cy: t.cy, label: t.label, sublabel: t.sublabel, details: t.details }; });
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ zones: zonePos, tanks: tankPos }));
@@ -318,6 +318,9 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const [resizingZoneId, setResizingZoneId] = useState<string | null>(null);
   const [resizingCorner, setResizingCorner] = useState<"se" | "sw" | "ne" | "nw" | null>(null);
   const [rotatingZoneId, setRotatingZoneId] = useState<string | null>(null);
+
+  // Zone type context menu
+  const [contextMenu, setContextMenu] = useState<{ zoneId: string; screenX: number; screenY: number } | null>(null);
   const resizeZoneStart = useRef<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 0, h: 0 });
   const rotateZoneStart = useRef<{ angle: number; rotation: number }>({ angle: 0, rotation: 0 });
 
@@ -1177,6 +1180,15 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   className={editMode ? "cursor-grab" : "cursor-pointer"}
                   style={{ opacity: dimmed ? 0.25 : isDragging ? 0.7 : 1 }}
                   onClick={(e) => { if (!editMode) { e.stopPropagation(); setSelectedZone(s => s === zone.id ? null : zone.id); } }}
+                  onContextMenu={(e) => {
+                    if (!editMode) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const container = containerRef.current;
+                    if (!container) return;
+                    const cr = container.getBoundingClientRect();
+                    setContextMenu({ zoneId: zone.id, screenX: e.clientX - cr.left, screenY: e.clientY - cr.top });
+                  }}
                   onMouseDown={(e) => handleZoneDragStart(e, zone.id)}
                   onMouseEnter={() => setHoveredZone(zone.id)}
                   onMouseLeave={() => setHoveredZone(null)}
@@ -1489,6 +1501,42 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
               placeholder={editingField === "sublabel" ? "Sublabel..." : "Label..."}
             />
           </div>
+        )}
+
+        {/* Zone type context menu */}
+        {contextMenu && editMode && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)} onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }} />
+            <div
+              className="absolute z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[180px] select-text"
+              style={{ left: contextMenu.screenX, top: contextMenu.screenY }}
+            >
+              <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Zone type wijzigen</div>
+              {(Object.entries(ZONE_TYPES) as [ZoneType, ZoneTypeConfig][]).map(([key, zt]) => {
+                const zone = zones.find(z => z.id === contextMenu.zoneId);
+                const isActive = zone?.type === key;
+                return (
+                  <button
+                    key={key}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
+                      isActive && "bg-accent font-semibold"
+                    )}
+                    onClick={() => {
+                      setZones(prev => prev.map(z => z.id === contextMenu.zoneId ? { ...z, type: key } : z));
+                      setHasChanges(true);
+                      setContextMenu(null);
+                      toast.success(`Type gewijzigd naar "${zt.label}"`);
+                    }}
+                  >
+                    <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: zt.color }} />
+                    <span style={{ color: isActive ? zt.color : undefined }}>{zt.label}</span>
+                    {isActive && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </>
         )}
 
         {/* Unsaved changes indicator */}
