@@ -948,6 +948,26 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             {/* Edit controls */}
             {editMode ? (
               <div className="flex items-center gap-1 bg-primary/10 p-1 rounded-md mr-2">
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => {
+                  const newId = `zone_${Date.now()}`;
+                  const centerX = Math.round((SVG_WIDTH / 2 - pan.x / zoom) / 10) * 10;
+                  const centerY = Math.round((SVG_HEIGHT / 2 - pan.y / zoom) / 10) * 10;
+                  const newZone: FloorZone = {
+                    id: newId,
+                    x: centerX - 55,
+                    y: centerY - 21,
+                    w: 110,
+                    h: 42,
+                    label: "Nieuw item",
+                    type: "logistiek",
+                  };
+                  setZones(prev => [...prev, newZone]);
+                  setSelectedZone(newId);
+                  setHasChanges(true);
+                  toast.success("Nieuw item toegevoegd – sleep naar de juiste positie");
+                }}>
+                  <Plus className="h-3 w-3" /> Toevoegen
+                </Button>
                 <Button size="sm" variant="default" className="h-7 text-xs gap-1" onClick={handleSave}>
                   <Save className="h-3 w-3" /> Opslaan
                 </Button>
