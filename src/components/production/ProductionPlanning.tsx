@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock, ShieldAlert, Truck, FlaskConical } from "lucide-react";
+import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock, ShieldAlert, Truck, FlaskConical, ChevronUp, ChevronDown } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { TopCustomersWidget } from "./TopCustomersWidget";
 import { KPIDashboard } from "./KPIDashboard";
