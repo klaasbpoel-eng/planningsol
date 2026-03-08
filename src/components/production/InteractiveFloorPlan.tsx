@@ -662,23 +662,38 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       const svgPt = toSVG(e);
       if (!svgPt) return;
       const s = resizeZoneStart.current;
+      
+      // Collect existing widths & heights from other zones for size-snapping
+      const SIZE_SNAP_THRESHOLD = 8;
+      const otherZones = zones.filter(z => z.id !== resizingZoneId);
+      const existingWidths = [...new Set(otherZones.map(z => z.w))];
+      const existingHeights = [...new Set(otherZones.map(z => z.h))];
+      
+      const snapToSize = (val: number, existingSizes: number[]) => {
+        const gridSnapped = snap(val);
+        for (const sz of existingSizes) {
+          if (Math.abs(val - sz) < SIZE_SNAP_THRESHOLD) return sz;
+        }
+        return gridSnapped;
+      };
+      
       let newX = s.x, newY = s.y, newW = s.w, newH = s.h;
       if (resizingCorner === "se") {
-        newW = Math.max(40, snap(svgPt.x - s.x));
-        newH = Math.max(20, snap(svgPt.y - s.y));
+        newW = Math.max(40, snapToSize(svgPt.x - s.x, existingWidths));
+        newH = Math.max(20, snapToSize(svgPt.y - s.y, existingHeights));
       } else if (resizingCorner === "sw") {
-        newW = Math.max(40, snap(s.x + s.w - svgPt.x));
-        newX = snap(svgPt.x);
-        newH = Math.max(20, snap(svgPt.y - s.y));
+        newW = Math.max(40, snapToSize(s.x + s.w - svgPt.x, existingWidths));
+        newX = s.x + s.w - newW;
+        newH = Math.max(20, snapToSize(svgPt.y - s.y, existingHeights));
       } else if (resizingCorner === "ne") {
-        newW = Math.max(40, snap(svgPt.x - s.x));
-        newH = Math.max(20, snap(s.y + s.h - svgPt.y));
-        newY = snap(svgPt.y);
+        newW = Math.max(40, snapToSize(svgPt.x - s.x, existingWidths));
+        newH = Math.max(20, snapToSize(s.y + s.h - svgPt.y, existingHeights));
+        newY = s.y + s.h - newH;
       } else if (resizingCorner === "nw") {
-        newW = Math.max(40, snap(s.x + s.w - svgPt.x));
-        newX = snap(svgPt.x);
-        newH = Math.max(20, snap(s.y + s.h - svgPt.y));
-        newY = snap(svgPt.y);
+        newW = Math.max(40, snapToSize(s.x + s.w - svgPt.x, existingWidths));
+        newX = s.x + s.w - newW;
+        newH = Math.max(20, snapToSize(s.y + s.h - svgPt.y, existingHeights));
+        newY = s.y + s.h - newH;
       }
       setZones(prev => prev.map(z => z.id === resizingZoneId ? { ...z, x: newX, y: newY, w: newW, h: newH } : z));
       setHasChanges(true);
