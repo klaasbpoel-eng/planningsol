@@ -828,7 +828,24 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             {/* Background */}
             <rect x="0" y="0" width={SVG_WIDTH} height={SVG_HEIGHT} fill="hsl(var(--background))" rx="8" />
 
-            {/* Terrain */}
+            {/* Site perimeter – hekwerk */}
+            <rect x="8" y="8" width={SVG_WIDTH - 16} height={SVG_HEIGHT - 16} rx="6" fill="none" stroke="hsl(var(--foreground) / 0.25)" strokeWidth="2" strokeDasharray="10 4 2 4" />
+            {/* Fence post markers */}
+            {Array.from({ length: Math.floor((SVG_WIDTH - 16) / 60) + 1 }, (_, i) => 8 + i * 60).map(x => (
+              <g key={`fp-t${x}`}>
+                <circle cx={Math.min(x, SVG_WIDTH - 8)} cy="8" r="3" fill="hsl(var(--foreground) / 0.2)" />
+                <circle cx={Math.min(x, SVG_WIDTH - 8)} cy={SVG_HEIGHT - 8} r="3" fill="hsl(var(--foreground) / 0.2)" />
+              </g>
+            ))}
+            {Array.from({ length: Math.floor((SVG_HEIGHT - 16) / 60) + 1 }, (_, i) => 8 + i * 60).map(y => (
+              <g key={`fp-l${y}`}>
+                <circle cx="8" cy={Math.min(y, SVG_HEIGHT - 8)} r="3" fill="hsl(var(--foreground) / 0.2)" />
+                <circle cx={SVG_WIDTH - 8} cy={Math.min(y, SVG_HEIGHT - 8)} r="3" fill="hsl(var(--foreground) / 0.2)" />
+              </g>
+            ))}
+            <text x="20" y="22" fill="hsl(var(--foreground) / 0.2)" fontSize="7" fontWeight="600" letterSpacing="1.5">TERREINGRENS</text>
+
+            {/* Buitenterrein – bulktanks area */}
             <rect x="15" y="40" width={SVG_WIDTH - 30} height={terrainHeight} rx="4" fill="hsl(var(--muted) / 0.08)" stroke="hsl(var(--border) / 0.4)" strokeWidth="1" strokeDasharray="6 3" />
             <text x={SVG_WIDTH / 2} y="57" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="9" fontWeight="700" letterSpacing="2" opacity="0.3">BUITENTERREIN – BULKTANKS</text>
 
