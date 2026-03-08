@@ -31,11 +31,7 @@ const DailyOverviewPage = () => {
   }, []);
 
   if (loading || permissionsLoading || approvalLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <BrandedLoader />;
   }
 
   if (!user) return <AuthForm />;

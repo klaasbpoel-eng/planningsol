@@ -503,14 +503,7 @@ export function ProductionPlanning({
       {/* Main content tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className={cn(
-          "w-full max-w-5xl grid bg-muted/50 backdrop-blur-sm overflow-x-auto h-auto p-1",
-          showAdvancedTabs && showRecipemaker
-            ? "grid-cols-4 sm:grid-cols-9"
-            : showAdvancedTabs
-              ? "grid-cols-4 sm:grid-cols-8"
-              : showRecipemaker
-                ? "grid-cols-4 sm:grid-cols-5"
-                : "grid-cols-3 sm:grid-cols-4"
+          "w-full max-w-5xl flex overflow-x-auto scrollbar-hide bg-muted/50 backdrop-blur-sm h-11 p-1 gap-0.5",
         )}>
 
           <TabsTrigger
