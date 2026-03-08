@@ -166,6 +166,14 @@ All colors MUST be HSL.
 }
 
 @layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   .glass-card {
     @apply bg-card/80 backdrop-blur-xl border border-border/50 shadow-xl;
   }
