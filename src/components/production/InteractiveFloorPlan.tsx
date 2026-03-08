@@ -865,7 +865,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             )}
 
             {/* Main building - hele overdekte gebied */}
-            <rect x="20" y={40 + terrainHeight} width={SVG_WIDTH - 40} height={655} rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
+            <rect x="20" y={40 + terrainHeight} width={Math.min(1060, SVG_WIDTH - 40)} height={655} rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
             <text x="35" y={40 + terrainHeight - 2} fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">PRODUCTIEHAL</text>
 
             {/* Medical bunker */}
