@@ -734,6 +734,23 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                 />
               </Badge>
             ))}
+            {/* Occupancy legend - only when inventory overlay is active */}
+            {showInventory && (
+              <>
+                <span className="mx-1.5 text-muted-foreground text-[10px]">│</span>
+                <span className="text-[10px] text-muted-foreground font-medium mr-1">Bezetting:</span>
+                {[
+                  { label: "< 60%", color: "hsl(140 60% 45%)" },
+                  { label: "60–85%", color: "hsl(35 90% 50%)" },
+                  { label: "> 85%", color: "hsl(0 80% 50%)" },
+                ].map((item) => (
+                  <span key={item.label} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                    {item.label}
+                  </span>
+                ))}
+              </>
+            )}
           </div>
         )}
       </CardHeader>
