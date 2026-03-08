@@ -1713,35 +1713,122 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                       {filteredGasTypes.map((gt) => {
                         const isActive = currentGas === gt.name;
                         const gasColor = getGasColor(gt.name);
+                        const formula = getGasFormula(gt.name);
+                        const displayFormula = formula || gt.description;
+                        const hasNoFormula = !formula && !gt.description;
                         return (
-                          <button
-                            key={gt.id}
-                            className={cn(
-                              "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
-                              isActive && "bg-accent font-semibold"
-                            )}
-                            onClick={() => {
-                              setZones(prev => {
-                                const updated = prev.map(z => {
-                                  if (z.id !== contextMenu.zoneId) return z;
-                                  return z.type === "opslag_vol"
-                                    ? { ...z, gasType: gt.name, label: gt.name, sublabel: getGasFormula(gt.name) || gt.description || gt.name }
-                                    : { ...z, gasType: gt.name };
+                          <div key={gt.id} className="group">
+                            <button
+                              className={cn(
+                                "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
+                                isActive && "bg-accent font-semibold"
+                              )}
+                              onClick={() => {
+                                setZones(prev => {
+                                  const updated = prev.map(z => {
+                                    if (z.id !== contextMenu.zoneId) return z;
+                                    return z.type === "opslag_vol"
+                                      ? { ...z, gasType: gt.name, label: gt.name, sublabel: formula || gt.description || gt.name }
+                                      : { ...z, gasType: gt.name };
+                                  });
+                                  savePositions(updated, tanks);
+                                  return updated;
                                 });
-                                savePositions(updated, tanks);
-                                return updated;
-                              });
-                              setHasChanges(true);
-                              setContextMenu(null);
-                              setGasSearch("");
-                              setContextMenuTab("type");
-                              toast.success(`Gassoort: "${gt.name}"`);
-                            }}
-                          >
-                            <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: gasColor }} />
-                            <span>{gt.name}</span>
-                            {isActive && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
-                          </button>
+                                setHasChanges(true);
+                                setContextMenu(null);
+                                setGasSearch("");
+                                setContextMenuTab("type");
+                                toast.success(`Gassoort: "${gt.name}"`);
+                              }}
+                            >
+                              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: gasColor }} />
+                              <span className="flex-1">{gt.name}</span>
+                              {displayFormula && <span className="text-[10px] text-muted-foreground">{displayFormula}</span>}
+                              {isActive && <span className="text-[10px] text-muted-foreground">✓</span>}
+                            </button>
+                            {/* Inline formula edit – show for active gas or on hover when no formula */}
+                            {isActive && hasNoFormula && (
+                              <div className="px-3 pb-1.5 pt-0.5">
+                                <form
+                                  className="flex gap-1"
+                                  onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    const input = (e.target as HTMLFormElement).elements.namedItem("formula") as HTMLInputElement;
+                                    const value = input?.value?.trim();
+                                    if (!value) return;
+                                    const { error } = await supabase.from("gas_types").update({ description: value }).eq("id", gt.id);
+                                    if (error) {
+                                      toast.error("Opslaan mislukt");
+                                      return;
+                                    }
+                                    // Update local state
+                                    setAvailableGasTypes(prev => prev.map(g => g.id === gt.id ? { ...g, description: value } : g));
+                                    // Update zone sublabel
+                                    setZones(prev => {
+                                      const updated = prev.map(z => {
+                                        if (z.id !== contextMenu.zoneId) return z;
+                                        return z.gasType === gt.name ? { ...z, sublabel: value } : z;
+                                      });
+                                      savePositions(updated, tanks);
+                                      return updated;
+                                    });
+                                    toast.success(`Formule "${value}" opgeslagen voor ${gt.name}`);
+                                  }}
+                                >
+                                  <input
+                                    name="formula"
+                                    autoFocus
+                                    className="flex-1 text-[11px] bg-muted/50 border border-border rounded px-1.5 py-1 outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/50"
+                                    placeholder="Formule invoeren, bijv. 15% CO₂ in Ar"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <button type="submit" className="text-[10px] bg-primary text-primary-foreground rounded px-2 py-1 hover:bg-primary/90 transition-colors">
+                                    Opslaan
+                                  </button>
+                                </form>
+                                <p className="text-[9px] text-muted-foreground mt-0.5">Geen formule gevonden – voer er een in om op te slaan in de database</p>
+                              </div>
+                            )}
+                            {isActive && displayFormula && !formula && (
+                              <div className="px-3 pb-1 pt-0">
+                                <form
+                                  className="flex gap-1"
+                                  onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    const input = (e.target as HTMLFormElement).elements.namedItem("formula") as HTMLInputElement;
+                                    const value = input?.value?.trim();
+                                    if (!value) return;
+                                    const { error } = await supabase.from("gas_types").update({ description: value }).eq("id", gt.id);
+                                    if (error) {
+                                      toast.error("Opslaan mislukt");
+                                      return;
+                                    }
+                                    setAvailableGasTypes(prev => prev.map(g => g.id === gt.id ? { ...g, description: value } : g));
+                                    setZones(prev => {
+                                      const updated = prev.map(z => {
+                                        if (z.id !== contextMenu.zoneId) return z;
+                                        return z.gasType === gt.name ? { ...z, sublabel: value } : z;
+                                      });
+                                      savePositions(updated, tanks);
+                                      return updated;
+                                    });
+                                    toast.success(`Formule bijgewerkt naar "${value}"`);
+                                  }}
+                                >
+                                  <input
+                                    name="formula"
+                                    defaultValue={gt.description || ""}
+                                    className="flex-1 text-[11px] bg-muted/50 border border-border rounded px-1.5 py-1 outline-none focus:ring-1 focus:ring-primary"
+                                    placeholder="Formule aanpassen..."
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <button type="submit" className="text-[10px] bg-primary text-primary-foreground rounded px-2 py-1 hover:bg-primary/90 transition-colors">
+                                    Opslaan
+                                  </button>
+                                </form>
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                       {filteredGasTypes.length === 0 && gasSearch && (
