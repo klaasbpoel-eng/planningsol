@@ -627,13 +627,20 @@ export function DailyOverview() {
     setter: React.Dispatch<React.SetStateAction<any[]>>,
   ) => {
     const prev = (table === "ambulance_trips" ? ambulanceTrips : table === "gas_cylinder_orders" ? gasOrders : table === "dry_ice_orders" ? dryIceOrders : tasks) as any[];
+    const oldItem = prev.find(i => i.id === id);
+    const oldStatus = oldItem?.status;
     setter((items: any[]) => items.map(i => i.id === id ? { ...i, status: newStatus } : i));
     const { error } = await supabase.from(table).update({ status: newStatus }).eq("id", id);
     if (error) {
       setter(prev);
       toast.error("Status wijzigen mislukt");
     } else {
-      toast.success("Status bijgewerkt");
+      toast.success("Status bijgewerkt", {
+        action: oldStatus ? {
+          label: "Ongedaan maken",
+          onClick: () => handleQuickStatus(table, id, oldStatus, setter),
+        } : undefined,
+      });
     }
   };
 
