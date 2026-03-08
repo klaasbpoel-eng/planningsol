@@ -1,47 +1,35 @@
 
+# Showroom als ronde vorm van Entrée naar Kantoor Vivisol
 
-## Plan: Access Data Viewer admin page
+## Wat wordt aangepast
 
-### What we're building
-A new "Access Data" tab in the admin sidebar where you can browse all synced Access tables, search/filter rows, and view sync history.
+De huidige showroom is een rechthoekig blokje (zone `showroom` op x:595, y:610, w:130, h:28). In werkelijkheid loopt de showroom in een boog/ronde vorm van de Entrée (x:540, y:750) richting het Kantoor bij de Vivisol opslag (x:808, y:565).
 
-### Changes
+## Plan
 
-**1. New component: `src/components/admin/AccessDataViewer.tsx`**
-- Fetches distinct `table_name` values from `access_sync_data` to show a table selector dropdown
-- On table select, fetches all rows for that table from `access_sync_data`
-- Dynamically extracts column headers from `row_data` JSONB (union of all keys across rows)
-- Renders a searchable, filterable data table:
-  - Global text search across all fields
-  - Column headers auto-generated from the JSONB keys
-  - Shows `synced_at` / `updated_at` timestamps
-  - Pagination (50 rows per page)
-- Sync Log section at the bottom showing recent entries from `access_sync_log` (status, rows received/upserted, timestamp, errors)
-- "Verwijder tabeldata" button to delete all rows for a specific table (with confirmation dialog)
+1. **Verwijder de huidige rechthoekige showroom-zone** uit `DEFAULT_ZONES`
 
-**2. Update `AdminSidebar.tsx`**
-- Add new nav item `{ id: "access-data", label: "Access Data", icon: Database }`
+2. **Voeg een gebogen SVG-pad toe als achtergrond** in de SVG-rendering (naast de bestaande achtergrondblokken), die een afgeronde L-bocht of boogvorm tekent van de Entrée (rechtsonder bij kantoren) omhoog naar het Vivisol-kantoor (rechtsboven). Dit wordt een `<path>` element met een kwadratische of cubische bezier-curve, met een gestippelde rand en licht gekleurde vulling, gelabeld "SHOWROOM".
 
-**3. Update `AdminDashboard.tsx`**
-- Add conditional render for `activeTab === 'access-data'` showing `<AccessDataViewer />`
+3. **Voeg de showroom-zone terug als een aangepast element** dat het gebogen pad visueel volgt. Omdat zones nu rechthoekig zijn, splits ik de showroom op in 2-3 kleinere zones die samen de boog vormen:
+   - `showroom_onder`: Horizontaal stuk naast de Entrée (ca. x:640, y:740, w:120, h:48)
+   - `showroom_midden`: Verticaal/schuin stuk (ca. x:730, y:640, w:80, h:100) 
+   - `showroom_boven`: Horizontaal stuk bij Vivisol opslag (ca. x:750, y:600, w:140, h:40)
+   
+   Of beter: een enkel decoratief SVG-pad als achtergrond met label, en de showroom-zone als een enkel dragbaar element op een representatieve positie.
 
-### UI Structure
-```text
-┌─────────────────────────────────────┐
-│ Access Data Synchronisatie          │
-│ [Table selector ▼]  [🔍 Zoeken...] │
-├─────────────────────────────────────┤
-│ KlantID │ Naam          │ Synced    │
-│ K001    │ Testbedrijf   │ 08-03... │
-│ K002    │ Ander bedrijf │ 08-03... │
-├─────────────────────────────────────┤
-│ Pagina 1 van 1          [< >]      │
-├─────────────────────────────────────┤
-│ Sync Logboek                        │
-│ TestKlanten │ 3 rijen │ success    │
-└─────────────────────────────────────┘
-```
+**Gekozen aanpak**: Een decoratief gebogen SVG-pad als achtergrondvorm (niet-dragbaar, puur visueel) dat de ronde loop van de showroom toont, plus de bestaande showroom-zone die als klikbaar element op het midden van het pad blijft staan.
 
-### No database changes needed
-Both `access_sync_data` and `access_sync_log` tables already exist. RLS policies need to be checked — if admin-only policies exist, the existing `is_admin()` check should suffice since this is an admin page.
+## Technische details
 
+**Bestand**: `src/components/production/InteractiveFloorPlan.tsx`
+
+- Voeg na de bestaande achtergrondblokken (rond lijn 640) een SVG `<path>` toe met een gebogen vorm:
+  - Start bij Entrée-gebied (ca. 640, 760)
+  - Bocht naar rechts en omhoog
+  - Eindigt bij Vivisol kantoor (ca. 810, 600)
+  - Styling: gevulde achtergrond (`hsl(40 70% 50% / 0.08)`), gestippelde rand, label "SHOWROOM"
+
+- Pas de bestaande `showroom` zone-positie en afmetingen aan zodat deze centraal op het pad ligt
+
+- De boog wordt getekend met een `quadratic bezier` curve in SVG (`Q` commando) om een natuurlijke ronde hoek te maken
