@@ -286,6 +286,10 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<"label" | "sublabel" | null>(null);
   const [editingValue, setEditingValue] = useState("");
+  const [terrainHeight, setTerrainHeight] = useState(() => {
+    try { const v = localStorage.getItem("floorplan-terrain-height"); return v ? Number(v) : 180; } catch { return 180; }
+  });
+  const [resizingTerrain, setResizingTerrain] = useState(false);
 
   const [showInventory, setShowInventory] = useState(true);
   const [pgsData, setPgsData] = useState<PgsSubstance[]>([]);
@@ -404,6 +408,16 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const [alignGuides, setAlignGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
 
   const handleSvgMouseMove = useCallback((e: React.MouseEvent) => {
+    // Terrain resize
+    if (resizingTerrain) {
+      const svgPt = toSVG(e);
+      if (!svgPt) return;
+      const newH = Math.max(100, Math.min(400, snap(svgPt.y - 40)));
+      setTerrainHeight(newH);
+      setHasChanges(true);
+      return;
+    }
+
     if (draggingId && dragType) {
       const svgPt = toSVG(e);
       if (!svgPt) return;
@@ -428,7 +442,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     if (isPanning) {
       setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
     }
-  }, [draggingId, dragType, isPanning, panStart, toSVG, alignSnap]);
+  }, [draggingId, dragType, isPanning, panStart, toSVG, alignSnap, resizingTerrain]);
 
   // Check overlap between two rectangles
   const rectsOverlap = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => {
@@ -452,6 +466,10 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   };
 
   const handleSvgMouseUp = useCallback(() => {
+    if (resizingTerrain) {
+      localStorage.setItem("floorplan-terrain-height", String(terrainHeight));
+      setResizingTerrain(false);
+    }
     if (draggingId && dragType && editMode) {
       if (dragType === "zone") {
         const dragged = zones.find(z => z.id === draggingId);
@@ -785,13 +803,24 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             <rect x="0" y="0" width={SVG_WIDTH} height={SVG_HEIGHT} fill="hsl(var(--background))" rx="8" />
 
             {/* Terrain */}
-            <rect x="15" y="40" width={SVG_WIDTH - 30} height={180} rx="4" fill="hsl(var(--muted) / 0.2)" stroke="hsl(var(--border) / 0.3)" strokeWidth="1" strokeDasharray="6 3" />
-            <text x={SVG_WIDTH / 2} y="57" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="9" fontWeight="700" letterSpacing="2" opacity="0.4">BUITENTERREIN – BULKTANKS</text>
+            <rect x="15" y="40" width={SVG_WIDTH - 30} height={terrainHeight} rx="4" fill="hsl(var(--muted) / 0.15)" stroke="hsl(var(--border) / 0.15)" strokeWidth="0.5" strokeDasharray="8 4" />
+            <text x={SVG_WIDTH / 2} y="57" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="9" fontWeight="700" letterSpacing="2" opacity="0.3">BUITENTERREIN – BULKTANKS</text>
 
+            {/* Terrain resize handle (edit mode only) */}
+            {editMode && (
+              <g
+                className="cursor-ns-resize"
+                onMouseDown={(e) => { e.stopPropagation(); setResizingTerrain(true); }}
+              >
+                <rect x={SVG_WIDTH / 2 - 30} y={40 + terrainHeight - 3} width={60} height={6} rx="3" fill="hsl(var(--primary) / 0.5)" />
+                <line x1={SVG_WIDTH / 2 - 10} y1={40 + terrainHeight - 1} x2={SVG_WIDTH / 2 + 10} y2={40 + terrainHeight - 1} stroke="hsl(var(--primary-foreground))" strokeWidth="0.8" opacity="0.7" />
+                <line x1={SVG_WIDTH / 2 - 10} y1={40 + terrainHeight + 1} x2={SVG_WIDTH / 2 + 10} y2={40 + terrainHeight + 1} stroke="hsl(var(--primary-foreground))" strokeWidth="0.8" opacity="0.7" />
+              </g>
+            )}
 
             {/* Main building - hele overdekte gebied */}
-            <rect x="20" y="220" width={SVG_WIDTH - 40} height={655} rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
-            <text x="35" y="218" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">PRODUCTIEHAL</text>
+            <rect x="20" y={40 + terrainHeight} width={SVG_WIDTH - 40} height={655} rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
+            <text x="35" y={40 + terrainHeight - 2} fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">PRODUCTIEHAL</text>
 
             {/* Medical bunker */}
             <rect x="110" y="645" width={550} height={72} rx="4" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="1.5" />
