@@ -327,8 +327,8 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const SVG_WIDTH = 1000;
-  const SVG_HEIGHT = 820;
+  const SVG_WIDTH = 1100;
+  const SVG_HEIGHT = 860;
 
   // Convert mouse event to SVG coordinates
   const toSVG = useCallback((e: React.MouseEvent): { x: number; y: number } | null => {
@@ -785,13 +785,13 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             <rect x="0" y="0" width={SVG_WIDTH} height={SVG_HEIGHT} fill="hsl(var(--background))" rx="8" />
 
             {/* Terrain */}
-            <rect x="15" y="15" width={SVG_WIDTH - 30} height={140} rx="4" fill="hsl(var(--muted) / 0.2)" stroke="hsl(var(--border) / 0.3)" strokeWidth="1" strokeDasharray="6 3" />
+            <rect x="15" y="15" width={SVG_WIDTH - 30} height={170} rx="4" fill="hsl(var(--muted) / 0.2)" stroke="hsl(var(--border) / 0.3)" strokeWidth="1" strokeDasharray="6 3" />
             <text x={SVG_WIDTH / 2} y="32" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="9" fontWeight="700" letterSpacing="2" opacity="0.4">BUITENTERREIN – BULKTANKS</text>
 
 
             {/* Main building - hele overdekte gebied */}
-            <rect x="20" y="150" width={SVG_WIDTH - 40} height={655} rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
-            <text x="35" y="148" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">PRODUCTIEHAL</text>
+            <rect x="20" y="180" width={SVG_WIDTH - 40} height={655} rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
+            <text x="35" y="178" fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">PRODUCTIEHAL</text>
 
             {/* Medical bunker */}
             <rect x="110" y="645" width={550} height={72} rx="4" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="1.5" />
