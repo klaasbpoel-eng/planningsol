@@ -296,7 +296,13 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const [canvasHeight, setCanvasHeight] = useState(() => {
     try { const v = localStorage.getItem("floorplan-canvas-height"); return v ? Number(v) : 900; } catch { return 900; }
   });
-  const [resizingCanvas, setResizingCanvas] = useState<"right" | "bottom" | "corner" | null>(null);
+  const [resizingCanvas, setResizingCanvas] = useState<"right" | "bottom" | "corner" | "left" | "top" | null>(null);
+  const [canvasOffsetX, setCanvasOffsetX] = useState(() => {
+    try { const v = localStorage.getItem("floorplan-canvas-offset-x"); return v ? Number(v) : 0; } catch { return 0; }
+  });
+  const [canvasOffsetY, setCanvasOffsetY] = useState(() => {
+    try { const v = localStorage.getItem("floorplan-canvas-offset-y"); return v ? Number(v) : 0; } catch { return 0; }
+  });
 
   const [showInventory, setShowInventory] = useState(true);
   const [pgsData, setPgsData] = useState<PgsSubstance[]>([]);
@@ -425,6 +431,14 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       if (resizingCanvas === "bottom" || resizingCanvas === "corner") {
         setCanvasHeight(Math.max(600, snap(svgPt.y + 10)));
       }
+      if (resizingCanvas === "left") {
+        const newOffset = Math.min(0, snap(svgPt.x - 10));
+        setCanvasOffsetX(newOffset);
+      }
+      if (resizingCanvas === "top") {
+        const newOffset = Math.min(0, snap(svgPt.y - 10));
+        setCanvasOffsetY(newOffset);
+      }
       setHasChanges(true);
       return;
     }
@@ -463,7 +477,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     if (isPanning) {
       setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
     }
-  }, [draggingId, dragType, isPanning, panStart, toSVG, alignSnap, resizingTerrain, resizingCanvas, canvasWidth, canvasHeight]);
+  }, [draggingId, dragType, isPanning, panStart, toSVG, alignSnap, resizingTerrain, resizingCanvas, canvasWidth, canvasHeight, canvasOffsetX, canvasOffsetY]);
 
   // Check overlap between two rectangles
   const rectsOverlap = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => {
@@ -490,6 +504,8 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     if (resizingCanvas) {
       localStorage.setItem("floorplan-canvas-width", String(canvasWidth));
       localStorage.setItem("floorplan-canvas-height", String(canvasHeight));
+      localStorage.setItem("floorplan-canvas-offset-x", String(canvasOffsetX));
+      localStorage.setItem("floorplan-canvas-offset-y", String(canvasOffsetY));
       setResizingCanvas(null);
     }
     if (resizingTerrain) {
@@ -552,7 +568,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     setDragType(null);
     setIsPanning(false);
     setAlignGuides({ x: null, y: null });
-  }, [draggingId, dragType, editMode, zones, tanks, resizingCanvas, resizingTerrain, canvasWidth, canvasHeight, terrainHeight]);
+  }, [draggingId, dragType, editMode, zones, tanks, resizingCanvas, resizingTerrain, canvasWidth, canvasHeight, canvasOffsetX, canvasOffsetY, terrainHeight]);
 
   // Inline text editing
   const handleStartEdit = useCallback((id: string, field: "label" | "sublabel", currentValue: string) => {
@@ -817,7 +833,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
         >
           <svg
             ref={svgRef}
-            viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
+            viewBox={`${canvasOffsetX} ${canvasOffsetY} ${SVG_WIDTH - canvasOffsetX} ${SVG_HEIGHT - canvasOffsetY}`}
             className="w-full h-full"
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
@@ -826,20 +842,20 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             }}
           >
             {/* Background */}
-            <rect x="0" y="0" width={SVG_WIDTH} height={SVG_HEIGHT} fill="hsl(var(--background))" rx="8" />
+            <rect x={canvasOffsetX} y={canvasOffsetY} width={SVG_WIDTH - canvasOffsetX} height={SVG_HEIGHT - canvasOffsetY} fill="hsl(var(--background))" rx="8" />
 
             {/* Site perimeter – hekwerk */}
-            <rect x="8" y="8" width={SVG_WIDTH - 16} height={SVG_HEIGHT - 16} rx="6" fill="none" stroke="hsl(var(--foreground) / 0.25)" strokeWidth="2" strokeDasharray="10 4 2 4" />
+            <rect x={canvasOffsetX + 8} y={canvasOffsetY + 8} width={SVG_WIDTH - canvasOffsetX - 16} height={SVG_HEIGHT - canvasOffsetY - 16} rx="6" fill="none" stroke="hsl(var(--foreground) / 0.25)" strokeWidth="2" strokeDasharray="10 4 2 4" />
             {/* Fence post markers */}
-            {Array.from({ length: Math.floor((SVG_WIDTH - 16) / 60) + 1 }, (_, i) => 8 + i * 60).map(x => (
+            {Array.from({ length: Math.floor((SVG_WIDTH - canvasOffsetX - 16) / 60) + 1 }, (_, i) => canvasOffsetX + 8 + i * 60).map(x => (
               <g key={`fp-t${x}`}>
-                <circle cx={Math.min(x, SVG_WIDTH - 8)} cy="8" r="3" fill="hsl(var(--foreground) / 0.2)" />
+                <circle cx={Math.min(x, SVG_WIDTH - 8)} cy={canvasOffsetY + 8} r="3" fill="hsl(var(--foreground) / 0.2)" />
                 <circle cx={Math.min(x, SVG_WIDTH - 8)} cy={SVG_HEIGHT - 8} r="3" fill="hsl(var(--foreground) / 0.2)" />
               </g>
             ))}
-            {Array.from({ length: Math.floor((SVG_HEIGHT - 16) / 60) + 1 }, (_, i) => 8 + i * 60).map(y => (
+            {Array.from({ length: Math.floor((SVG_HEIGHT - canvasOffsetY - 16) / 60) + 1 }, (_, i) => canvasOffsetY + 8 + i * 60).map(y => (
               <g key={`fp-l${y}`}>
-                <circle cx="8" cy={Math.min(y, SVG_HEIGHT - 8)} r="3" fill="hsl(var(--foreground) / 0.2)" />
+                <circle cx={canvasOffsetX + 8} cy={Math.min(y, SVG_HEIGHT - 8)} r="3" fill="hsl(var(--foreground) / 0.2)" />
                 <circle cx={SVG_WIDTH - 8} cy={Math.min(y, SVG_HEIGHT - 8)} r="3" fill="hsl(var(--foreground) / 0.2)" />
               </g>
             ))}
@@ -1110,6 +1126,16 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             {/* Canvas resize handles (edit mode) */}
             {editMode && (
               <>
+                {/* Left edge */}
+                <g className="cursor-ew-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("left"); }}>
+                  <rect x={canvasOffsetX} y={SVG_HEIGHT / 2 - 30} width={12} height={60} fill="transparent" />
+                  <rect x={canvasOffsetX + 2} y={SVG_HEIGHT / 2 - 20} width={4} height={40} rx="2" fill="hsl(var(--primary) / 0.5)" />
+                </g>
+                {/* Top edge */}
+                <g className="cursor-ns-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("top"); }}>
+                  <rect x={SVG_WIDTH / 2 - 30} y={canvasOffsetY} width={60} height={12} fill="transparent" />
+                  <rect x={SVG_WIDTH / 2 - 20} y={canvasOffsetY + 2} width={40} height={4} rx="2" fill="hsl(var(--primary) / 0.5)" />
+                </g>
                 {/* Right edge */}
                 <g className="cursor-ew-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("right"); }}>
                   <rect x={SVG_WIDTH - 12} y={SVG_HEIGHT / 2 - 30} width={12} height={60} fill="transparent" />
@@ -1120,7 +1146,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   <rect x={SVG_WIDTH / 2 - 30} y={SVG_HEIGHT - 12} width={60} height={12} fill="transparent" />
                   <rect x={SVG_WIDTH / 2 - 20} y={SVG_HEIGHT - 6} width={40} height={4} rx="2" fill="hsl(var(--primary) / 0.5)" />
                 </g>
-                {/* Corner */}
+                {/* Corner bottom-right */}
                 <g className="cursor-nwse-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("corner"); }}>
                   <rect x={SVG_WIDTH - 16} y={SVG_HEIGHT - 16} width={16} height={16} fill="transparent" />
                   <path d={`M${SVG_WIDTH - 4} ${SVG_HEIGHT - 12} L${SVG_WIDTH - 4} ${SVG_HEIGHT - 4} L${SVG_WIDTH - 12} ${SVG_HEIGHT - 4}`} fill="none" stroke="hsl(var(--primary) / 0.6)" strokeWidth="2" strokeLinecap="round" />
