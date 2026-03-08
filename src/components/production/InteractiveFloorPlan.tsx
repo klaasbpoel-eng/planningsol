@@ -645,6 +645,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   }, [zones, tanks]);
 
   const [alignGuides, setAlignGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
+  const [resizeGuides, setResizeGuides] = useState<{ w: { x: number; y: number; w: number; h: number } | null; h: { x: number; y: number; w: number; h: number } | null }>({ w: null, h: null });
 
   const handleSvgMouseMove = useCallback((e: React.MouseEvent) => {
     // Canvas resize
@@ -709,37 +710,69 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       const s = resizeZoneStart.current;
       
       // Collect existing widths & heights from other zones for size-snapping
-      const SIZE_SNAP_THRESHOLD = 8;
+      const SIZE_SNAP_THRESHOLD = 15;
       const otherZones = zones.filter(z => z.id !== resizingZoneId);
       const existingWidths = [...new Set(otherZones.map(z => z.w))];
       const existingHeights = [...new Set(otherZones.map(z => z.h))];
       
-      const snapToSize = (val: number, existingSizes: number[]) => {
-        const gridSnapped = snap(val);
+      const snapToSize = (val: number, existingSizes: number[]): { value: number; snappedTo: number | null } => {
+        let bestDist = Infinity;
+        let bestSize: number | null = null;
         for (const sz of existingSizes) {
-          if (Math.abs(val - sz) < SIZE_SNAP_THRESHOLD) return sz;
+          const dist = Math.abs(val - sz);
+          if (dist < SIZE_SNAP_THRESHOLD && dist < bestDist) {
+            bestDist = dist;
+            bestSize = sz;
+          }
         }
-        return gridSnapped;
+        return bestSize !== null 
+          ? { value: bestSize, snappedTo: bestSize } 
+          : { value: snap(val), snappedTo: null };
       };
       
       let newX = s.x, newY = s.y, newW = s.w, newH = s.h;
+      let snappedW: number | null = null;
+      let snappedH: number | null = null;
+      
       if (resizingCorner === "se") {
-        newW = Math.max(40, snapToSize(svgPt.x - s.x, existingWidths));
-        newH = Math.max(20, snapToSize(svgPt.y - s.y, existingHeights));
+        const wSnap = snapToSize(svgPt.x - s.x, existingWidths);
+        const hSnap = snapToSize(svgPt.y - s.y, existingHeights);
+        newW = Math.max(40, wSnap.value); snappedW = wSnap.snappedTo;
+        newH = Math.max(20, hSnap.value); snappedH = hSnap.snappedTo;
       } else if (resizingCorner === "sw") {
-        newW = Math.max(40, snapToSize(s.x + s.w - svgPt.x, existingWidths));
+        const wSnap = snapToSize(s.x + s.w - svgPt.x, existingWidths);
+        const hSnap = snapToSize(svgPt.y - s.y, existingHeights);
+        newW = Math.max(40, wSnap.value); snappedW = wSnap.snappedTo;
         newX = s.x + s.w - newW;
-        newH = Math.max(20, snapToSize(svgPt.y - s.y, existingHeights));
+        newH = Math.max(20, hSnap.value); snappedH = hSnap.snappedTo;
       } else if (resizingCorner === "ne") {
-        newW = Math.max(40, snapToSize(svgPt.x - s.x, existingWidths));
-        newH = Math.max(20, snapToSize(s.y + s.h - svgPt.y, existingHeights));
+        const wSnap = snapToSize(svgPt.x - s.x, existingWidths);
+        const hSnap = snapToSize(s.y + s.h - svgPt.y, existingHeights);
+        newW = Math.max(40, wSnap.value); snappedW = wSnap.snappedTo;
+        newH = Math.max(20, hSnap.value); snappedH = hSnap.snappedTo;
         newY = s.y + s.h - newH;
       } else if (resizingCorner === "nw") {
-        newW = Math.max(40, snapToSize(s.x + s.w - svgPt.x, existingWidths));
+        const wSnap = snapToSize(s.x + s.w - svgPt.x, existingWidths);
+        const hSnap = snapToSize(s.y + s.h - svgPt.y, existingHeights);
+        newW = Math.max(40, wSnap.value); snappedW = wSnap.snappedTo;
         newX = s.x + s.w - newW;
-        newH = Math.max(20, snapToSize(s.y + s.h - svgPt.y, existingHeights));
+        newH = Math.max(20, hSnap.value); snappedH = hSnap.snappedTo;
         newY = s.y + s.h - newH;
       }
+      
+      // Find the source zone(s) we're snapping to for visual guides
+      let guideZoneW: { x: number; y: number; w: number; h: number } | null = null;
+      let guideZoneH: { x: number; y: number; w: number; h: number } | null = null;
+      if (snappedW !== null) {
+        const match = otherZones.find(z => z.w === snappedW);
+        if (match) guideZoneW = match;
+      }
+      if (snappedH !== null) {
+        const match = otherZones.find(z => z.h === snappedH);
+        if (match) guideZoneH = match;
+      }
+      setResizeGuides({ w: guideZoneW, h: guideZoneH });
+      
       setZones(prev => prev.map(z => z.id === resizingZoneId ? { ...z, x: newX, y: newY, w: newW, h: newH } : z));
       setHasChanges(true);
       return;
@@ -911,6 +944,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     setDragType(null);
     setIsPanning(false);
     setAlignGuides({ x: null, y: null });
+    setResizeGuides({ w: null, h: null });
   }, [draggingId, dragType, editMode, zones, tanks, resizingCanvas, resizingTerrain, canvasWidth, canvasHeight, canvasOffsetX, canvasOffsetY, terrainHeight, resizingZoneId, rotatingZoneId]);
 
   // Inline text editing
@@ -1346,7 +1380,37 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
               <line x1="0" y1={alignGuides.y} x2={SVG_WIDTH} y2={alignGuides.y} stroke="hsl(var(--primary))" strokeWidth="0.75" strokeDasharray="4 3" opacity="0.6" />
             )}
 
-            {/* Bulk tanks */}
+            {/* Resize size-snap guide lines */}
+            {resizingZoneId && resizeGuides.w && (() => {
+              const src = resizeGuides.w;
+              const resizing = zones.find(z => z.id === resizingZoneId);
+              if (!resizing) return null;
+              return (
+                <g>
+                  {/* Highlight the matched zone's width */}
+                  <rect x={src.x} y={src.y} width={src.w} height={src.h} fill="none" stroke="hsl(var(--primary))" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.5" />
+                  {/* Width dimension line on source */}
+                  <line x1={src.x} y1={src.y - 4} x2={src.x + src.w} y2={src.y - 4} stroke="hsl(var(--primary))" strokeWidth="0.75" opacity="0.6" />
+                  <text x={src.x + src.w / 2} y={src.y - 7} textAnchor="middle" fill="hsl(var(--primary))" fontSize="7" fontWeight="600" opacity="0.7">{Math.round(src.w)}</text>
+                </g>
+              );
+            })()}
+            {resizingZoneId && resizeGuides.h && (() => {
+              const src = resizeGuides.h;
+              const resizing = zones.find(z => z.id === resizingZoneId);
+              if (!resizing) return null;
+              // Only draw if not already drawn by width guide
+              if (resizeGuides.w && resizeGuides.w.x === src.x && resizeGuides.w.y === src.y) return null;
+              return (
+                <g>
+                  <rect x={src.x} y={src.y} width={src.w} height={src.h} fill="none" stroke="hsl(var(--primary))" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.5" />
+                  {/* Height dimension line on source */}
+                  <line x1={src.x - 4} y1={src.y} x2={src.x - 4} y2={src.y + src.h} stroke="hsl(var(--primary))" strokeWidth="0.75" opacity="0.6" />
+                  <text x={src.x - 7} y={src.y + src.h / 2} textAnchor="middle" fill="hsl(var(--primary))" fontSize="7" fontWeight="600" opacity="0.7" transform={`rotate(-90, ${src.x - 7}, ${src.y + src.h / 2})`}>{Math.round(src.h)}</text>
+                </g>
+              );
+            })()}
+
             {showTanks && tanks.map((tank) => {
               const isSelected = selectedZone === tank.id;
               const isHovered = hoveredZone === tank.id;
