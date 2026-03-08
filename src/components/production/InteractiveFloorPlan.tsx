@@ -134,7 +134,7 @@ const DEFAULTS_KEY = "floorplan-defaults";
 const GRID_SNAP = 10;
 const snap = (v: number) => Math.round(v / GRID_SNAP) * GRID_SNAP;
 
-function loadPositions(): { zones: Record<string, { x: number; y: number; label?: string; sublabel?: string }>; tanks: Record<string, { cx: number; cy: number; label?: string; sublabel?: string }> } | null {
+function loadPositions(): { zones: Record<string, { x: number; y: number; w?: number; h?: number; label?: string; sublabel?: string; details?: string; rotation?: number; type?: string; gasType?: string }>; tanks: Record<string, { cx: number; cy: number; label?: string; sublabel?: string }> } | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
