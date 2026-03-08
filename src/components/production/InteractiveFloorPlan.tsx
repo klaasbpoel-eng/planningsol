@@ -42,6 +42,7 @@ interface FloorZone {
   sublabel?: string;
   type: ZoneType;
   details?: string;
+  rotation?: number;
 }
 
 interface BulkTank {
