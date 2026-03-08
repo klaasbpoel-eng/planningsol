@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, ZoomIn, ZoomOut, Move, Maximize2, Minimize2, Info, Pencil, Save, RotateCcw, GripVertical, Flame, Eye, EyeOff } from "lucide-react";
+import { MapPin, ZoomIn, ZoomOut, Move, Maximize2, Minimize2, Info, Pencil, Save, RotateCcw, GripVertical, Flame, Eye, EyeOff, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { getGasColor } from "@/constants/gasColors";
@@ -134,7 +134,7 @@ const DEFAULTS_KEY = "floorplan-defaults";
 const GRID_SNAP = 10;
 const snap = (v: number) => Math.round(v / GRID_SNAP) * GRID_SNAP;
 
-function loadPositions(): { zones: Record<string, { x: number; y: number; label?: string; sublabel?: string }>; tanks: Record<string, { cx: number; cy: number; label?: string; sublabel?: string }> } | null {
+function loadPositions(): { zones: Record<string, { x: number; y: number; w?: number; h?: number; label?: string; sublabel?: string; details?: string; rotation?: number; type?: string; gasType?: string }>; tanks: Record<string, { cx: number; cy: number; label?: string; sublabel?: string }> } | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -149,9 +149,19 @@ function savePositions(zones: FloorZone[], tanks: BulkTank[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ zones: zonePos, tanks: tankPos }));
 }
 
-function applyPositions(zones: FloorZone[], tanks: BulkTank[], saved: ReturnType<typeof loadPositions>) {
+function applyPositions(zones: FloorZone[], tanks: BulkTank[], saved: ReturnType<typeof loadPositions>): { zones: FloorZone[]; tanks: BulkTank[] } {
   if (!saved) return { zones, tanks };
-  const newZones = zones.map(z => saved.zones[z.id] ? { ...z, ...saved.zones[z.id] } : z);
+  const newZones: FloorZone[] = zones.map(z => {
+    const s = saved.zones[z.id];
+    return s ? { ...z, ...s, type: (s.type as ZoneType) || z.type } : z;
+  });
+  // Restore dynamically added zones (IDs not in defaults)
+  const existingIds = new Set(zones.map(z => z.id));
+  Object.entries(saved.zones).forEach(([id, data]) => {
+    if (!existingIds.has(id) && data.type && data.w && data.h) {
+      newZones.push({ id, x: data.x, y: data.y, w: data.w, h: data.h, label: data.label || "Zone", sublabel: data.sublabel, type: data.type as ZoneType, details: data.details, rotation: data.rotation, gasType: data.gasType });
+    }
+  });
   const newTanks = tanks.map(t => saved.tanks[t.id] ? { ...t, ...saved.tanks[t.id] } : t);
   return { zones: newZones, tanks: newTanks };
 }
@@ -948,6 +958,26 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             {/* Edit controls */}
             {editMode ? (
               <div className="flex items-center gap-1 bg-primary/10 p-1 rounded-md mr-2">
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => {
+                  const newId = `zone_${Date.now()}`;
+                  const centerX = Math.round((SVG_WIDTH / 2 - pan.x / zoom) / 10) * 10;
+                  const centerY = Math.round((SVG_HEIGHT / 2 - pan.y / zoom) / 10) * 10;
+                  const newZone: FloorZone = {
+                    id: newId,
+                    x: centerX - 55,
+                    y: centerY - 21,
+                    w: 110,
+                    h: 42,
+                    label: "Nieuw item",
+                    type: "logistiek",
+                  };
+                  setZones(prev => [...prev, newZone]);
+                  setSelectedZone(newId);
+                  setHasChanges(true);
+                  toast.success("Nieuw item toegevoegd – sleep naar de juiste positie");
+                }}>
+                  <Plus className="h-3 w-3" /> Toevoegen
+                </Button>
                 <Button size="sm" variant="default" className="h-7 text-xs gap-1" onClick={handleSave}>
                   <Save className="h-3 w-3" /> Opslaan
                 </Button>
