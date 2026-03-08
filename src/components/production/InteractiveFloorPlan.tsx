@@ -231,10 +231,43 @@ const GAS_FORMULA_MAPPING: Record<string, string> = {
 
 function getGasFormula(name: string): string | undefined {
   if (!name) return undefined;
+  // Direct match
   if (GAS_FORMULA_MAPPING[name]) return GAS_FORMULA_MAPPING[name];
-  const lowerName = name.toLowerCase();
+  // Case-insensitive match
+  const lowerName = name.toLowerCase().trim();
   const key = Object.keys(GAS_FORMULA_MAPPING).find(k => k.toLowerCase() === lowerName);
-  return key ? GAS_FORMULA_MAPPING[key] : undefined;
+  if (key) return GAS_FORMULA_MAPPING[key];
+
+  // Pattern matching for common mixtures
+  // Weldmix XX → XX% CO₂ in Ar
+  const weldmixMatch = name.match(/weldmix\s*(\d+)/i);
+  if (weldmixMatch) return `${weldmixMatch[1]}% CO₂ in Ar`;
+  // Sagox XX → XX% CO₂ in Ar
+  const sagoxMatch = name.match(/sagox\s*(\d+)/i);
+  if (sagoxMatch) return `${sagoxMatch[1]}% CO₂ in Ar`;
+  // Weldar XX → XX% CO₂ in Ar  
+  const weldarMatch = name.match(/weldar\s*(\d+)/i);
+  if (weldarMatch) return `${weldarMatch[1]}% CO₂ in Ar`;
+  // ARGOMET XX → XX% CO₂ in Ar
+  const argometMatch = name.match(/argomet\s*(\d+)/i);
+  if (argometMatch) return `${argometMatch[1]}% CO₂ in Ar`;
+  // Formeer XX/YY → XX% H₂ / YY% N₂
+  const formeerMatch = name.match(/formeer\s*(\d+)\s*[\/\-]\s*(\d+)/i);
+  if (formeerMatch) return `${formeerMatch[1]}% H₂ / ${formeerMatch[2]}% N₂`;
+  // Carbogeen XX → XX% CO₂ in O₂
+  const carbogeenMatch = name.match(/carbogeen\s*(\d+)/i);
+  if (carbogeenMatch) return `${carbogeenMatch[1]}% CO₂ in O₂`;
+  // Lasermix / Lasersol → CO₂/N₂/He in Ar  
+  if (/lasermix|lasersol/i.test(name)) return "CO₂/He in Ar";
+  // Enermix → H₂/N₂ mix
+  if (/enermix/i.test(name)) return "H₂/N₂";
+  // Menggas → generic
+  if (/menggas/i.test(name)) return "Menggas";
+  // Partial match on known names
+  const partialKey = Object.keys(GAS_FORMULA_MAPPING).find(k => lowerName.includes(k.toLowerCase()));
+  if (partialKey) return GAS_FORMULA_MAPPING[partialKey];
+
+  return undefined;
 }
 
 // Mapping zone IDs to gas type names for inventory overlay
@@ -390,9 +423,9 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   }, []);
 
   // Fetch available gas types for the selector
-  const [availableGasTypes, setAvailableGasTypes] = useState<{ id: string; name: string }[]>([]);
+  const [availableGasTypes, setAvailableGasTypes] = useState<{ id: string; name: string; description: string | null }[]>([]);
   useEffect(() => {
-    supabase.from("gas_types").select("id, name").eq("is_active", true).order("name").then(({ data }) => {
+    supabase.from("gas_types").select("id, name, description").eq("is_active", true).order("name").then(({ data }) => {
       if (data) setAvailableGasTypes(data);
     });
   }, []);
@@ -1692,7 +1725,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                                 const updated = prev.map(z => {
                                   if (z.id !== contextMenu.zoneId) return z;
                                   return z.type === "opslag_vol"
-                                    ? { ...z, gasType: gt.name, label: gt.name, sublabel: getGasFormula(gt.name) || z.sublabel }
+                                    ? { ...z, gasType: gt.name, label: gt.name, sublabel: getGasFormula(gt.name) || gt.description || gt.name }
                                     : { ...z, gasType: gt.name };
                                 });
                                 savePositions(updated, tanks);
