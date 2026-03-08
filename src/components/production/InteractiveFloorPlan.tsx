@@ -343,15 +343,24 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     fetchInventory();
   }, []);
 
+  // Fetch available gas types for the selector
+  const [availableGasTypes, setAvailableGasTypes] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    supabase.from("gas_types").select("id, name").eq("is_active", true).order("name").then(({ data }) => {
+      if (data) setAvailableGasTypes(data);
+    });
+  }, []);
+
   // Helper to get PGS data for a zone by gas name
   const getZoneInventory = useCallback((zoneId: string) => {
-    const gasName = ZONE_GAS_MAPPING[zoneId];
+    const zone = zones.find(z => z.id === zoneId);
+    const gasName = zone?.gasType || ZONE_GAS_MAPPING[zoneId];
     if (!gasName) return null;
     const substance = pgsData.find(p => p.gas_types?.name?.toLowerCase().includes(gasName.toLowerCase()));
     if (!substance || substance.max_allowed_kg <= 0) return null;
     const pct = Math.round((substance.current_stock_kg / substance.max_allowed_kg) * 100);
-    return { current: substance.current_stock_kg, max: substance.max_allowed_kg, pct };
-  }, [pgsData]);
+    return { current: substance.current_stock_kg, max: substance.max_allowed_kg, pct, gasName };
+  }, [pgsData, zones]);
 
   // Helper to get bulk tank data
   const getTankInventory = useCallback((tankId: string) => {
