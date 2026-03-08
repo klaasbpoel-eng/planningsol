@@ -568,7 +568,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     setDragType(null);
     setIsPanning(false);
     setAlignGuides({ x: null, y: null });
-  }, [draggingId, dragType, editMode, zones, tanks, resizingCanvas, resizingTerrain, canvasWidth, canvasHeight, terrainHeight]);
+  }, [draggingId, dragType, editMode, zones, tanks, resizingCanvas, resizingTerrain, canvasWidth, canvasHeight, canvasOffsetX, canvasOffsetY, terrainHeight]);
 
   // Inline text editing
   const handleStartEdit = useCallback((id: string, field: "label" | "sublabel", currentValue: string) => {
