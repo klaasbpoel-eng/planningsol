@@ -1,5 +1,5 @@
 import { CategoryManagement } from "./CategoryManagement";
-import { PowerAutomateSync } from "./PowerAutomateSync";
+import { ExternalDataSync } from "./PowerAutomateSync";
 import { LeaveTypeManagement } from "./LeaveTypeManagement";
 import { GasCylinderSettings } from "./GasCylinderSettings";
 import { DryIceSettings } from "./DryIceSettings";
@@ -104,7 +104,7 @@ export function AdminSettings() {
 
         <TabsContent value="migration" className="space-y-4 animate-fade-in-up">
           <DataSourceSettings />
-          <PowerAutomateSync />
+          <ExternalDataSync />
           <MigrationSettings />
           <DirectAdminExport />
         </TabsContent>
