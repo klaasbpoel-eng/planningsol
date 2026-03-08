@@ -165,7 +165,10 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
 
         {/* Main Content Area */}
         <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full">
-          {/* Mobile Header for Sidebar Trigger is handled inside AdminSidebar via SheetTrigger */}
+          {/* Mobile: show sidebar trigger prominently */}
+          <div className="md:hidden mb-4">
+            <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+          </div>
 
           <div className="max-w-6xl mx-auto w-full space-y-6">
             {activeTab === 'requests' && <DailyOverview />}
