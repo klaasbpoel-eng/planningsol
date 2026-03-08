@@ -186,7 +186,7 @@ export function Header({
 
 
         {/* Right side - Actions */}
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           {!isMobile && (
             <Button
               variant="outline"
