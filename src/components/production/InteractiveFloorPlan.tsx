@@ -349,8 +349,10 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const SVG_WIDTH = canvasWidth;
   const SVG_HEIGHT = canvasHeight;
 
-  // Auto-fit zoom to fill container on mount and fullscreen toggle
+  // Auto-fit zoom to fill container on mount and fullscreen toggle only
   useEffect(() => {
+    // Skip auto-fit while user is actively resizing the canvas
+    if (resizingCanvas) return;
     const fit = () => {
       const container = containerRef.current;
       if (!container) return;
@@ -368,7 +370,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     };
     const timer = setTimeout(fit, 80);
     return () => clearTimeout(timer);
-  }, [isFullscreen, SVG_WIDTH, SVG_HEIGHT, canvasOffsetX, canvasOffsetY]);
+  }, [isFullscreen]); // Only re-fit on fullscreen toggle, not during resize
 
   // Convert mouse event to SVG coordinates
   const toSVG = useCallback((e: React.MouseEvent): { x: number; y: number } | null => {
