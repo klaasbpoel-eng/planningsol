@@ -225,6 +225,10 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
               </div>
             )}
 
+            {activeTab === 'access-data' && (
+              <AccessDataViewer />
+            )}
+
             {activeTab === 'settings' && (
               <div className="animate-fade-in space-y-6">
                 <div className="flex flex-col gap-2 mb-6">
