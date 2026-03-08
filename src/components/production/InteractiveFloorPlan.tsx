@@ -292,6 +292,14 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     try { const v = localStorage.getItem("floorplan-terrain-height"); return v ? Number(v) : 180; } catch { return 180; }
   });
   const [resizingTerrain, setResizingTerrain] = useState(false);
+  const [buildingWidth, setBuildingWidth] = useState(() => {
+    try { const v = localStorage.getItem("floorplan-building-width"); return v ? Number(v) : 1060; } catch { return 1060; }
+  });
+  const [buildingHeight, setBuildingHeight] = useState(() => {
+    try { const v = localStorage.getItem("floorplan-building-height"); return v ? Number(v) : 655; } catch { return 655; }
+  });
+  const [resizingBuilding, setResizingBuilding] = useState<"right" | "bottom" | "corner" | null>(null);
+  const buildingResizeStart = useRef({ clientX: 0, clientY: 0, w: 0, h: 0 });
   const [canvasWidth, setCanvasWidth] = useState(() => {
     try { const v = localStorage.getItem("floorplan-canvas-width"); return v ? Number(v) : 1100; } catch { return 1100; }
   });
