@@ -498,15 +498,21 @@ export function DailyOverview() {
     fetchData();
   }, [fetchData]);
 
-  // Realtime subscriptions
+  // Realtime subscriptions with visual feedback
+  const [realtimeFlash, setRealtimeFlash] = useState(false);
   useEffect(() => {
+    const onRealtimeUpdate = () => {
+      fetchData();
+      setRealtimeFlash(true);
+      setTimeout(() => setRealtimeFlash(false), 2000);
+    };
     const channel = supabase
       .channel('daily-overview-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_off_requests' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dry_ice_orders' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'gas_cylinder_orders' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ambulance_trips' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, onRealtimeUpdate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_off_requests' }, onRealtimeUpdate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dry_ice_orders' }, onRealtimeUpdate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'gas_cylinder_orders' }, onRealtimeUpdate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ambulance_trips' }, onRealtimeUpdate)
       .subscribe();
 
     return () => {
