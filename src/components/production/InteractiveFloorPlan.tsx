@@ -1001,8 +1001,41 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             )}
 
             {/* Main building - hele overdekte gebied */}
-            <rect x="20" y={40 + terrainHeight} width={Math.min(1060, SVG_WIDTH - 40)} height={655} rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
+            <rect x="20" y={40 + terrainHeight} width={Math.min(buildingWidth, SVG_WIDTH - 40)} height={buildingHeight} rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
             <text x="35" y={40 + terrainHeight - 2} fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">PRODUCTIEHAL</text>
+
+            {/* Building resize handles (edit mode only) */}
+            {editMode && (
+              <>
+                {/* Right edge */}
+                <g className="cursor-ew-resize" onMouseDown={(e) => {
+                  e.stopPropagation(); e.preventDefault();
+                  buildingResizeStart.current = { clientX: e.clientX, clientY: e.clientY, w: buildingWidth, h: buildingHeight };
+                  setResizingBuilding("right");
+                }}>
+                  <rect x={20 + Math.min(buildingWidth, SVG_WIDTH - 40) - 6} y={40 + terrainHeight + buildingHeight / 2 - 30} width={12} height={60} fill="transparent" />
+                  <rect x={20 + Math.min(buildingWidth, SVG_WIDTH - 40) - 2} y={40 + terrainHeight + buildingHeight / 2 - 20} width={4} height={40} rx="2" fill="hsl(var(--primary) / 0.5)" />
+                </g>
+                {/* Bottom edge */}
+                <g className="cursor-ns-resize" onMouseDown={(e) => {
+                  e.stopPropagation(); e.preventDefault();
+                  buildingResizeStart.current = { clientX: e.clientX, clientY: e.clientY, w: buildingWidth, h: buildingHeight };
+                  setResizingBuilding("bottom");
+                }}>
+                  <rect x={20 + Math.min(buildingWidth, SVG_WIDTH - 40) / 2 - 30} y={40 + terrainHeight + buildingHeight - 6} width={60} height={12} fill="transparent" />
+                  <rect x={20 + Math.min(buildingWidth, SVG_WIDTH - 40) / 2 - 20} y={40 + terrainHeight + buildingHeight - 2} width={40} height={4} rx="2" fill="hsl(var(--primary) / 0.5)" />
+                </g>
+                {/* Corner */}
+                <g className="cursor-nwse-resize" onMouseDown={(e) => {
+                  e.stopPropagation(); e.preventDefault();
+                  buildingResizeStart.current = { clientX: e.clientX, clientY: e.clientY, w: buildingWidth, h: buildingHeight };
+                  setResizingBuilding("corner");
+                }}>
+                  <rect x={20 + Math.min(buildingWidth, SVG_WIDTH - 40) - 10} y={40 + terrainHeight + buildingHeight - 10} width={16} height={16} fill="transparent" />
+                  <rect x={20 + Math.min(buildingWidth, SVG_WIDTH - 40) - 5} y={40 + terrainHeight + buildingHeight - 5} width={8} height={8} rx="2" fill="hsl(var(--primary) / 0.7)" stroke="hsl(var(--background))" strokeWidth="1" />
+                </g>
+              </>
+            )}
 
             {/* Medical bunker */}
             <rect x="110" y="645" width={550} height={72} rx="4" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="1.5" />
