@@ -790,7 +790,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     savePositions(zones, tanks);
     // Save current state as new defaults
     const zonePos: Record<string, any> = {};
-    zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y, w: z.w, h: z.h, label: z.label, sublabel: z.sublabel, details: z.details, type: z.type }; });
+    zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y, w: z.w, h: z.h, label: z.label, sublabel: z.sublabel, details: z.details, type: z.type, gasType: z.gasType }; });
     const tankPos: Record<string, any> = {};
     tanks.forEach(t => { tankPos[t.id] = { cx: t.cx, cy: t.cy, r: t.r, label: t.label, sublabel: t.sublabel, details: t.details }; });
     localStorage.setItem(DEFAULTS_KEY, JSON.stringify({ zones: zonePos, tanks: tankPos }));
