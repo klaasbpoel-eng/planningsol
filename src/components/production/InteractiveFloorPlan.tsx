@@ -43,6 +43,7 @@ interface FloorZone {
   type: ZoneType;
   details?: string;
   rotation?: number;
+  gasType?: string; // linked gas type name for inventory overlay
 }
 
 interface BulkTank {
