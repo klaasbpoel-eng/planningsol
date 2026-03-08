@@ -1089,6 +1089,28 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                 </g>
               );
             })()}
+
+            {/* Canvas resize handles (edit mode) */}
+            {editMode && (
+              <>
+                {/* Right edge */}
+                <g className="cursor-ew-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("right"); }}>
+                  <rect x={SVG_WIDTH - 12} y={SVG_HEIGHT / 2 - 30} width={12} height={60} fill="transparent" />
+                  <rect x={SVG_WIDTH - 6} y={SVG_HEIGHT / 2 - 20} width={4} height={40} rx="2" fill="hsl(var(--primary) / 0.5)" />
+                </g>
+                {/* Bottom edge */}
+                <g className="cursor-ns-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("bottom"); }}>
+                  <rect x={SVG_WIDTH / 2 - 30} y={SVG_HEIGHT - 12} width={60} height={12} fill="transparent" />
+                  <rect x={SVG_WIDTH / 2 - 20} y={SVG_HEIGHT - 6} width={40} height={4} rx="2" fill="hsl(var(--primary) / 0.5)" />
+                </g>
+                {/* Corner */}
+                <g className="cursor-nwse-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("corner"); }}>
+                  <rect x={SVG_WIDTH - 16} y={SVG_HEIGHT - 16} width={16} height={16} fill="transparent" />
+                  <path d={`M${SVG_WIDTH - 4} ${SVG_HEIGHT - 12} L${SVG_WIDTH - 4} ${SVG_HEIGHT - 4} L${SVG_WIDTH - 12} ${SVG_HEIGHT - 4}`} fill="none" stroke="hsl(var(--primary) / 0.6)" strokeWidth="2" strokeLinecap="round" />
+                  <path d={`M${SVG_WIDTH - 4} ${SVG_HEIGHT - 7} L${SVG_WIDTH - 4} ${SVG_HEIGHT - 4} L${SVG_WIDTH - 7} ${SVG_HEIGHT - 4}`} fill="none" stroke="hsl(var(--primary) / 0.6)" strokeWidth="2" strokeLinecap="round" />
+                </g>
+              </>
+            )}
           </svg>
         </div>
 
