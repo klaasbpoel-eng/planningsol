@@ -872,6 +872,27 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                     onDoubleClick={(e) => { e.stopPropagation(); handleStartEdit(tank.id, "sublabel", tank.sublabel || ""); }}
                   >{tank.sublabel}</text>
                   {editMode && <circle cx={tank.cx} cy={tank.cy - tank.r - 6} r="4" fill="hsl(var(--primary))" opacity="0.6"><title>Sleep om te verplaatsen</title></circle>}
+                  {/* Tank inventory fill arc */}
+                  {showInventory && !editMode && (() => {
+                    const inv = getTankInventory(tank.id);
+                    if (!inv) return null;
+                    const col = getOccupancyColor(inv.pct);
+                    const fillR = tank.r - 2;
+                    const fillAngle = (inv.pct / 100) * 360;
+                    const rad = (a: number) => ((a - 90) * Math.PI) / 180;
+                    const x1 = tank.cx + fillR * Math.cos(rad(0));
+                    const y1 = tank.cy + fillR * Math.sin(rad(0));
+                    const x2 = tank.cx + fillR * Math.cos(rad(fillAngle));
+                    const y2 = tank.cy + fillR * Math.sin(rad(fillAngle));
+                    const largeArc = fillAngle > 180 ? 1 : 0;
+                    if (inv.pct <= 0) return null;
+                    if (inv.pct >= 100) {
+                      return <circle cx={tank.cx} cy={tank.cy} r={fillR} fill={`${col}33`} stroke="none" />;
+                    }
+                    return (
+                      <path d={`M ${tank.cx} ${tank.cy} L ${x1} ${y1} A ${fillR} ${fillR} 0 ${largeArc} 1 ${x2} ${y2} Z`} fill={`${col}33`} stroke="none" />
+                    );
+                  })()}
                 </g>
               );
             })}
