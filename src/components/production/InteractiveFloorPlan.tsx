@@ -415,6 +415,20 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const [alignGuides, setAlignGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
 
   const handleSvgMouseMove = useCallback((e: React.MouseEvent) => {
+    // Canvas resize
+    if (resizingCanvas) {
+      const svgPt = toSVG(e);
+      if (!svgPt) return;
+      if (resizingCanvas === "right" || resizingCanvas === "corner") {
+        setCanvasWidth(Math.max(800, snap(svgPt.x + 10)));
+      }
+      if (resizingCanvas === "bottom" || resizingCanvas === "corner") {
+        setCanvasHeight(Math.max(600, snap(svgPt.y + 10)));
+      }
+      setHasChanges(true);
+      return;
+    }
+
     // Terrain resize
     if (resizingTerrain) {
       const svgPt = toSVG(e);
