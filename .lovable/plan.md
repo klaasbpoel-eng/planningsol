@@ -1,61 +1,35 @@
 
+# Showroom als ronde vorm van Entrée naar Kantoor Vivisol
 
-## Plan: Interactieve Plattegrond optimaliseren voor Inventory & Stock Management
+## Wat wordt aangepast
 
-Dit plan bevat twee delen: (1) de plattegrond koppelen aan live voorraaddata, en (2) een buitenopslag-zone toevoegen voor brandbare gassen. Daarnaast worden de build errors gefixed.
+De huidige showroom is een rechthoekig blokje (zone `showroom` op x:595, y:610, w:130, h:28). In werkelijkheid loopt de showroom in een boog/ronde vorm van de Entrée (x:540, y:750) richting het Kantoor bij de Vivisol opslag (x:808, y:565).
 
----
+## Plan
 
-### 1. Build Errors Fixen (sql_sync_tasks)
+1. **Verwijder de huidige rechthoekige showroom-zone** uit `DEFAULT_ZONES`
 
-De `sql_sync_tasks` tabel bestaat niet in de gegenereerde types. Oplossing: alle Supabase calls in `SqlSyncTaskForm.tsx` en `SqlSyncTasksPage.tsx` casten met `as any` om de TypeScript-fouten te omzeilen, aangezien de tabel wel in de database bestaat maar niet in de typedefinitie.
+2. **Voeg een gebogen SVG-pad toe als achtergrond** in de SVG-rendering (naast de bestaande achtergrondblokken), die een afgeronde L-bocht of boogvorm tekent van de Entrée (rechtsonder bij kantoren) omhoog naar het Vivisol-kantoor (rechtsboven). Dit wordt een `<path>` element met een kwadratische of cubische bezier-curve, met een gestippelde rand en licht gekleurde vulling, gelabeld "SHOWROOM".
 
----
+3. **Voeg de showroom-zone terug als een aangepast element** dat het gebogen pad visueel volgt. Omdat zones nu rechthoekig zijn, splits ik de showroom op in 2-3 kleinere zones die samen de boog vormen:
+   - `showroom_onder`: Horizontaal stuk naast de Entrée (ca. x:640, y:740, w:120, h:48)
+   - `showroom_midden`: Verticaal/schuin stuk (ca. x:730, y:640, w:80, h:100) 
+   - `showroom_boven`: Horizontaal stuk bij Vivisol opslag (ca. x:750, y:600, w:140, h:40)
+   
+   Of beter: een enkel decoratief SVG-pad als achtergrond met label, en de showroom-zone als een enkel dragbaar element op een representatieve positie.
 
-### 2. Buitenopslag Brandbare Gassen (rechtsbovenin)
+**Gekozen aanpak**: Een decoratief gebogen SVG-pad als achtergrondvorm (niet-dragbaar, puur visueel) dat de ronde loop van de showroom toont, plus de bestaande showroom-zone die als klikbaar element op het midden van het pad blijft staan.
 
-Toevoegen aan `InteractiveFloorPlan.tsx`:
-- Nieuw terreingebied rechtsbovenin de SVG (x: ~600-970, y: 15-140) naast de bulktanks
-- Nieuwe zone "Buitenopslag Brandbare Gassen" met sub-zones voor Acetyleen, Waterstof en Methaan
-- Zone type: nieuw `opslag_brandbaar` met oranje/rode kleur en waarschuwingsindicator
-- Gevarenpictogram (GHS02 - vlam) in de zone-rendering
-- Zones versleepbaar in edit mode, net als bestaande zones
+## Technische details
 
-Nieuwe DEFAULT_ZONES entries:
-```
-{ id: "buiten_brandbaar", x: 620, y: 30, w: 350, h: 110, label: "Buitenopslag", sublabel: "Brandbare gassen", type: "opslag_brandbaar" }
-{ id: "buiten_acetyleen", x: 630, y: 50, w: 100, h: 75, label: "Acetyleen", sublabel: "C₂H₂", type: "opslag_brandbaar" }
-{ id: "buiten_waterstof", x: 740, y: 50, w: 100, h: 75, label: "Waterstof", sublabel: "H₂", type: "opslag_brandbaar" }
-{ id: "buiten_methaan", x: 850, y: 50, w: 100, h: 75, label: "Methaan", sublabel: "CH₄", type: "opslag_brandbaar" }
-```
+**Bestand**: `src/components/production/InteractiveFloorPlan.tsx`
 
----
+- Voeg na de bestaande achtergrondblokken (rond lijn 640) een SVG `<path>` toe met een gebogen vorm:
+  - Start bij Entrée-gebied (ca. 640, 760)
+  - Bocht naar rechts en omhoog
+  - Eindigt bij Vivisol kantoor (ca. 810, 600)
+  - Styling: gevulde achtergrond (`hsl(40 70% 50% / 0.08)`), gestippelde rand, label "SHOWROOM"
 
-### 3. Inventory & Stock Integratie op de Plattegrond
+- Pas de bestaande `showroom` zone-positie en afmetingen aan zodat deze centraal op het pad ligt
 
-Zones koppelen aan live database data:
-- **PGS-data op zones**: Bij het klikken op een gasopslag-zone (bijv. "Zuurstof Trolley") wordt een detail-paneel getoond met actuele voorraadinfo uit `pgs_substances` (current_stock_kg, max_allowed_kg, bezettingspercentage)
-- **Visuele bezettingsindicatoren**: Zones krijgen een kleurcodering op basis van bezettingsgraad:
-  - Groen (< 60%), Oranje (60-85%), Rood (> 85%)
-  - Kleine voortgangsbalk onderaan elke zone
-- **Bulktanks**: Toon actueel niveau uit `bulk_storage_tanks` tabel als visuele vulling in de cirkels (arc/fill)
-- **Mapping**: Zone-id's koppelen aan gas_type_id's via een mapping-object, zodat de juiste voorraaddata per zone wordt opgehaald
-- **Real-time**: Supabase query bij mount + optioneel realtime subscription
-
-Technisch:
-- Nieuwe prop `showInventoryOverlay?: boolean` op `InteractiveFloorPlan`
-- useEffect hook om `pgs_substances` en `bulk_storage_tanks` data op te halen
-- Mapping object `ZONE_TO_GAS_TYPE` dat zone-id's koppelt aan gastypes
-- SVG rect overlay met bezettingspercentage per zone
-- Detail-panel uitbreiden met voorraadinfo wanneer een zone geselecteerd is
-
----
-
-### 4. Bestanden die worden gewijzigd
-
-| Bestand | Wijziging |
-|---|---|
-| `src/components/production/InteractiveFloorPlan.tsx` | Nieuw zone type `opslag_brandbaar`, buitenopslag-zones, inventory overlay, database koppeling |
-| `src/components/admin/SqlSyncTaskForm.tsx` | `as any` cast op `.from()` calls |
-| `src/pages/SqlSyncTasksPage.tsx` | `as any` cast op `.from()` calls |
-
+- De boog wordt getekend met een `quadratic bezier` curve in SVG (`Q` commando) om een natuurlijke ronde hoek te maken

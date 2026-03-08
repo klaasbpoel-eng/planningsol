@@ -1342,6 +1342,42 @@ export type Database = {
           },
         ]
       }
+      sql_sync_tasks: {
+        Row: {
+          created_at: string
+          destination_table: string
+          id: string
+          is_active: boolean
+          last_sync_time: string | null
+          name: string
+          primary_key_column: string
+          source_query: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          destination_table: string
+          id?: string
+          is_active?: boolean
+          last_sync_time?: string | null
+          name: string
+          primary_key_column?: string
+          source_query: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          destination_table?: string
+          id?: string
+          is_active?: boolean
+          last_sync_time?: string | null
+          name?: string
+          primary_key_column?: string
+          source_query?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       stock_products: {
         Row: {
           created_at: string
