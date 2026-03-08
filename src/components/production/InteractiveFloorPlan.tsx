@@ -358,7 +358,16 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   // Helper to get PGS data for a zone by gas name
   const getZoneInventory = useCallback((zoneId: string) => {
     const zone = zones.find(z => z.id === zoneId);
-    const gasName = zone?.gasType || ZONE_GAS_MAPPING[zoneId];
+    // For opslag_vol zones, only show inventory if a gasType is explicitly set
+    if (zone?.type === "opslag_vol") {
+      if (!zone.gasType) return null;
+      const substance = pgsData.find(p => p.gas_types?.name?.toLowerCase().includes(zone.gasType!.toLowerCase()));
+      if (!substance || substance.max_allowed_kg <= 0) return null;
+      const pct = Math.round((substance.current_stock_kg / substance.max_allowed_kg) * 100);
+      return { current: substance.current_stock_kg, max: substance.max_allowed_kg, pct, gasName: zone.gasType };
+    }
+    // For other zones, use hardcoded mapping
+    const gasName = ZONE_GAS_MAPPING[zoneId];
     if (!gasName) return null;
     const substance = pgsData.find(p => p.gas_types?.name?.toLowerCase().includes(gasName.toLowerCase()));
     if (!substance || substance.max_allowed_kg <= 0) return null;
