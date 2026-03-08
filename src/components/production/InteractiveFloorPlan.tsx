@@ -306,7 +306,14 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     try { const v = localStorage.getItem("floorplan-canvas-offset-y"); return v ? Number(v) : 0; } catch { return 0; }
   });
 
-  const [showInventory, setShowInventory] = useState(true);
+  // Zone resize & rotation
+  const [resizingZoneId, setResizingZoneId] = useState<string | null>(null);
+  const [resizingCorner, setResizingCorner] = useState<"se" | "sw" | "ne" | "nw" | null>(null);
+  const [rotatingZoneId, setRotatingZoneId] = useState<string | null>(null);
+  const resizeZoneStart = useRef<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 0, h: 0 });
+  const rotateZoneStart = useRef<{ angle: number; rotation: number }>({ angle: 0, rotation: 0 });
+
+
   const [pgsData, setPgsData] = useState<PgsSubstance[]>([]);
   const [bulkTankData, setBulkTankData] = useState<BulkTankData[]>([]);
 
