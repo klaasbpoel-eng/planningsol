@@ -191,6 +191,56 @@ function EditableText({ value, onSave, className, placeholder }: {
   );
 }
 
+// Mapping zone IDs to gas type names for inventory overlay
+const ZONE_GAS_MAPPING: Record<string, string> = {
+  o2_trolley: "Zuurstof",
+  o2_pakket: "Zuurstof",
+  o2_16cil: "Zuurstof",
+  o2_16cil_200a: "Zuurstof",
+  o2_16cil_200b: "Zuurstof",
+  co2_vulling: "Kooldioxide",
+  ar_mix_trolley: "Argon",
+  ar_mix_pakket: "Argon",
+  ar_mix_300: "Argon",
+  ar_mix_300bar: "Argon",
+  ar_mix_200_du: "Argon",
+  ar_mix_200_nl: "Argon",
+  n2_16cil: "Stikstof",
+  buiten_acetyleen: "Acetyleen",
+  buiten_waterstof: "Waterstof",
+  buiten_methaan: "Methaan",
+};
+
+const TANK_GAS_MAPPING: Record<string, string> = {
+  tank_lin: "Stikstof",
+  tank_lox: "Zuurstof",
+  tank_lar: "Argon",
+  tank_lco2_1: "Kooldioxide",
+  tank_lco2_2: "Kooldioxide",
+};
+
+interface PgsSubstance {
+  id: string;
+  gas_type_id: string | null;
+  current_stock_kg: number;
+  max_allowed_kg: number;
+  gas_types?: { name: string } | null;
+}
+
+interface BulkTankData {
+  id: string;
+  tank_name: string;
+  current_level_kg: number;
+  capacity_kg: number;
+  gas_types?: { name: string } | null;
+}
+
+function getOccupancyColor(pct: number): string {
+  if (pct >= 85) return "hsl(0 80% 50%)";
+  if (pct >= 60) return "hsl(35 90% 50%)";
+  return "hsl(140 60% 45%)";
+}
+
 interface InteractiveFloorPlanProps {
   className?: string;
 }
@@ -236,6 +286,43 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<"label" | "sublabel" | null>(null);
   const [editingValue, setEditingValue] = useState("");
+
+  const [showInventory, setShowInventory] = useState(true);
+  const [pgsData, setPgsData] = useState<PgsSubstance[]>([]);
+  const [bulkTankData, setBulkTankData] = useState<BulkTankData[]>([]);
+
+  // Fetch inventory data
+  useEffect(() => {
+    const fetchInventory = async () => {
+      const [pgsRes, tankRes] = await Promise.all([
+        supabase.from("pgs_substances").select("id, gas_type_id, current_stock_kg, max_allowed_kg, gas_types(name)").eq("location", "sol_emmen"),
+        supabase.from("bulk_storage_tanks").select("id, tank_name, current_level_kg, capacity_kg, gas_types(name)").eq("location", "sol_emmen"),
+      ]);
+      if (pgsRes.data) setPgsData(pgsRes.data as any);
+      if (tankRes.data) setBulkTankData(tankRes.data as any);
+    };
+    fetchInventory();
+  }, []);
+
+  // Helper to get PGS data for a zone by gas name
+  const getZoneInventory = useCallback((zoneId: string) => {
+    const gasName = ZONE_GAS_MAPPING[zoneId];
+    if (!gasName) return null;
+    const substance = pgsData.find(p => p.gas_types?.name?.toLowerCase().includes(gasName.toLowerCase()));
+    if (!substance || substance.max_allowed_kg <= 0) return null;
+    const pct = Math.round((substance.current_stock_kg / substance.max_allowed_kg) * 100);
+    return { current: substance.current_stock_kg, max: substance.max_allowed_kg, pct };
+  }, [pgsData]);
+
+  // Helper to get bulk tank data
+  const getTankInventory = useCallback((tankId: string) => {
+    const gasName = TANK_GAS_MAPPING[tankId];
+    if (!gasName) return null;
+    const tank = bulkTankData.find(t => t.gas_types?.name?.toLowerCase().includes(gasName.toLowerCase()));
+    if (!tank || tank.capacity_kg <= 0) return null;
+    const pct = Math.round((tank.current_level_kg / tank.capacity_kg) * 100);
+    return { current: tank.current_level_kg, max: tank.capacity_kg, pct };
+  }, [bulkTankData]);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
