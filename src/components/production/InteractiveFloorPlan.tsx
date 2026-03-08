@@ -622,6 +622,11 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       localStorage.setItem("floorplan-terrain-height", String(terrainHeight));
       setResizingTerrain(false);
     }
+    if (resizingBuilding) {
+      localStorage.setItem("floorplan-building-width", String(buildingWidth));
+      localStorage.setItem("floorplan-building-height", String(buildingHeight));
+      setResizingBuilding(null);
+    }
     if (resizingZoneId) {
       setResizingZoneId(null);
       setResizingCorner(null);
