@@ -1027,8 +1027,17 @@ export function DailyOverview() {
                   placeholder="Zoek op klant of taak..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-9 text-sm"
+                  className="pl-9 pr-8 h-9 text-sm"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Zoekopdracht wissen"
+                  >
+                    <XIcon className="h-4 w-4" />
+                  </button>
+                )}
               </div>
               <div className="flex rounded-lg border bg-muted p-0.5">
                 {(["all", "open", "completed"] as StatusFilter[]).map((f) => (
