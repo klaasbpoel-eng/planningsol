@@ -645,6 +645,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   }, [zones, tanks]);
 
   const [alignGuides, setAlignGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
+  const [resizeGuides, setResizeGuides] = useState<{ w: { x: number; y: number; w: number; h: number } | null; h: { x: number; y: number; w: number; h: number } | null }>({ w: null, h: null });
 
   const handleSvgMouseMove = useCallback((e: React.MouseEvent) => {
     // Canvas resize
