@@ -1692,7 +1692,9 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                             const updated = prev.map(z => {
                               if (z.id !== contextMenu.zoneId) return z;
                               const shouldResetLabel = z.type === "opslag_vol" && (!!z.gasType && z.label === z.gasType);
-                              const shouldResetSublabel = z.type === "opslag_vol" && z.sublabel === getGasFormula(z.gasType || "");
+                              const gasFormula = getGasFormula(z.gasType || "");
+                              const gasDesc = availableGasTypes.find(g => g.name === z.gasType)?.description;
+                              const shouldResetSublabel = z.type === "opslag_vol" && (z.sublabel === gasFormula || z.sublabel === gasDesc || z.sublabel === z.gasType);
                               return { ...z, gasType: undefined, label: shouldResetLabel ? "Opslag Vol" : z.label, sublabel: shouldResetSublabel ? undefined : z.sublabel };
                             });
                             savePositions(updated, tanks);
