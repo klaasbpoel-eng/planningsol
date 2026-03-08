@@ -292,6 +292,14 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     try { const v = localStorage.getItem("floorplan-terrain-height"); return v ? Number(v) : 180; } catch { return 180; }
   });
   const [resizingTerrain, setResizingTerrain] = useState(false);
+  const [buildingWidth, setBuildingWidth] = useState(() => {
+    try { const v = localStorage.getItem("floorplan-building-width"); return v ? Number(v) : 1060; } catch { return 1060; }
+  });
+  const [buildingHeight, setBuildingHeight] = useState(() => {
+    try { const v = localStorage.getItem("floorplan-building-height"); return v ? Number(v) : 655; } catch { return 655; }
+  });
+  const [resizingBuilding, setResizingBuilding] = useState<"right" | "bottom" | "corner" | null>(null);
+  const buildingResizeStart = useRef({ clientX: 0, clientY: 0, w: 0, h: 0 });
   const [canvasWidth, setCanvasWidth] = useState(() => {
     try { const v = localStorage.getItem("floorplan-canvas-width"); return v ? Number(v) : 1100; } catch { return 1100; }
   });
@@ -493,6 +501,23 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       return;
     }
 
+    // Building resize
+    if (resizingBuilding) {
+      const svgRect = svgRef.current!.getBoundingClientRect();
+      const pxPerSvgUnitX = svgRect.width / (SVG_WIDTH - canvasOffsetX);
+      const pxPerSvgUnitY = svgRect.height / (SVG_HEIGHT - canvasOffsetY);
+      const dxPx = e.clientX - buildingResizeStart.current.clientX;
+      const dyPx = e.clientY - buildingResizeStart.current.clientY;
+      if (resizingBuilding === "right" || resizingBuilding === "corner") {
+        setBuildingWidth(Math.max(400, snap(buildingResizeStart.current.w + dxPx / pxPerSvgUnitX)));
+      }
+      if (resizingBuilding === "bottom" || resizingBuilding === "corner") {
+        setBuildingHeight(Math.max(300, snap(buildingResizeStart.current.h + dyPx / pxPerSvgUnitY)));
+      }
+      setHasChanges(true);
+      return;
+    }
+
     // Zone resize
     if (resizingZoneId && resizingCorner) {
       const svgPt = toSVG(e);
@@ -562,7 +587,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     if (isPanning) {
       setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
     }
-  }, [draggingId, dragType, isPanning, panStart, toSVG, alignSnap, resizingTerrain, resizingCanvas, canvasWidth, canvasHeight, canvasOffsetX, canvasOffsetY, resizingZoneId, resizingCorner, rotatingZoneId, zones]);
+  }, [draggingId, dragType, isPanning, panStart, toSVG, alignSnap, resizingTerrain, resizingCanvas, canvasWidth, canvasHeight, canvasOffsetX, canvasOffsetY, resizingZoneId, resizingCorner, rotatingZoneId, zones, resizingBuilding]);
 
   // Check overlap between two rectangles
   const rectsOverlap = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => {
@@ -596,6 +621,11 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     if (resizingTerrain) {
       localStorage.setItem("floorplan-terrain-height", String(terrainHeight));
       setResizingTerrain(false);
+    }
+    if (resizingBuilding) {
+      localStorage.setItem("floorplan-building-width", String(buildingWidth));
+      localStorage.setItem("floorplan-building-height", String(buildingHeight));
+      setResizingBuilding(null);
     }
     if (resizingZoneId) {
       setResizingZoneId(null);
@@ -971,8 +1001,41 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             )}
 
             {/* Main building - hele overdekte gebied */}
-            <rect x="20" y={40 + terrainHeight} width={Math.min(1060, SVG_WIDTH - 40)} height={655} rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
+            <rect x="20" y={40 + terrainHeight} width={Math.min(buildingWidth, SVG_WIDTH - 40)} height={buildingHeight} rx="5" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="2" />
             <text x="35" y={40 + terrainHeight - 2} fill="hsl(var(--muted-foreground))" fontSize="8" fontWeight="600" opacity="0.5">PRODUCTIEHAL</text>
+
+            {/* Building resize handles (edit mode only) */}
+            {editMode && (
+              <>
+                {/* Right edge */}
+                <g className="cursor-ew-resize" onMouseDown={(e) => {
+                  e.stopPropagation(); e.preventDefault();
+                  buildingResizeStart.current = { clientX: e.clientX, clientY: e.clientY, w: buildingWidth, h: buildingHeight };
+                  setResizingBuilding("right");
+                }}>
+                  <rect x={20 + Math.min(buildingWidth, SVG_WIDTH - 40) - 6} y={40 + terrainHeight + buildingHeight / 2 - 30} width={12} height={60} fill="transparent" />
+                  <rect x={20 + Math.min(buildingWidth, SVG_WIDTH - 40) - 2} y={40 + terrainHeight + buildingHeight / 2 - 20} width={4} height={40} rx="2" fill="hsl(var(--primary) / 0.5)" />
+                </g>
+                {/* Bottom edge */}
+                <g className="cursor-ns-resize" onMouseDown={(e) => {
+                  e.stopPropagation(); e.preventDefault();
+                  buildingResizeStart.current = { clientX: e.clientX, clientY: e.clientY, w: buildingWidth, h: buildingHeight };
+                  setResizingBuilding("bottom");
+                }}>
+                  <rect x={20 + Math.min(buildingWidth, SVG_WIDTH - 40) / 2 - 30} y={40 + terrainHeight + buildingHeight - 6} width={60} height={12} fill="transparent" />
+                  <rect x={20 + Math.min(buildingWidth, SVG_WIDTH - 40) / 2 - 20} y={40 + terrainHeight + buildingHeight - 2} width={40} height={4} rx="2" fill="hsl(var(--primary) / 0.5)" />
+                </g>
+                {/* Corner */}
+                <g className="cursor-nwse-resize" onMouseDown={(e) => {
+                  e.stopPropagation(); e.preventDefault();
+                  buildingResizeStart.current = { clientX: e.clientX, clientY: e.clientY, w: buildingWidth, h: buildingHeight };
+                  setResizingBuilding("corner");
+                }}>
+                  <rect x={20 + Math.min(buildingWidth, SVG_WIDTH - 40) - 10} y={40 + terrainHeight + buildingHeight - 10} width={16} height={16} fill="transparent" />
+                  <rect x={20 + Math.min(buildingWidth, SVG_WIDTH - 40) - 5} y={40 + terrainHeight + buildingHeight - 5} width={8} height={8} rx="2" fill="hsl(var(--primary) / 0.7)" stroke="hsl(var(--background))" strokeWidth="1" />
+                </g>
+              </>
+            )}
 
             {/* Medical bunker */}
             <rect x="110" y="645" width={550} height={72} rx="4" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="1.5" />
