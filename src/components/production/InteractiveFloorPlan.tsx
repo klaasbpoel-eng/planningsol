@@ -358,7 +358,16 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   // Helper to get PGS data for a zone by gas name
   const getZoneInventory = useCallback((zoneId: string) => {
     const zone = zones.find(z => z.id === zoneId);
-    const gasName = zone?.gasType || ZONE_GAS_MAPPING[zoneId];
+    // For opslag_vol zones, only show inventory if a gasType is explicitly set
+    if (zone?.type === "opslag_vol") {
+      if (!zone.gasType) return null;
+      const substance = pgsData.find(p => p.gas_types?.name?.toLowerCase().includes(zone.gasType!.toLowerCase()));
+      if (!substance || substance.max_allowed_kg <= 0) return null;
+      const pct = Math.round((substance.current_stock_kg / substance.max_allowed_kg) * 100);
+      return { current: substance.current_stock_kg, max: substance.max_allowed_kg, pct, gasName: zone.gasType };
+    }
+    // For other zones, use hardcoded mapping
+    const gasName = ZONE_GAS_MAPPING[zoneId];
     if (!gasName) return null;
     const substance = pgsData.find(p => p.gas_types?.name?.toLowerCase().includes(gasName.toLowerCase()));
     if (!substance || substance.max_allowed_kg <= 0) return null;
@@ -1538,7 +1547,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   {ctxZone?.sublabel && <div className="text-[10px] text-muted-foreground truncate">{ctxZone.sublabel}</div>}
                 </div>
 
-                {/* Tab switcher */}
+                {/* Tab switcher - only show gas tab for opslag_vol */}
                 <div className="flex border-b border-border">
                   <button
                     className={cn("flex-1 text-[11px] py-1.5 font-medium transition-colors", contextMenuTab === "type" ? "text-primary border-b-2 border-primary bg-primary/5" : "text-muted-foreground hover:text-foreground")}
@@ -1546,13 +1555,15 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   >
                     Zone type
                   </button>
-                  <button
-                    className={cn("flex-1 text-[11px] py-1.5 font-medium transition-colors", contextMenuTab === "gas" ? "text-primary border-b-2 border-primary bg-primary/5" : "text-muted-foreground hover:text-foreground")}
-                    onClick={() => setContextMenuTab("gas")}
-                  >
-                    Gassoort
-                    {currentGas && <span className="ml-1 w-2 h-2 rounded-full inline-block" style={{ backgroundColor: getGasColor(currentGas) }} />}
-                  </button>
+                  {ctxZone?.type === "opslag_vol" && (
+                    <button
+                      className={cn("flex-1 text-[11px] py-1.5 font-medium transition-colors", contextMenuTab === "gas" ? "text-primary border-b-2 border-primary bg-primary/5" : "text-muted-foreground hover:text-foreground")}
+                      onClick={() => setContextMenuTab("gas")}
+                    >
+                      Gassoort
+                      {currentGas && <span className="ml-1 w-2 h-2 rounded-full inline-block" style={{ backgroundColor: getGasColor(currentGas) }} />}
+                    </button>
+                  )}
                 </div>
 
                 {/* Tab content */}
