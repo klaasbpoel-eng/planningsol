@@ -149,14 +149,17 @@ function savePositions(zones: FloorZone[], tanks: BulkTank[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ zones: zonePos, tanks: tankPos }));
 }
 
-function applyPositions(zones: FloorZone[], tanks: BulkTank[], saved: ReturnType<typeof loadPositions>) {
+function applyPositions(zones: FloorZone[], tanks: BulkTank[], saved: ReturnType<typeof loadPositions>): { zones: FloorZone[]; tanks: BulkTank[] } {
   if (!saved) return { zones, tanks };
-  const newZones = zones.map(z => saved.zones[z.id] ? { ...z, ...saved.zones[z.id] } : z);
+  const newZones: FloorZone[] = zones.map(z => {
+    const s = saved.zones[z.id];
+    return s ? { ...z, ...s, type: (s.type as ZoneType) || z.type } : z;
+  });
   // Restore dynamically added zones (IDs not in defaults)
   const existingIds = new Set(zones.map(z => z.id));
   Object.entries(saved.zones).forEach(([id, data]) => {
-    if (!existingIds.has(id) && data.type) {
-      newZones.push({ id, x: data.x, y: data.y, w: data.w, h: data.h, label: data.label, sublabel: data.sublabel, type: data.type as ZoneType, details: data.details, rotation: data.rotation, gasType: data.gasType });
+    if (!existingIds.has(id) && data.type && data.w && data.h) {
+      newZones.push({ id, x: data.x, y: data.y, w: data.w, h: data.h, label: data.label || "Zone", sublabel: data.sublabel, type: data.type as ZoneType, details: data.details, rotation: data.rotation, gasType: data.gasType });
     }
   });
   const newTanks = tanks.map(t => saved.tanks[t.id] ? { ...t, ...saved.tanks[t.id] } : t);
