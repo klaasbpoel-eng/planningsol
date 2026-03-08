@@ -1659,7 +1659,8 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                             const updated = prev.map(z => {
                               if (z.id !== contextMenu.zoneId) return z;
                               const shouldResetLabel = z.type === "opslag_vol" && (!!z.gasType && z.label === z.gasType);
-                              return { ...z, gasType: undefined, label: shouldResetLabel ? "Opslag Vol" : z.label };
+                              const shouldResetSublabel = z.type === "opslag_vol" && z.sublabel === getGasFormula(z.gasType || "");
+                              return { ...z, gasType: undefined, label: shouldResetLabel ? "Opslag Vol" : z.label, sublabel: shouldResetSublabel ? undefined : z.sublabel };
                             });
                             savePositions(updated, tanks);
                             return updated;
