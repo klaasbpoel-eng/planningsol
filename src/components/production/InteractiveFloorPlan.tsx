@@ -1625,7 +1625,6 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                           toast.success("Gassoort verwijderd");
                         }}
                       >
-...
                         <span className="w-3 h-3 rounded-sm flex-shrink-0 border border-border bg-muted" />
                         <span className="italic text-muted-foreground">Geen / Automatisch</span>
                         {!currentGas && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
