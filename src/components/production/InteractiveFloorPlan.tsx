@@ -842,20 +842,20 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             }}
           >
             {/* Background */}
-            <rect x="0" y="0" width={SVG_WIDTH} height={SVG_HEIGHT} fill="hsl(var(--background))" rx="8" />
+            <rect x={canvasOffsetX} y={canvasOffsetY} width={SVG_WIDTH - canvasOffsetX} height={SVG_HEIGHT - canvasOffsetY} fill="hsl(var(--background))" rx="8" />
 
             {/* Site perimeter – hekwerk */}
-            <rect x="8" y="8" width={SVG_WIDTH - 16} height={SVG_HEIGHT - 16} rx="6" fill="none" stroke="hsl(var(--foreground) / 0.25)" strokeWidth="2" strokeDasharray="10 4 2 4" />
+            <rect x={canvasOffsetX + 8} y={canvasOffsetY + 8} width={SVG_WIDTH - canvasOffsetX - 16} height={SVG_HEIGHT - canvasOffsetY - 16} rx="6" fill="none" stroke="hsl(var(--foreground) / 0.25)" strokeWidth="2" strokeDasharray="10 4 2 4" />
             {/* Fence post markers */}
-            {Array.from({ length: Math.floor((SVG_WIDTH - 16) / 60) + 1 }, (_, i) => 8 + i * 60).map(x => (
+            {Array.from({ length: Math.floor((SVG_WIDTH - canvasOffsetX - 16) / 60) + 1 }, (_, i) => canvasOffsetX + 8 + i * 60).map(x => (
               <g key={`fp-t${x}`}>
-                <circle cx={Math.min(x, SVG_WIDTH - 8)} cy="8" r="3" fill="hsl(var(--foreground) / 0.2)" />
+                <circle cx={Math.min(x, SVG_WIDTH - 8)} cy={canvasOffsetY + 8} r="3" fill="hsl(var(--foreground) / 0.2)" />
                 <circle cx={Math.min(x, SVG_WIDTH - 8)} cy={SVG_HEIGHT - 8} r="3" fill="hsl(var(--foreground) / 0.2)" />
               </g>
             ))}
-            {Array.from({ length: Math.floor((SVG_HEIGHT - 16) / 60) + 1 }, (_, i) => 8 + i * 60).map(y => (
+            {Array.from({ length: Math.floor((SVG_HEIGHT - canvasOffsetY - 16) / 60) + 1 }, (_, i) => canvasOffsetY + 8 + i * 60).map(y => (
               <g key={`fp-l${y}`}>
-                <circle cx="8" cy={Math.min(y, SVG_HEIGHT - 8)} r="3" fill="hsl(var(--foreground) / 0.2)" />
+                <circle cx={canvasOffsetX + 8} cy={Math.min(y, SVG_HEIGHT - 8)} r="3" fill="hsl(var(--foreground) / 0.2)" />
                 <circle cx={SVG_WIDTH - 8} cy={Math.min(y, SVG_HEIGHT - 8)} r="3" fill="hsl(var(--foreground) / 0.2)" />
               </g>
             ))}
