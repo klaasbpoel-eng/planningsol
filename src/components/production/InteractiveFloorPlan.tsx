@@ -828,7 +828,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             "overflow-hidden select-none",
             editMode ? "cursor-default" : isPanning ? "cursor-grabbing" : "cursor-grab"
           )}
-          style={{ height: isFullscreen ? "calc(100vh - 200px)" : 550 }}
+          style={{ height: isFullscreen ? "calc(100vh - 160px)" : "clamp(350px, calc(100vh - 320px), 800px)" }}
           onMouseDown={handleBgMouseDown}
           onMouseMove={handleSvgMouseMove}
           onMouseUp={handleSvgMouseUp}
