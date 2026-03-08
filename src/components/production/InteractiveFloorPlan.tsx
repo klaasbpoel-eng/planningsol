@@ -323,6 +323,8 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
 
   // Zone type context menu
   const [contextMenu, setContextMenu] = useState<{ zoneId: string; screenX: number; screenY: number } | null>(null);
+  const [contextMenuTab, setContextMenuTab] = useState<"type" | "gas">("type");
+  const [gasSearch, setGasSearch] = useState("");
   const resizeZoneStart = useRef<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 0, h: 0 });
   const rotateZoneStart = useRef<{ angle: number; rotation: number }>({ angle: 0, rotation: 0 });
 
