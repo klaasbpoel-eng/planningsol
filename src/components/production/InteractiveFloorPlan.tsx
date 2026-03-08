@@ -423,9 +423,9 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   }, []);
 
   // Fetch available gas types for the selector
-  const [availableGasTypes, setAvailableGasTypes] = useState<{ id: string; name: string }[]>([]);
+  const [availableGasTypes, setAvailableGasTypes] = useState<{ id: string; name: string; description: string | null }[]>([]);
   useEffect(() => {
-    supabase.from("gas_types").select("id, name").eq("is_active", true).order("name").then(({ data }) => {
+    supabase.from("gas_types").select("id, name, description").eq("is_active", true).order("name").then(({ data }) => {
       if (data) setAvailableGasTypes(data);
     });
   }, []);
