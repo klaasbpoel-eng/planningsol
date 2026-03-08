@@ -195,6 +195,48 @@ function EditableText({ value, onSave, className, placeholder }: {
   );
 }
 
+// Gas name to chemical formula mapping
+const GAS_FORMULA_MAPPING: Record<string, string> = {
+  "Zuurstof": "O₂",
+  "Stikstof": "N₂",
+  "Kooldioxide": "CO₂",
+  "CO2": "CO₂",
+  "Koolzuur": "CO₂",
+  "Argon": "Ar",
+  "Acetyleen": "C₂H₂",
+  "Helium": "He",
+  "Waterstof": "H₂",
+  "Propaan": "C₃H₈",
+  "Methaan": "CH₄",
+  "Neon": "Ne",
+  "Lachgas": "N₂O",
+  "Distikstofoxide": "N₂O",
+  "Koolmonoxide": "CO",
+  "Perslucht": "Lucht",
+  "Lucht": "Lucht",
+  "Ademlucht": "Lucht",
+  "Lucht Synth": "Lucht",
+  "Lucht Droog": "Lucht",
+  "Technische Lucht": "Lucht",
+  "Formeer": "H₂/N₂",
+  "Etheen": "C₂H₄",
+  "Ethaan": "C₂H₆",
+  "Propyleen": "C₃H₆",
+  "Oxygen": "O₂",
+  "Nitrogen": "N₂",
+  "Carbon Dioxide": "CO₂",
+  "Hydrogen": "H₂",
+  "Compressed Air": "Air",
+};
+
+function getGasFormula(name: string): string | undefined {
+  if (!name) return undefined;
+  if (GAS_FORMULA_MAPPING[name]) return GAS_FORMULA_MAPPING[name];
+  const lowerName = name.toLowerCase();
+  const key = Object.keys(GAS_FORMULA_MAPPING).find(k => k.toLowerCase() === lowerName);
+  return key ? GAS_FORMULA_MAPPING[key] : undefined;
+}
+
 // Mapping zone IDs to gas type names for inventory overlay
 const ZONE_GAS_MAPPING: Record<string, string> = {
   o2_trolley: "Zuurstof",
