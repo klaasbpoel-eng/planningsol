@@ -1072,6 +1072,27 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   placeholder="+ details toevoegen"
                 />
               </div>
+              {/* Inventory info in detail panel */}
+              {showInventory && (() => {
+                const inv = isZone && selectedZone ? getZoneInventory(selectedZone) : (!isZone && selectedZone ? getTankInventory(selectedZone) : null);
+                if (!inv) return null;
+                const col = getOccupancyColor(inv.pct);
+                return (
+                  <div className="mt-2 p-2 rounded-md border" style={{ borderColor: `${col}40` }}>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">Bezetting</span>
+                      <span className="font-bold" style={{ color: col }}>{inv.pct}%</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'hsl(var(--muted) / 0.3)' }}>
+                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(inv.pct, 100)}%`, backgroundColor: col }} />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                      <span>{Math.round(inv.current)} kg</span>
+                      <span>max {Math.round(inv.max)} kg</span>
+                    </div>
+                  </div>
+                );
+              })()}
               <Button variant="ghost" size="sm" className="mt-2 w-full text-xs h-7" onClick={() => setSelectedZone(null)}>
                 Sluiten
               </Button>
