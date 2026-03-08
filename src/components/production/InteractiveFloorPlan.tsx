@@ -318,6 +318,9 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const [resizingZoneId, setResizingZoneId] = useState<string | null>(null);
   const [resizingCorner, setResizingCorner] = useState<"se" | "sw" | "ne" | "nw" | null>(null);
   const [rotatingZoneId, setRotatingZoneId] = useState<string | null>(null);
+
+  // Zone type context menu
+  const [contextMenu, setContextMenu] = useState<{ zoneId: string; screenX: number; screenY: number } | null>(null);
   const resizeZoneStart = useRef<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 0, h: 0 });
   const rotateZoneStart = useRef<{ angle: number; rotation: number }>({ angle: 0, rotation: 0 });
 
