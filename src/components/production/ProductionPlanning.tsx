@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock, ShieldAlert, Truck, FlaskConical } from "lucide-react";
+import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock, ShieldAlert, Truck, FlaskConical, ChevronUp, ChevronDown } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { TopCustomersWidget } from "./TopCustomersWidget";
 import { KPIDashboard } from "./KPIDashboard";
@@ -69,6 +69,9 @@ export function ProductionPlanning({
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hideDigital, setHideDigital] = useState(false);
+  const [statsCollapsed, setStatsCollapsed] = useState(() => {
+    try { return localStorage.getItem("production-stats-collapsed") === "true"; } catch { return false; }
+  });
 
   // Date range state for dashboard sync with reports
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -367,107 +370,133 @@ export function ProductionPlanning({
       {/* Quick stats - Only show for planning tabs, hide for reporting to give more space */}
       {activeTab !== 'rapportage' && (
         <div className="space-y-2">
-          {/* Period indicator - only show report tab hint for users who can see reports */}
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="text-xs font-medium">
-              📅 {getDateRangeLabel(dateRange)}
-            </Badge>
-            {showAdvancedTabs && (
-              <span className="text-xs text-muted-foreground">
-                Wijzig periode in Rapportage tab
-              </span>
-            )}
-          </div>
-
-          <div className={cn(
-            "grid gap-4",
-            showAdvancedWidgets
-              ? selectedLocation === "sol_tilburg"
-                ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
-                : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-5"
-              : selectedLocation === "sol_tilburg"
-                ? "grid-cols-1 sm:grid-cols-2"
-                : "grid-cols-1 sm:grid-cols-3"
-          )}>
-            {selectedLocation !== "sol_tilburg" && (
-              <StatCard
-                value={`${formatNumber(dryIceToday, 0)} kg`}
-                label="Droogijs gepland"
-                icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
-                iconBgColor="bg-cyan-500/10"
-                trend={{
-                  value: calculateTrend(dryIceToday, previousDryIceToday),
-                  label: "vs. vorige periode"
-                }}
-                className={cn(
-                  "glass-card transition-all duration-300",
-                  isRefreshing && "animate-pulse ring-2 ring-primary/30"
-                )}
-              />
-            )}
-
-            <div className="relative">
-              <StatCard
-                value={formatNumber(cylindersToday, 0)}
-                label="Cilinders gepland"
-                icon={<Cylinder className="h-5 w-5 text-orange-500" />}
-                iconBgColor="bg-orange-500/10"
-                trend={{
-                  value: calculateTrend(cylindersToday, previousCylindersToday),
-                  label: "vs. vorige periode"
-                }}
-                className={cn(
-                  "glass-card transition-all duration-300",
-                  isRefreshing && "animate-pulse ring-2 ring-primary/30"
-                )}
-              />
-              {selectedLocation !== "all" && (
-                <Badge variant="outline" className="absolute top-2 right-2 text-[10px] py-0">
-                  {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
-                </Badge>
+          {/* Period indicator + collapse toggle */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-xs font-medium">
+                📅 {getDateRangeLabel(dateRange)}
+              </Badge>
+              {showAdvancedTabs && (
+                <span className="text-xs text-muted-foreground">
+                  Wijzig periode in Rapportage tab
+                </span>
               )}
             </div>
+            <button
+              onClick={() => {
+                setStatsCollapsed(prev => {
+                  const next = !prev;
+                  localStorage.setItem("production-stats-collapsed", String(next));
+                  return next;
+                });
+              }}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted/50"
+            >
+              {statsCollapsed ? (
+                <>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Toon KPI's</span>
+                </>
+              ) : (
+                <>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Verberg KPI's</span>
+                </>
+              )}
+            </button>
+          </div>
 
-            <div className="relative">
-              <StatCard
-                value={formatNumber(weekOrders, 0)}
-                label="Totaal orders"
-                icon={<Package className="h-5 w-5 text-green-500" />}
-                iconBgColor="bg-green-500/10"
-                trend={{
-                  value: calculateTrend(weekOrders, previousWeekOrders),
-                  label: "vs. vorige periode"
-                }}
-                className={cn(
-                  "glass-card transition-all duration-300",
-                  isRefreshing && "animate-pulse ring-2 ring-primary/30"
+          {!statsCollapsed && (
+            <div className={cn(
+              "grid gap-4 animate-in fade-in-0 slide-in-from-top-2 duration-200",
+              showAdvancedWidgets
+                ? selectedLocation === "sol_tilburg"
+                  ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+                  : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-5"
+                : selectedLocation === "sol_tilburg"
+                  ? "grid-cols-1 sm:grid-cols-2"
+                  : "grid-cols-1 sm:grid-cols-3"
+            )}>
+              {selectedLocation !== "sol_tilburg" && (
+                <StatCard
+                  value={`${formatNumber(dryIceToday, 0)} kg`}
+                  label="Droogijs gepland"
+                  icon={<Snowflake className="h-5 w-5 text-cyan-500" />}
+                  iconBgColor="bg-cyan-500/10"
+                  trend={{
+                    value: calculateTrend(dryIceToday, previousDryIceToday),
+                    label: "vs. vorige periode"
+                  }}
+                  className={cn(
+                    "glass-card transition-all duration-300",
+                    isRefreshing && "animate-pulse ring-2 ring-primary/30"
+                  )}
+                />
+              )}
+
+              <div className="relative">
+                <StatCard
+                  value={formatNumber(cylindersToday, 0)}
+                  label="Cilinders gepland"
+                  icon={<Cylinder className="h-5 w-5 text-orange-500" />}
+                  iconBgColor="bg-orange-500/10"
+                  trend={{
+                    value: calculateTrend(cylindersToday, previousCylindersToday),
+                    label: "vs. vorige periode"
+                  }}
+                  className={cn(
+                    "glass-card transition-all duration-300",
+                    isRefreshing && "animate-pulse ring-2 ring-primary/30"
+                  )}
+                />
+                {selectedLocation !== "all" && (
+                  <Badge variant="outline" className="absolute top-2 right-2 text-[10px] py-0">
+                    {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
+                  </Badge>
                 )}
-              />
-              {selectedLocation !== "all" && (
-                <Badge variant="outline" className="absolute top-2 right-2 text-[10px] py-0">
-                  {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
-                </Badge>
+              </div>
+
+              <div className="relative">
+                <StatCard
+                  value={formatNumber(weekOrders, 0)}
+                  label="Totaal orders"
+                  icon={<Package className="h-5 w-5 text-green-500" />}
+                  iconBgColor="bg-green-500/10"
+                  trend={{
+                    value: calculateTrend(weekOrders, previousWeekOrders),
+                    label: "vs. vorige periode"
+                  }}
+                  className={cn(
+                    "glass-card transition-all duration-300",
+                    isRefreshing && "animate-pulse ring-2 ring-primary/30"
+                  )}
+                />
+                {selectedLocation !== "all" && (
+                  <Badge variant="outline" className="absolute top-2 right-2 text-[10px] py-0">
+                    {selectedLocation === "sol_emmen" ? "Emmen" : "Tilburg"}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Advanced widgets - only for non-operators */}
+              {showAdvancedWidgets && (
+                <>
+                  <StockSummaryWidget
+                    refreshKey={refreshKey}
+                    isRefreshing={isRefreshing}
+                    selectedLocation={selectedLocation}
+                  />
+
+                  <TopCustomersWidget
+                    refreshKey={refreshKey}
+                    isRefreshing={isRefreshing}
+                    location={selectedLocation}
+                    dateRange={dateRange}
+                  />
+                </>
               )}
             </div>
-
-            {/* Advanced widgets - only for non-operators */}
-            {showAdvancedWidgets && (
-              <>
-                <StockSummaryWidget
-                  refreshKey={refreshKey}
-                  isRefreshing={isRefreshing}
-                  selectedLocation={selectedLocation}
-                />
-
-                <TopCustomersWidget
-                  refreshKey={refreshKey}
-                  isRefreshing={isRefreshing}
-                  location={selectedLocation}
-                  dateRange={dateRange}
-                />
-              </>
-            )}
-          </div>
+          )}
         </div>
       )}
 
