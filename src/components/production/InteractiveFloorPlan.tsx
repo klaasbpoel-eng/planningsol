@@ -274,6 +274,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [autoFitDone, setAutoFitDone] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
