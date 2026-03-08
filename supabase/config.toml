@@ -16,6 +16,3 @@ verify_jwt = false
 
 [functions.trigger-github-workflow]
 verify_jwt = false
-
-[functions.receive-access-data]
-verify_jwt = false

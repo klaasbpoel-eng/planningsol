@@ -9,7 +9,6 @@ import {
     Users,
     Settings,
     Menu,
-    Database,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -56,7 +55,6 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         { id: "calendar", label: "Teamkalender", icon: CalendarDays, badgeKey: null },
         { id: "logbook", label: "Toolbox Logboek", icon: BookOpen, badgeKey: null },
         { id: "employees", label: "Medewerkers", icon: Users, badgeKey: "employees" as const },
-        { id: "access-data", label: "Access Data", icon: Database, badgeKey: null },
         { id: "settings", label: "Instellingen", icon: Settings, badgeKey: null },
     ];
 

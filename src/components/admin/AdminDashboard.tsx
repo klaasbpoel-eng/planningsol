@@ -7,7 +7,6 @@ import { TaskList } from "@/components/admin/TaskList";
 import { FilterState } from "@/components/admin/AdminFilters";
 import { AdminSettings } from "@/components/admin/AdminSettings";
 import { ToolboxLogbook } from "@/components/admin/ToolboxLogbook";
-import { AccessDataViewer } from "@/components/admin/AccessDataViewer";
 import { AdminSidebar } from "@/components/admin/layout/AdminSidebar";
 import { DailyOverview } from "@/components/dashboard/DailyOverview";
 import { supabase } from "@/integrations/supabase/client";
@@ -223,10 +222,6 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
                 </div>
                 <EmployeeList />
               </div>
-            )}
-
-            {activeTab === 'access-data' && (
-              <AccessDataViewer />
             )}
 
             {activeTab === 'settings' && (
