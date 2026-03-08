@@ -597,11 +597,19 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       localStorage.setItem("floorplan-terrain-height", String(terrainHeight));
       setResizingTerrain(false);
     }
+    if (resizingZoneId) {
+      setResizingZoneId(null);
+      setResizingCorner(null);
+      setHasChanges(true);
+    }
+    if (rotatingZoneId) {
+      setRotatingZoneId(null);
+      setHasChanges(true);
+    }
     if (draggingId && dragType && editMode) {
       if (dragType === "zone") {
         const dragged = zones.find(z => z.id === draggingId);
         if (dragged) {
-          // Check zone-zone overlap → swap positions
           const overlapping = zones.find(z => z.id !== draggingId && rectsOverlap(dragged, z));
           if (overlapping) {
             setZones(prev => prev.map(z => {
@@ -611,7 +619,6 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             }));
             toast.info(`${dragged.label} ↔ ${overlapping.label} gewisseld`);
           }
-          // Check zone-tank overlap → swap center/position
           const overlappingTank = tanks.find(t => circleRectOverlap(t, dragged));
           if (overlappingTank && !overlapping) {
             const startCenterX = dragStartPos.current.x + dragged.w / 2;
@@ -626,7 +633,6 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       } else if (dragType === "tank") {
         const dragged = tanks.find(t => t.id === draggingId);
         if (dragged) {
-          // Check tank-tank overlap → swap
           const overlapping = tanks.find(t => t.id !== draggingId && circlesOverlap(dragged, t));
           if (overlapping) {
             setTanks(prev => prev.map(t => {
@@ -636,7 +642,6 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             }));
             toast.info(`${dragged.label} ↔ ${overlapping.label} gewisseld`);
           }
-          // Check tank-zone overlap → swap
           const overlappingZone = zones.find(z => circleRectOverlap(dragged, z));
           if (overlappingZone && !overlapping) {
             const zoneCenterX = overlappingZone.x + overlappingZone.w / 2;
@@ -653,7 +658,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     setDragType(null);
     setIsPanning(false);
     setAlignGuides({ x: null, y: null });
-  }, [draggingId, dragType, editMode, zones, tanks, resizingCanvas, resizingTerrain, canvasWidth, canvasHeight, canvasOffsetX, canvasOffsetY, terrainHeight]);
+  }, [draggingId, dragType, editMode, zones, tanks, resizingCanvas, resizingTerrain, canvasWidth, canvasHeight, canvasOffsetX, canvasOffsetY, terrainHeight, resizingZoneId, rotatingZoneId]);
 
   // Inline text editing
   const handleStartEdit = useCallback((id: string, field: "label" | "sublabel", currentValue: string) => {
