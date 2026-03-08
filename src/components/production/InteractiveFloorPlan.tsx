@@ -1646,7 +1646,12 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                             )}
                             onClick={() => {
                               setZones(prev => {
-                                const updated = prev.map(z => z.id === contextMenu.zoneId ? { ...z, gasType: gt.name } : z);
+                                const updated = prev.map(z => {
+                                  if (z.id !== contextMenu.zoneId) return z;
+                                  return z.type === "opslag_vol"
+                                    ? { ...z, gasType: gt.name, label: gt.name }
+                                    : { ...z, gasType: gt.name };
+                                });
                                 savePositions(updated, tanks);
                                 return updated;
                               });
