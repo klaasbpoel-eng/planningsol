@@ -180,8 +180,8 @@ All colors MUST be HSL.
 
   /* PREMIUM UTILITIES START */
   .glass-card-premium {
-    @apply bg-white/70 dark:bg-black/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 shadow-2xl;
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+    @apply bg-white/95 dark:bg-white/10 backdrop-blur-2xl border border-white/30 dark:border-white/10 shadow-2xl;
+    box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1);
   }
 
   .text-gradient-primary {
@@ -189,18 +189,15 @@ All colors MUST be HSL.
   }
 
   .bg-mesh-animate {
-    background-color: hsla(210, 70%, 35%, 1);
-    /* Fallback color */
+    background-color: hsla(215, 25%, 12%, 1);
     background-image:
-      radial-gradient(at 0% 0%, hsla(210, 70%, 35%, 1) 0px, transparent 50%),
-      radial-gradient(at 50% 0%, hsla(32, 95%, 52%, 1) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, hsla(210, 70%, 35%, 1) 0px, transparent 50%),
-      radial-gradient(at 0% 50%, hsla(210, 20%, 98%, 1) 0px, transparent 50%),
-      radial-gradient(at 100% 50%, hsla(210, 20%, 96%, 1) 0px, transparent 50%),
-      radial-gradient(at 0% 100%, hsla(210, 70%, 35%, 1) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, hsla(32, 95%, 52%, 1) 0px, transparent 50%);
-    background-size: 200% 200%;
-    animation: mesh-move 15s ease infinite alternate;
+      radial-gradient(at 15% 85%, hsla(210, 70%, 25%, 0.8) 0px, transparent 50%),
+      radial-gradient(at 85% 15%, hsla(210, 55%, 30%, 0.6) 0px, transparent 50%),
+      radial-gradient(at 50% 50%, hsla(215, 25%, 15%, 1) 0px, transparent 70%),
+      radial-gradient(at 0% 0%, hsla(210, 60%, 20%, 0.5) 0px, transparent 60%),
+      radial-gradient(at 100% 100%, hsla(32, 80%, 45%, 0.15) 0px, transparent 50%);
+    background-size: 150% 150%;
+    animation: mesh-move 20s ease infinite alternate;
   }
 
   /* Dark mode mesh adjustment */
