@@ -773,10 +773,34 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
         setZones(prev => prev.map(z => z.id === draggingId ? { ...z, x, y } : z));
         setAlignGuides({ x: guideX, y: guideY });
       } else {
-        const snappedCx = snap(svgPt.x - dragOffset.current.x);
-        const snappedCy = snap(svgPt.y - dragOffset.current.y);
-        setTanks(prev => prev.map(t => t.id === draggingId ? { ...t, cx: snappedCx, cy: snappedCy } : t));
-        setAlignGuides({ x: null, y: null });
+        // Tank alignment snapping
+        const rawCx = svgPt.x - dragOffset.current.x;
+        const rawCy = svgPt.y - dragOffset.current.y;
+        let cx = snap(rawCx);
+        let cy = snap(rawCy);
+        let guideX: number | null = null;
+        let guideY: number | null = null;
+
+        // Snap to other tanks
+        for (const t of tanks) {
+          if (t.id === draggingId) continue;
+          if (Math.abs(rawCx - t.cx) < ALIGN_THRESHOLD) { cx = t.cx; guideX = t.cx; }
+          if (Math.abs(rawCy - t.cy) < ALIGN_THRESHOLD) { cy = t.cy; guideY = t.cy; }
+        }
+        // Snap to zone centers and edges
+        for (const z of zones) {
+          const zCx = z.x + z.w / 2;
+          const zCy = z.y + z.h / 2;
+          if (Math.abs(rawCx - zCx) < ALIGN_THRESHOLD) { cx = zCx; guideX = zCx; }
+          if (Math.abs(rawCy - zCy) < ALIGN_THRESHOLD) { cy = zCy; guideY = zCy; }
+          if (Math.abs(rawCx - z.x) < ALIGN_THRESHOLD) { cx = z.x; guideX = z.x; }
+          if (Math.abs(rawCx - (z.x + z.w)) < ALIGN_THRESHOLD) { cx = z.x + z.w; guideX = z.x + z.w; }
+          if (Math.abs(rawCy - z.y) < ALIGN_THRESHOLD) { cy = z.y; guideY = z.y; }
+          if (Math.abs(rawCy - (z.y + z.h)) < ALIGN_THRESHOLD) { cy = z.y + z.h; guideY = z.y + z.h; }
+        }
+
+        setTanks(prev => prev.map(t => t.id === draggingId ? { ...t, cx, cy } : t));
+        setAlignGuides({ x: guideX, y: guideY });
       }
       setHasChanges(true);
       return;
