@@ -1180,6 +1180,15 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   className={editMode ? "cursor-grab" : "cursor-pointer"}
                   style={{ opacity: dimmed ? 0.25 : isDragging ? 0.7 : 1 }}
                   onClick={(e) => { if (!editMode) { e.stopPropagation(); setSelectedZone(s => s === zone.id ? null : zone.id); } }}
+                  onContextMenu={(e) => {
+                    if (!editMode) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const container = containerRef.current;
+                    if (!container) return;
+                    const cr = container.getBoundingClientRect();
+                    setContextMenu({ zoneId: zone.id, screenX: e.clientX - cr.left, screenY: e.clientY - cr.top });
+                  }}
                   onMouseDown={(e) => handleZoneDragStart(e, zone.id)}
                   onMouseEnter={() => setHoveredZone(zone.id)}
                   onMouseLeave={() => setHoveredZone(null)}
