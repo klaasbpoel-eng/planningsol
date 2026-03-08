@@ -491,7 +491,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       // Calculate bounding box of all zones and tanks
       const allItems: { x: number; y: number; w: number; h: number }[] = [];
       zones.forEach(z => allItems.push({ x: z.x, y: z.y, w: z.w, h: z.h }));
-      tanks.forEach(t => allItems.push({ x: t.x, y: t.y, w: t.w, h: t.h }));
+      tanks.forEach(t => allItems.push({ x: t.cx - t.r, y: t.cy - t.r, w: t.r * 2, h: t.r * 2 }));
 
       if (allItems.length === 0) {
         setZoom(1);
