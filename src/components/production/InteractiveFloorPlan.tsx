@@ -571,33 +571,78 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     setDragType("tank");
   }, [editMode, tanks, toSVG]);
 
-  const ALIGN_THRESHOLD = 8; // pixels threshold for snapping to alignment
+  const ALIGN_THRESHOLD = 12; // Generous snapping threshold for better UX
 
   const alignSnap = useCallback((id: string, rawX: number, rawY: number): { x: number; y: number; guideX: number | null; guideY: number | null } => {
-    let x = snap(rawX);
-    let y = snap(rawY);
-    let guideX: number | null = null;
-    let guideY: number | null = null;
     const dragged = zones.find(z => z.id === id);
-    if (!dragged) return { x, y, guideX, guideY };
+    if (!dragged) return { x: snap(rawX), y: snap(rawY), guideX: null, guideY: null };
+
+    const dw = dragged.w;
+    const dh = dragged.h;
+    const dCx = rawX + dw / 2;
+    const dCy = rawY + dh / 2;
+    const dRight = rawX + dw;
+    const dBottom = rawY + dh;
+
+    // Collect all snap candidates (edges + centers of other zones AND tanks)
+    const xCandidates: { target: number; source: number; guide: number }[] = [];
+    const yCandidates: { target: number; source: number; guide: number }[] = [];
 
     for (const z of zones) {
       if (z.id === id) continue;
-      // Snap left edges
-      if (Math.abs(x - z.x) < ALIGN_THRESHOLD) { x = z.x; guideX = x; }
-      // Snap right edges
-      if (Math.abs((x + dragged.w) - (z.x + z.w)) < ALIGN_THRESHOLD) { x = z.x + z.w - dragged.w; guideX = x + dragged.w; }
-      // Snap left to right
-      if (Math.abs(x - (z.x + z.w)) < ALIGN_THRESHOLD) { x = z.x + z.w; guideX = x; }
-      // Snap top edges
-      if (Math.abs(y - z.y) < ALIGN_THRESHOLD) { y = z.y; guideY = y; }
-      // Snap bottom edges
-      if (Math.abs((y + dragged.h) - (z.y + z.h)) < ALIGN_THRESHOLD) { y = z.y + z.h - dragged.h; guideY = y + dragged.h; }
-      // Snap top to bottom
-      if (Math.abs(y - (z.y + z.h)) < ALIGN_THRESHOLD) { y = z.y + z.h; guideY = y; }
+      const zCx = z.x + z.w / 2;
+      const zCy = z.y + z.h / 2;
+      const zRight = z.x + z.w;
+      const zBottom = z.y + z.h;
+
+      // X-axis snaps: left-left, right-right, left-right, right-left, center-center
+      xCandidates.push({ target: z.x, source: rawX, guide: z.x });           // left-left
+      xCandidates.push({ target: zRight, source: dRight, guide: zRight });     // right-right
+      xCandidates.push({ target: zRight, source: rawX, guide: zRight });       // left-to-right
+      xCandidates.push({ target: z.x, source: dRight, guide: z.x });          // right-to-left
+      xCandidates.push({ target: zCx, source: dCx, guide: zCx });             // center-center
+
+      // Y-axis snaps: top-top, bottom-bottom, top-bottom, bottom-top, center-center
+      yCandidates.push({ target: z.y, source: rawY, guide: z.y });            // top-top
+      yCandidates.push({ target: zBottom, source: dBottom, guide: zBottom });   // bottom-bottom
+      yCandidates.push({ target: zBottom, source: rawY, guide: zBottom });      // top-to-bottom
+      yCandidates.push({ target: z.y, source: dBottom, guide: z.y });          // bottom-to-top
+      yCandidates.push({ target: zCy, source: dCy, guide: zCy });             // center-center
     }
-    return { x, y, guideX, guideY };
-  }, [zones]);
+
+    // Also snap to tanks
+    for (const t of tanks) {
+      xCandidates.push({ target: t.cx, source: dCx, guide: t.cx });           // center-center
+      xCandidates.push({ target: t.cx - t.r, source: rawX, guide: t.cx - t.r });  // left edge
+      xCandidates.push({ target: t.cx + t.r, source: dRight, guide: t.cx + t.r }); // right edge
+      yCandidates.push({ target: t.cy, source: dCy, guide: t.cy });           // center-center
+      yCandidates.push({ target: t.cy - t.r, source: rawY, guide: t.cy - t.r });  // top edge
+      yCandidates.push({ target: t.cy + t.r, source: dBottom, guide: t.cy + t.r }); // bottom edge
+    }
+
+    // Find the closest X snap
+    let bestX = { dist: Infinity, offset: 0, guide: null as number | null };
+    for (const c of xCandidates) {
+      const dist = Math.abs(c.source - c.target);
+      if (dist < ALIGN_THRESHOLD && dist < bestX.dist) {
+        bestX = { dist, offset: c.target - c.source, guide: c.guide };
+      }
+    }
+
+    // Find the closest Y snap
+    let bestY = { dist: Infinity, offset: 0, guide: null as number | null };
+    for (const c of yCandidates) {
+      const dist = Math.abs(c.source - c.target);
+      if (dist < ALIGN_THRESHOLD && dist < bestY.dist) {
+        bestY = { dist, offset: c.target - c.source, guide: c.guide };
+      }
+    }
+
+    const finalX = bestX.guide !== null ? rawX + bestX.offset : snap(rawX);
+    const finalY = bestY.guide !== null ? rawY + bestY.offset : snap(rawY);
+
+    return { x: finalX, y: finalY, guideX: bestX.guide, guideY: bestY.guide };
+  }, [zones, tanks]);
 
   const [alignGuides, setAlignGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
 
