@@ -985,7 +985,7 @@ export function DailyOverview() {
             {/* === PROGRESS BAR + SUMMARY === */}
             <div className="mb-4 print:hidden space-y-2">
               <div className="flex items-center gap-3">
-                <Progress value={progressStats.percentage} className="flex-1 h-2.5" />
+                <Progress value={progressStats.percentage} className={`flex-1 h-2.5 ${progressStats.percentage > 75 ? "[&>div]:bg-green-500" : progressStats.percentage > 40 ? "[&>div]:bg-orange-500" : "[&>div]:bg-red-500"}`} />
                 <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
                   {progressStats.completed}/{progressStats.total} afgerond
                 </span>
