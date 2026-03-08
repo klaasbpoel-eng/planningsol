@@ -501,6 +501,23 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       return;
     }
 
+    // Building resize
+    if (resizingBuilding) {
+      const svgRect = svgRef.current!.getBoundingClientRect();
+      const pxPerSvgUnitX = svgRect.width / (SVG_WIDTH - canvasOffsetX);
+      const pxPerSvgUnitY = svgRect.height / (SVG_HEIGHT - canvasOffsetY);
+      const dxPx = e.clientX - buildingResizeStart.current.clientX;
+      const dyPx = e.clientY - buildingResizeStart.current.clientY;
+      if (resizingBuilding === "right" || resizingBuilding === "corner") {
+        setBuildingWidth(Math.max(400, snap(buildingResizeStart.current.w + dxPx / pxPerSvgUnitX)));
+      }
+      if (resizingBuilding === "bottom" || resizingBuilding === "corner") {
+        setBuildingHeight(Math.max(300, snap(buildingResizeStart.current.h + dyPx / pxPerSvgUnitY)));
+      }
+      setHasChanges(true);
+      return;
+    }
+
     // Zone resize
     if (resizingZoneId && resizingCorner) {
       const svgPt = toSVG(e);
