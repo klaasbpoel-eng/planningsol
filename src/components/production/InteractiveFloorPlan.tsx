@@ -342,6 +342,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   }, [bulkTankData]);
 
   const svgRef = useRef<SVGSVGElement>(null);
+  const resizeStartRef = useRef<{ clientX: number; clientY: number; offsetX: number; offsetY: number }>({ clientX: 0, clientY: 0, offsetX: 0, offsetY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
   const SVG_WIDTH = canvasWidth;
