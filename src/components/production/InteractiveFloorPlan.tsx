@@ -466,6 +466,10 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   };
 
   const handleSvgMouseUp = useCallback(() => {
+    if (resizingTerrain) {
+      localStorage.setItem("floorplan-terrain-height", String(terrainHeight));
+      setResizingTerrain(false);
+    }
     if (draggingId && dragType && editMode) {
       if (dragType === "zone") {
         const dragged = zones.find(z => z.id === draggingId);
