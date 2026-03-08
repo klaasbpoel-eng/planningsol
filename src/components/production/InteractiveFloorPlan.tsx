@@ -12,6 +12,7 @@ import { getGasColor } from "@/constants/gasColors";
 const DEFAULT_ZONE_TYPES = {
   vulstation: { label: "Vulstation", color: "hsl(var(--primary))", bg: "hsl(var(--primary) / 0.15)", border: "hsl(var(--primary) / 0.4)" },
   opslag_gas: { label: "Gasopslag", color: "hsl(200 80% 50%)", bg: "hsl(200 80% 50% / 0.12)", border: "hsl(200 80% 50% / 0.4)" },
+  opslag_vol: { label: "Opslag Vol", color: "hsl(160 65% 45%)", bg: "hsl(160 65% 45% / 0.12)", border: "hsl(160 65% 45% / 0.4)" },
   opslag_droogijs: { label: "Droogijs", color: "hsl(190 90% 45%)", bg: "hsl(190 90% 45% / 0.12)", border: "hsl(190 90% 45% / 0.4)" },
   opslag_bulk: { label: "Bulkopslag", color: "hsl(280 60% 55%)", bg: "hsl(280 60% 55% / 0.12)", border: "hsl(280 60% 55% / 0.4)" },
   opslag_brandbaar: { label: "Brandbaar", color: "hsl(25 90% 50%)", bg: "hsl(25 90% 50% / 0.12)", border: "hsl(25 90% 50% / 0.4)" },
