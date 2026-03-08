@@ -70,8 +70,8 @@ export function AuthForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-xl border-0 bg-card">
+    <div className="min-h-screen flex items-center justify-center bg-mesh-animate p-4">
+      <Card className="w-full max-w-md glass-card-premium border-0">
         <CardHeader className="space-y-1 text-center pb-2">
           <div className="flex flex-col items-center gap-2 mb-4">
             <img src={siteLogo} alt="SOL Group Logo" className="h-14 w-auto" />

@@ -119,8 +119,8 @@ export function Header({
                   className={cn(
                     "w-full justify-start text-base h-12 gap-3",
                     isActive(item.path)
-                      ? "bg-primary/10 text-primary font-semibold"
-                      : "text-foreground"
+                      ? "bg-primary/10 text-primary font-semibold border-l-4 border-primary"
+                      : "text-foreground border-l-4 border-transparent"
                   )}
                 >
                   {item.icon}
