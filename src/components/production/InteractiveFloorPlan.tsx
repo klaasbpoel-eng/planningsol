@@ -286,6 +286,10 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<"label" | "sublabel" | null>(null);
   const [editingValue, setEditingValue] = useState("");
+  const [terrainHeight, setTerrainHeight] = useState(() => {
+    try { const v = localStorage.getItem("floorplan-terrain-height"); return v ? Number(v) : 180; } catch { return 180; }
+  });
+  const [resizingTerrain, setResizingTerrain] = useState(false);
 
   const [showInventory, setShowInventory] = useState(true);
   const [pgsData, setPgsData] = useState<PgsSubstance[]>([]);
