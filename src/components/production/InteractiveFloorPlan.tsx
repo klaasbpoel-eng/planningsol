@@ -1691,7 +1691,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                                 const updated = prev.map(z => {
                                   if (z.id !== contextMenu.zoneId) return z;
                                   return z.type === "opslag_vol"
-                                    ? { ...z, gasType: gt.name, label: gt.name }
+                                    ? { ...z, gasType: gt.name, label: gt.name, sublabel: getGasFormula(gt.name) || z.sublabel }
                                     : { ...z, gasType: gt.name };
                                 });
                                 savePositions(updated, tanks);
