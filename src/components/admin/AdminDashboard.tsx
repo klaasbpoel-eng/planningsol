@@ -10,7 +10,7 @@ import { ToolboxLogbook } from "@/components/admin/ToolboxLogbook";
 import { AdminSidebar } from "@/components/admin/layout/AdminSidebar";
 import { DailyOverview } from "@/components/dashboard/DailyOverview";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { BrandedLoader } from "@/components/ui/branded-loader";
 import { parseISO, isWithinInterval, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 import type { RolePermissions, AppRole } from "@/hooks/useUserPermissions";
