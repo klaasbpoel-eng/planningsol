@@ -1518,7 +1518,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
           <>
             <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)} onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }} />
             <div
-              className="absolute z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[180px] select-text"
+              className="absolute z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[200px] max-h-[400px] overflow-y-auto select-text"
               style={{ left: contextMenu.screenX, top: contextMenu.screenY }}
             >
               <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Zone type wijzigen</div>
@@ -1545,6 +1545,55 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   </button>
                 );
               })}
+              <div className="my-1 border-t border-border" />
+              <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Gassoort (voorraad)</div>
+              {(() => {
+                const zone = zones.find(z => z.id === contextMenu.zoneId);
+                const currentGas = zone?.gasType;
+                return (
+                  <>
+                    <button
+                      className={cn(
+                        "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
+                        !currentGas && "bg-accent font-semibold"
+                      )}
+                      onClick={() => {
+                        setZones(prev => prev.map(z => z.id === contextMenu.zoneId ? { ...z, gasType: undefined } : z));
+                        setHasChanges(true);
+                        setContextMenu(null);
+                        toast.success("Gassoort verwijderd");
+                      }}
+                    >
+                      <span className="w-3 h-3 rounded-sm flex-shrink-0 border border-border bg-muted" />
+                      <span className="italic text-muted-foreground">Geen / Automatisch</span>
+                      {!currentGas && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
+                    </button>
+                    {availableGasTypes.map((gt) => {
+                      const isActive = currentGas === gt.name;
+                      const gasColor = getGasColor(gt.name);
+                      return (
+                        <button
+                          key={gt.id}
+                          className={cn(
+                            "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
+                            isActive && "bg-accent font-semibold"
+                          )}
+                          onClick={() => {
+                            setZones(prev => prev.map(z => z.id === contextMenu.zoneId ? { ...z, gasType: gt.name } : z));
+                            setHasChanges(true);
+                            setContextMenu(null);
+                            toast.success(`Gassoort ingesteld op "${gt.name}"`);
+                          }}
+                        >
+                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: gasColor }} />
+                          <span>{gt.name}</span>
+                          {isActive && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
+                        </button>
+                      );
+                    })}
+                  </>
+                );
+              })()}
               <div className="my-1 border-t border-border" />
               <button
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-destructive/10 transition-colors text-left text-destructive"
