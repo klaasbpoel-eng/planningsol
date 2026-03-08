@@ -1535,6 +1535,20 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   </button>
                 );
               })}
+              <div className="my-1 border-t border-border" />
+              <button
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-destructive/10 transition-colors text-left text-destructive"
+                onClick={() => {
+                  const zone = zones.find(z => z.id === contextMenu.zoneId);
+                  setZones(prev => prev.filter(z => z.id !== contextMenu.zoneId));
+                  setHasChanges(true);
+                  setContextMenu(null);
+                  toast.success(`"${zone?.label || 'Zone'}" verwijderd`);
+                }}
+              >
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                Verwijderen
+              </button>
             </div>
           </>
         )}
