@@ -290,6 +290,13 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     try { const v = localStorage.getItem("floorplan-terrain-height"); return v ? Number(v) : 180; } catch { return 180; }
   });
   const [resizingTerrain, setResizingTerrain] = useState(false);
+  const [canvasWidth, setCanvasWidth] = useState(() => {
+    try { const v = localStorage.getItem("floorplan-canvas-width"); return v ? Number(v) : 1100; } catch { return 1100; }
+  });
+  const [canvasHeight, setCanvasHeight] = useState(() => {
+    try { const v = localStorage.getItem("floorplan-canvas-height"); return v ? Number(v) : 900; } catch { return 900; }
+  });
+  const [resizingCanvas, setResizingCanvas] = useState<"right" | "bottom" | "corner" | null>(null);
 
   const [showInventory, setShowInventory] = useState(true);
   const [pgsData, setPgsData] = useState<PgsSubstance[]>([]);
