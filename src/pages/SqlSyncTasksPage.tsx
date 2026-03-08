@@ -30,7 +30,7 @@ export default function SqlSyncTasksPage() {
     const fetchTasks = async () => {
         try {
             setIsLoading(true);
-            const { data, error } = await supabase
+            const { data, error } = await (supabase as any)
                 .from("sql_sync_tasks")
                 .select("*")
                 .order("created_at", { ascending: false });
@@ -61,7 +61,7 @@ export default function SqlSyncTasksPage() {
         if (!confirm(`Weet je zeker dat je de taak "${name}" wilt verwijderen?`)) return;
 
         try {
-            const { error } = await supabase.from("sql_sync_tasks").delete().eq("id", id);
+            const { error } = await (supabase as any).from("sql_sync_tasks").delete().eq("id", id);
             if (error) throw error;
 
             toast({
@@ -80,7 +80,7 @@ export default function SqlSyncTasksPage() {
 
     const handleToggleActive = async (id: string, currentStatus: boolean) => {
         try {
-            const { error } = await supabase
+            const { error } = await (supabase as any)
                 .from("sql_sync_tasks")
                 .update({ is_active: !currentStatus })
                 .eq("id", id);

@@ -84,7 +84,7 @@ export function SqlSyncTaskForm({ open, onOpenChange, onSuccess, task }: SqlSync
         try {
             if (task?.id) {
                 // Edit existing
-                const { error } = await supabase
+                const { error } = await (supabase as any)
                     .from("sql_sync_tasks")
                     .update(values)
                     .eq("id", task.id);
@@ -93,7 +93,7 @@ export function SqlSyncTaskForm({ open, onOpenChange, onSuccess, task }: SqlSync
                 toast({ title: "Bijgewerkt", description: "Configuratie is opgeslagen." });
             } else {
                 // Create new
-                const { error } = await supabase
+                const { error } = await (supabase as any)
                     .from("sql_sync_tasks")
                     .insert([values]);
 
