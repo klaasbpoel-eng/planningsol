@@ -479,28 +479,54 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
   const SVG_WIDTH = canvasWidth;
   const SVG_HEIGHT = canvasHeight;
 
-  // Auto-fit zoom to fill container on mount and fullscreen toggle only
+  // Auto-fit zoom based on bounding box of all existing items
   useEffect(() => {
-    // Skip auto-fit while user is actively resizing the canvas
     if (resizingCanvas) return;
     const fit = () => {
       const container = containerRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
-      const vbW = SVG_WIDTH - canvasOffsetX;
-      const vbH = SVG_HEIGHT - canvasOffsetY;
-      const containerAspect = rect.width / rect.height;
-      const svgAspect = vbW / vbH;
-      const fitZoom = containerAspect > svgAspect
-        ? (containerAspect / svgAspect) * 0.97
-        : (svgAspect / containerAspect) * 0.97;
-      setZoom(Math.min(Math.max(fitZoom, 1), 3));
-      setPan({ x: 0, y: 0 });
+
+      // Calculate bounding box of all zones and tanks
+      const allItems: { x: number; y: number; w: number; h: number }[] = [];
+      zones.forEach(z => allItems.push({ x: z.x, y: z.y, w: z.w, h: z.h }));
+      tanks.forEach(t => allItems.push({ x: t.x, y: t.y, w: t.w, h: t.h }));
+
+      if (allItems.length === 0) {
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+        return;
+      }
+
+      const padding = 40;
+      const minX = Math.min(...allItems.map(i => i.x)) - padding;
+      const minY = Math.min(...allItems.map(i => i.y)) - padding;
+      const maxX = Math.max(...allItems.map(i => i.x + i.w)) + padding;
+      const maxY = Math.max(...allItems.map(i => i.y + i.h)) + padding;
+
+      const contentW = maxX - minX;
+      const contentH = maxY - minY;
+
+      if (contentW <= 0 || contentH <= 0) return;
+
+      const scaleX = rect.width / contentW;
+      const scaleY = rect.height / contentH;
+      const fitZoom = Math.min(scaleX, scaleY) * 0.95;
+      const clampedZoom = Math.min(Math.max(fitZoom, 0.3), 3);
+
+      // Center the content in the container
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      const panX = (rect.width / 2) - (centerX * clampedZoom);
+      const panY = (rect.height / 2) - (centerY * clampedZoom);
+
+      setZoom(clampedZoom);
+      setPan({ x: panX, y: panY });
     };
     const timer = setTimeout(fit, 80);
     return () => clearTimeout(timer);
-  }, [isFullscreen]); // Only re-fit on fullscreen toggle, not during resize
+  }, [isFullscreen, zones.length, tanks.length]); // Re-fit when items change or fullscreen toggles
 
   // Convert mouse event to SVG coordinates
   const toSVG = useCallback((e: React.MouseEvent): { x: number; y: number } | null => {
