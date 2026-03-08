@@ -42,6 +42,7 @@ interface FloorZone {
   sublabel?: string;
   type: ZoneType;
   details?: string;
+  rotation?: number;
 }
 
 interface BulkTank {
@@ -138,8 +139,8 @@ function loadPositions(): { zones: Record<string, { x: number; y: number; label?
 }
 
 function savePositions(zones: FloorZone[], tanks: BulkTank[]) {
-  const zonePos: Record<string, { x: number; y: number; label: string; sublabel?: string; details?: string }> = {};
-  zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y, label: z.label, sublabel: z.sublabel, details: z.details }; });
+  const zonePos: Record<string, { x: number; y: number; w: number; h: number; label: string; sublabel?: string; details?: string; rotation?: number }> = {};
+  zones.forEach(z => { zonePos[z.id] = { x: z.x, y: z.y, w: z.w, h: z.h, label: z.label, sublabel: z.sublabel, details: z.details, rotation: z.rotation }; });
   const tankPos: Record<string, { cx: number; cy: number; label: string; sublabel?: string; details?: string }> = {};
   tanks.forEach(t => { tankPos[t.id] = { cx: t.cx, cy: t.cy, label: t.label, sublabel: t.sublabel, details: t.details }; });
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ zones: zonePos, tanks: tankPos }));
@@ -305,7 +306,15 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     try { const v = localStorage.getItem("floorplan-canvas-offset-y"); return v ? Number(v) : 0; } catch { return 0; }
   });
 
+  // Zone resize & rotation
+  const [resizingZoneId, setResizingZoneId] = useState<string | null>(null);
+  const [resizingCorner, setResizingCorner] = useState<"se" | "sw" | "ne" | "nw" | null>(null);
+  const [rotatingZoneId, setRotatingZoneId] = useState<string | null>(null);
+  const resizeZoneStart = useRef<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 0, h: 0 });
+  const rotateZoneStart = useRef<{ angle: number; rotation: number }>({ angle: 0, rotation: 0 });
+
   const [showInventory, setShowInventory] = useState(true);
+
   const [pgsData, setPgsData] = useState<PgsSubstance[]>([]);
   const [bulkTankData, setBulkTankData] = useState<BulkTankData[]>([]);
 
@@ -484,6 +493,51 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       return;
     }
 
+    // Zone resize
+    if (resizingZoneId && resizingCorner) {
+      const svgPt = toSVG(e);
+      if (!svgPt) return;
+      const s = resizeZoneStart.current;
+      let newX = s.x, newY = s.y, newW = s.w, newH = s.h;
+      if (resizingCorner === "se") {
+        newW = Math.max(40, snap(svgPt.x - s.x));
+        newH = Math.max(20, snap(svgPt.y - s.y));
+      } else if (resizingCorner === "sw") {
+        newW = Math.max(40, snap(s.x + s.w - svgPt.x));
+        newX = snap(svgPt.x);
+        newH = Math.max(20, snap(svgPt.y - s.y));
+      } else if (resizingCorner === "ne") {
+        newW = Math.max(40, snap(svgPt.x - s.x));
+        newH = Math.max(20, snap(s.y + s.h - svgPt.y));
+        newY = snap(svgPt.y);
+      } else if (resizingCorner === "nw") {
+        newW = Math.max(40, snap(s.x + s.w - svgPt.x));
+        newX = snap(svgPt.x);
+        newH = Math.max(20, snap(s.y + s.h - svgPt.y));
+        newY = snap(svgPt.y);
+      }
+      setZones(prev => prev.map(z => z.id === resizingZoneId ? { ...z, x: newX, y: newY, w: newW, h: newH } : z));
+      setHasChanges(true);
+      return;
+    }
+
+    // Zone rotation
+    if (rotatingZoneId) {
+      const svgPt = toSVG(e);
+      if (!svgPt) return;
+      const zone = zones.find(z => z.id === rotatingZoneId);
+      if (!zone) return;
+      const cx = zone.x + zone.w / 2;
+      const cy = zone.y + zone.h / 2;
+      const angle = Math.atan2(svgPt.y - cy, svgPt.x - cx) * (180 / Math.PI);
+      const delta = angle - rotateZoneStart.current.angle;
+      // Snap to 15° increments
+      const newRot = Math.round((rotateZoneStart.current.rotation + delta) / 15) * 15;
+      setZones(prev => prev.map(z => z.id === rotatingZoneId ? { ...z, rotation: newRot } : z));
+      setHasChanges(true);
+      return;
+    }
+
     if (draggingId && dragType) {
       const svgPt = toSVG(e);
       if (!svgPt) return;
@@ -508,7 +562,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     if (isPanning) {
       setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
     }
-  }, [draggingId, dragType, isPanning, panStart, toSVG, alignSnap, resizingTerrain, resizingCanvas, canvasWidth, canvasHeight, canvasOffsetX, canvasOffsetY]);
+  }, [draggingId, dragType, isPanning, panStart, toSVG, alignSnap, resizingTerrain, resizingCanvas, canvasWidth, canvasHeight, canvasOffsetX, canvasOffsetY, resizingZoneId, resizingCorner, rotatingZoneId, zones]);
 
   // Check overlap between two rectangles
   const rectsOverlap = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => {
@@ -543,11 +597,19 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       localStorage.setItem("floorplan-terrain-height", String(terrainHeight));
       setResizingTerrain(false);
     }
+    if (resizingZoneId) {
+      setResizingZoneId(null);
+      setResizingCorner(null);
+      setHasChanges(true);
+    }
+    if (rotatingZoneId) {
+      setRotatingZoneId(null);
+      setHasChanges(true);
+    }
     if (draggingId && dragType && editMode) {
       if (dragType === "zone") {
         const dragged = zones.find(z => z.id === draggingId);
         if (dragged) {
-          // Check zone-zone overlap → swap positions
           const overlapping = zones.find(z => z.id !== draggingId && rectsOverlap(dragged, z));
           if (overlapping) {
             setZones(prev => prev.map(z => {
@@ -557,7 +619,6 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             }));
             toast.info(`${dragged.label} ↔ ${overlapping.label} gewisseld`);
           }
-          // Check zone-tank overlap → swap center/position
           const overlappingTank = tanks.find(t => circleRectOverlap(t, dragged));
           if (overlappingTank && !overlapping) {
             const startCenterX = dragStartPos.current.x + dragged.w / 2;
@@ -572,7 +633,6 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       } else if (dragType === "tank") {
         const dragged = tanks.find(t => t.id === draggingId);
         if (dragged) {
-          // Check tank-tank overlap → swap
           const overlapping = tanks.find(t => t.id !== draggingId && circlesOverlap(dragged, t));
           if (overlapping) {
             setTanks(prev => prev.map(t => {
@@ -582,7 +642,6 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             }));
             toast.info(`${dragged.label} ↔ ${overlapping.label} gewisseld`);
           }
-          // Check tank-zone overlap → swap
           const overlappingZone = zones.find(z => circleRectOverlap(dragged, z));
           if (overlappingZone && !overlapping) {
             const zoneCenterX = overlappingZone.x + overlappingZone.w / 2;
@@ -599,7 +658,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
     setDragType(null);
     setIsPanning(false);
     setAlignGuides({ x: null, y: null });
-  }, [draggingId, dragType, editMode, zones, tanks, resizingCanvas, resizingTerrain, canvasWidth, canvasHeight, canvasOffsetX, canvasOffsetY, terrainHeight]);
+  }, [draggingId, dragType, editMode, zones, tanks, resizingCanvas, resizingTerrain, canvasWidth, canvasHeight, canvasOffsetX, canvasOffsetY, terrainHeight, resizingZoneId, rotatingZoneId]);
 
   // Inline text editing
   const handleStartEdit = useCallback((id: string, field: "label" | "sublabel", currentValue: string) => {
@@ -1043,11 +1102,15 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
               const isHovered = hoveredZone === zone.id;
               const isDragging = draggingId === zone.id;
               const dimmed = filterType !== "all" && zone.type !== filterType;
+              const rot = zone.rotation || 0;
+              const cx = zone.x + zone.w / 2;
+              const cy = zone.y + zone.h / 2;
 
               return (
                 <g
                   key={zone.id}
                   data-zone={zone.id}
+                  transform={rot ? `rotate(${rot} ${cx} ${cy})` : undefined}
                   className={editMode ? "cursor-grab" : "cursor-pointer"}
                   style={{ opacity: dimmed ? 0.25 : isDragging ? 0.7 : 1 }}
                   onClick={(e) => { if (!editMode) { e.stopPropagation(); setSelectedZone(s => s === zone.id ? null : zone.id); } }}
@@ -1079,7 +1142,6 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                       onDoubleClick={(e) => { e.stopPropagation(); handleStartEdit(zone.id, "sublabel", zone.sublabel || ""); }}
                     >{zone.sublabel}</text>
                   )}
-                  {/* Double-click hint to add sublabel */}
                   {editMode && !zone.sublabel && (
                     <text
                       x={zone.x + zone.w / 2} y={zone.y + zone.h / 2 + 9}
@@ -1089,12 +1151,74 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                       onDoubleClick={(e) => { e.stopPropagation(); handleStartEdit(zone.id, "sublabel", ""); }}
                     >+ sublabel</text>
                   )}
-                  {/* Edit mode drag indicator */}
+                  {/* Edit mode: drag indicator */}
                   {editMode && (
                     <g style={{ pointerEvents: "none" }}>
-                      <rect x={zone.x + zone.w / 2 - 8} y={zone.y - 6} width="16" height="8" rx="3" fill="hsl(var(--primary))" opacity="0.6" />
-                      <line x1={zone.x + zone.w / 2 - 3} y1={zone.y - 3.5} x2={zone.x + zone.w / 2 + 3} y2={zone.y - 3.5} stroke="hsl(var(--primary-foreground))" strokeWidth="1" opacity="0.8" />
-                      <line x1={zone.x + zone.w / 2 - 3} y1={zone.y - 1} x2={zone.x + zone.w / 2 + 3} y2={zone.y - 1} stroke="hsl(var(--primary-foreground))" strokeWidth="1" opacity="0.8" />
+                      <rect x={zone.x + zone.w / 2 - 8} y={zone.y + 2} width="16" height="8" rx="3" fill="hsl(var(--primary))" opacity="0.4" />
+                      <line x1={zone.x + zone.w / 2 - 3} y1={zone.y + 4.5} x2={zone.x + zone.w / 2 + 3} y2={zone.y + 4.5} stroke="hsl(var(--primary-foreground))" strokeWidth="1" opacity="0.6" />
+                      <line x1={zone.x + zone.w / 2 - 3} y1={zone.y + 7} x2={zone.x + zone.w / 2 + 3} y2={zone.y + 7} stroke="hsl(var(--primary-foreground))" strokeWidth="1" opacity="0.6" />
+                    </g>
+                  )}
+                  {/* Edit mode: corner resize handles */}
+                  {editMode && (isSelected || isHovered) && (
+                    <>
+                      {(["nw", "ne", "sw", "se"] as const).map(corner => {
+                        const hx = corner.includes("w") ? zone.x : zone.x + zone.w;
+                        const hy = corner.includes("n") ? zone.y : zone.y + zone.h;
+                        const cursorMap = { nw: "nwse-resize", ne: "nesw-resize", sw: "nesw-resize", se: "nwse-resize" };
+                        return (
+                          <g key={corner}>
+                            <rect
+                              x={hx - 6} y={hy - 6} width={12} height={12}
+                              fill="transparent" style={{ cursor: cursorMap[corner] }}
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                resizeZoneStart.current = { x: zone.x, y: zone.y, w: zone.w, h: zone.h };
+                                setResizingZoneId(zone.id);
+                                setResizingCorner(corner);
+                              }}
+                            />
+                            <rect
+                              x={hx - 3} y={hy - 3} width={6} height={6} rx="1"
+                              fill="hsl(var(--primary))" stroke="hsl(var(--background))" strokeWidth="1"
+                              style={{ pointerEvents: "none" }}
+                            />
+                          </g>
+                        );
+                      })}
+                    </>
+                  )}
+                  {/* Edit mode: rotation handle */}
+                  {editMode && (isSelected || isHovered) && (
+                    <g>
+                      <line
+                        x1={cx} y1={zone.y - 4} x2={cx} y2={zone.y - 20}
+                        stroke="hsl(var(--primary) / 0.4)" strokeWidth="1.5"
+                        style={{ pointerEvents: "none" }}
+                      />
+                      <circle
+                        cx={cx} cy={zone.y - 22} r="5"
+                        fill="hsl(var(--primary))" stroke="hsl(var(--background))" strokeWidth="1.5"
+                        style={{ cursor: "grab" }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          const svgPt = toSVG(e);
+                          if (!svgPt) return;
+                          const angle = Math.atan2(svgPt.y - cy, svgPt.x - cx) * (180 / Math.PI);
+                          rotateZoneStart.current = { angle, rotation: zone.rotation || 0 };
+                          setRotatingZoneId(zone.id);
+                        }}
+                      />
+                      {/* Rotation degree indicator */}
+                      {rot !== 0 && (
+                        <text
+                          x={cx + 10} y={zone.y - 22}
+                          fill="hsl(var(--primary))" fontSize="7" fontWeight="600"
+                          dominantBaseline="middle"
+                        >{rot}°</text>
+                      )}
                     </g>
                   )}
                   {!editMode && isSelected && <circle cx={zone.x + zone.w - 8} cy={zone.y + 8} r="4" fill={zt.color} />}
@@ -1113,7 +1237,6 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                       </g>
                     );
                   })()}
-                  {/* Flame icon for flammable zones */}
                   {zone.type === "opslag_brandbaar" && zone.id !== "buiten_brandbaar" && (
                     <g>
                       <image href="/ghs/GHS02.svg" x={zone.x + zone.w - 18} y={zone.y + 2} width="16" height="16" opacity="0.7" />
