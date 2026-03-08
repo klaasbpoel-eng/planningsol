@@ -1626,7 +1626,7 @@ function Section({
       <div className="flex items-center gap-2 mb-2">
         <button
           onClick={onToggle}
-          className="flex items-center gap-2 flex-1 min-w-0 text-left min-h-[44px] md:min-h-0"
+          className="flex items-center gap-2 flex-1 min-w-0 text-left min-h-[44px] md:min-h-0 rounded-md px-1 -mx-1 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         >
           <span className={color}>{icon}</span>
           <span className="text-sm font-medium">{label}</span>
