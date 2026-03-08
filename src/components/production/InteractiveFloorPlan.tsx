@@ -1613,7 +1613,11 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                           !currentGas && "bg-accent font-semibold"
                         )}
                         onClick={() => {
-                          setZones(prev => prev.map(z => z.id === contextMenu.zoneId ? { ...z, gasType: undefined } : z));
+                          setZones(prev => {
+                            const updated = prev.map(z => z.id === contextMenu.zoneId ? { ...z, gasType: undefined } : z);
+                            savePositions(updated, tanks);
+                            return updated;
+                          });
                           setHasChanges(true);
                           setContextMenu(null);
                           setGasSearch("");
@@ -1637,7 +1641,11 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                               isActive && "bg-accent font-semibold"
                             )}
                             onClick={() => {
-                              setZones(prev => prev.map(z => z.id === contextMenu.zoneId ? { ...z, gasType: gt.name } : z));
+                              setZones(prev => {
+                                const updated = prev.map(z => z.id === contextMenu.zoneId ? { ...z, gasType: gt.name } : z);
+                                savePositions(updated, tanks);
+                                return updated;
+                              });
                               setHasChanges(true);
                               setContextMenu(null);
                               setGasSearch("");
