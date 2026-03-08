@@ -1126,6 +1126,16 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
             {/* Canvas resize handles (edit mode) */}
             {editMode && (
               <>
+                {/* Left edge */}
+                <g className="cursor-ew-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("left"); }}>
+                  <rect x={canvasOffsetX} y={SVG_HEIGHT / 2 - 30} width={12} height={60} fill="transparent" />
+                  <rect x={canvasOffsetX + 2} y={SVG_HEIGHT / 2 - 20} width={4} height={40} rx="2" fill="hsl(var(--primary) / 0.5)" />
+                </g>
+                {/* Top edge */}
+                <g className="cursor-ns-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("top"); }}>
+                  <rect x={SVG_WIDTH / 2 - 30} y={canvasOffsetY} width={60} height={12} fill="transparent" />
+                  <rect x={SVG_WIDTH / 2 - 20} y={canvasOffsetY + 2} width={40} height={4} rx="2" fill="hsl(var(--primary) / 0.5)" />
+                </g>
                 {/* Right edge */}
                 <g className="cursor-ew-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("right"); }}>
                   <rect x={SVG_WIDTH - 12} y={SVG_HEIGHT / 2 - 30} width={12} height={60} fill="transparent" />
@@ -1136,7 +1146,7 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
                   <rect x={SVG_WIDTH / 2 - 30} y={SVG_HEIGHT - 12} width={60} height={12} fill="transparent" />
                   <rect x={SVG_WIDTH / 2 - 20} y={SVG_HEIGHT - 6} width={40} height={4} rx="2" fill="hsl(var(--primary) / 0.5)" />
                 </g>
-                {/* Corner */}
+                {/* Corner bottom-right */}
                 <g className="cursor-nwse-resize" onMouseDown={(e) => { e.stopPropagation(); setResizingCanvas("corner"); }}>
                   <rect x={SVG_WIDTH - 16} y={SVG_HEIGHT - 16} width={16} height={16} fill="transparent" />
                   <path d={`M${SVG_WIDTH - 4} ${SVG_HEIGHT - 12} L${SVG_WIDTH - 4} ${SVG_HEIGHT - 4} L${SVG_WIDTH - 12} ${SVG_HEIGHT - 4}`} fill="none" stroke="hsl(var(--primary) / 0.6)" strokeWidth="2" strokeLinecap="round" />
