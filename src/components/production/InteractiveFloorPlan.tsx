@@ -1517,103 +1517,156 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
         )}
 
         {/* Zone type context menu */}
-        {contextMenu && editMode && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)} onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }} />
-            <div
-              className="absolute z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[200px] max-h-[400px] overflow-y-auto select-text"
-              style={{ left: contextMenu.screenX, top: contextMenu.screenY }}
-            >
-              <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Zone type wijzigen</div>
-              {(Object.entries(ZONE_TYPES) as [ZoneType, ZoneTypeConfig][]).map(([key, zt]) => {
-                const zone = zones.find(z => z.id === contextMenu.zoneId);
-                const isActive = zone?.type === key;
-                return (
+        {contextMenu && editMode && (() => {
+          const ctxZone = zones.find(z => z.id === contextMenu.zoneId);
+          const currentGas = ctxZone?.gasType;
+          const filteredGasTypes = gasSearch
+            ? availableGasTypes.filter(gt => gt.name.toLowerCase().includes(gasSearch.toLowerCase()))
+            : availableGasTypes;
+
+          return (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => { setContextMenu(null); setGasSearch(""); setContextMenuTab("type"); }} onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); setGasSearch(""); setContextMenuTab("type"); }} />
+              <div
+                className="absolute z-50 bg-popover border border-border rounded-lg shadow-xl min-w-[220px] w-[240px] select-text overflow-hidden"
+                style={{ left: contextMenu.screenX, top: contextMenu.screenY }}
+              >
+                {/* Header with zone name */}
+                <div className="px-3 py-2 border-b border-border bg-muted/30">
+                  <div className="text-xs font-semibold truncate">{ctxZone?.label || "Zone"}</div>
+                  {ctxZone?.sublabel && <div className="text-[10px] text-muted-foreground truncate">{ctxZone.sublabel}</div>}
+                </div>
+
+                {/* Tab switcher */}
+                <div className="flex border-b border-border">
                   <button
-                    key={key}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
-                      isActive && "bg-accent font-semibold"
-                    )}
+                    className={cn("flex-1 text-[11px] py-1.5 font-medium transition-colors", contextMenuTab === "type" ? "text-primary border-b-2 border-primary bg-primary/5" : "text-muted-foreground hover:text-foreground")}
+                    onClick={() => setContextMenuTab("type")}
+                  >
+                    Zone type
+                  </button>
+                  <button
+                    className={cn("flex-1 text-[11px] py-1.5 font-medium transition-colors", contextMenuTab === "gas" ? "text-primary border-b-2 border-primary bg-primary/5" : "text-muted-foreground hover:text-foreground")}
+                    onClick={() => setContextMenuTab("gas")}
+                  >
+                    Gassoort
+                    {currentGas && <span className="ml-1 w-2 h-2 rounded-full inline-block" style={{ backgroundColor: getGasColor(currentGas) }} />}
+                  </button>
+                </div>
+
+                {/* Tab content */}
+                <div className="max-h-[280px] overflow-y-auto">
+                  {contextMenuTab === "type" ? (
+                    <div className="py-1">
+                      {(Object.entries(ZONE_TYPES) as [ZoneType, ZoneTypeConfig][]).map(([key, zt]) => {
+                        const isActive = ctxZone?.type === key;
+                        return (
+                          <button
+                            key={key}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
+                              isActive && "bg-accent font-semibold"
+                            )}
+                            onClick={() => {
+                              setZones(prev => prev.map(z => z.id === contextMenu.zoneId ? { ...z, type: key } : z));
+                              setHasChanges(true);
+                              setContextMenu(null);
+                              setContextMenuTab("type");
+                              toast.success(`Type gewijzigd naar "${zt.label}"`);
+                            }}
+                          >
+                            <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: zt.color }} />
+                            <span style={{ color: isActive ? zt.color : undefined }}>{zt.label}</span>
+                            {isActive && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-1">
+                      {/* Search input */}
+                      <div className="px-2 pb-1.5 pt-1">
+                        <input
+                          autoFocus
+                          className="w-full text-xs bg-muted/50 border border-border rounded-md px-2 py-1.5 outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/60"
+                          placeholder="Zoek gassoort..."
+                          value={gasSearch}
+                          onChange={(e) => setGasSearch(e.target.value)}
+                        />
+                      </div>
+                      {/* None option */}
+                      <button
+                        className={cn(
+                          "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
+                          !currentGas && "bg-accent font-semibold"
+                        )}
+                        onClick={() => {
+                          setZones(prev => prev.map(z => z.id === contextMenu.zoneId ? { ...z, gasType: undefined } : z));
+                          setHasChanges(true);
+                          setContextMenu(null);
+                          setGasSearch("");
+                          setContextMenuTab("type");
+                          toast.success("Gassoort verwijderd");
+                        }}
+                      >
+                        <span className="w-3 h-3 rounded-sm flex-shrink-0 border border-border bg-muted" />
+                        <span className="italic text-muted-foreground">Geen / Automatisch</span>
+                        {!currentGas && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
+                      </button>
+                      {/* Gas type list */}
+                      {filteredGasTypes.map((gt) => {
+                        const isActive = currentGas === gt.name;
+                        const gasColor = getGasColor(gt.name);
+                        return (
+                          <button
+                            key={gt.id}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
+                              isActive && "bg-accent font-semibold"
+                            )}
+                            onClick={() => {
+                              setZones(prev => prev.map(z => z.id === contextMenu.zoneId ? { ...z, gasType: gt.name } : z));
+                              setHasChanges(true);
+                              setContextMenu(null);
+                              setGasSearch("");
+                              setContextMenuTab("type");
+                              toast.success(`Gassoort: "${gt.name}"`);
+                            }}
+                          >
+                            <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: gasColor }} />
+                            <span>{gt.name}</span>
+                            {isActive && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
+                          </button>
+                        );
+                      })}
+                      {filteredGasTypes.length === 0 && gasSearch && (
+                        <div className="px-3 py-3 text-xs text-muted-foreground text-center">Geen resultaten</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Delete action - always visible */}
+                <div className="border-t border-border py-1">
+                  <button
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-destructive/10 transition-colors text-left text-destructive"
                     onClick={() => {
-                      setZones(prev => prev.map(z => z.id === contextMenu.zoneId ? { ...z, type: key } : z));
+                      setZones(prev => prev.filter(z => z.id !== contextMenu.zoneId));
                       setHasChanges(true);
                       setContextMenu(null);
-                      toast.success(`Type gewijzigd naar "${zt.label}"`);
+                      setGasSearch("");
+                      setContextMenuTab("type");
+                      toast.success(`"${ctxZone?.label || 'Zone'}" verwijderd`);
                     }}
                   >
-                    <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: zt.color }} />
-                    <span style={{ color: isActive ? zt.color : undefined }}>{zt.label}</span>
-                    {isActive && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                    Verwijderen
                   </button>
-                );
-              })}
-              <div className="my-1 border-t border-border" />
-              <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Gassoort (voorraad)</div>
-              {(() => {
-                const zone = zones.find(z => z.id === contextMenu.zoneId);
-                const currentGas = zone?.gasType;
-                return (
-                  <>
-                    <button
-                      className={cn(
-                        "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
-                        !currentGas && "bg-accent font-semibold"
-                      )}
-                      onClick={() => {
-                        setZones(prev => prev.map(z => z.id === contextMenu.zoneId ? { ...z, gasType: undefined } : z));
-                        setHasChanges(true);
-                        setContextMenu(null);
-                        toast.success("Gassoort verwijderd");
-                      }}
-                    >
-                      <span className="w-3 h-3 rounded-sm flex-shrink-0 border border-border bg-muted" />
-                      <span className="italic text-muted-foreground">Geen / Automatisch</span>
-                      {!currentGas && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
-                    </button>
-                    {availableGasTypes.map((gt) => {
-                      const isActive = currentGas === gt.name;
-                      const gasColor = getGasColor(gt.name);
-                      return (
-                        <button
-                          key={gt.id}
-                          className={cn(
-                            "w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left",
-                            isActive && "bg-accent font-semibold"
-                          )}
-                          onClick={() => {
-                            setZones(prev => prev.map(z => z.id === contextMenu.zoneId ? { ...z, gasType: gt.name } : z));
-                            setHasChanges(true);
-                            setContextMenu(null);
-                            toast.success(`Gassoort ingesteld op "${gt.name}"`);
-                          }}
-                        >
-                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: gasColor }} />
-                          <span>{gt.name}</span>
-                          {isActive && <span className="ml-auto text-[10px] text-muted-foreground">✓</span>}
-                        </button>
-                      );
-                    })}
-                  </>
-                );
-              })()}
-              <div className="my-1 border-t border-border" />
-              <button
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-destructive/10 transition-colors text-left text-destructive"
-                onClick={() => {
-                  const zone = zones.find(z => z.id === contextMenu.zoneId);
-                  setZones(prev => prev.filter(z => z.id !== contextMenu.zoneId));
-                  setHasChanges(true);
-                  setContextMenu(null);
-                  toast.success(`"${zone?.label || 'Zone'}" verwijderd`);
-                }}
-              >
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                Verwijderen
-              </button>
-            </div>
-          </>
-        )}
+                </div>
+              </div>
+            </>
+          );
+        })()}
 
         {/* Unsaved changes indicator */}
         {editMode && hasChanges && (
