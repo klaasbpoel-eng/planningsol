@@ -152,6 +152,13 @@ function savePositions(zones: FloorZone[], tanks: BulkTank[]) {
 function applyPositions(zones: FloorZone[], tanks: BulkTank[], saved: ReturnType<typeof loadPositions>) {
   if (!saved) return { zones, tanks };
   const newZones = zones.map(z => saved.zones[z.id] ? { ...z, ...saved.zones[z.id] } : z);
+  // Restore dynamically added zones (IDs not in defaults)
+  const existingIds = new Set(zones.map(z => z.id));
+  Object.entries(saved.zones).forEach(([id, data]) => {
+    if (!existingIds.has(id) && data.type) {
+      newZones.push({ id, x: data.x, y: data.y, w: data.w, h: data.h, label: data.label, sublabel: data.sublabel, type: data.type as ZoneType, details: data.details, rotation: data.rotation, gasType: data.gasType });
+    }
+  });
   const newTanks = tanks.map(t => saved.tanks[t.id] ? { ...t, ...saved.tanks[t.id] } : t);
   return { zones: newZones, tanks: newTanks };
 }
