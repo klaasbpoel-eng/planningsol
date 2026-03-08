@@ -1,6 +1,7 @@
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 interface FloatingActionButtonProps {
   onClick: () => void;
@@ -22,18 +23,25 @@ export function FloatingActionButton({
   };
 
   return (
-    <Button
-      onClick={onClick}
-      className={cn(
-        "fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg md:hidden",
-        "flex items-center justify-center p-0",
-        "transition-transform hover:scale-105 active:scale-95",
-        variantClasses[variant],
-        className
-      )}
-      aria-label={label}
+    <motion.div
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ type: "spring", stiffness: 260, damping: 20, delay: 0.2 }}
     >
-      <Plus className="h-6 w-6" />
-    </Button>
+      <Button
+        onClick={onClick}
+        className={cn(
+          "fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg md:hidden pb-safe",
+          "flex items-center justify-center p-0",
+          "transition-transform hover:scale-105 active:scale-95",
+          "shadow-primary/25 hover:shadow-xl",
+          variantClasses[variant],
+          className
+        )}
+        aria-label={label}
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
+    </motion.div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { X as XIcon } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -984,7 +985,7 @@ export function DailyOverview() {
             {/* === PROGRESS BAR + SUMMARY === */}
             <div className="mb-4 print:hidden space-y-2">
               <div className="flex items-center gap-3">
-                <Progress value={progressStats.percentage} className="flex-1 h-2.5" />
+                <Progress value={progressStats.percentage} className={`flex-1 h-2.5 ${progressStats.percentage > 75 ? "[&>div]:bg-green-500" : progressStats.percentage > 40 ? "[&>div]:bg-orange-500" : "[&>div]:bg-red-500"}`} />
                 <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
                   {progressStats.completed}/{progressStats.total} afgerond
                 </span>
@@ -1026,8 +1027,17 @@ export function DailyOverview() {
                   placeholder="Zoek op klant of taak..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-9 text-sm"
+                  className="pl-9 pr-8 h-9 text-sm"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Zoekopdracht wissen"
+                  >
+                    <XIcon className="h-4 w-4" />
+                  </button>
+                )}
               </div>
               <div className="flex rounded-lg border bg-muted p-0.5">
                 {(["all", "open", "completed"] as StatusFilter[]).map((f) => (
@@ -1616,7 +1626,7 @@ function Section({
       <div className="flex items-center gap-2 mb-2">
         <button
           onClick={onToggle}
-          className="flex items-center gap-2 flex-1 min-w-0 text-left min-h-[44px] md:min-h-0"
+          className="flex items-center gap-2 flex-1 min-w-0 text-left min-h-[44px] md:min-h-0 rounded-md px-1 -mx-1 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         >
           <span className={color}>{icon}</span>
           <span className="text-sm font-medium">{label}</span>

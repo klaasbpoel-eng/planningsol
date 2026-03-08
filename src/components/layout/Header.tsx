@@ -119,8 +119,8 @@ export function Header({
                   className={cn(
                     "w-full justify-start text-base h-12 gap-3",
                     isActive(item.path)
-                      ? "bg-primary/10 text-primary font-semibold"
-                      : "text-foreground"
+                      ? "bg-primary/10 text-primary font-semibold border-l-4 border-primary"
+                      : "text-foreground border-l-4 border-transparent"
                   )}
                 >
                   {item.icon}
@@ -158,11 +158,14 @@ export function Header({
           Uitloggen
         </Button>
       </div>
+      <div className="px-3 py-3 border-t text-center">
+        <span className="text-xs text-muted-foreground font-medium">SOL Planner</span>
+      </div>
     </div>
   );
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-primary-foreground shadow-md border-b border-border/50">
+    <header className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-xl shadow-sm border-b border-border/50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between overflow-x-hidden">
         {/* Left side - Logo */}
         <div className="flex items-center gap-3 shrink-0">
@@ -175,7 +178,7 @@ export function Header({
                 </h1>
                 <Badge
                   variant="outline"
-                  className={`text-xs ${ROLE_COLORS[role] || ROLE_COLORS.user}`}
+                  className={`text-xs hidden md:inline-flex ${ROLE_COLORS[role] || ROLE_COLORS.user}`}
                 >
                   {ROLE_LABELS[role] || "Gebruiker"}
                 </Badge>
@@ -186,7 +189,7 @@ export function Header({
 
 
         {/* Right side - Actions */}
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           {!isMobile && (
             <Button
               variant="outline"

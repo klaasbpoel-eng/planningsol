@@ -7,7 +7,8 @@ import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
 import { PageTransition } from "@/components/ui/page-transition";
 import { PageLayout } from "@/components/layout/PageLayout";
-import { Loader2, CalendarDays } from "lucide-react";
+import { BrandedLoader } from "@/components/ui/branded-loader";
+import { CalendarDays } from "lucide-react";
 import { DailyOverview } from "@/components/dashboard/DailyOverview";
 import type { User } from "@supabase/supabase-js";
 
@@ -42,11 +43,7 @@ const Index = () => {
   }, [searchParams]);
 
   if (loading || permissionsLoading || approvalLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <BrandedLoader />;
   }
 
   if (!user) {
