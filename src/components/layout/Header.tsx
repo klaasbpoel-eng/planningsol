@@ -158,6 +158,9 @@ export function Header({
           Uitloggen
         </Button>
       </div>
+      <div className="px-3 py-3 border-t text-center">
+        <span className="text-xs text-muted-foreground font-medium">SOL Planner</span>
+      </div>
     </div>
   );
 
