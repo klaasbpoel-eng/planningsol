@@ -493,6 +493,51 @@ export function InteractiveFloorPlan({ className }: InteractiveFloorPlanProps) {
       return;
     }
 
+    // Zone resize
+    if (resizingZoneId && resizingCorner) {
+      const svgPt = toSVG(e);
+      if (!svgPt) return;
+      const s = resizeZoneStart.current;
+      let newX = s.x, newY = s.y, newW = s.w, newH = s.h;
+      if (resizingCorner === "se") {
+        newW = Math.max(40, snap(svgPt.x - s.x));
+        newH = Math.max(20, snap(svgPt.y - s.y));
+      } else if (resizingCorner === "sw") {
+        newW = Math.max(40, snap(s.x + s.w - svgPt.x));
+        newX = snap(svgPt.x);
+        newH = Math.max(20, snap(svgPt.y - s.y));
+      } else if (resizingCorner === "ne") {
+        newW = Math.max(40, snap(svgPt.x - s.x));
+        newH = Math.max(20, snap(s.y + s.h - svgPt.y));
+        newY = snap(svgPt.y);
+      } else if (resizingCorner === "nw") {
+        newW = Math.max(40, snap(s.x + s.w - svgPt.x));
+        newX = snap(svgPt.x);
+        newH = Math.max(20, snap(s.y + s.h - svgPt.y));
+        newY = snap(svgPt.y);
+      }
+      setZones(prev => prev.map(z => z.id === resizingZoneId ? { ...z, x: newX, y: newY, w: newW, h: newH } : z));
+      setHasChanges(true);
+      return;
+    }
+
+    // Zone rotation
+    if (rotatingZoneId) {
+      const svgPt = toSVG(e);
+      if (!svgPt) return;
+      const zone = zones.find(z => z.id === rotatingZoneId);
+      if (!zone) return;
+      const cx = zone.x + zone.w / 2;
+      const cy = zone.y + zone.h / 2;
+      const angle = Math.atan2(svgPt.y - cy, svgPt.x - cx) * (180 / Math.PI);
+      const delta = angle - rotateZoneStart.current.angle;
+      // Snap to 15° increments
+      const newRot = Math.round((rotateZoneStart.current.rotation + delta) / 15) * 15;
+      setZones(prev => prev.map(z => z.id === rotatingZoneId ? { ...z, rotation: newRot } : z));
+      setHasChanges(true);
+      return;
+    }
+
     if (draggingId && dragType) {
       const svgPt = toSVG(e);
       if (!svgPt) return;
