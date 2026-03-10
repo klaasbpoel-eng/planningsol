@@ -185,6 +185,12 @@ export function CreateLeaveRequestDialog({
 
   const isSingleDay = startDate && endDate && differenceInDays(endDate, startDate) === 0;
 
+  const isTimeInvalid = dayPart === "hours" && (() => {
+    const [sh, sm] = startTime.split(":").map(Number);
+    const [eh, em] = endTime.split(":").map(Number);
+    return eh * 60 + em <= sh * 60 + sm;
+  })();
+
   const getDurationDisplay = () => {
     if (!startDate || !endDate) return null;
     if (dayPart === "morning" || dayPart === "afternoon") return "0,5 dag";
@@ -388,31 +394,69 @@ export function CreateLeaveRequestDialog({
 
               {/* Time inputs for custom hours */}
               {dayPart === "hours" && (
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Van</Label>
-                    <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-background">
-                      <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <input
-                        type="time"
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
-                        className="flex-1 bg-transparent text-sm outline-none"
-                      />
+                <div className="space-y-3 pt-1">
+                  {/* Quick presets */}
+                  <div className="flex gap-2">
+                    {[
+                      { label: "Ochtend", from: "08:00", to: "12:00" },
+                      { label: "Middag", from: "12:00", to: "17:00" },
+                      { label: "Volledig", from: "08:00", to: "17:00" },
+                    ].map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => { setStartTime(preset.from); setEndTime(preset.to); }}
+                        className={cn(
+                          "flex-1 py-1.5 rounded-md border text-xs transition-colors",
+                          startTime === preset.from && endTime === preset.to
+                            ? "bg-primary/10 border-primary text-primary font-semibold"
+                            : "border-border hover:bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {preset.label}
+                        <span className="block opacity-60">{preset.from}–{preset.to}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Van → Tot inputs */}
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Van</Label>
+                      <div className={cn(
+                        "flex items-center gap-2 border rounded-md px-3 py-2 bg-background transition-colors",
+                        isTimeInvalid && "border-destructive"
+                      )}>
+                        <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <input
+                          type="time"
+                          value={startTime}
+                          onChange={(e) => setStartTime(e.target.value)}
+                          className="flex-1 bg-transparent text-sm outline-none"
+                        />
+                      </div>
+                    </div>
+                    <span className="text-muted-foreground pb-2.5 text-lg">→</span>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Tot</Label>
+                      <div className={cn(
+                        "flex items-center gap-2 border rounded-md px-3 py-2 bg-background transition-colors",
+                        isTimeInvalid && "border-destructive"
+                      )}>
+                        <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <input
+                          type="time"
+                          value={endTime}
+                          onChange={(e) => setEndTime(e.target.value)}
+                          className="flex-1 bg-transparent text-sm outline-none"
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Tot</Label>
-                    <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-background">
-                      <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <input
-                        type="time"
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
-                        className="flex-1 bg-transparent text-sm outline-none"
-                      />
-                    </div>
-                  </div>
+
+                  {isTimeInvalid && (
+                    <p className="text-xs text-destructive">Eindtijd moet na begintijd liggen</p>
+                  )}
                 </div>
               )}
             </div>
@@ -445,7 +489,7 @@ export function CreateLeaveRequestDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={saving || !startDate || !endDate || !typeId || (isAdmin && !selectedProfileId)}
+            disabled={saving || !startDate || !endDate || !typeId || (isAdmin && !selectedProfileId) || isTimeInvalid}
           >
             <Plus className="h-4 w-4 mr-2" />
             {saving ? "Indienen..." : "Aanvraag indienen"}
