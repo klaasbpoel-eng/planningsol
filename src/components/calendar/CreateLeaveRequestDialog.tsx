@@ -30,7 +30,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type TimeOffTypeRecord = Database["public"]["Tables"]["time_off_types"]["Row"];
-type DayPart = "full" | "morning" | "afternoon" | "hours";
+type DayPart = "full_day" | "morning" | "afternoon" | "hours";
 
 interface CreateLeaveRequestDialogProps {
   open: boolean;
@@ -60,7 +60,7 @@ export function CreateLeaveRequestDialog({
   const [reason, setReason] = useState("");
   const [selectedProfileId, setSelectedProfileId] = useState(currentProfileId || "");
   const [leaveTypes, setLeaveTypes] = useState<TimeOffTypeRecord[]>([]);
-  const [dayPart, setDayPart] = useState<DayPart>("full");
+  const [dayPart, setDayPart] = useState<DayPart>("full_day");
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("17:00");
 
@@ -105,7 +105,7 @@ export function CreateLeaveRequestDialog({
   // Reset to full day when a multi-day period is selected
   useEffect(() => {
     if (startDate && endDate && differenceInDays(endDate, startDate) > 0) {
-      setDayPart("full");
+      setDayPart("full_day");
     }
   }, [startDate, endDate]);
 
@@ -115,7 +115,7 @@ export function CreateLeaveRequestDialog({
     setTypeId(leaveTypes.length > 0 ? leaveTypes[0].id : "");
     setReason("");
     setSelectedProfileId(currentProfileId || "");
-    setDayPart("full");
+    setDayPart("full_day");
     setStartTime("09:00");
     setEndTime("17:00");
   };
@@ -148,7 +148,7 @@ export function CreateLeaveRequestDialog({
       // Use profile_id and type_id for the new schema
       // Admin-created requests are automatically approved
       const dayPartValue =
-        dayPart === "full" ? null :
+        dayPart === "full_day" ? "full_day" :
         dayPart === "hours" ? `${startTime}-${endTime}` :
         dayPart;
 
@@ -188,6 +188,10 @@ export function CreateLeaveRequestDialog({
   const getDurationDisplay = () => {
     if (!startDate || !endDate) return null;
     if (dayPart === "morning" || dayPart === "afternoon") return "0,5 dag";
+    if (dayPart === "full_day" || !dayPart) {
+      const days = differenceInDays(endDate, startDate) + 1;
+      return `${days} ${days === 1 ? "dag" : "dagen"}`;
+    }
     if (dayPart === "hours") {
       const [sh, sm] = startTime.split(":").map(Number);
       const [eh, em] = endTime.split(":").map(Number);
@@ -197,8 +201,7 @@ export function CreateLeaveRequestDialog({
       const m = totalMinutes % 60;
       return m > 0 ? `${h} uur ${m} min` : `${h} uur`;
     }
-    const days = differenceInDays(endDate, startDate) + 1;
-    return `${days} ${days === 1 ? "dag" : "dagen"}`;
+    return null;
   };
 
   const durationDisplay = getDurationDisplay();
@@ -361,7 +364,7 @@ export function CreateLeaveRequestDialog({
               <div className="flex rounded-lg border overflow-hidden divide-x text-sm">
                 {(
                   [
-                    { value: "full", label: "Hele dag" },
+                    { value: "full_day", label: "Hele dag" },
                     { value: "morning", label: "Eerste helft" },
                     { value: "afternoon", label: "Laatste helft" },
                     { value: "hours", label: "Uren" },
