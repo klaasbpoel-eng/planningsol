@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays, Palmtree, Plus } from "lucide-react";
+import { CalendarDays, Clock, Palmtree, Plus } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type TimeOffTypeRecord = Database["public"]["Tables"]["time_off_types"]["Row"];
+type DayPart = "full" | "morning" | "afternoon" | "hours";
 
 interface CreateLeaveRequestDialogProps {
   open: boolean;
@@ -59,6 +60,9 @@ export function CreateLeaveRequestDialog({
   const [reason, setReason] = useState("");
   const [selectedProfileId, setSelectedProfileId] = useState(currentProfileId || "");
   const [leaveTypes, setLeaveTypes] = useState<TimeOffTypeRecord[]>([]);
+  const [dayPart, setDayPart] = useState<DayPart>("full");
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("17:00");
 
   useEffect(() => {
     if (open) {
@@ -98,12 +102,22 @@ export function CreateLeaveRequestDialog({
     }
   }, [leaveTypes, typeId]);
 
+  // Reset to full day when a multi-day period is selected
+  useEffect(() => {
+    if (startDate && endDate && differenceInDays(endDate, startDate) > 0) {
+      setDayPart("full");
+    }
+  }, [startDate, endDate]);
+
   const resetForm = () => {
     setStartDate(initialDate);
     setEndDate(initialDate);
     setTypeId(leaveTypes.length > 0 ? leaveTypes[0].id : "");
     setReason("");
     setSelectedProfileId(currentProfileId || "");
+    setDayPart("full");
+    setStartTime("09:00");
+    setEndTime("17:00");
   };
 
   const handleClose = () => {
@@ -133,6 +147,11 @@ export function CreateLeaveRequestDialog({
     try {
       // Use profile_id and type_id for the new schema
       // Admin-created requests are automatically approved
+      const dayPartValue =
+        dayPart === "full" ? null :
+        dayPart === "hours" ? `${startTime}-${endTime}` :
+        dayPart;
+
       await api.timeOffRequests.create({
         profile_id: profileId,
         type_id: typeId,
@@ -140,6 +159,7 @@ export function CreateLeaveRequestDialog({
         end_date: format(endDate, "yyyy-MM-dd"),
         reason: reason.trim() || null,
         status: isAdmin ? 'approved' : 'pending',
+        day_part: dayPartValue,
       });
 
       const employeeName = isAdmin
@@ -163,9 +183,25 @@ export function CreateLeaveRequestDialog({
     }
   };
 
-  const duration = startDate && endDate
-    ? differenceInDays(endDate, startDate) + 1
-    : 0;
+  const isSingleDay = startDate && endDate && differenceInDays(endDate, startDate) === 0;
+
+  const getDurationDisplay = () => {
+    if (!startDate || !endDate) return null;
+    if (dayPart === "morning" || dayPart === "afternoon") return "0,5 dag";
+    if (dayPart === "hours") {
+      const [sh, sm] = startTime.split(":").map(Number);
+      const [eh, em] = endTime.split(":").map(Number);
+      const totalMinutes = eh * 60 + em - (sh * 60 + sm);
+      if (totalMinutes <= 0) return null;
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      return m > 0 ? `${h} uur ${m} min` : `${h} uur`;
+    }
+    const days = differenceInDays(endDate, startDate) + 1;
+    return `${days} ${days === 1 ? "dag" : "dagen"}`;
+  };
+
+  const durationDisplay = getDurationDisplay();
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -318,13 +354,72 @@ export function CreateLeaveRequestDialog({
             </div>
           </div>
 
+          {/* Day part selector - only for single day */}
+          {isSingleDay && (
+            <div className="space-y-2">
+              <Label>Dagdeel</Label>
+              <div className="flex rounded-lg border overflow-hidden divide-x text-sm">
+                {(
+                  [
+                    { value: "full", label: "Hele dag" },
+                    { value: "morning", label: "Eerste helft" },
+                    { value: "afternoon", label: "Laatste helft" },
+                    { value: "hours", label: "Uren" },
+                  ] as { value: DayPart; label: string }[]
+                ).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setDayPart(opt.value)}
+                    className={cn(
+                      "flex-1 py-2 font-medium transition-colors",
+                      dayPart === opt.value
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Time inputs for custom hours */}
+              {dayPart === "hours" && (
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Van</Label>
+                    <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-background">
+                      <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <input
+                        type="time"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        className="flex-1 bg-transparent text-sm outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Tot</Label>
+                    <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-background">
+                      <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <input
+                        type="time"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                        className="flex-1 bg-transparent text-sm outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Duration display */}
-          {duration > 0 && (
+          {durationDisplay && (
             <div className="p-3 rounded-lg bg-muted/50 text-center">
               <span className="text-sm text-muted-foreground">Duur: </span>
-              <span className="font-semibold text-foreground">
-                {duration} {duration === 1 ? "dag" : "dagen"}
-              </span>
+              <span className="font-semibold text-foreground">{durationDisplay}</span>
             </div>
           )}
 
