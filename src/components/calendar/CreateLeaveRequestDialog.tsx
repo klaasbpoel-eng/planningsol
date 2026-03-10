@@ -149,15 +149,20 @@ export function CreateLeaveRequestDialog({
       // Admin-created requests are automatically approved
       const dayPartValue =
         dayPart === "full_day" ? "full_day" :
-        dayPart === "hours" ? `${startTime}-${endTime}` :
+        dayPart === "hours" ? null :
         dayPart;
+
+      // Prepend time range to reason when hours are specified
+      const reasonValue = dayPart === "hours"
+        ? `[${startTime}-${endTime}]${reason.trim() ? ` ${reason.trim()}` : ""}`
+        : reason.trim() || null;
 
       await api.timeOffRequests.create({
         profile_id: profileId,
         type_id: typeId,
         start_date: format(startDate, "yyyy-MM-dd"),
         end_date: format(endDate, "yyyy-MM-dd"),
-        reason: reason.trim() || null,
+        reason: reasonValue,
         status: isAdmin ? 'approved' : 'pending',
         day_part: dayPartValue,
       });
