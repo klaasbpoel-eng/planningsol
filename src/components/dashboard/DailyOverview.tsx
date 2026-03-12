@@ -67,6 +67,7 @@ import { CalendarItemDialog } from "@/components/calendar/CalendarItemDialog";
 import { CreateAmbulanceTripDialog } from "@/components/calendar/CreateAmbulanceTripDialog";
 import { CreateDryIceOrderCalendarDialog } from "@/components/calendar/CreateDryIceOrderCalendarDialog";
 import { CreateTaskDialog } from "@/components/calendar/CreateTaskDialog";
+import { CreateLeaveRequestDialog } from "@/components/calendar/CreateLeaveRequestDialog";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -201,6 +202,7 @@ export function DailyOverview() {
   const [createAmbulanceOpen, setCreateAmbulanceOpen] = useState(false);
   const [createDryIceOpen, setCreateDryIceOpen] = useState(false);
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [createLeaveOpen, setCreateLeaveOpen] = useState(false);
 
   // Auth & permissions
   const [userId, setUserId] = useState<string | undefined>(undefined);
@@ -208,6 +210,7 @@ export function DailyOverview() {
   const isMobile = useIsMobile();
   const [adminProfiles, setAdminProfiles] = useState<any[]>([]);
   const [adminTimeOffTypes, setAdminTimeOffTypes] = useState<any[]>([]);
+  const currentProfileId = useMemo(() => adminProfiles.find(p => p.user_id === userId)?.id, [adminProfiles, userId]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
@@ -1459,7 +1462,7 @@ export function DailyOverview() {
                       )}
 
                       {/* Vrij */}
-                      {dayTimeOff.length > 0 && (
+                      {(dayTimeOff.length > 0 || isAdmin) && (
                         <Section
                           icon={<Palmtree className="h-4 w-4" />}
                           label="Afwezig"
@@ -1469,7 +1472,11 @@ export function DailyOverview() {
                           bgClass="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900/30"
                           collapsed={collapsedSections["timeoff"]}
                           onToggle={() => toggleSection("timeoff")}
+                          onAdd={isAdmin ? () => setCreateLeaveOpen(true) : undefined}
                         >
+                          {dayTimeOff.length === 0 && (
+                            <p className="text-xs text-muted-foreground py-1 text-center">Niemand afwezig</p>
+                          )}
                           {dayTimeOff.map((t) => (
                             <Popover key={t.id}>
                               <PopoverTrigger asChild>
@@ -1550,6 +1557,9 @@ export function DailyOverview() {
               <DropdownMenuItem onClick={() => setCreateTaskOpen(true)}>
                 <ClipboardList className="h-4 w-4 mr-2" /> Taak
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCreateLeaveOpen(true)}>
+                <Palmtree className="h-4 w-4 mr-2" /> Verlofaanvraag
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -1614,6 +1624,17 @@ export function DailyOverview() {
         initialDate={currentDate}
         profiles={adminProfiles}
         currentUserId={userId}
+      />
+
+      <CreateLeaveRequestDialog
+        open={createLeaveOpen}
+        onOpenChange={setCreateLeaveOpen}
+        onCreate={fetchData}
+        initialDate={currentDate}
+        profiles={adminProfiles}
+        currentUserId={userId}
+        currentProfileId={currentProfileId}
+        isAdmin={isAdmin}
       />
     </div>
   );
