@@ -64,46 +64,67 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     setIsLoadingDB(true);
     setDbError(null);
     try {
-      const { data, error } = await supabase.functions.invoke("get-stock-data");
-
-      if (error) {
-        setDbError(error.message || "Kon voorraaddata niet ophalen");
+      // Stock data in main project — use apikey URL param (no CORS preflight, satisfies JWT)
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/get-stock-data?apikey=${anonKey}`);
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        setDbError(`HTTP ${response.status}${text ? `: ${text}` : ""}`);
         return;
       }
+
+      const data = await response.json();
 
       if (data?.error) {
         setDbError(data.error);
         return;
       }
 
-      const voorraadRows: { subcode: string; center: string; count: number }[] = data?.voorraad ?? [];
-      const afnameRows: { subcode: string; description: string; center: string; total_aantal: number }[] = data?.afname ?? [];
+      // Voorraad: { subcode (CD_SUBCODE), description (DS_SUBCODE), center, aantal }
+      // Afname:   { subcode (SubCode), description (SubCodeDescription), center, aantal }
+      // Join key: subcode + normalized center
+      type StockRow = { subcode: string; description: string; center: string; aantal: number };
+      const voorraadRows: StockRow[] = data?.voorraad ?? [];
+      const afnameRows: StockRow[] = data?.afname ?? [];
 
       const normalizeCenter = (center: string): "emmen" | "tilburg" =>
         center?.toLowerCase().includes("emmen") ? "emmen" : "tilburg";
 
-      const stockCount = new Map<string, number>();
+      const stockMap = new Map<string, { description: string; aantal: number }>();
       for (const row of voorraadRows) {
         const key = `${row.subcode}||${normalizeCenter(row.center)}`;
-        stockCount.set(key, Number(row.count));
+        const ex = stockMap.get(key);
+        if (ex) ex.aantal += Number(row.aantal);
+        else stockMap.set(key, { description: row.description, aantal: Number(row.aantal) });
       }
 
+      const consumptionMap = new Map<string, { description: string; aantal: number }>();
+      for (const row of afnameRows) {
+        const key = `${row.subcode}||${normalizeCenter(row.center)}`;
+        const ex = consumptionMap.get(key);
+        if (ex) ex.aantal += Number(row.aantal);
+        else consumptionMap.set(key, { description: row.description, aantal: Number(row.aantal) });
+      }
+
+      // Outer join — show all products from either table
+      const allKeys = new Set([...stockMap.keys(), ...consumptionMap.keys()]);
       const emmenItems: StockItem[] = [];
       const tilburgItems: StockItem[] = [];
-      for (const row of afnameRows) {
-        const centerNorm = normalizeCenter(row.center);
-        // Join on description: voorraad.DS_SUBCODE = afname.SubCodeDescription (both are product names)
-        const key = `${row.description}||${centerNorm}`;
-        const numberOnStock = stockCount.get(key) || 0;
-        const averageConsumption = Number(row.total_aantal) || 0;
+      for (const key of allKeys) {
+        const [subcode, center] = key.split("||");
+        const stock = stockMap.get(key);
+        const consumption = consumptionMap.get(key);
+        const numberOnStock = stock?.aantal ?? 0;
+        const averageConsumption = consumption?.aantal ?? 0;
         const item: StockItem = {
-          subCode: row.subcode,
-          description: row.description,
+          subCode: subcode,
+          description: stock?.description ?? consumption?.description ?? subcode,
           numberOnStock,
           averageConsumption,
           difference: numberOnStock - averageConsumption,
         };
-        if (centerNorm === "emmen") emmenItems.push(item);
+        if (center === "emmen") emmenItems.push(item);
         else tilburgItems.push(item);
       }
 

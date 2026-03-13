@@ -11,34 +11,34 @@ Deno.serve(async (req) => {
     return new Response('ok', { status: 200, headers: cors })
   }
 
-  const dbUrl = Deno.env.get('SUPABASE_DB_URL')
-  if (!dbUrl) {
-    return new Response(JSON.stringify({ error: 'SUPABASE_DB_URL not set' }), {
-      status: 500, headers: { ...cors, 'Content-Type': 'application/json' }
-    })
-  }
-
   try {
-    const pool = new Pool(dbUrl, 1)
+    const pool = new Pool(Deno.env.get('SUPABASE_DB_URL')!, 1)
     const client = await pool.connect()
 
-    // Debug: list all tables in all schemas to find where voorraad lives
-    const tables = await client.queryObject(`
-      SELECT table_schema, table_name
-      FROM information_schema.tables
-      WHERE table_type = 'BASE TABLE'
-      ORDER BY table_schema, table_name
-    `)
+    const [voorraad, afname] = await Promise.all([
+      client.queryObject(`
+        SELECT "CD_SUBCODE" as subcode, "DS_SUBCODE" as description,
+               "DS_CENTER_DESCRIPTION" as center, SUM("Aantal")::float as aantal
+        FROM public."Voorraad"
+        GROUP BY "CD_SUBCODE", "DS_SUBCODE", "DS_CENTER_DESCRIPTION"
+      `),
+      client.queryObject(`
+        SELECT "SubCode" as subcode, "SubCodeDescription" as description,
+               "CenterDescription" as center, SUM("Aantal")::float as aantal
+        FROM public."Afname"
+        GROUP BY "SubCode", "SubCodeDescription", "CenterDescription"
+      `)
+    ])
 
     client.release()
     await pool.end()
 
-    return new Response(JSON.stringify({ debug_tables: tables.rows }), {
+    return new Response(JSON.stringify({ voorraad: voorraad.rows, afname: afname.rows }), {
       headers: { ...cors, 'Content-Type': 'application/json' }
     })
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    return new Response(JSON.stringify({ error: message }), {
+    const msg = e instanceof Error ? e.message : String(e)
+    return new Response(JSON.stringify({ error: msg }), {
       status: 500, headers: { ...cors, 'Content-Type': 'application/json' }
     })
   }
