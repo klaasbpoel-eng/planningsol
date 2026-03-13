@@ -6,27 +6,33 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
 
+// Initialize the pool at the cold-start edge scope, not on every request!
+const pool = new Pool(Deno.env.get('SUPABASE_DB_URL')!, 2) // Pool size 2 since we will fetch 2 queries in parallel
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { status: 200, headers: cors })
   }
 
   try {
-    const pool = new Pool(Deno.env.get('SUPABASE_DB_URL')!, 1)
     const client = await pool.connect()
 
-    const voorraad = await client.queryObject(`
-      SELECT "DS_SUBCODE" as subcode, "DS_CENTER_DESCRIPTION" as center, COUNT(*)::int as count
-      FROM voorraad GROUP BY "DS_SUBCODE", "DS_CENTER_DESCRIPTION"
-    `)
-    const afname = await client.queryObject(`
-      SELECT "SubCode" as subcode, "SubCodeDescription" as description,
-             "CenterDescription" as center, SUM("Aantal")::float as total_aantal
-      FROM afname GROUP BY "SubCode", "SubCodeDescription", "CenterDescription"
-    `)
+    // Run both large table aggregations perfectly in parallel
+    const [voorraad, afname] = await Promise.all([
+      client.queryObject(`
+        SELECT "DS_SUBCODE" as subcode, "DS_CENTER_DESCRIPTION" as center, COUNT(*)::int as count
+        FROM voorraad GROUP BY "DS_SUBCODE", "DS_CENTER_DESCRIPTION"
+      `),
+      client.queryObject(`
+        SELECT "SubCode" as subcode, "SubCodeDescription" as description,
+               "CenterDescription" as center, SUM("Aantal")::float as total_aantal
+        FROM afname GROUP BY "SubCode", "SubCodeDescription", "CenterDescription"
+      `)
+    ])
 
     client.release()
-    await pool.end()
+    // Intentionally omitting await pool.end() so the connection stays open globally for the next invocation!
+
 
     return new Response(JSON.stringify({ voorraad: voorraad.rows, afname: afname.rows }), {
       headers: { ...cors, 'Content-Type': 'application/json' }
