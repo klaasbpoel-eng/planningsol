@@ -443,7 +443,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
       <StockPrintView
         ref={printRef}
         stockData={stockData}
-        locationLabel={importLocationLabel}
+        locationLabel={selectedLocation === "sol_tilburg" ? "SOL Tilburg" : selectedLocation === "sol_emmen" ? "SOL Emmen" : "Alle locaties"}
       />
     </div>
     </>
