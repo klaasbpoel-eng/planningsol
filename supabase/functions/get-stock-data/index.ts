@@ -6,15 +6,20 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
 
-// Initialize the pool at the cold-start edge scope, not on every request!
-const pool = new Pool(Deno.env.get('SUPABASE_DB_URL')!, 2) // Pool size 2 since we will fetch 2 queries in parallel
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { status: 200, headers: cors })
   }
 
+  const dbUrl = Deno.env.get('SUPABASE_DB_URL')
+  if (!dbUrl) {
+    return new Response(JSON.stringify({ error: 'SUPABASE_DB_URL not set' }), {
+      status: 500, headers: { ...cors, 'Content-Type': 'application/json' }
+    })
+  }
+
   try {
+    const pool = new Pool(dbUrl, 1)
     const client = await pool.connect()
 
     // Debug: list all tables in all schemas to find where voorraad lives
@@ -26,6 +31,7 @@ Deno.serve(async (req) => {
     `)
 
     client.release()
+    await pool.end()
 
     return new Response(JSON.stringify({ debug_tables: tables.rows }), {
       headers: { ...cors, 'Content-Type': 'application/json' }
