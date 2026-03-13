@@ -93,7 +93,8 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
       const tilburgItems: StockItem[] = [];
       for (const row of afnameRows) {
         const centerNorm = normalizeCenter(row.center);
-        const key = `${row.subcode}||${centerNorm}`;
+        // Join on description: voorraad.DS_SUBCODE = afname.SubCodeDescription (both are product names)
+        const key = `${row.description}||${centerNorm}`;
         const numberOnStock = stockCount.get(key) || 0;
         const averageConsumption = Number(row.total_aantal) || 0;
         const item: StockItem = {
