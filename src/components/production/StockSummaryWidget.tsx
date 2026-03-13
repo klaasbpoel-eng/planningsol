@@ -64,29 +64,39 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     setIsLoadingDB(true);
     setDbError(null);
     try {
-      // Stock data in main project — use apikey URL param (no CORS preflight, satisfies JWT)
-      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(`${supabaseUrl}/functions/v1/get-stock-data?apikey=${anonKey}`);
-      if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        setDbError(`HTTP ${response.status}${text ? `: ${text}` : ""}`);
+      // Stock data lives in separate Supabase project — query PostgREST directly with apikey param
+      const stockUrl = import.meta.env.VITE_STOCK_SUPABASE_URL;
+      const stockKey = import.meta.env.VITE_STOCK_SUPABASE_KEY;
+      const base = `${stockUrl}/rest/v1`;
+
+      const [voorraadRes, afnameRes] = await Promise.all([
+        fetch(`${base}/Voorraad?select=CD_SUBCODE,DS_SUBCODE,DS_CENTER_DESCRIPTION,Aantal&apikey=${stockKey}`),
+        fetch(`${base}/Afname?select=SubCode,SubCodeDescription,CenterDescription,Aantal&apikey=${stockKey}`),
+      ]);
+
+      if (!voorraadRes.ok || !afnameRes.ok) {
+        const errRes = !voorraadRes.ok ? voorraadRes : afnameRes;
+        const text = await errRes.text().catch(() => "");
+        setDbError(`HTTP ${errRes.status}${text ? `: ${text}` : ""}`);
         return;
       }
 
-      const data = await response.json();
+      const [voorraadRaw, afnameRaw] = await Promise.all([voorraadRes.json(), afnameRes.json()]);
 
-      if (data?.error) {
-        setDbError(data.error);
-        return;
-      }
-
-      // Voorraad: { subcode (CD_SUBCODE), description (DS_SUBCODE), center, aantal }
-      // Afname:   { subcode (SubCode), description (SubCodeDescription), center, aantal }
-      // Join key: subcode + normalized center
+      // Normalize to common shape
       type StockRow = { subcode: string; description: string; center: string; aantal: number };
-      const voorraadRows: StockRow[] = data?.voorraad ?? [];
-      const afnameRows: StockRow[] = data?.afname ?? [];
+      const voorraadRows: StockRow[] = (voorraadRaw as Record<string, unknown>[]).map((r) => ({
+        subcode: String(r["CD_SUBCODE"] ?? ""),
+        description: String(r["DS_SUBCODE"] ?? ""),
+        center: String(r["DS_CENTER_DESCRIPTION"] ?? ""),
+        aantal: Number(r["Aantal"] ?? 0),
+      }));
+      const afnameRows: StockRow[] = (afnameRaw as Record<string, unknown>[]).map((r) => ({
+        subcode: String(r["SubCode"] ?? ""),
+        description: String(r["SubCodeDescription"] ?? ""),
+        center: String(r["CenterDescription"] ?? ""),
+        aantal: Number(r["Aantal"] ?? 0),
+      }));
 
       const normalizeCenter = (center: string): "emmen" | "tilburg" =>
         center?.toLowerCase().includes("emmen") ? "emmen" : "tilburg";
