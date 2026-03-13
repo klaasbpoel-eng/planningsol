@@ -131,6 +131,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
       setStockByLocation({ sol_emmen: emmenItems, sol_tilburg: tilburgItems });
     } catch (err) {
       console.error("Error fetching stock from DB:", err);
+      setDbError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoadingDB(false);
     }
