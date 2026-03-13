@@ -161,7 +161,7 @@ export function StockFillingLocationManager({ open, onOpenChange }: StockFilling
           </div>
         ) : products.length === 0 ? (
           <div className="text-center py-12 text-sm text-muted-foreground">
-            Geen producten gevonden. Importeer eerst een Excel bestand via de voorraadwidget.
+            Geen producten gevonden. Laad de voorraadpagina opnieuw om producten te synchroniseren.
           </div>
         ) : (
           <ScrollArea className="flex-1 border rounded-lg">

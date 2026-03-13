@@ -4,11 +4,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Upload, Maximize2, Minimize2, Printer, MapPin, FileSpreadsheet } from "lucide-react";
+import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Maximize2, Minimize2, Printer, MapPin } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
 import { getStockStatus, type StockStatus } from "./StockStatusBadge";
-import { StockExcelImportDialog, type StockItem } from "./StockExcelImportDialog";
-import { SOLInventoryImportDialog } from "./SOLInventoryImportDialog";
+import { type StockItem } from "./StockExcelImportDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { StockPrintView } from "./StockPrintView";
@@ -44,8 +43,6 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
   });
   const [isLoadingDB, setIsLoadingDB] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [solImportDialogOpen, setSolImportDialogOpen] = useState(false);
   const [locationManagerOpen, setLocationManagerOpen] = useState(false);
   const [fullscreenStatus, setFullscreenStatus] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | undefined>();
@@ -139,6 +136,20 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
       }
 
       setStockByLocation({ sol_emmen: emmenItems, sol_tilburg: tilburgItems });
+
+      // Sync unique products into stock_products for Vullocatie Beheer (insert only, preserve existing filled_in_emmen)
+      const uniqueMap = new Map<string, StockItem>();
+      for (const item of [...emmenItems, ...tilburgItems]) {
+        if (!uniqueMap.has(item.subCode)) uniqueMap.set(item.subCode, item);
+      }
+      const toInsert = Array.from(uniqueMap.values()).map((item) => ({
+        sub_code: item.subCode,
+        description: item.description,
+        filled_in_emmen: true,
+      }));
+      if (toInsert.length > 0) {
+        await supabase.from("stock_products").upsert(toInsert, { onConflict: "sub_code", ignoreDuplicates: true });
+      }
     } catch (err) {
       console.error("Error fetching stock from DB:", err);
       setDbError(err instanceof Error ? err.message : String(err));
@@ -175,58 +186,6 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     }
     return stockByLocation[selectedLocation] || [];
   }, [stockByLocation, selectedLocation]);
-
-  const handleImported = async (data: StockItem[]) => {
-    const targetLocation = selectedLocation === "all" ? "sol_emmen" : selectedLocation;
-
-    // Sync with stock_products table: look up filled_in_emmen and upsert new products
-    try {
-      const subCodes = data.map((d) => d.subCode);
-      const { data: existing } = await supabase
-        .from("stock_products")
-        .select("sub_code, filled_in_emmen")
-        .in("sub_code", subCodes);
-
-      const existingMap = new Map<string, boolean>(
-        (existing || []).map((e) => [e.sub_code, e.filled_in_emmen])
-      );
-
-      // Find new products to insert
-      const newProducts = data
-        .filter((d) => !existingMap.has(d.subCode))
-        .map((d) => ({
-          sub_code: d.subCode,
-          description: d.description,
-          filled_in_emmen: d.filledInEmmen ?? true,
-        }));
-
-      if (newProducts.length > 0) {
-        await supabase.from("stock_products").upsert(newProducts, { onConflict: "sub_code" });
-      }
-
-      // Override filledInEmmen from database for known products
-      const enrichedData = data.map((d) => ({
-        ...d,
-        filledInEmmen: existingMap.has(d.subCode) ? existingMap.get(d.subCode)! : (d.filledInEmmen ?? true),
-      }));
-
-      setStockByLocation((prev) => ({
-        ...prev,
-        [targetLocation]: enrichedData,
-      }));
-    } catch (err) {
-      console.error("Error syncing stock_products:", err);
-      // Fallback: use data as-is
-      setStockByLocation((prev) => ({
-        ...prev,
-        [targetLocation]: data,
-      }));
-    }
-  };
-
-  const importLocationLabel = selectedLocation === "sol_tilburg" ? "SOL Tilburg" 
-    : selectedLocation === "sol_emmen" ? "SOL Emmen" 
-    : "SOL Emmen";
 
   const handlePrint = useCallback(() => {
     window.print();
@@ -360,45 +319,10 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
                 <MapPin className="h-3.5 w-3.5" />
               </Button>
             )}
-            {isAdmin && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => setImportDialogOpen(true)}
-                title={`Excel importeren voor ${importLocationLabel}`}
-              >
-                <Upload className="h-3.5 w-3.5" />
-              </Button>
-            )}
-            {isAdmin && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => setSolImportDialogOpen(true)}
-                title={`SOL inventaris importeren voor ${importLocationLabel}`}
-              >
-                <FileSpreadsheet className="h-3.5 w-3.5" />
-              </Button>
-            )}
           </span>
         </CardDescription>
       </CardHeader>
 
-      <StockExcelImportDialog
-        open={importDialogOpen}
-        onOpenChange={setImportDialogOpen}
-        onImported={handleImported}
-        locationLabel={importLocationLabel}
-      />
-      <SOLInventoryImportDialog
-        open={solImportDialogOpen}
-        onOpenChange={setSolImportDialogOpen}
-        onImported={handleImported}
-        locationLabel={importLocationLabel}
-        targetLocation={selectedLocation === "all" ? "sol_emmen" : selectedLocation}
-      />
       <StockFillingLocationManager
         open={locationManagerOpen}
         onOpenChange={setLocationManagerOpen}
