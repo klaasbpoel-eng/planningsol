@@ -24,24 +24,6 @@ interface StockSummaryWidgetProps {
   selectedLocation?: ProductionLocation;
 }
 
-// Default mock data for Emmen
-const defaultEmmenStock: StockItem[] = [
-  { subCode: "250049", description: "Lucht Inhalatie (tech) (50L)", averageConsumption: 11, numberOnStock: 3, difference: -8, filledInEmmen: true },
-  { subCode: "201112", description: "Zuurstof Medicinaal Gasv. SOL act. geint. 300bar (1L)", averageConsumption: 5, numberOnStock: 1, difference: -4, filledInEmmen: true },
-  { subCode: "201107", description: "Zuurstof Medicinaal Gasv. SOL P.I. (1L)", averageConsumption: 5, numberOnStock: 3, difference: -2, filledInEmmen: true },
-  { subCode: "205408", description: "Kooldioxide E.P. Alu P.I. (5L)", averageConsumption: 2, numberOnStock: 1, difference: -1, filledInEmmen: false },
-  { subCode: "210050", description: "Lucht (10L)", averageConsumption: 2, numberOnStock: 1, difference: -1, filledInEmmen: false },
-  { subCode: "250045", description: "Lucht Synth. Medicinaal Gasv. SOL (50L)", averageConsumption: 3, numberOnStock: 2, difference: -1, filledInEmmen: true },
-  { subCode: "202507", description: "Distikstofoxide Medicinaal SOL P.I. (2L)", averageConsumption: 2, numberOnStock: 2, difference: 0, filledInEmmen: true },
-  { subCode: "205407", description: "Kooldioxide E.P. P.I. (5L)", averageConsumption: 3, numberOnStock: 3, difference: 0, filledInEmmen: false },
-  { subCode: "270382", description: "Pakket AliSOL Stikstof (16x50L)", averageConsumption: 1, numberOnStock: 1, difference: 0, filledInEmmen: true },
-  { subCode: "270840", description: "Pakket Helium 5.0 (16x50L)", averageConsumption: 1, numberOnStock: 1, difference: 0, filledInEmmen: false },
-  { subCode: "250700", description: "Acetyleen (50L)", averageConsumption: 2, numberOnStock: 3, difference: 1, filledInEmmen: true },
-  { subCode: "250288", description: "12% O2 in N2 (50L)", averageConsumption: 3, numberOnStock: 5, difference: 2, filledInEmmen: true },
-  { subCode: "250370", description: "Argon 5.0 300bar (50L)", averageConsumption: 7, numberOnStock: 10, difference: 3, filledInEmmen: true },
-  { subCode: "250383", description: "AliSOL 028 (50L)", averageConsumption: 8, numberOnStock: 13, difference: 5, filledInEmmen: true },
-  { subCode: "250350", description: "Argon 5.0 (50L)", averageConsumption: 1, numberOnStock: 17, difference: 16, filledInEmmen: true },
-];
 
 interface StatusConfig {
   status: StockStatus;
@@ -56,11 +38,11 @@ interface StatusConfig {
 
 export function StockSummaryWidget({ refreshKey, isRefreshing, className, selectedLocation = "all" }: StockSummaryWidgetProps) {
   const printRef = useRef<HTMLDivElement>(null);
-  // Store stock data per location
   const [stockByLocation, setStockByLocation] = useState<Record<string, StockItem[]>>({
-    sol_emmen: defaultEmmenStock,
+    sol_emmen: [],
     sol_tilburg: [],
   });
+  const [isLoadingDB, setIsLoadingDB] = useState(true);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [solImportDialogOpen, setSolImportDialogOpen] = useState(false);
   const [locationManagerOpen, setLocationManagerOpen] = useState(false);
@@ -75,6 +57,89 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     };
     getUser();
   }, []);
+
+  // Fetch stock data from voorraad + afname tables
+  const fetchStockFromDB = useCallback(async () => {
+    setIsLoadingDB(true);
+    try {
+      // Fetch voorraad in pages (can be large)
+      let voorraadRows: { DS_SUBCODE: string; DS_CENTER_DESCRIPTION: string }[] = [];
+      const PAGE = 1000;
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("voorraad")
+          .select("DS_SUBCODE, DS_CENTER_DESCRIPTION")
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        voorraadRows = [...voorraadRows, ...data];
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+
+      // Fetch afname (smaller table)
+      const { data: afnameRows, error: afErr } = await supabase
+        .from("afname")
+        .select("SubCode, SubCodeDescription, Aantal, CenterDescription");
+      if (afErr) throw afErr;
+
+      // Count voorraad rows per description + center
+      const stockCount = new Map<string, number>();
+      for (const row of voorraadRows) {
+        const key = `${row.DS_SUBCODE}||${row.DS_CENTER_DESCRIPTION}`;
+        stockCount.set(key, (stockCount.get(key) || 0) + 1);
+      }
+
+      // Sum afname Aantal per SubCodeDescription + center
+      const afnameSum = new Map<string, { subCode: string; description: string; center: string; total: number }>();
+      for (const row of afnameRows || []) {
+        const key = `${row.SubCodeDescription}||${row.CenterDescription}`;
+        const existing = afnameSum.get(key);
+        if (existing) {
+          existing.total += row.Aantal || 0;
+        } else {
+          afnameSum.set(key, {
+            subCode: row.SubCode,
+            description: row.SubCodeDescription,
+            center: row.CenterDescription,
+            total: row.Aantal || 0,
+          });
+        }
+      }
+
+      // Build StockItems by joining on description + center
+      const emmenItems: StockItem[] = [];
+      const tilburgItems: StockItem[] = [];
+      for (const [, afname] of afnameSum) {
+        const stockKey = `${afname.description}||${afname.center}`;
+        const numberOnStock = stockCount.get(stockKey) || 0;
+        const averageConsumption = afname.total;
+        const item: StockItem = {
+          subCode: afname.subCode,
+          description: afname.description,
+          numberOnStock,
+          averageConsumption,
+          difference: numberOnStock - averageConsumption,
+        };
+        if (afname.center?.includes("Emmen")) {
+          emmenItems.push(item);
+        } else {
+          tilburgItems.push(item);
+        }
+      }
+
+      setStockByLocation({ sol_emmen: emmenItems, sol_tilburg: tilburgItems });
+    } catch (err) {
+      console.error("Error fetching stock from DB:", err);
+    } finally {
+      setIsLoadingDB(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStockFromDB();
+  }, [fetchStockFromDB, refreshKey]);
 
   // Determine which stock data to display based on selected location
   const stockData = useMemo(() => {
@@ -332,7 +397,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
         <div className={cn("text-2xl font-bold mb-2", overallColor)}>{overallLabel}</div>
         {stockData.length === 0 ? (
           <div className="text-xs text-muted-foreground text-center py-2">
-            Importeer een Excel bestand om voorraaddata te zien
+            {isLoadingDB ? "Voorraaddata laden..." : "Geen voorraaddata beschikbaar"}
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-1">
