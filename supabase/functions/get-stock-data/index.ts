@@ -21,12 +21,12 @@ Deno.serve(async (req) => {
     const [voorraad, afname] = await Promise.all([
       client.queryObject(`
         SELECT "DS_SUBCODE" as subcode, "DS_CENTER_DESCRIPTION" as center, COUNT(*)::int as count
-        FROM voorraad GROUP BY "DS_SUBCODE", "DS_CENTER_DESCRIPTION"
+        FROM public.voorraad GROUP BY "DS_SUBCODE", "DS_CENTER_DESCRIPTION"
       `),
       client.queryObject(`
         SELECT "SubCode" as subcode, "SubCodeDescription" as description,
                "CenterDescription" as center, SUM("Aantal")::float as total_aantal
-        FROM afname GROUP BY "SubCode", "SubCodeDescription", "CenterDescription"
+        FROM public.afname GROUP BY "SubCode", "SubCodeDescription", "CenterDescription"
       `)
     ])
 
