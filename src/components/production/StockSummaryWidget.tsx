@@ -64,10 +64,8 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     setIsLoadingDB(true);
     setDbError(null);
     try {
-      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      // Plain GET with apikey as URL param — no CORS preflight triggered, satisfies JWT verification
-      const response = await fetch(`${supabaseUrl}/functions/v1/get-stock-data?apikey=${anonKey}`);
+      // Stock data lives in the SOL data project (JWT disabled, no auth needed)
+      const response = await fetch("https://sbngjpnvxwwlchenyhhy.supabase.co/functions/v1/get-stock-data");
       if (!response.ok) {
         const text = await response.text().catch(() => "");
         setDbError(`HTTP ${response.status}${text ? `: ${text}` : ""}`);
