@@ -64,15 +64,13 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     setIsLoadingDB(true);
     setDbError(null);
     try {
-      // Use Edge Function to bypass PostgREST schema cache
-      const { data, error } = await supabase.functions.invoke("get-stock-data");
-      if (error) {
-        setDbError(`Edge function error: ${error.message}`);
-        return;
-      }
-      const voorraadRows: { subcode: string; center: string; count: number }[] = data?.voorraad || [];
-      const afnameRows: { subcode: string; description: string; center: string; total_aantal: number }[] = data?.afname || [];
-      if (data?.error) setDbError(data.error);
+      // Use RPC functions (server-side GROUP BY, no pagination needed)
+      const [{ data: voorraadRows, error: vErr }, { data: afnameRows, error: afErr }] = await Promise.all([
+        (supabase as any).rpc("get_voorraad_summary"),
+        (supabase as any).rpc("get_afname_summary"),
+      ]);
+      if (vErr) setDbError(`voorraad: ${vErr.message || vErr.code}`);
+      if (afErr) setDbError((prev) => prev ? `${prev} | afname: ${afErr.message || afErr.code}` : `afname: ${afErr.message || afErr.code}`);
 
       // Normalize center name to "emmen" or "tilburg" for robust matching
       const normalizeCenter = (center: string): "emmen" | "tilburg" =>
