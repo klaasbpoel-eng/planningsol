@@ -137,18 +137,31 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
 
       setStockByLocation({ sol_emmen: emmenItems, sol_tilburg: tilburgItems });
 
-      // Sync unique products into stock_products for Vullocatie Beheer (insert only, preserve existing filled_in_emmen)
-      const uniqueMap = new Map<string, StockItem>();
+      // Sync unique products into stock_products for Vullocatie Beheer
+      // Default filled_in_emmen: true if product exists in Emmen stock, false if only in Tilburg
+      const emmenSubCodes = new Set(emmenItems.map((item) => item.subCode));
+      const uniqueMap = new Map<string, { sub_code: string; description: string; filled_in_emmen: boolean }>();
       for (const item of [...emmenItems, ...tilburgItems]) {
-        if (!uniqueMap.has(item.subCode)) uniqueMap.set(item.subCode, item);
+        if (!uniqueMap.has(item.subCode)) {
+          uniqueMap.set(item.subCode, {
+            sub_code: item.subCode,
+            description: item.description,
+            filled_in_emmen: emmenSubCodes.has(item.subCode),
+          });
+        }
       }
-      const toInsert = Array.from(uniqueMap.values()).map((item) => ({
-        sub_code: item.subCode,
-        description: item.description,
-        filled_in_emmen: true,
-      }));
-      if (toInsert.length > 0) {
-        await supabase.from("stock_products").upsert(toInsert, { onConflict: "sub_code", ignoreDuplicates: true });
+      if (uniqueMap.size > 0) {
+        // Only insert new products; existing records (with manual overrides) are left untouched
+        const subCodes = Array.from(uniqueMap.keys());
+        const { data: existing } = await supabase
+          .from("stock_products")
+          .select("sub_code")
+          .in("sub_code", subCodes);
+        const existingSet = new Set((existing ?? []).map((r) => r.sub_code));
+        const newProducts = Array.from(uniqueMap.values()).filter((p) => !existingSet.has(p.sub_code));
+        if (newProducts.length > 0) {
+          await supabase.from("stock_products").insert(newProducts);
+        }
       }
     } catch (err) {
       console.error("Error fetching stock from DB:", err);
