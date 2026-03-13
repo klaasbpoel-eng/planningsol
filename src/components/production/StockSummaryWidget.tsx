@@ -64,14 +64,13 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     setIsLoadingDB(true);
     setDbError(null);
     try {
-      // Stock data lives in the SOL data project (JWT disabled, no auth needed)
-      const response = await fetch("https://sbngjpnvxwwlchenyhhy.supabase.co/functions/v1/get-stock-data");
-      if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        setDbError(`HTTP ${response.status}${text ? `: ${text}` : ""}`);
+      const { data, error } = await supabase.functions.invoke("get-stock-data");
+
+      if (error) {
+        setDbError(error.message || "Kon voorraaddata niet ophalen");
         return;
       }
-      const data = await response.json();
+
       if (data?.error) {
         setDbError(data.error);
         return;
