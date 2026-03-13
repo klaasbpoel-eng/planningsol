@@ -61,34 +61,27 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     setIsLoadingDB(true);
     setDbError(null);
     try {
-      // Stock data lives in separate Supabase project — query PostgREST directly with apikey param
-      const stockUrl = import.meta.env.VITE_STOCK_SUPABASE_URL;
-      const stockKey = import.meta.env.VITE_STOCK_SUPABASE_KEY;
-      const base = `${stockUrl}/rest/v1`;
-
-      const [voorraadRes, afnameRes] = await Promise.all([
-        fetch(`${base}/Voorraad?select=CD_SUBCODE,DS_SUBCODE,DS_CENTER_DESCRIPTION,Aantal&apikey=${stockKey}`),
-        fetch(`${base}/Afname?select=SubCode,SubCodeDescription,CenterDescription,Aantal&apikey=${stockKey}`),
+      // Query Voorraad and Afname via supabase client (same project as stock_products)
+      const [{ data: voorraadRaw, error: vErr }, { data: afnameRaw, error: aErr }] = await Promise.all([
+        supabase.from("Voorraad" as never).select("CD_SUBCODE,DS_SUBCODE,DS_CENTER_DESCRIPTION,Aantal"),
+        supabase.from("Afname" as never).select("SubCode,SubCodeDescription,CenterDescription,Aantal"),
       ]);
 
-      if (!voorraadRes.ok || !afnameRes.ok) {
-        const errRes = !voorraadRes.ok ? voorraadRes : afnameRes;
-        const text = await errRes.text().catch(() => "");
-        setDbError(`HTTP ${errRes.status}${text ? `: ${text}` : ""}`);
+      if (vErr || aErr) {
+        setDbError((vErr ?? aErr)!.message);
         return;
       }
 
-      const [voorraadRaw, afnameRaw] = await Promise.all([voorraadRes.json(), afnameRes.json()]);
-
       // Normalize to common shape
       type StockRow = { subcode: string; description: string; center: string; aantal: number };
-      const voorraadRows: StockRow[] = (voorraadRaw as Record<string, unknown>[]).map((r) => ({
+      type VRow = Record<string, unknown>;
+      const voorraadRows: StockRow[] = ((voorraadRaw as VRow[]) ?? []).map((r) => ({
         subcode: String(r["CD_SUBCODE"] ?? ""),
         description: String(r["DS_SUBCODE"] ?? ""),
         center: String(r["DS_CENTER_DESCRIPTION"] ?? ""),
         aantal: Number(r["Aantal"] ?? 0),
       }));
-      const afnameRows: StockRow[] = (afnameRaw as Record<string, unknown>[]).map((r) => ({
+      const afnameRows: StockRow[] = ((afnameRaw as VRow[]) ?? []).map((r) => ({
         subcode: String(r["SubCode"] ?? ""),
         description: String(r["SubCodeDescription"] ?? ""),
         center: String(r["CenterDescription"] ?? ""),
