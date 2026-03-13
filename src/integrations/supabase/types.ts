@@ -74,6 +74,33 @@ export type Database = {
         }
         Relationships: []
       }
+      afname: {
+        Row: {
+          Aantal: number
+          CenterDescription: string
+          created_at: string
+          id: string
+          SubCode: string
+          SubCodeDescription: string
+        }
+        Insert: {
+          Aantal?: number
+          CenterDescription: string
+          created_at?: string
+          id?: string
+          SubCode: string
+          SubCodeDescription: string
+        }
+        Update: {
+          Aantal?: number
+          CenterDescription?: string
+          created_at?: string
+          id?: string
+          SubCode?: string
+          SubCodeDescription?: string
+        }
+        Relationships: []
+      }
       ambulance_trip_customers: {
         Row: {
           created_at: string
@@ -1920,6 +1947,27 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      voorraad: {
+        Row: {
+          created_at: string
+          DS_CENTER_DESCRIPTION: string
+          DS_SUBCODE: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          DS_CENTER_DESCRIPTION: string
+          DS_SUBCODE: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          DS_CENTER_DESCRIPTION?: string
+          DS_SUBCODE?: string
+          id?: string
         }
         Relationships: []
       }
