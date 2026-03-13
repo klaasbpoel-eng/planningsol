@@ -64,77 +64,42 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     setIsLoadingDB(true);
     setDbError(null);
     try {
-      // Fetch voorraad in pages (can be large)
-      let voorraadRows: { DS_SUBCODE: string; DS_CENTER_DESCRIPTION: string }[] = [];
-      const PAGE = 1000;
-      let from = 0;
-      while (true) {
-        const { data, error } = await (supabase as any)
-          .from("voorraad")
-          .select("DS_SUBCODE, DS_CENTER_DESCRIPTION")
-          .range(from, from + PAGE - 1);
-        if (error) {
-          setDbError(`voorraad: ${error.message || error.code || JSON.stringify(error)}`);
-          break;
-        }
-        if (!data || data.length === 0) break;
-        voorraadRows = [...voorraadRows, ...data];
-        if (data.length < PAGE) break;
-        from += PAGE;
-      }
+      // Use RPC functions to bypass PostgREST schema cache issues
+      const [{ data: voorraadRows, error: vErr }, { data: afnameRows, error: afErr }] = await Promise.all([
+        (supabase as any).rpc("get_voorraad_summary"),
+        (supabase as any).rpc("get_afname_summary"),
+      ]);
 
-      // Fetch afname (smaller table)
-      const { data: afnameRows, error: afErr } = await (supabase as any)
-        .from("afname")
-        .select("SubCode, SubCodeDescription, Aantal, CenterDescription");
-      if (afErr) {
-        setDbError((prev) => prev ? `${prev} | afname: ${afErr.message || afErr.code}` : `afname: ${afErr.message || afErr.code}`);
-      }
+      if (vErr) setDbError(`voorraad: ${vErr.message || vErr.code}`);
+      if (afErr) setDbError((prev) => prev ? `${prev} | afname: ${afErr.message || afErr.code}` : `afname: ${afErr.message || afErr.code}`);
 
       // Normalize center name to "emmen" or "tilburg" for robust matching
       const normalizeCenter = (center: string): "emmen" | "tilburg" =>
         center?.toLowerCase().includes("emmen") ? "emmen" : "tilburg";
 
-      // Count voorraad rows per DS_SUBCODE + normalized center
+      // Build stockCount map from voorraad summary (already aggregated by DB)
       const stockCount = new Map<string, number>();
-      for (const row of voorraadRows) {
-        const key = `${row.DS_SUBCODE}||${normalizeCenter(row.DS_CENTER_DESCRIPTION)}`;
-        stockCount.set(key, (stockCount.get(key) || 0) + 1);
+      for (const row of (voorraadRows || [])) {
+        const key = `${row.subcode}||${normalizeCenter(row.center)}`;
+        stockCount.set(key, Number(row.count));
       }
 
-      // Sum afname Aantal per SubCode + normalized center (join key: SubCode ↔ DS_SUBCODE)
-      const afnameSum = new Map<string, { subCode: string; description: string; center: string; centerNorm: string; total: number }>();
-      for (const row of (afnameRows || [])) {
-        const centerNorm = normalizeCenter(row.CenterDescription);
-        const key = `${row.SubCode}||${centerNorm}`;
-        const existing = afnameSum.get(key);
-        if (existing) {
-          existing.total += row.Aantal || 0;
-        } else {
-          afnameSum.set(key, {
-            subCode: row.SubCode,
-            description: row.SubCodeDescription,
-            center: row.CenterDescription,
-            centerNorm,
-            total: row.Aantal || 0,
-          });
-        }
-      }
-
-      // Build StockItems by joining on SubCode + normalized center
+      // Build StockItems from afname summary
       const emmenItems: StockItem[] = [];
       const tilburgItems: StockItem[] = [];
-      for (const [key, afname] of afnameSum) {
+      for (const row of (afnameRows || [])) {
+        const centerNorm = normalizeCenter(row.center);
+        const key = `${row.subcode}||${centerNorm}`;
         const numberOnStock = stockCount.get(key) || 0;
-        const averageConsumption = afname.total;
+        const averageConsumption = Number(row.total_aantal) || 0;
         const item: StockItem = {
-          subCode: afname.subCode,
-          description: afname.description,
+          subCode: row.subcode,
+          description: row.description,
           numberOnStock,
           averageConsumption,
           difference: numberOnStock - averageConsumption,
         };
-        if (afname.centerNorm === "emmen") {
+        if (centerNorm === "emmen") {
           emmenItems.push(item);
         } else {
           tilburgItems.push(item);
