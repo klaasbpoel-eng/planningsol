@@ -17,24 +17,17 @@ Deno.serve(async (req) => {
   try {
     const client = await pool.connect()
 
-    // Run both large table aggregations perfectly in parallel
-    const [voorraad, afname] = await Promise.all([
-      client.queryObject(`
-        SELECT "DS_SUBCODE" as subcode, "DS_CENTER_DESCRIPTION" as center, COUNT(*)::int as count
-        FROM public.voorraad GROUP BY "DS_SUBCODE", "DS_CENTER_DESCRIPTION"
-      `),
-      client.queryObject(`
-        SELECT "SubCode" as subcode, "SubCodeDescription" as description,
-               "CenterDescription" as center, SUM("Aantal")::float as total_aantal
-        FROM public.afname GROUP BY "SubCode", "SubCodeDescription", "CenterDescription"
-      `)
-    ])
+    // Debug: list all tables in all schemas to find where voorraad lives
+    const tables = await client.queryObject(`
+      SELECT table_schema, table_name
+      FROM information_schema.tables
+      WHERE table_type = 'BASE TABLE'
+      ORDER BY table_schema, table_name
+    `)
 
     client.release()
-    // Intentionally omitting await pool.end() so the connection stays open globally for the next invocation!
 
-
-    return new Response(JSON.stringify({ voorraad: voorraad.rows, afname: afname.rows }), {
+    return new Response(JSON.stringify({ debug_tables: tables.rows }), {
       headers: { ...cors, 'Content-Type': 'application/json' }
     })
   } catch (e: unknown) {
