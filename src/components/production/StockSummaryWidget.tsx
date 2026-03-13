@@ -64,9 +64,18 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     setIsLoadingDB(true);
     setDbError(null);
     try {
-      const { data, error } = await supabase.functions.invoke("get-stock-data");
-      if (error) {
-        setDbError(error.message);
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      // Plain GET with apikey as URL param — no CORS preflight triggered, satisfies JWT verification
+      const response = await fetch(`${supabaseUrl}/functions/v1/get-stock-data?apikey=${anonKey}`);
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        setDbError(`HTTP ${response.status}${text ? `: ${text}` : ""}`);
+        return;
+      }
+      const data = await response.json();
+      if (data?.error) {
+        setDbError(data.error);
         return;
       }
 
