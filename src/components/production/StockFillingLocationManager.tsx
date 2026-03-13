@@ -27,6 +27,7 @@ export function StockFillingLocationManager({ open, onOpenChange }: StockFilling
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [locationFilter, setLocationFilter] = useState<"all" | "emmen" | "extern">("all");
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -48,16 +49,22 @@ export function StockFillingLocationManager({ open, onOpenChange }: StockFilling
       fetchProducts();
       setSelected(new Set());
       setSearch("");
+      setLocationFilter("all");
     }
   }, [open]);
 
   const filtered = useMemo(() => {
-    if (!search) return products;
-    const q = search.toLowerCase();
-    return products.filter(
-      (p) => p.sub_code.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
-    );
-  }, [products, search]);
+    let result = products;
+    if (locationFilter === "emmen") result = result.filter((p) => p.filled_in_emmen);
+    else if (locationFilter === "extern") result = result.filter((p) => !p.filled_in_emmen);
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (p) => p.sub_code.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [products, search, locationFilter]);
 
   const allFilteredSelected = filtered.length > 0 && filtered.every((p) => selected.has(p.id));
 
@@ -139,8 +146,16 @@ export function StockFillingLocationManager({ open, onOpenChange }: StockFilling
               className="pl-9"
             />
           </div>
-          <Badge variant="outline">{emmenCount} Emmen</Badge>
-          <Badge variant="secondary">{externCount} Extern</Badge>
+          <Badge
+            variant={locationFilter === "emmen" ? "default" : "outline"}
+            className="cursor-pointer select-none"
+            onClick={() => setLocationFilter(locationFilter === "emmen" ? "all" : "emmen")}
+          >{emmenCount} Emmen</Badge>
+          <Badge
+            variant={locationFilter === "extern" ? "default" : "secondary"}
+            className="cursor-pointer select-none"
+            onClick={() => setLocationFilter(locationFilter === "extern" ? "all" : "extern")}
+          >{externCount} Extern</Badge>
         </div>
 
         {selected.size > 0 && (
