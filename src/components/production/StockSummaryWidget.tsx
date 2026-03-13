@@ -67,11 +67,11 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
       const PAGE = 1000;
       let from = 0;
       while (true) {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from("voorraad")
           .select("DS_SUBCODE, DS_CENTER_DESCRIPTION")
           .range(from, from + PAGE - 1);
-        if (error) throw error;
+        if (error) { console.error("voorraad fetch error:", error); break; }
         if (!data || data.length === 0) break;
         voorraadRows = [...voorraadRows, ...data];
         if (data.length < PAGE) break;
@@ -79,22 +79,27 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
       }
 
       // Fetch afname (smaller table)
-      const { data: afnameRows, error: afErr } = await supabase
+      const { data: afnameRows, error: afErr } = await (supabase as any)
         .from("afname")
         .select("SubCode, SubCodeDescription, Aantal, CenterDescription");
-      if (afErr) throw afErr;
+      if (afErr) { console.error("afname fetch error:", afErr); }
 
-      // Count voorraad rows per description + center
+      // Normalize center name to "emmen" or "tilburg" for robust matching
+      const normalizeCenter = (center: string): "emmen" | "tilburg" =>
+        center?.toLowerCase().includes("emmen") ? "emmen" : "tilburg";
+
+      // Count voorraad rows per DS_SUBCODE + normalized center
       const stockCount = new Map<string, number>();
       for (const row of voorraadRows) {
-        const key = `${row.DS_SUBCODE}||${row.DS_CENTER_DESCRIPTION}`;
+        const key = `${row.DS_SUBCODE}||${normalizeCenter(row.DS_CENTER_DESCRIPTION)}`;
         stockCount.set(key, (stockCount.get(key) || 0) + 1);
       }
 
-      // Sum afname Aantal per SubCodeDescription + center
-      const afnameSum = new Map<string, { subCode: string; description: string; center: string; total: number }>();
-      for (const row of afnameRows || []) {
-        const key = `${row.SubCodeDescription}||${row.CenterDescription}`;
+      // Sum afname Aantal per SubCode + normalized center (join key: SubCode ↔ DS_SUBCODE)
+      const afnameSum = new Map<string, { subCode: string; description: string; center: string; centerNorm: string; total: number }>();
+      for (const row of (afnameRows || [])) {
+        const centerNorm = normalizeCenter(row.CenterDescription);
+        const key = `${row.SubCode}||${centerNorm}`;
         const existing = afnameSum.get(key);
         if (existing) {
           existing.total += row.Aantal || 0;
@@ -103,17 +108,17 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
             subCode: row.SubCode,
             description: row.SubCodeDescription,
             center: row.CenterDescription,
+            centerNorm,
             total: row.Aantal || 0,
           });
         }
       }
 
-      // Build StockItems by joining on description + center
+      // Build StockItems by joining on SubCode + normalized center
       const emmenItems: StockItem[] = [];
       const tilburgItems: StockItem[] = [];
-      for (const [, afname] of afnameSum) {
-        const stockKey = `${afname.description}||${afname.center}`;
-        const numberOnStock = stockCount.get(stockKey) || 0;
+      for (const [key, afname] of afnameSum) {
+        const numberOnStock = stockCount.get(key) || 0;
         const averageConsumption = afname.total;
         const item: StockItem = {
           subCode: afname.subCode,
@@ -122,13 +127,14 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
           averageConsumption,
           difference: numberOnStock - averageConsumption,
         };
-        if (afname.center?.includes("Emmen")) {
+        if (afname.centerNorm === "emmen") {
           emmenItems.push(item);
         } else {
           tilburgItems.push(item);
         }
       }
 
+      console.log(`Stock loaded: ${emmenItems.length} Emmen, ${tilburgItems.length} Tilburg items`);
       setStockByLocation({ sol_emmen: emmenItems, sol_tilburg: tilburgItems });
     } catch (err) {
       console.error("Error fetching stock from DB:", err);
