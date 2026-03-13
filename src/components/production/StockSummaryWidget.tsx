@@ -59,75 +59,32 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     getUser();
   }, []);
 
-  // Fetch stock data from voorraad + afname tables
+  // Fetch stock data via Edge Function (bypasses PostgREST schema cache)
   const fetchStockFromDB = useCallback(async () => {
     setIsLoadingDB(true);
     setDbError(null);
     try {
-      // Fetch voorraad in pages
-      let voorraadRows: { subcode: string; center: string; count: number }[] = [];
-      {
-        const PAGE = 1000;
-        const rawRows: { DS_SUBCODE: string; DS_CENTER_DESCRIPTION: string }[] = [];
-        let from = 0;
-        while (true) {
-          const { data, error } = await (supabase as any)
-            .from("voorraad")
-            .select("DS_SUBCODE, DS_CENTER_DESCRIPTION")
-            .range(from, from + PAGE - 1);
-          if (error) { setDbError(`voorraad: ${error.message || error.code}`); break; }
-          if (!data || data.length === 0) break;
-          rawRows.push(...data);
-          if (data.length < PAGE) break;
-          from += PAGE;
-        }
-        // Aggregate client-side
-        const map = new Map<string, number>();
-        for (const r of rawRows) {
-          const k = `${r.DS_SUBCODE}||${r.DS_CENTER_DESCRIPTION}`;
-          map.set(k, (map.get(k) || 0) + 1);
-        }
-        voorraadRows = Array.from(map.entries()).map(([k, count]) => {
-          const [subcode, center] = k.split("||");
-          return { subcode, center, count };
-        });
+      const { data, error } = await supabase.functions.invoke("get-stock-data");
+      if (error) {
+        setDbError(error.message);
+        return;
       }
 
-      // Fetch afname
-      let afnameRows: { subcode: string; description: string; center: string; total_aantal: number }[] = [];
-      {
-        const { data, error } = await (supabase as any)
-          .from("afname")
-          .select("SubCode, SubCodeDescription, Aantal, CenterDescription");
-        if (error) {
-          setDbError((prev) => prev ? `${prev} | afname: ${error.message}` : `afname: ${error.message}`);
-        } else {
-          const map = new Map<string, { subcode: string; description: string; center: string; total: number }>();
-          for (const r of (data || [])) {
-            const k = `${r.SubCode}||${r.CenterDescription}`;
-            const ex = map.get(k);
-            if (ex) { ex.total += r.Aantal || 0; }
-            else map.set(k, { subcode: r.SubCode, description: r.SubCodeDescription, center: r.CenterDescription, total: r.Aantal || 0 });
-          }
-          afnameRows = Array.from(map.values()).map(v => ({ subcode: v.subcode, description: v.description, center: v.center, total_aantal: v.total }));
-        }
-      }
+      const voorraadRows: { subcode: string; center: string; count: number }[] = data?.voorraad ?? [];
+      const afnameRows: { subcode: string; description: string; center: string; total_aantal: number }[] = data?.afname ?? [];
 
-      // Normalize center name to "emmen" or "tilburg" for robust matching
       const normalizeCenter = (center: string): "emmen" | "tilburg" =>
         center?.toLowerCase().includes("emmen") ? "emmen" : "tilburg";
 
-      // Build stockCount map from voorraad summary (already aggregated by DB)
       const stockCount = new Map<string, number>();
-      for (const row of (voorraadRows || [])) {
+      for (const row of voorraadRows) {
         const key = `${row.subcode}||${normalizeCenter(row.center)}`;
         stockCount.set(key, Number(row.count));
       }
 
-      // Build StockItems from afname summary
       const emmenItems: StockItem[] = [];
       const tilburgItems: StockItem[] = [];
-      for (const row of (afnameRows || [])) {
+      for (const row of afnameRows) {
         const centerNorm = normalizeCenter(row.center);
         const key = `${row.subcode}||${centerNorm}`;
         const numberOnStock = stockCount.get(key) || 0;
@@ -139,14 +96,10 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
           averageConsumption,
           difference: numberOnStock - averageConsumption,
         };
-        if (centerNorm === "emmen") {
-          emmenItems.push(item);
-        } else {
-          tilburgItems.push(item);
-        }
+        if (centerNorm === "emmen") emmenItems.push(item);
+        else tilburgItems.push(item);
       }
 
-      console.log(`Stock loaded: ${emmenItems.length} Emmen, ${tilburgItems.length} Tilburg items`);
       setStockByLocation({ sol_emmen: emmenItems, sol_tilburg: tilburgItems });
     } catch (err) {
       console.error("Error fetching stock from DB:", err);
