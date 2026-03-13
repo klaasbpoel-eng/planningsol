@@ -3,8 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Maximize2, Minimize2, Printer, MapPin } from "lucide-react";
+import { Package, ShieldAlert, AlertTriangle, CheckCircle, TrendingUp, Maximize2, Minimize2, Printer, MapPin, Search } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
 import { getStockStatus, type StockStatus } from "./StockStatusBadge";
 import { type StockItem } from "./StockExcelImportDialog";
@@ -45,6 +46,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
   const [dbError, setDbError] = useState<string | null>(null);
   const [locationManagerOpen, setLocationManagerOpen] = useState(false);
   const [fullscreenStatus, setFullscreenStatus] = useState<string | null>(null);
+  const [dialogSearch, setDialogSearch] = useState("");
   const [userId, setUserId] = useState<string | undefined>();
   const { isAdmin } = useUserRole(userId);
 
@@ -350,7 +352,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
             {statusConfigs.map((config) => {
               const Icon = config.icon;
               return (
-                <Dialog key={config.status}>
+                <Dialog key={config.status} onOpenChange={() => setDialogSearch("")}>
                   <DialogTrigger asChild>
                     <div
                       className={cn(
@@ -397,10 +399,23 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
                         </span>
                       </DialogTitle>
                     </DialogHeader>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Zoek op omschrijving of code..."
+                        value={dialogSearch}
+                        onChange={(e) => setDialogSearch(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
                     {config.items.length > 0 ? (
-                      <ScrollArea className={fullscreenStatus === config.status ? "max-h-[60vh]" : "h-[calc(95vh-80px)]"}>
+                      <ScrollArea className={fullscreenStatus === config.status ? "max-h-[60vh]" : "h-[calc(95vh-140px)]"}>
                         <div className="space-y-2">
-                          {config.items.map((item) => (
+                          {config.items.filter((item) => {
+                            if (!dialogSearch) return true;
+                            const q = dialogSearch.toLowerCase();
+                            return item.description.toLowerCase().includes(q) || item.subCode.toLowerCase().includes(q);
+                          }).map((item) => (
                             <div
                               key={item.subCode}
                               className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
