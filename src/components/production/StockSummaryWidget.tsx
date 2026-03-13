@@ -140,13 +140,17 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
       // Sync unique products into stock_products for Vullocatie Beheer
       // Default filled_in_emmen: true if product exists in Emmen stock, false if only in Tilburg
       const emmenSubCodes = new Set(emmenItems.map((item) => item.subCode));
-      const uniqueMap = new Map<string, { sub_code: string; description: string; filled_in_emmen: boolean }>();
+      const tilburgSubCodes = new Set(tilburgItems.map((item) => item.subCode));
+      const uniqueMap = new Map<string, { sub_code: string; description: string; fill_location: string }>();
       for (const item of [...emmenItems, ...tilburgItems]) {
         if (!uniqueMap.has(item.subCode)) {
+          const fillLocation = emmenSubCodes.has(item.subCode) ? "emmen"
+            : tilburgSubCodes.has(item.subCode) ? "tilburg"
+            : "extern";
           uniqueMap.set(item.subCode, {
             sub_code: item.subCode,
             description: item.description,
-            filled_in_emmen: emmenSubCodes.has(item.subCode),
+            fill_location: fillLocation,
           });
         }
       }

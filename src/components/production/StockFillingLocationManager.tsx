@@ -9,11 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { MapPin, Search, Loader2 } from "lucide-react";
 
+type FillLocation = "emmen" | "tilburg" | "extern";
+
 interface StockProduct {
   id: string;
   sub_code: string;
   description: string;
-  filled_in_emmen: boolean;
+  fill_location: FillLocation;
 }
 
 interface StockFillingLocationManagerProps {
@@ -21,25 +23,40 @@ interface StockFillingLocationManagerProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const LOCATION_LABELS: Record<FillLocation, string> = {
+  emmen: "Emmen",
+  tilburg: "Tilburg",
+  extern: "Extern",
+};
+
+const LOCATION_VARIANTS: Record<FillLocation, "default" | "secondary" | "outline"> = {
+  emmen: "default",
+  tilburg: "secondary",
+  extern: "outline",
+};
+
 export function StockFillingLocationManager({ open, onOpenChange }: StockFillingLocationManagerProps) {
   const [products, setProducts] = useState<StockProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [locationFilter, setLocationFilter] = useState<"all" | "emmen" | "extern">("all");
+  const [locationFilter, setLocationFilter] = useState<FillLocation | "all">("all");
 
   const fetchProducts = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("stock_products")
-      .select("*")
+      .select("id, sub_code, description, fill_location")
       .order("sub_code");
     if (error) {
       toast.error("Fout bij laden producten");
       console.error(error);
     } else {
-      setProducts(data || []);
+      setProducts((data || []).map((p) => ({
+        ...p,
+        fill_location: (p.fill_location as FillLocation) ?? "emmen",
+      })));
     }
     setLoading(false);
   };
@@ -55,8 +72,7 @@ export function StockFillingLocationManager({ open, onOpenChange }: StockFilling
 
   const filtered = useMemo(() => {
     let result = products;
-    if (locationFilter === "emmen") result = result.filter((p) => p.filled_in_emmen);
-    else if (locationFilter === "extern") result = result.filter((p) => !p.filled_in_emmen);
+    if (locationFilter !== "all") result = result.filter((p) => p.fill_location === locationFilter);
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -87,13 +103,13 @@ export function StockFillingLocationManager({ open, onOpenChange }: StockFilling
     setSelected(newSelected);
   };
 
-  const handleBulkUpdate = async (filledInEmmen: boolean) => {
+  const handleBulkUpdate = async (loc: FillLocation) => {
     if (selected.size === 0) return;
     setSaving(true);
     const ids = Array.from(selected);
     const { error } = await supabase
       .from("stock_products")
-      .update({ filled_in_emmen: filledInEmmen })
+      .update({ fill_location: loc })
       .in("id", ids);
     if (error) {
       toast.error("Fout bij opslaan");
@@ -101,7 +117,7 @@ export function StockFillingLocationManager({ open, onOpenChange }: StockFilling
     } else {
       toast.success(`${ids.length} producten bijgewerkt`);
       setProducts((prev) =>
-        prev.map((p) => (ids.includes(p.id) ? { ...p, filled_in_emmen: filledInEmmen } : p))
+        prev.map((p) => (ids.includes(p.id) ? { ...p, fill_location: loc } : p))
       );
       setSelected(new Set());
     }
@@ -109,22 +125,26 @@ export function StockFillingLocationManager({ open, onOpenChange }: StockFilling
   };
 
   const handleToggleSingle = async (product: StockProduct) => {
-    const newValue = !product.filled_in_emmen;
+    const order: FillLocation[] = ["emmen", "tilburg", "extern"];
+    const next = order[(order.indexOf(product.fill_location) + 1) % order.length];
     const { error } = await supabase
       .from("stock_products")
-      .update({ filled_in_emmen: newValue })
+      .update({ fill_location: next })
       .eq("id", product.id);
     if (error) {
       toast.error("Fout bij opslaan");
     } else {
       setProducts((prev) =>
-        prev.map((p) => (p.id === product.id ? { ...p, filled_in_emmen: newValue } : p))
+        prev.map((p) => (p.id === product.id ? { ...p, fill_location: next } : p))
       );
     }
   };
 
-  const emmenCount = products.filter((p) => p.filled_in_emmen).length;
-  const externCount = products.length - emmenCount;
+  const counts = useMemo(() => ({
+    emmen: products.filter((p) => p.fill_location === "emmen").length,
+    tilburg: products.filter((p) => p.fill_location === "tilburg").length,
+    extern: products.filter((p) => p.fill_location === "extern").length,
+  }), [products]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -146,27 +166,26 @@ export function StockFillingLocationManager({ open, onOpenChange }: StockFilling
               className="pl-9"
             />
           </div>
-          <Badge
-            variant={locationFilter === "emmen" ? "default" : "outline"}
-            className="cursor-pointer select-none"
-            onClick={() => setLocationFilter(locationFilter === "emmen" ? "all" : "emmen")}
-          >{emmenCount} Emmen</Badge>
-          <Badge
-            variant={locationFilter === "extern" ? "default" : "secondary"}
-            className="cursor-pointer select-none"
-            onClick={() => setLocationFilter(locationFilter === "extern" ? "all" : "extern")}
-          >{externCount} Extern</Badge>
+          {(["emmen", "tilburg", "extern"] as FillLocation[]).map((loc) => (
+            <Badge
+              key={loc}
+              variant={locationFilter === loc ? "default" : LOCATION_VARIANTS[loc]}
+              className="cursor-pointer select-none"
+              onClick={() => setLocationFilter(locationFilter === loc ? "all" : loc)}
+            >
+              {counts[loc]} {LOCATION_LABELS[loc]}
+            </Badge>
+          ))}
         </div>
 
         {selected.size > 0 && (
-          <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+          <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg flex-wrap">
             <span className="text-sm font-medium">{selected.size} geselecteerd</span>
-            <Button size="sm" onClick={() => handleBulkUpdate(true)} disabled={saving}>
-              Markeer als Emmen
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => handleBulkUpdate(false)} disabled={saving}>
-              Markeer als extern
-            </Button>
+            {(["emmen", "tilburg", "extern"] as FillLocation[]).map((loc) => (
+              <Button key={loc} size="sm" variant={loc === "emmen" ? "default" : "outline"} onClick={() => handleBulkUpdate(loc)} disabled={saving}>
+                {LOCATION_LABELS[loc]}
+              </Button>
+            ))}
           </div>
         )}
 
@@ -191,7 +210,7 @@ export function StockFillingLocationManager({ open, onOpenChange }: StockFilling
                   </th>
                   <th className="text-left p-2 font-medium">Code</th>
                   <th className="text-left p-2 font-medium">Omschrijving</th>
-                  <th className="text-center p-2 font-medium">Gevuld in Emmen</th>
+                  <th className="text-center p-2 font-medium">Vullocatie</th>
                 </tr>
               </thead>
               <tbody>
@@ -206,10 +225,14 @@ export function StockFillingLocationManager({ open, onOpenChange }: StockFilling
                     <td className="p-2 font-mono text-xs">{product.sub_code}</td>
                     <td className="p-2 max-w-[300px] truncate">{product.description}</td>
                     <td className="p-2 text-center">
-                      <Checkbox
-                        checked={product.filled_in_emmen}
-                        onCheckedChange={() => handleToggleSingle(product)}
-                      />
+                      <Badge
+                        variant={LOCATION_VARIANTS[product.fill_location]}
+                        className="cursor-pointer select-none"
+                        onClick={() => handleToggleSingle(product)}
+                        title="Klik om te wijzigen"
+                      >
+                        {LOCATION_LABELS[product.fill_location]}
+                      </Badge>
                     </td>
                   </tr>
                 ))}
