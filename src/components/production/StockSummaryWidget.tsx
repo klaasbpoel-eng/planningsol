@@ -43,6 +43,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     sol_tilburg: [],
   });
   const [isLoadingDB, setIsLoadingDB] = useState(true);
+  const [dbError, setDbError] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [solImportDialogOpen, setSolImportDialogOpen] = useState(false);
   const [locationManagerOpen, setLocationManagerOpen] = useState(false);
@@ -61,6 +62,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
   // Fetch stock data from voorraad + afname tables
   const fetchStockFromDB = useCallback(async () => {
     setIsLoadingDB(true);
+    setDbError(null);
     try {
       // Fetch voorraad in pages (can be large)
       let voorraadRows: { DS_SUBCODE: string; DS_CENTER_DESCRIPTION: string }[] = [];
@@ -71,7 +73,10 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
           .from("voorraad")
           .select("DS_SUBCODE, DS_CENTER_DESCRIPTION")
           .range(from, from + PAGE - 1);
-        if (error) { console.error("voorraad fetch error:", error); break; }
+        if (error) {
+          setDbError(`voorraad: ${error.message || error.code || JSON.stringify(error)}`);
+          break;
+        }
         if (!data || data.length === 0) break;
         voorraadRows = [...voorraadRows, ...data];
         if (data.length < PAGE) break;
@@ -82,7 +87,9 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
       const { data: afnameRows, error: afErr } = await (supabase as any)
         .from("afname")
         .select("SubCode, SubCodeDescription, Aantal, CenterDescription");
-      if (afErr) { console.error("afname fetch error:", afErr); }
+      if (afErr) {
+        setDbError((prev) => prev ? `${prev} | afname: ${afErr.message || afErr.code}` : `afname: ${afErr.message || afErr.code}`);
+      }
 
       // Normalize center name to "emmen" or "tilburg" for robust matching
       const normalizeCenter = (center: string): "emmen" | "tilburg" =>
@@ -403,7 +410,9 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
         <div className={cn("text-2xl font-bold mb-2", overallColor)}>{overallLabel}</div>
         {stockData.length === 0 ? (
           <div className="text-xs text-muted-foreground text-center py-2">
-            {isLoadingDB ? "Voorraaddata laden..." : "Geen voorraaddata beschikbaar"}
+            {isLoadingDB ? "Voorraaddata laden..." : dbError ? (
+              <span className="text-red-500 break-all">{dbError}</span>
+            ) : "Geen voorraaddata beschikbaar"}
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-1">
