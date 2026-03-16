@@ -1,0 +1,1 @@
+ALTER TABLE public.stock_products ADD COLUMN IF NOT EXISTS fill_location text NOT NULL DEFAULT 'emmen';
