@@ -1469,6 +1469,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string
+          fill_location: string
           filled_in_emmen: boolean
           id: string
           sub_code: string
@@ -1477,6 +1478,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string
+          fill_location?: string
           filled_in_emmen?: boolean
           id?: string
           sub_code: string
@@ -1485,6 +1487,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string
+          fill_location?: string
           filled_in_emmen?: boolean
           id?: string
           sub_code?: string
