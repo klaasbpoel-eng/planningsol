@@ -84,101 +84,83 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
         const currentYear = new Date().getFullYear();
         const startYear = 2017;
         const years: number[] = [];
+        for (let y = currentYear; y >= startYear; y--) years.push(y);
 
-        for (let y = currentYear; y >= startYear; y--) {
-          years.push(y);
-        }
-
-        const orderType = type === "cylinders" ? "cylinder" : "dry_ice";
         const locationParam = location === "all" ? null : location;
+        const allYearData: YearlyMonthlyData[] = [];
 
-        // For cylinders, also fetch digital gas type info
-        let digitalGasTypeIds = new Set<string>();
         if (type === "cylinders") {
-          const { data: gasTypesData } = await supabase.from("gas_types").select("id, is_digital");
-          if (gasTypesData) {
-            const digitalTypes = gasTypesData.filter((gt: any) => gt.is_digital);
-            digitalGasTypeIds = new Set(digitalTypes.map((gt: any) => gt.id));
-            setHasDigitalTypes(digitalTypes.length > 0);
-          }
-        }
+          // Fetch from Productie for each year in parallel
+          const yearResults = await Promise.all(
+            years.map(async (year) => {
+              const PAGE = 1000;
+              const allRows: any[] = [];
+              let from = 0;
+              while (true) {
+                const { data } = await (supabase.from("Productie" as never) as any)
+                  .select("Datum,Locatie,Aantal").eq("Jaar", year).range(from, from + PAGE - 1);
+                if (!data || data.length === 0) break;
+                allRows.push(...data);
+                if (data.length < PAGE) break;
+                from += PAGE;
+              }
+              const filtered = locationParam
+                ? allRows.filter(row => {
+                    const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+                    return loc === locationParam;
+                  })
+                : allRows;
+              return { year, rows: filtered };
+            })
+          );
 
-        // Fetch all years in parallel using API
-        const [totalResults, gasTypeResults] = await Promise.all([
-          Promise.all(
+          for (const { year, rows } of yearResults) {
+            const monthly = new Array(12).fill(0);
+            for (const row of rows) {
+              const raw: string = row.Datum || "";
+              if (!raw) continue;
+              const iso = raw.includes("T") ? raw.substring(0, 10) : (() => { const p = raw.split("-"); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+              const month = parseInt(iso.substring(5, 7), 10) - 1;
+              if (month >= 0 && month < 12) monthly[month] += row.Aantal || 0;
+            }
+            if (monthly.some(v => v > 0)) allYearData.push({ year, months: monthly });
+          }
+
+          setHasDigitalTypes(false);
+          setDigitalMonthlyByYear(new Map());
+        } else {
+          // dry ice: keep using api.reports
+          const totalResults = await Promise.all(
             years.map(async (year) => {
               try {
-                const data = await api.reports.getMonthlyOrderTotals(year, orderType, locationParam, hideDigital);
+                const data = await api.reports.getMonthlyOrderTotals(year, "dry_ice", locationParam, hideDigital);
                 return { data, error: null };
               } catch (err) {
                 return { data: null, error: err };
               }
             })
-          ),
-          // For cylinders, also fetch per-gas-type data to compute digital monthly totals
-          type === "cylinders" && digitalGasTypeIds.size > 0
-            ? Promise.all(
-                years.map(async (year) => {
-                  try {
-                    const data = await api.reports.getMonthlyCylinderTotalsByGasType(year, locationParam, hideDigital);
-                    return { data, error: null };
-                  } catch (err) {
-                    return { data: null, error: err };
-                  }
-                })
-              )
-            : Promise.resolve(null),
-        ]);
+          );
 
-        // Build digital monthly map
-        const digitalMap = new Map<number, number[]>();
-        if (gasTypeResults) {
-          gasTypeResults.forEach((result: any, index: number) => {
+          totalResults.forEach((result, index) => {
             const year = years[index];
-            const monthlyDigital = new Array(12).fill(0);
-            if (result?.data) {
-              result.data.forEach((item: any) => {
-                if (digitalGasTypeIds.has(item.gas_type_id)) {
-                  monthlyDigital[item.month - 1] += Number(item.total_cylinders) || 0;
-                }
+            if (result.error) return;
+            const monthlyTotals = new Array(12).fill(0);
+            if (result.data) {
+              result.data.forEach((item: { month: number; total_value: number }) => {
+                monthlyTotals[item.month - 1] = Number(item.total_value) || 0;
               });
             }
-            digitalMap.set(year, monthlyDigital);
+            if (monthlyTotals.some(v => v > 0)) allYearData.push({ year, months: monthlyTotals });
           });
+
+          setHasDigitalTypes(false);
+          setDigitalMonthlyByYear(new Map());
         }
-        setDigitalMonthlyByYear(digitalMap);
-
-        const allYearData: YearlyMonthlyData[] = [];
-
-        totalResults.forEach((result, index) => {
-          const year = years[index];
-
-          if (result.error) {
-            console.error(`[CumulativeYearChart] RPC error for ${year}:`, result.error);
-            return;
-          }
-
-          const monthlyTotals = new Array(12).fill(0);
-
-          if (result.data) {
-            result.data.forEach((item: { month: number; total_value: number }) => {
-              monthlyTotals[item.month - 1] = Number(item.total_value) || 0;
-            });
-          }
-
-          const hasData = monthlyTotals.some(v => v > 0);
-          if (hasData) {
-            allYearData.push({ year, months: monthlyTotals });
-          }
-        });
 
         allYearData.sort((a, b) => b.year - a.year);
-
         setYearlyDataRaw(allYearData);
         setAvailableYears(allYearData.map(d => d.year));
-
-        const defaultYears = allYearData.slice(0, 4).map(d => d.year);
-        setSelectedYears(defaultYears);
+        setSelectedYears(allYearData.slice(0, 4).map(d => d.year));
       } catch (err) {
         console.error("[CumulativeYearChart] Fetch error:", err);
         setError("Fout bij ophalen data");

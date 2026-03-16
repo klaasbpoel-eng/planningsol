@@ -31,6 +31,7 @@ const ReportLoadingFallback = () => (
   <ChartSkeleton height={350} />
 );
 import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { format, subWeeks, startOfMonth, endOfMonth, differenceInDays, subDays, startOfYear, endOfYear, startOfWeek, endOfWeek, isSameDay, isSameMonth, isSameYear, subMonths, subYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn, formatNumber } from "@/lib/utils";
@@ -75,8 +76,8 @@ export function ProductionPlanning({
 
   // Date range state for dashboard sync with reports
   const [dateRange, setDateRange] = useState<DateRange>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date())
+    from: startOfYear(new Date()),
+    to: endOfYear(new Date())
   });
 
   // Helper function to format date range as human-readable label
@@ -181,6 +182,51 @@ export function ProductionPlanning({
     setDateRange(newRange);
   }, []);
 
+  // Fetch cylinder stats directly from Productie table
+  const fetchProductieStats = async (
+    fromDate: string,
+    toDate: string,
+    locationParam: string | null
+  ): Promise<{ total_cylinders: number; total_records: number }> => {
+    const fromYear = parseInt(fromDate.substring(0, 4));
+    const toYear = parseInt(toDate.substring(0, 4));
+    const yearsNeeded = Array.from({ length: toYear - fromYear + 1 }, (_, i) => fromYear + i);
+
+    const allRows: any[] = [];
+    for (const year of yearsNeeded) {
+      const PAGE = 1000;
+      let from = 0;
+      while (true) {
+        const { data } = await (supabase.from("Productie" as never) as any)
+          .select("Datum,Locatie,Aantal")
+          .eq("Jaar", year)
+          .range(from, from + PAGE - 1);
+        if (!data || data.length === 0) break;
+        allRows.push(...data);
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+    }
+
+    const filtered = allRows.filter((row: any) => {
+      const raw: string = row.Datum || "";
+      if (!raw) return false;
+      const iso = raw.includes("T") ? raw.substring(0, 10)
+        : (() => { const p = raw.split("-"); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+      if (iso < fromDate || iso > toDate) return false;
+      if (locationParam) {
+        const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+        if (loc !== locationParam) return false;
+      }
+      return true;
+    });
+
+    return {
+      total_cylinders: filtered.reduce((sum: number, r: any) => sum + (r.Aantal || 0), 0),
+      total_records: filtered.length,
+    };
+  };
+
   const fetchStats = async () => {
     const fromDate = format(dateRange.from, "yyyy-MM-dd");
     const toDate = format(dateRange.to, "yyyy-MM-dd");
@@ -192,15 +238,11 @@ export function ProductionPlanning({
     const prevFromDate = format(prevFrom, "yyyy-MM-dd");
     const prevToDate = format(prevTo, "yyyy-MM-dd");
 
-    // Use RPC functions for server-side aggregation (avoids 1000 row limit)
     const locationParam = selectedLocation === "all" ? null : selectedLocation;
+    const isTilburg = selectedLocation === "sol_tilburg";
 
     try {
-      // Fetch current period stats using RPC functions (parallel calls)
-      const isTilburg = selectedLocation === "sol_tilburg";
-
-      // Skip dry ice RPC calls for Tilburg (dry ice is only produced in Emmen)
-      // Skip dry ice RPC calls for Tilburg (dry ice is only produced in Emmen)
+      // Dry ice: still from dry ice planning (unchanged)
       const dryIcePromise = isTilburg
         ? Promise.resolve([{ total_kg: 0, total_orders: 0 }] as any)
         : api.reports.getDryIceEfficiency(fromDate, toDate, null);
@@ -208,41 +250,28 @@ export function ProductionPlanning({
         ? Promise.resolve([{ total_kg: 0, total_orders: 0 }] as any)
         : api.reports.getDryIceEfficiency(prevFromDate, prevToDate, null);
 
-      const [dryIceData, cylinderData, prevDryIceData, prevCylinderData] = await Promise.all([
+      // Cylinders: from Productie table
+      const [dryIceData, prevDryIceData, cylinderData, prevCylinderData] = await Promise.all([
         dryIcePromise,
-        api.reports.getProductionEfficiency(fromDate, toDate, locationParam),
         prevDryIcePromise,
-        api.reports.getProductionEfficiency(prevFromDate, prevToDate, locationParam)
+        fetchProductieStats(fromDate, toDate, locationParam),
+        fetchProductieStats(prevFromDate, prevToDate, locationParam),
       ]);
 
-      // Handle dry ice current period
       if (dryIceData?.[0]) {
         setDryIceToday(Number(dryIceData[0].total_kg) || 0);
       }
-
-      // Handle cylinder current period
-      if (cylinderData?.[0]) {
-        setCylindersToday(Number(cylinderData[0].total_cylinders) || 0);
-      }
-
-      // Handle dry ice previous period
       if (prevDryIceData?.[0]) {
         setPreviousDryIceToday(Number(prevDryIceData[0].total_kg) || 0);
       }
 
-      // Handle cylinder previous period
-      if (prevCylinderData?.[0]) {
-        setPreviousCylindersToday(Number(prevCylinderData[0].total_cylinders) || 0);
-      }
+      setCylindersToday(cylinderData.total_cylinders);
+      setPreviousCylindersToday(prevCylinderData.total_cylinders);
 
-      // Calculate total orders from RPC responses
       const currentDryIceOrders = isTilburg ? 0 : (dryIceData?.[0]?.total_orders || 0);
-      const currentCylinderOrders = cylinderData?.[0]?.total_orders || 0;
-      setWeekOrders(Number(currentDryIceOrders) + Number(currentCylinderOrders));
-
       const prevDryIceOrders = isTilburg ? 0 : (prevDryIceData?.[0]?.total_orders || 0);
-      const prevCylinderOrders = prevCylinderData?.[0]?.total_orders || 0;
-      setPreviousWeekOrders(Number(prevDryIceOrders) + Number(prevCylinderOrders));
+      setWeekOrders(Number(currentDryIceOrders) + cylinderData.total_records);
+      setPreviousWeekOrders(Number(prevDryIceOrders) + prevCylinderData.total_records);
 
     } catch (error) {
       console.error("[ProductionPlanning] Error fetching stats:", error);

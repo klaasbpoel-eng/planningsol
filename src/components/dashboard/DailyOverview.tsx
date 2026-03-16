@@ -440,17 +440,13 @@ export function DailyOverview() {
         .select("id, start_date, end_date, status, day_part, profiles:profile_id(full_name), time_off_types:type_id(name, color)")
         .lte("start_date", toStr)
         .gte("end_date", fromStr)
-        .eq("status", "approved"),
+        .in("status", ["approved", "pending"]),
       supabase
         .from("dry_ice_orders")
         .select("id, customer_name, quantity_kg, box_count, status, scheduled_date, notes, parent_order_id, dry_ice_packaging:packaging_id(name, capacity_kg)")
         .gte("scheduled_date", fromStr)
         .lte("scheduled_date", toStr),
-      supabase
-        .from("gas_cylinder_orders")
-        .select("id, customer_name, cylinder_count, cylinder_size, status, scheduled_date, notes, series_id, gas_types:gas_type_id(name)")
-        .gte("scheduled_date", fromStr)
-        .lte("scheduled_date", toStr),
+      Promise.resolve({ data: [] as GasCylinderOrder[], error: null }),
       supabase
         .from("ambulance_trips")
         .select("id, scheduled_date, cylinders_2l_300_o2, cylinders_2l_200_o2, cylinders_5l_o2_integrated, cylinders_1l_pindex_o2, cylinders_10l_o2_integrated, cylinders_5l_air_integrated, cylinders_2l_air_integrated, model_5l, status, notes, series_id, ambulance_trip_customers(customer_number, customer_name)")
@@ -516,7 +512,7 @@ export function DailyOverview() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, onRealtimeUpdate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'time_off_requests' }, onRealtimeUpdate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'dry_ice_orders' }, onRealtimeUpdate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'gas_cylinder_orders' }, onRealtimeUpdate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'Productie' }, onRealtimeUpdate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ambulance_trips' }, onRealtimeUpdate)
       .subscribe();
 
@@ -739,8 +735,15 @@ export function DailyOverview() {
     const displayFrom = format(dateRange.from, "yyyy-MM-dd");
     const displayTo = format(dateRange.to, "yyyy-MM-dd");
 
-    const inRange = (date: string) => date >= displayFrom && date <= displayTo;
-    const inRangeTimeOff = (start: string, end: string) => start <= displayTo && end >= displayFrom;
+    const inRange = (date: string) => {
+      const d = date?.slice(0, 10);
+      return d >= displayFrom && d <= displayTo;
+    };
+    const inRangeTimeOff = (start: string, end: string) => {
+      const s = start?.slice(0, 10);
+      const e = end?.slice(0, 10);
+      return s <= displayTo && e >= displayFrom;
+    };
 
     const visibleAmbulance = filteredAmbulance.filter(o => inRange(o.scheduled_date));
     const visibleGas = filteredGas.filter(o => inRange(o.scheduled_date));
@@ -1119,14 +1122,14 @@ export function DailyOverview() {
               )}
               {days.map((day) => {
                 const dayStr = format(day, "yyyy-MM-dd");
-                const dayTasks = filteredTasks.filter((t) => t.due_date === dayStr);
+                const dayTasks = filteredTasks.filter((t) => t.due_date?.slice(0, 10) === dayStr);
                 const dayTimeOff = filteredTimeOff.filter(
-                  (t) => t.start_date <= dayStr && t.end_date >= dayStr
+                  (t) => t.start_date?.slice(0, 10) <= dayStr && t.end_date?.slice(0, 10) >= dayStr
                 );
-                const dayDryIce = filteredDryIce.filter((o) => o.scheduled_date === dayStr);
-                const dayGas = filteredGas.filter((o) => o.scheduled_date === dayStr);
-                const dayAmbulance = filteredAmbulance.filter((o) => o.scheduled_date === dayStr);
-                const dayEmpty = dayTasks.length === 0 && dayTimeOff.length === 0 && dayDryIce.length === 0 && dayGas.length === 0 && dayAmbulance.length === 0;
+                const dayDryIce = filteredDryIce.filter((o) => o.scheduled_date?.slice(0, 10) === dayStr);
+                const dayGas = filteredGas.filter((o) => o.scheduled_date?.slice(0, 10) === dayStr);
+                const dayAmbulance = filteredAmbulance.filter((o) => o.scheduled_date?.slice(0, 10) === dayStr);
+                const dayEmpty = dayTasks.length === 0 && dayTimeOff.length === 0 && dayDryIce.length === 0 && dayAmbulance.length === 0;
 
                 if (dayEmpty && !printRequested && (viewMode === "week" || lookaheadActive)) return null;
 
@@ -1256,8 +1259,8 @@ export function DailyOverview() {
                         </Section>
                       )}
 
-                      {/* Gascilinders - grouped by customer */}
-                      {dayGas.length > 0 && (
+                      {/* Gascilinders removed from daily overview */}
+                      {false && dayGas.length > 0 && (
                         <Section
                           icon={<Cylinder className="h-4 w-4" />}
                           label="Gascilinders"
@@ -1478,31 +1481,58 @@ export function DailyOverview() {
                             <p className="text-xs text-muted-foreground py-1 text-center">Niemand afwezig</p>
                           )}
                           {dayTimeOff.map((t) => (
-                            <Popover key={t.id}>
-                              <PopoverTrigger asChild>
-                                <div className="flex items-center gap-2 text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors">
-                                  <span className="truncate">
-                                    {t.profiles?.full_name || "Medewerker"}
-                                  </span>
-                                  <span className="text-muted-foreground text-xs ml-auto shrink-0">
-                                    {t.time_off_types?.name || "Verlof"}
-                                    {t.day_part && t.day_part !== "full_day" && ` (${t.day_part === "morning" ? "ochtend" : "middag"})`}
-                                  </span>
-                                </div>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-64 p-3">
-                                <div className="space-y-1.5">
-                                  <div className="font-medium text-sm">{t.profiles?.full_name || "Medewerker"}</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {t.time_off_types?.name || "Verlof"}
-                                    {t.day_part && t.day_part !== "full_day" && ` (${t.day_part === "morning" ? "ochtend" : "middag"})`}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {format(new Date(t.start_date), "d MMM", { locale: nl })} – {format(new Date(t.end_date), "d MMM yyyy", { locale: nl })}
-                                  </div>
-                                </div>
-                              </PopoverContent>
-                            </Popover>
+                            <ContextMenu key={t.id}>
+                              <ContextMenuTrigger asChild>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <div className={`flex items-center gap-2 text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${t.status === "pending" ? "opacity-70 border-l-2 border-warning pl-2" : ""}`}>
+                                      <span className="truncate">
+                                        {t.profiles?.full_name || "Medewerker"}
+                                      </span>
+                                      <div className="flex items-center gap-1 ml-auto shrink-0">
+                                        {t.status === "pending" && (
+                                          <Badge variant="warning" className="text-[9px] px-1.5 py-0 h-4">In afwachting</Badge>
+                                        )}
+                                        <span className="text-muted-foreground text-xs">
+                                          {t.time_off_types?.name || "Verlof"}
+                                          {t.day_part && t.day_part !== "full_day" && ` (${t.day_part === "morning" ? "ochtend" : "middag"})`}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-64 p-3">
+                                    <div className="space-y-1.5">
+                                      <div className="font-medium text-sm flex items-center justify-between">
+                                          {t.profiles?.full_name || "Medewerker"}
+                                          {t.status === "pending" && <Badge variant="warning" className="text-[10px]">In afwachting</Badge>}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {t.time_off_types?.name || "Verlof"}
+                                        {t.day_part && t.day_part !== "full_day" && ` (${t.day_part === "morning" ? "ochtend" : "middag"})`}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {format(new Date(t.start_date), "d MMM", { locale: nl })} – {format(new Date(t.end_date), "d MMM yyyy", { locale: nl })}
+                                      </div>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              </ContextMenuTrigger>
+                              {isAdmin && (
+                                <ContextMenuContent>
+                                  <ContextMenuItem onClick={() => handleQuickStatus("time_off_requests" as any, t.id, "approved", setTimeOff as any)}>
+                                    <CheckCircle2 className="h-4 w-4 mr-2 text-success" /> Goedkeuren
+                                  </ContextMenuItem>
+                                  <ContextMenuItem onClick={() => handleQuickStatus("time_off_requests" as any, t.id, "rejected", setTimeOff as any)}>
+                                    <XCircle className="h-4 w-4 mr-2 text-destructive" /> Afkeuren
+                                  </ContextMenuItem>
+                                  {t.status !== "pending" && (
+                                    <ContextMenuItem onClick={() => handleQuickStatus("time_off_requests" as any, t.id, "pending", setTimeOff as any)}>
+                                      <Clock className="h-4 w-4 mr-2 text-warning" /> Naar in afwachting
+                                    </ContextMenuItem>
+                                  )}
+                                </ContextMenuContent>
+                              )}
+                            </ContextMenu>
                           ))}
                         </Section>
                       )}

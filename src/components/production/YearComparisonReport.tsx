@@ -15,6 +15,7 @@ import { CylinderSizeMultiSelect } from "./CylinderSizeMultiSelect";
 import { CumulativeYearChart } from "./CumulativeYearChart";
 import { CumulativeGasTypeChart } from "./CumulativeGasTypeChart";
 import { getGasColor } from "@/constants/gasColors";
+import { supabase } from "@/integrations/supabase/client";
 import {
   BarChart,
   Bar,
@@ -369,94 +370,204 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
     const previousYear = selectedYear - 1;
     const locationFilter = location === "all" ? null : location;
 
-    // Use database function to get aggregated monthly totals - bypasses the 1000 row limit
-    const [
-      currentCylinderRes,
-      previousCylinderRes,
-      currentDryIceRes,
-      previousDryIceRes,
-      currentGasTypeRes,
-      previousGasTypeRes,
-      currentCustomerRes,
-      previousCustomerRes,
-      currentMonthlyCustCylRes,
-      previousMonthlyCustCylRes,
-      currentCylinderSizeRes,
-      previousCylinderSizeRes
-    ] = await Promise.all([
-      api.reports.getMonthlyOrderTotals(currentYear, "cylinder", locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyOrderTotals(previousYear, "cylinder", locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyOrderTotals(currentYear, "dry_ice", locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyOrderTotals(previousYear, "dry_ice", locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyCylinderTotalsByGasType(currentYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyCylinderTotalsByGasType(previousYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getYearlyTotalsByCustomer(currentYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getYearlyTotalsByCustomer(previousYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyCylinderTotalsByCustomer(currentYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyCylinderTotalsByCustomer(previousYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyCylinderTotalsBySize(currentYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error })),
-      api.reports.getMonthlyCylinderTotalsBySize(previousYear, locationFilter, hideDigital).then(data => ({ data })).catch(error => ({ data: [], error }))
-    ]);
+    // Helper: paginate Productie table for a given year and optional location
+    const PAGE = 1000;
+    const fetchAllRowsForYear = async (year: number, locationParam: string | null): Promise<any[]> => {
+      const locFilter = locationParam === "sol_emmen"
+        ? "SOL Nederland-Depot Emmen"
+        : locationParam === "sol_tilburg"
+        ? "SOL Nederland-Tilburg"
+        : null;
+      const allRows: any[] = [];
+      let from = 0;
+      while (true) {
+        let query = (supabase.from("Productie" as never) as any)
+          .select("Datum, Product, Capaciteit, Aantal, Klant")
+          .eq("Jaar", year)
+          .range(from, from + PAGE - 1);
+        if (locFilter) {
+          query = query.eq("Locatie", locFilter);
+        }
+        const { data, error } = await query;
+        if (error) break;
+        if (!data || data.length === 0) break;
+        allRows.push(...data);
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      return allRows;
+    };
 
-    // Process cylinder data from aggregated results
-    const cylinderMonthly = processMonthlyDataFromAggregated(
-      currentCylinderRes.data || [],
-      previousCylinderRes.data || []
-    );
-    setCylinderData(cylinderMonthly);
-    setCylinderTotals(calculateTotals(cylinderMonthly));
+    // Helper: get month number from a Productie row's Datum field
+    const getRowMonth = (row: any): number | null => {
+      const raw = row.Datum;
+      if (!raw) return null;
+      const iso = raw.includes("T") ? raw.substring(0, 10) : raw;
+      if (!iso || iso.length < 7) return null;
+      return parseInt(iso.substring(5, 7));
+    };
 
-    // Process dry ice data from aggregated results
-    const dryIceMonthly = processMonthlyDataFromAggregated(
-      currentDryIceRes.data || [],
-      previousDryIceRes.data || []
-    );
-    setDryIceData(dryIceMonthly);
-    setDryIceTotals(calculateTotals(dryIceMonthly));
+    // Helper: aggregate rows into monthly order totals {month, total_cylinders, total_orders}
+    const aggregateMonthlyOrderTotals = (rows: any[]): { month: number; total_value: number }[] => {
+      const monthMap = new Map<number, { cylinders: number; orders: number }>();
+      for (const row of rows) {
+        const month = getRowMonth(row);
+        if (!month) continue;
+        const existing = monthMap.get(month) || { cylinders: 0, orders: 0 };
+        existing.cylinders += Number(row.Aantal) || 0;
+        existing.orders += 1;
+        monthMap.set(month, existing);
+      }
+      return Array.from(monthMap.entries()).map(([month, v]) => ({ month, total_value: v.cylinders }));
+    };
 
-    // Process gas type comparison data
-    const { comparison: gasTypeData, monthlyData, typeInfo } = processGasTypeData(
-      currentGasTypeRes.data || [],
-      previousGasTypeRes.data || []
-    );
-    setGasTypeComparison(gasTypeData);
-    setMonthlyGasTypeData(monthlyData);
-    setGasTypeInfo(typeInfo);
+    // Helper: aggregate rows into monthly gas type totals
+    const aggregateMonthlyCylinderTotalsByGasType = (rows: any[]): { month: number; gas_type_id: string; gas_type_name: string; gas_type_color: string; total_cylinders: number }[] => {
+      const map = new Map<string, { month: number; name: string; total: number }>();
+      for (const row of rows) {
+        const month = getRowMonth(row);
+        if (!month) continue;
+        const name = row.Product || "Onbekend";
+        const key = `${month}::${name}`;
+        const existing = map.get(key) || { month, name, total: 0 };
+        existing.total += Number(row.Aantal) || 0;
+        map.set(key, existing);
+      }
+      return Array.from(map.values()).map(v => ({
+        month: v.month,
+        gas_type_id: v.name,
+        gas_type_name: v.name,
+        gas_type_color: getGasColor(v.name, "#8b5cf6"),
+        total_cylinders: v.total,
+      }));
+    };
 
-    // Process customer comparison data
-    const customerData = processCustomerComparison(
-      currentCustomerRes.data || [],
-      previousCustomerRes.data || []
-    );
-    setCustomerComparison(customerData);
+    // Helper: aggregate rows into yearly totals by customer
+    const aggregateYearlyTotalsByCustomer = (rows: any[]): { customer_id: string | null; customer_name: string; total_cylinders: number; total_dry_ice_kg: number }[] => {
+      const map = new Map<string, { name: string; total: number }>();
+      for (const row of rows) {
+        const name = row.Klant || "Onbekend";
+        const existing = map.get(name) || { name, total: 0 };
+        existing.total += Number(row.Aantal) || 0;
+        map.set(name, existing);
+      }
+      return Array.from(map.values()).map(v => ({
+        customer_id: null,
+        customer_name: v.name,
+        total_cylinders: v.total,
+        total_dry_ice_kg: 0,
+      }));
+    };
 
-    // Process monthly customer cylinder data
-    const currentMonthlyCustMap = new Map<number, MonthlyCustomerCylinderData[]>();
-    const previousMonthlyCustMap = new Map<number, MonthlyCustomerCylinderData[]>();
+    // Helper: aggregate rows into monthly totals by customer
+    const aggregateMonthlyCylinderTotalsByCustomer = (rows: any[]): MonthlyCustomerCylinderData[] => {
+      const map = new Map<string, { month: number; name: string; total: number }>();
+      for (const row of rows) {
+        const month = getRowMonth(row);
+        if (!month) continue;
+        const name = row.Klant || "Onbekend";
+        const key = `${month}::${name}`;
+        const existing = map.get(key) || { month, name, total: 0 };
+        existing.total += Number(row.Aantal) || 0;
+        map.set(key, existing);
+      }
+      return Array.from(map.values()).map(v => ({
+        month: v.month,
+        customer_id: null,
+        customer_name: v.name,
+        total_cylinders: v.total,
+      }));
+    };
 
-    (currentMonthlyCustCylRes.data || []).forEach((item: MonthlyCustomerCylinderData) => {
-      const existing = currentMonthlyCustMap.get(item.month) || [];
-      existing.push(item);
-      currentMonthlyCustMap.set(item.month, existing);
-    });
+    // Helper: aggregate rows into monthly totals by cylinder size
+    const aggregateMonthlyCylinderTotalsBySize = (rows: any[]): { month: number; cylinder_size: string; total_cylinders: number }[] => {
+      const map = new Map<string, { month: number; size: string; total: number }>();
+      for (const row of rows) {
+        const month = getRowMonth(row);
+        if (!month) continue;
+        const size = row.Capaciteit != null ? `${row.Capaciteit}L` : "OnbekendL";
+        const key = `${month}::${size}`;
+        const existing = map.get(key) || { month, size, total: 0 };
+        existing.total += Number(row.Aantal) || 0;
+        map.set(key, existing);
+      }
+      return Array.from(map.values()).map(v => ({
+        month: v.month,
+        cylinder_size: v.size,
+        total_cylinders: v.total,
+      }));
+    };
 
-    (previousMonthlyCustCylRes.data || []).forEach((item: MonthlyCustomerCylinderData) => {
-      const existing = previousMonthlyCustMap.get(item.month) || [];
-      existing.push(item);
-      previousMonthlyCustMap.set(item.month, existing);
-    });
+    try {
+      // Fetch rows from Productie for current and previous year in parallel
+      const [currentRows, previousRows] = await Promise.all([
+        fetchAllRowsForYear(currentYear, locationFilter),
+        fetchAllRowsForYear(previousYear, locationFilter),
+      ]);
 
-    setMonthlyCustomerCylinderData({
-      current: currentMonthlyCustMap,
-      previous: previousMonthlyCustMap
-    });
+      // Dry ice data still uses the old API (not in Productie)
+      const [currentDryIceRes, previousDryIceRes] = await Promise.all([
+        api.reports.getMonthlyOrderTotals(currentYear, "dry_ice", locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
+        api.reports.getMonthlyOrderTotals(previousYear, "dry_ice", locationFilter).then(data => ({ data })).catch(error => ({ data: [], error })),
+      ]);
 
-    // Process cylinder size comparison data
-    const cylinderSizeData = processCylinderSizeComparison(
-      currentCylinderSizeRes.data || [],
-      previousCylinderSizeRes.data || []
-    );
-    setCylinderSizeComparison(cylinderSizeData);
+      // Compute cylinder monthly data
+      const currentCylinderAgg = aggregateMonthlyOrderTotals(currentRows);
+      const previousCylinderAgg = aggregateMonthlyOrderTotals(previousRows);
+      const cylinderMonthly = processMonthlyDataFromAggregated(currentCylinderAgg, previousCylinderAgg);
+      setCylinderData(cylinderMonthly);
+      setCylinderTotals(calculateTotals(cylinderMonthly));
+
+      // Process dry ice data from API results
+      const dryIceMonthly = processMonthlyDataFromAggregated(
+        currentDryIceRes.data || [],
+        previousDryIceRes.data || []
+      );
+      setDryIceData(dryIceMonthly);
+      setDryIceTotals(calculateTotals(dryIceMonthly));
+
+      // Compute gas type data
+      const currentGasTypeAgg = aggregateMonthlyCylinderTotalsByGasType(currentRows);
+      const previousGasTypeAgg = aggregateMonthlyCylinderTotalsByGasType(previousRows);
+      const { comparison: gasTypeDataResult, monthlyData: gasTypeMonthlyData, typeInfo } = processGasTypeData(
+        currentGasTypeAgg,
+        previousGasTypeAgg
+      );
+      setGasTypeComparison(gasTypeDataResult);
+      setMonthlyGasTypeData(gasTypeMonthlyData);
+      setGasTypeInfo(typeInfo);
+
+      // Compute customer comparison data
+      const currentCustomerAgg = aggregateYearlyTotalsByCustomer(currentRows);
+      const previousCustomerAgg = aggregateYearlyTotalsByCustomer(previousRows);
+      const customerData = processCustomerComparison(currentCustomerAgg, previousCustomerAgg);
+      setCustomerComparison(customerData);
+
+      // Compute monthly customer cylinder data
+      const currentMonthlyCustAgg = aggregateMonthlyCylinderTotalsByCustomer(currentRows);
+      const previousMonthlyCustAgg = aggregateMonthlyCylinderTotalsByCustomer(previousRows);
+      const currentMonthlyCustMap = new Map<number, MonthlyCustomerCylinderData[]>();
+      const previousMonthlyCustMap = new Map<number, MonthlyCustomerCylinderData[]>();
+      currentMonthlyCustAgg.forEach((item) => {
+        const existing = currentMonthlyCustMap.get(item.month) || [];
+        existing.push(item);
+        currentMonthlyCustMap.set(item.month, existing);
+      });
+      previousMonthlyCustAgg.forEach((item) => {
+        const existing = previousMonthlyCustMap.get(item.month) || [];
+        existing.push(item);
+        previousMonthlyCustMap.set(item.month, existing);
+      });
+      setMonthlyCustomerCylinderData({ current: currentMonthlyCustMap, previous: previousMonthlyCustMap });
+
+      // Compute cylinder size comparison data
+      const currentCylinderSizeAgg = aggregateMonthlyCylinderTotalsBySize(currentRows);
+      const previousCylinderSizeAgg = aggregateMonthlyCylinderTotalsBySize(previousRows);
+      const cylinderSizeData = processCylinderSizeComparison(currentCylinderSizeAgg, previousCylinderSizeAgg);
+      setCylinderSizeComparison(cylinderSizeData);
+    } catch (err) {
+      console.error("Error fetching year comparison data:", err);
+    }
 
     setLoading(false);
   };

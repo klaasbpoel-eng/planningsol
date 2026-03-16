@@ -145,26 +145,35 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
     return options;
   }, []);
 
-  const fetchSizeDistribution = async (from: string, to: string, location: string): Promise<SizeItem[]> => {
-    const { data, error } = await supabase
-      .from("gas_cylinder_orders")
-      .select("cylinder_size, cylinder_count")
-      .gte("scheduled_date", from)
-      .lte("scheduled_date", to)
-      .eq("location", location as any)
-      .neq("status", "cancelled");
-
-    if (error || !data) return [];
-
-    const sizeMap = new Map<string, number>();
-    data.forEach((row: any) => {
-      const size = row.cylinder_size || "medium";
-      sizeMap.set(size, (sizeMap.get(size) || 0) + (Number(row.cylinder_count) || 0));
+  // Paginate all Productie rows for a date range and location
+  const fetchProductieForPeriod = async (from: string, to: string, locationParam: string): Promise<any[]> => {
+    const fromYear = parseInt(from.substring(0, 4));
+    const toYear = parseInt(to.substring(0, 4));
+    const years = Array.from({ length: toYear - fromYear + 1 }, (_, i) => fromYear + i);
+    const allRows: any[] = [];
+    for (const year of years) {
+      const PAGE = 1000;
+      let offset = 0;
+      while (true) {
+        const { data } = await (supabase.from("Productie" as never) as any)
+          .select("Datum,Locatie,Product,Capaciteit,Aantal,Klant")
+          .eq("Jaar", year)
+          .range(offset, offset + PAGE - 1);
+        if (!data || data.length === 0) break;
+        allRows.push(...data);
+        if (data.length < PAGE) break;
+        offset += PAGE;
+      }
+    }
+    return allRows.filter((row: any) => {
+      const raw: string = row.Datum || "";
+      if (!raw) return false;
+      const iso = raw.includes("T") ? raw.substring(0, 10)
+        : (() => { const p = raw.split("-"); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+      if (iso < from || iso > to) return false;
+      const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+      return loc === locationParam;
     });
-
-    return Array.from(sizeMap.entries())
-      .map(([size, count]) => ({ size, count }))
-      .sort((a, b) => b.count - a.count);
   };
 
   const fetchLocationData = async (
@@ -173,49 +182,64 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
     from: string,
     to: string,
   ): Promise<LocationKPI> => {
-    const [effRes, dryIceEffRes, customerRes, gasTypeRes, sizeRes] = await Promise.all([
-      api.reports.getProductionEfficiency(from, to, location, hideDigital).catch(() => []),
-      api.reports.getDryIceEfficiency(from, to, location).catch(() => []),
-      api.reports.getCustomerTotals(from, to, location, hideDigital).catch(() => []),
-      api.reports.getGasTypeDistribution(from, to, location, hideDigital).catch(() => []),
-      fetchSizeDistribution(from, to, location),
+    const isTilburg = location === "sol_tilburg";
+    const [rows, dryIceEffRes] = await Promise.all([
+      fetchProductieForPeriod(from, to, location),
+      isTilburg
+        ? Promise.resolve([{ total_kg: 0, total_orders: 0 }])
+        : api.reports.getDryIceEfficiency(from, to, location).catch(() => [{ total_kg: 0, total_orders: 0 }]),
     ]);
 
-    const eff = (effRes as any)?.[0] || {};
+    const totalCyl = rows.reduce((sum, r) => sum + (r.Aantal || 0), 0);
+    const cylOrders = rows.length;
+
+    // Top customers grouped by Klant
+    const custMap = new Map<string, number>();
+    for (const row of rows) {
+      const name = row.Klant || "Onbekend";
+      custMap.set(name, (custMap.get(name) || 0) + (row.Aantal || 0));
+    }
+    const customers = Array.from(custMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, cylinders]) => ({ name, cylinders, dryIceKg: 0 }));
+
+    // Gas type distribution grouped by Product
+    const typeMap = new Map<string, number>();
+    for (const row of rows) {
+      const name = row.Product || "Onbekend";
+      typeMap.set(name, (typeMap.get(name) || 0) + (row.Aantal || 0));
+    }
+    const gasTypes = Array.from(typeMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, count]) => ({ name, color: "#3b82f6", count }));
+
+    // Size distribution grouped by Capaciteit
+    const sizeMap = new Map<string, number>();
+    for (const row of rows) {
+      const size = row.Capaciteit != null ? `${row.Capaciteit}L` : "Onbekend";
+      sizeMap.set(size, (sizeMap.get(size) || 0) + (row.Aantal || 0));
+    }
+    const sizeDistribution = Array.from(sizeMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([size, count]) => ({ size, count }));
+
     const dryIceEff = (dryIceEffRes as any)?.[0] || {};
-    const customers = ((customerRes as any) || [])
-      .sort((a: any, b: any) => (b.total_cylinders || 0) - (a.total_cylinders || 0))
-      .slice(0, 5)
-      .map((c: any) => ({
-        name: c.customer_name || "Onbekend",
-        cylinders: Number(c.total_cylinders) || 0,
-        dryIceKg: Number(c.total_dry_ice_kg) || 0,
-      }));
-
-    const gasTypes = ((gasTypeRes as any) || [])
-      .slice(0, 5)
-      .map((g: any) => ({
-        name: g.gas_type_name || "Onbekend",
-        color: g.gas_type_color || "#3b82f6",
-        count: Number(g.total_cylinders) || 0,
-      }));
-
-    const totalCyl = Number(eff.total_cylinders) || 0;
-    const cylOrders = Number(eff.total_orders) || 0;
 
     return {
       location,
       label,
       totalCylinders: totalCyl,
       cylinderOrders: cylOrders,
-      completedCylinders: Number(eff.completed_cylinders) || 0,
-      efficiencyRate: Number(eff.efficiency_rate) || 0,
+      completedCylinders: totalCyl,
+      efficiencyRate: cylOrders > 0 ? 100 : 0,
       avgCylindersPerOrder: cylOrders > 0 ? Math.round((totalCyl / cylOrders) * 10) / 10 : 0,
       totalDryIceKg: Number(dryIceEff.total_kg) || 0,
       dryIceOrders: Number(dryIceEff.total_orders) || 0,
       topCustomers: customers,
       gasTypeDistribution: gasTypes,
-      sizeDistribution: sizeRes,
+      sizeDistribution,
     };
   };
 

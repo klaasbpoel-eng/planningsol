@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,30 +56,37 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
 
   const fetchHeatMapData = async () => {
     setLoading(true);
-
     const locationParam = location === "all" ? null : location;
     const fromDate = format(startOfMonth(currentDate), "yyyy-MM-dd");
     const toDate = format(endOfMonth(currentDate), "yyyy-MM-dd");
+    const year = currentDate.getFullYear();
 
     try {
-      const data = await api.reports.getDailyProductionByPeriod(fromDate, toDate, locationParam, hideDigital);
-
-      if (data) {
-        const dataMap = new Map<string, DailyData>();
-        // @ts-ignore - Supabase RPC types might not be fully inferred yet
-        data.forEach((row: { production_date: string; cylinder_count: number; dry_ice_kg: number }) => {
-          dataMap.set(row.production_date, {
-            date: row.production_date,
-            cylinders: Number(row.cylinder_count),
-            dryIce: Number(row.dry_ice_kg)
-          });
-        });
-        setDailyData(dataMap);
+      const PAGE = 1000;
+      const allRows: any[] = [];
+      let from = 0;
+      while (true) {
+        const { data } = await (supabase.from("Productie" as never) as any)
+          .select("Datum,Locatie,Aantal").eq("Jaar", year).range(from, from + PAGE - 1);
+        if (!data || data.length === 0) break;
+        allRows.push(...data); if (data.length < PAGE) break; from += PAGE;
       }
+
+      const dataMap = new Map<string, DailyData>();
+      for (const row of allRows) {
+        const raw: string = row.Datum || "";
+        if (!raw) continue;
+        const iso = raw.includes("T") ? raw.substring(0,10) : (() => { const p = raw.split("-"); return p.length===3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+        if (iso < fromDate || iso > toDate) continue;
+        if (locationParam) { const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg"; if (loc !== locationParam) continue; }
+        const existing = dataMap.get(iso) || { date: iso, cylinders: 0, dryIce: 0 };
+        existing.cylinders += row.Aantal || 0;
+        dataMap.set(iso, existing);
+      }
+      setDailyData(dataMap);
     } catch (error) {
       console.error("Error fetching heatmap data:", error);
     }
-
     setLoading(false);
   };
 

@@ -253,6 +253,7 @@ export function SOLInventoryImportDialog({
       description: `${row.contentDescription} (${row.capacity}L)`,
       averageConsumption: 0, // SOL inventory doesn't include consumption data
       numberOnStock: row.countVol,
+      numberEmpty: row.countLeeg,
       difference: row.countVol, // No consumption baseline, so difference = stock
       filledInEmmen: row.location === "emmen",
     }));

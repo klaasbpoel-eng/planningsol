@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Trophy, TrendingUp, TrendingDown, Minus, RefreshCw } from "lucide-react";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { cn, formatNumber } from "@/lib/utils";
 import { FadeIn } from "@/components/ui/fade-in";
 import { CustomerListSkeleton } from "@/components/ui/skeletons";
@@ -71,66 +71,130 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
     }
   }, [dateRange, location]);
 
-  const fetchCustomersByYear = async () => {
-    const currentYear = new Date().getFullYear();
-    const previousYear = currentYear - 1;
+  // Fetch Productie rows for a date range and group by customer
+  const fetchProductieByCustomer = async (
+    fromDate: string,
+    toDate: string,
+    locationFilter: string | null
+  ): Promise<Map<string, number>> => {
+    const fromYear = parseInt(fromDate.substring(0, 4));
+    const toYear = parseInt(toDate.substring(0, 4));
+    const yearsNeeded = Array.from({ length: toYear - fromYear + 1 }, (_, i) => fromYear + i);
 
-    // Pass location filter to the RPC function (null for "all")
-    const locationFilter = location === "all" ? null : location;
-
-    const [currentData, previousData] = await Promise.all([
-      api.reports.getYearlyTotalsByCustomer(currentYear, locationFilter).catch(error => {
-        console.error("[TopCustomersWidget] Error fetching current year data:", error);
-        throw error;
-      }),
-      api.reports.getYearlyTotalsByCustomer(previousYear, locationFilter).catch(error => {
-        console.error("[TopCustomersWidget] Error fetching previous year data:", error);
-        return null;
-      })
-    ]);
-
-    const previousMap = new Map<string, { cylinders: number; dryIce: number }>();
-    if (previousData) {
-      previousData.forEach((c: { customer_name: string; total_cylinders: number; total_dry_ice_kg: number }) => {
-        previousMap.set(c.customer_name, {
-          cylinders: Number(c.total_cylinders) || 0,
-          dryIce: Number(c.total_dry_ice_kg) || 0
-        });
-      });
+    const allRows: any[] = [];
+    for (const year of yearsNeeded) {
+      const PAGE = 1000;
+      let from = 0;
+      while (true) {
+        const { data } = await (supabase.from("Productie" as never) as any)
+          .select("Datum,Locatie,Aantal,Klant")
+          .eq("Jaar", year)
+          .range(from, from + PAGE - 1);
+        if (!data || data.length === 0) break;
+        allRows.push(...data);
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
     }
 
-    const enriched: CustomerData[] = (currentData || []).map((c: { customer_id: string | null; customer_name: string; total_cylinders: number; total_dry_ice_kg: number }) => {
-      const prev = previousMap.get(c.customer_name) || { cylinders: 0, dryIce: 0 };
-      const currentTotal = Number(c.total_cylinders) + Number(c.total_dry_ice_kg);
-      const previousTotal = prev.cylinders + prev.dryIce;
-      const changePercent = previousTotal > 0
-        ? ((currentTotal - previousTotal) / previousTotal) * 100
-        : currentTotal > 0 ? 100 : 0;
-
-      return {
-        customer_id: c.customer_id,
-        customer_name: c.customer_name,
-        total_cylinders: Number(c.total_cylinders) || 0,
-        total_dry_ice_kg: Number(c.total_dry_ice_kg) || 0,
-        previousCylinders: prev.cylinders,
-        previousDryIce: prev.dryIce,
-        totalVolume: currentTotal,
-        changePercent
-      };
+    const filtered = allRows.filter((row: any) => {
+      const raw: string = row.Datum || "";
+      if (!raw) return false;
+      const iso = raw.includes("T") ? raw.substring(0, 10)
+        : (() => { const p = raw.split("-"); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+      if (iso < fromDate || iso > toDate) return false;
+      if (locationFilter) {
+        const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+        if (loc !== locationFilter) return false;
+      }
+      return true;
     });
 
-    const top5 = enriched
+    const byCustomer = new Map<string, number>();
+    for (const row of filtered) {
+      const name = row.Klant || "Onbekend";
+      byCustomer.set(name, (byCustomer.get(name) || 0) + (row.Aantal || 0));
+    }
+    return byCustomer;
+  };
+
+  // Fetch Productie rows for a full year and group by customer
+  const fetchProductieByCustomerForYear = async (
+    year: number,
+    locationFilter: string | null
+  ): Promise<Map<string, number>> => {
+    const PAGE = 1000;
+    const data: any[] = [];
+    let from = 0;
+    while (true) {
+      const { data: page } = await (supabase.from("Productie" as never) as any)
+        .select("Locatie,Aantal,Klant")
+        .eq("Jaar", year)
+        .range(from, from + PAGE - 1);
+      if (!page || page.length === 0) break;
+      data.push(...page);
+      if (page.length < PAGE) break;
+      from += PAGE;
+    }
+
+    const filtered = (data || []).filter((row: any) => {
+      if (!locationFilter) return true;
+      const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+      return loc === locationFilter;
+    });
+
+    const byCustomer = new Map<string, number>();
+    for (const row of filtered) {
+      const name = row.Klant || "Onbekend";
+      byCustomer.set(name, (byCustomer.get(name) || 0) + (row.Aantal || 0));
+    }
+    return byCustomer;
+  };
+
+  const buildCustomerList = (
+    currentMap: Map<string, number>,
+    previousMap: Map<string, number>
+  ): CustomerData[] => {
+    return Array.from(currentMap.entries())
+      .map(([name, cylinders]) => {
+        const prevCylinders = previousMap.get(name) || 0;
+        const changePercent =
+          prevCylinders > 0
+            ? ((cylinders - prevCylinders) / prevCylinders) * 100
+            : cylinders > 0
+            ? 100
+            : 0;
+        return {
+          customer_id: null,
+          customer_name: name,
+          total_cylinders: cylinders,
+          total_dry_ice_kg: 0,
+          previousCylinders: prevCylinders,
+          previousDryIce: 0,
+          totalVolume: cylinders,
+          changePercent,
+        };
+      })
       .sort((a, b) => b.total_cylinders - a.total_cylinders)
       .slice(0, 5);
+  };
 
-    setCustomers(top5);
+  const fetchCustomersByYear = async () => {
+    const currentYear = new Date().getFullYear();
+    const locationFilter = location === "all" ? null : location;
+
+    const [currentMap, previousMap] = await Promise.all([
+      fetchProductieByCustomerForYear(currentYear, locationFilter),
+      fetchProductieByCustomerForYear(currentYear - 1, locationFilter),
+    ]);
+
+    setCustomers(buildCustomerList(currentMap, previousMap));
   };
 
   const fetchCustomersByDateRange = async (range: DateRange) => {
     const fromDate = format(range.from, "yyyy-MM-dd");
     const toDate = format(range.to, "yyyy-MM-dd");
 
-    // Calculate previous period (same length, immediately before)
     const periodLength = differenceInDays(range.to, range.from);
     const prevTo = subDays(range.from, 1);
     const prevFrom = subDays(prevTo, periodLength);
@@ -139,55 +203,12 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
 
     const locationFilter = location === "all" ? null : location;
 
-    // Use RPC function for server-side aggregation (avoids 1000 row limit)
-    const [currentData, previousData] = await Promise.all([
-      api.reports.getCustomerTotals(fromDate, toDate, locationFilter).catch(error => {
-        console.error("[TopCustomersWidget] Error fetching current period data:", error);
-        throw error;
-      }),
-      api.reports.getCustomerTotals(prevFromDate, prevToDate, locationFilter).catch(error => {
-        console.error("[TopCustomersWidget] Error fetching previous period data:", error);
-        return null;
-      })
+    const [currentMap, previousMap] = await Promise.all([
+      fetchProductieByCustomer(fromDate, toDate, locationFilter),
+      fetchProductieByCustomer(prevFromDate, prevToDate, locationFilter),
     ]);
 
-    // Build previous period map for trend calculation
-    const prevMap = new Map<string, { cylinders: number; dryIce: number }>();
-    if (previousData) {
-      previousData.forEach((c: { customer_name: string; total_cylinders: number; total_dry_ice_kg: number }) => {
-        prevMap.set(c.customer_name, {
-          cylinders: Number(c.total_cylinders) || 0,
-          dryIce: Number(c.total_dry_ice_kg) || 0
-        });
-      });
-    }
-
-    // Build enriched customer data
-    const enriched: CustomerData[] = (currentData || []).map((c: { customer_id: string | null; customer_name: string; total_cylinders: number; total_dry_ice_kg: number }) => {
-      const prev = prevMap.get(c.customer_name) || { cylinders: 0, dryIce: 0 };
-      const currentTotal = Number(c.total_cylinders) + Number(c.total_dry_ice_kg);
-      const previousTotal = prev.cylinders + prev.dryIce;
-      const changePercent = previousTotal > 0
-        ? ((currentTotal - previousTotal) / previousTotal) * 100
-        : currentTotal > 0 ? 100 : 0;
-
-      return {
-        customer_id: c.customer_id,
-        customer_name: c.customer_name,
-        total_cylinders: Number(c.total_cylinders) || 0,
-        total_dry_ice_kg: Number(c.total_dry_ice_kg) || 0,
-        previousCylinders: prev.cylinders,
-        previousDryIce: prev.dryIce,
-        totalVolume: currentTotal,
-        changePercent
-      };
-    });
-
-    const top5 = enriched
-      .sort((a, b) => b.total_cylinders - a.total_cylinders)
-      .slice(0, 5);
-
-    setCustomers(top5);
+    setCustomers(buildCustomerList(currentMap, previousMap));
   };
 
   const getTrendIcon = useCallback((change: number) => {
@@ -261,8 +282,12 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
                     <p className="font-medium text-sm truncate">{customer.customer_name}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{formatNumber(customer.total_cylinders, 0)} cil.</span>
-                      <span>•</span>
-                      <span>{formatNumber(customer.total_dry_ice_kg, 0)} kg</span>
+                      {customer.total_dry_ice_kg > 0 && (
+                        <>
+                          <span>•</span>
+                          <span>{formatNumber(customer.total_dry_ice_kg, 0)} kg</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

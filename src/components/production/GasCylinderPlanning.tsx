@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Cylinder, Calendar, Gauge, AlertTriangle, Trash2, Filter, CalendarIcon, X, Edit2, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, MapPin, Download, Loader2 } from "lucide-react";
-import { FloatingActionButton } from "@/components/ui/floating-action-button";
-import { FadeIn } from "@/components/ui/fade-in";
+import { Input } from "@/components/ui/input";
+import { Cylinder, Calendar, Filter, CalendarIcon, X, ArrowUp, ArrowDown, ArrowUpDown, MapPin } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -30,67 +29,35 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 import { toast } from "sonner";
-import { CreateGasCylinderOrderDialog } from "./CreateGasCylinderOrderDialog";
-import { GasCylinderOrderDialog } from "./GasCylinderOrderDialog";
-import { GasTypeMultiSelect } from "./GasTypeMultiSelect";
-import { ExcelImportDialog } from "./ExcelImportDialog";
-import { useUserPermissions } from "@/hooks/useUserPermissions";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { MobileOrderCard, OrderDetail } from "./MobileOrderCard";
 import { getGasColor } from "@/constants/gasColors";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
-interface GasCylinderOrder {
+interface ProductieRow {
   id: string;
-  order_number: string;
+  Jaar: number;
+  Datum: string;
+  Locatie: string;
+  Product: string;
+  Capaciteit: number;
+  Aantal: number;
+  Klant: string;
+}
+
+interface CylinderFilling {
+  id: string;
   customer_name: string;
   gas_type: string;
-  gas_type_id: string | null;
-  gas_grade: string;
   cylinder_count: number;
-  cylinder_size: string;
-  scheduled_date: string;
-  status: string;
-  notes: string | null;
-  created_at: string;
-  pressure: number;
-  series_id: string | null;
+  cylinder_size: number;
+  scheduled_date: string; // YYYY-MM-DD
   location: "sol_emmen" | "sol_tilburg";
-  gas_type_ref?: {
-    id: string;
-    name: string;
-    color: string;
-  } | null;
 }
 
 type LocationTab = "sol_emmen" | "sol_tilburg";
-
-type PressureFilter = "all" | "200" | "300";
-type StatusFilter = "all" | "pending" | "in_progress" | "completed" | "cancelled";
-type GradeFilter = "all" | "medical" | "technical";
-type SortColumn = "order_number" | "customer_name" | "gas_type" | "cylinder_count" | "pressure" | "scheduled_date" | "status";
+type SortColumn = "customer_name" | "gas_type" | "cylinder_count" | "cylinder_size" | "scheduled_date";
 type SortDirection = "asc" | "desc";
-
-interface GasType {
-  id: string;
-  name: string;
-  color: string;
-}
-
 type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 
 interface GasCylinderPlanningProps {
@@ -98,57 +65,51 @@ interface GasCylinderPlanningProps {
   location?: ProductionLocation;
 }
 
-export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCylinderPlanningProps) {
-  // Determine initial tab based on location prop
+function mapLocatie(locatie: string): "sol_emmen" | "sol_tilburg" {
+  return locatie.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+}
+
+// Convert datum to "YYYY-MM-DD"
+// Handles both ISO "2020-01-02T00:00:00.000Z" (new) and "DD-MM-YYYY" (legacy)
+function mapDatum(datum: string): string {
+  if (!datum) return "";
+  if (datum.includes("T")) return datum.substring(0, 10);
+  const parts = datum.split("-");
+  if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  return datum;
+}
+
+export function GasCylinderPlanning({ location = "all" }: GasCylinderPlanningProps) {
   const getInitialTab = (): LocationTab => {
-    if (location === "sol_emmen" || location === "sol_tilburg") {
-      return location;
-    }
+    if (location === "sol_emmen" || location === "sol_tilburg") return location;
     return "sol_emmen";
   };
 
-  const [orders, setOrders] = useState<GasCylinderOrder[]>([]);
+  const [orders, setOrders] = useState<CylinderFilling[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<GasCylinderOrder | null>(null);
-  const [pressureFilter, setPressureFilter] = useState<PressureFilter>("all");
-  const [gasTypeFilter, setGasTypeFilter] = useState<string[]>([]);
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [gradeFilter, setGradeFilter] = useState<GradeFilter>("all");
   const [customerFilter, setCustomerFilter] = useState<string>("all");
-  const [userId, setUserId] = useState<string | undefined>();
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [orderToDelete, setOrderToDelete] = useState<GasCylinderOrder | null>(null);
-  const [gasTypes, setGasTypes] = useState<GasType[]>([]);
+  const [productFilter, setProductFilter] = useState<string>("");
   const [sortColumn, setSortColumn] = useState<SortColumn>("scheduled_date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
-  const [monthFilter, setMonthFilter] = useState<number>(new Date().getMonth() + 1);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [monthFilter, setMonthFilter] = useState<number>(0);
   const [locationTab, setLocationTab] = useState<LocationTab>(getInitialTab());
-  const [isExporting, setIsExporting] = useState(false);
 
-  // Update location tab when location prop changes (for non-admin users)
   useEffect(() => {
     if (location === "sol_emmen" || location === "sol_tilburg") {
       setLocationTab(location);
     }
   }, [location]);
 
-  // Check if location tabs should be hidden (when user is restricted to a single location)
   const showLocationTabs = location === "all";
 
-  // Dutch month names for dropdown
   const monthNames = [
     "Januari", "Februari", "Maart", "April", "Mei", "Juni",
-    "Juli", "Augustus", "September", "Oktober", "November", "December"
+    "Juli", "Augustus", "September", "Oktober", "November", "December",
   ];
 
-  // Unique customers from orders for filtering
-  const uniqueCustomers = [...new Set(orders.map(o => o.customer_name))].sort();
-  const { permissions, isAdmin } = useUserPermissions(userId);
+  const uniqueCustomers = [...new Set(orders.map((o) => o.customer_name))].sort();
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -160,375 +121,126 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
   };
 
   const SortIcon = ({ column }: { column: SortColumn }) => {
-    if (sortColumn !== column) {
-      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
-    }
+    if (sortColumn !== column) return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
     return sortDirection === "asc"
       ? <ArrowUp className="h-4 w-4 ml-1" />
       : <ArrowDown className="h-4 w-4 ml-1" />;
   };
 
-  const handleEditOrder = (order: GasCylinderOrder) => {
-    setSelectedOrder(order);
-    setEditDialogOpen(true);
-  };
-
-  const handleEditDialogClose = (open: boolean) => {
-    setEditDialogOpen(open);
-    if (!open) {
-      setSelectedOrder(null);
-    }
-  };
-
-  const handleOrderUpdated = () => {
-    fetchOrders();
-    setEditDialogOpen(false);
-    setSelectedOrder(null);
-    onDataChanged?.();
-  };
-
-  const handleOrderCreated = () => {
-    fetchOrders();
-    setDialogOpen(false);
-    onDataChanged?.();
-  };
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUserId(data.user?.id);
-    });
-  }, []);
-
   useEffect(() => {
     fetchOrders();
-    fetchGasTypes();
-  }, [yearFilter, monthFilter]);
-
-  const fetchGasTypes = async () => {
-    const { data } = await supabase
-      .from("gas_types")
-      .select("id, name, color")
-      .eq("is_active", true)
-      .order("name");
-
-    if (data) {
-      setGasTypes(data);
-    }
-  };
-
-  // Fetch data for a single week (to bypass Supabase 1000-row default limit)
-  const fetchWeekData = async (startDate: string, endDate: string) => {
-    try {
-      const data = await api.gasCylinderOrders.getAll(startDate, endDate);
-      return (data as GasCylinderOrder[]) || [];
-    } catch (error) {
-      console.error(`Error fetching orders for ${startDate} - ${endDate}:`, error);
-      return [];
-    }
-  };
-
-  // Get all weeks for a given month
-  const getWeeksInMonth = (year: number, month: number) => {
-    const weeks: { startDate: string; endDate: string }[] = [];
-    const monthStr = String(month).padStart(2, '0');
-    const lastDay = new Date(year, month, 0).getDate();
-
-    let currentDay = 1;
-    while (currentDay <= lastDay) {
-      const endDay = Math.min(currentDay + 6, lastDay);
-      weeks.push({
-        startDate: `${year}-${monthStr}-${String(currentDay).padStart(2, '0')}`,
-        endDate: `${year}-${monthStr}-${String(endDay).padStart(2, '0')}`
-      });
-      currentDay = endDay + 1;
-    }
-    return weeks;
-  };
-
-  const fetchMonthData = async (year: number, month: number) => {
-    // Split month into weeks to bypass 1000-row limit
-    const weeks = getWeeksInMonth(year, month);
-    const weekPromises = weeks.map(({ startDate, endDate }) =>
-      fetchWeekData(startDate, endDate)
-    );
-    const weekResults = await Promise.all(weekPromises);
-
-    // Combine and deduplicate (in case of edge cases)
-    const allOrders = weekResults.flat();
-    const uniqueOrders = Array.from(
-      new Map(allOrders.map(o => [o.id, o])).values()
-    );
-    return uniqueOrders.sort((a, b) =>
-      a.scheduled_date.localeCompare(b.scheduled_date)
-    );
-  };
+  }, [yearFilter]);
 
   const fetchOrders = async () => {
     setLoading(true);
-
     try {
-      if (monthFilter === 0) {
-        // Hele jaar: laad alle 12 maanden parallel
-        const monthPromises = Array.from({ length: 12 }, (_, i) =>
-          fetchMonthData(yearFilter, i + 1)
-        );
-        const allMonthData = await Promise.all(monthPromises);
-        const combinedOrders = allMonthData.flat().sort((a, b) =>
-          a.scheduled_date.localeCompare(b.scheduled_date)
-        );
-        // Deduplicate across months (shouldn't happen but safety first)
-        const uniqueOrders = Array.from(
-          new Map(combinedOrders.map(o => [o.id, o])).values()
-        );
-        setOrders(uniqueOrders);
-      } else {
-        // Specifieke maand
-        const data = await fetchMonthData(yearFilter, monthFilter);
-        setOrders(data);
+      const PAGE = 1000;
+      const allData: ProductieRow[] = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await (supabase.from("Productie" as never) as any)
+          .select("id,Jaar,Datum,Locatie,Product,Capaciteit,Aantal,Klant")
+          .eq("Jaar", yearFilter)
+          .range(from, from + PAGE - 1);
+        if (error) {
+          console.error("Error fetching Productie:", error);
+          toast.error(`Fout bij ophalen productiedata: ${error.message}`);
+          setOrders([]);
+          setLoading(false);
+          return;
+        }
+        if (!data || data.length === 0) break;
+        allData.push(...data);
+        if (data.length < PAGE) break;
+        from += PAGE;
       }
-    } catch (error) {
-      console.error("Error fetching orders:", error);
-      toast.error("Fout bij ophalen orders");
+      setOrders(allData.map((row) => ({
+        id: row.id,
+        customer_name: row.Klant || "",
+        gas_type: row.Product || "",
+        cylinder_count: row.Aantal || 0,
+        cylinder_size: row.Capaciteit || 0,
+        scheduled_date: mapDatum(row.Datum),
+        location: mapLocatie(row.Locatie || ""),
+      })));
+    } catch (err) {
+      console.error("Fetch error:", err);
+      toast.error("Fout bij ophalen productiedata");
+      setOrders([]);
     }
-
     setLoading(false);
   };
 
-  // Generate available years (2022 to current year + 1)
+  // Available years: 2020 to current year
   const availableYears = Array.from(
-    { length: new Date().getFullYear() - 2021 + 1 },
-    (_, i) => 2022 + i
+    { length: new Date().getFullYear() - 2019 + 1 },
+    (_, i) => 2020 + i
   );
 
-  const handleDeleteClick = (order: GasCylinderOrder) => {
-    setOrderToDelete(order);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!orderToDelete) return;
-
-    try {
-      await api.gasCylinderOrders.delete(orderToDelete.id);
-      toast.success("Order verwijderd");
-      fetchOrders();
-      onDataChanged?.();
-    } catch (error) {
-      console.error("Error deleting order:", error);
-      toast.error("Fout bij verwijderen order");
+  const filteredOrders = orders.filter((o) => {
+    if (o.location !== locationTab) return false;
+    if (monthFilter !== 0) {
+      const month = parseInt(o.scheduled_date.split("-")[1], 10);
+      if (month !== monthFilter) return false;
     }
-    setDeleteDialogOpen(false);
-    setOrderToDelete(null);
-  };
-
-  const handleStatusChange = async (id: string, newStatus: string) => {
-    // Optimistic update
-    setOrders(prev => prev.map(order =>
-      order.id === id ? { ...order, status: newStatus } : order
-    ));
-
-    try {
-      await api.gasCylinderOrders.update(id, { status: newStatus });
-      toast.success("Status bijgewerkt");
-    } catch (error) {
-      console.error("Error updating status:", error);
-      toast.error("Fout bij bijwerken status");
-      fetchOrders(); // Revert on error
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-      pending: { variant: "secondary", label: "Gepland" },
-      in_progress: { variant: "default", label: "Bezig" },
-      completed: { variant: "outline", label: "Voltooid" },
-      cancelled: { variant: "destructive", label: "Geannuleerd" },
-    };
-    const config = variants[status] || { variant: "secondary", label: status };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
-
-  const gasTypeLabels: Record<string, string> = {
-    co2: "CO₂",
-    nitrogen: "Stikstof (N₂)",
-    argon: "Argon",
-    acetylene: "Acetyleen",
-    oxygen: "Zuurstof",
-    helium: "Helium",
-    other: "Overig",
-  };
-
-  const getGasTypeLabel = (order: GasCylinderOrder) => {
-    // First priority: use gas_type_ref from the joined gas_types table
-    if (order.gas_type_ref?.name) {
-      return order.gas_type_ref.name;
-    }
-
-    // Fallback: Try to find matching gas type from loaded gas types using gas_type_id
-    if (order.gas_type_id) {
-      const matchingGasType = gasTypes.find(gt => gt.id === order.gas_type_id);
-      if (matchingGasType) {
-        return matchingGasType.name;
-      }
-    }
-
-    // Legacy fallback: check notes for "Gastype: Name" format (for old imported data)
-    if (order.notes) {
-      const gasTypeMatch = order.notes.match(/^Gastype:\s*(.+?)(?:\n|$)/i);
-      if (gasTypeMatch) {
-        return gasTypeMatch[1].trim();
-      }
-    }
-
-    // Final fallback: use enum labels
-    const gasTypeLabels: Record<string, string> = {
-      co2: "CO₂",
-      nitrogen: "Stikstof (N₂)",
-      argon: "Argon",
-      acetylene: "Acetyleen",
-      oxygen: "Zuurstof",
-      helium: "Helium",
-      other: "Overig",
-    };
-    return gasTypeLabels[order.gas_type] || order.gas_type;
-  };
-
-  const getGasTypeColor = (order: GasCylinderOrder): string => {
-    const label = getGasTypeLabel(order);
-    return getGasColor(label, order.gas_type_ref?.color || "#6b7280");
-  };
-
-  const statusLabels: Record<string, string> = {
-    pending: "Gepland",
-    in_progress: "Bezig",
-    completed: "Voltooid",
-    cancelled: "Geannuleerd",
-  };
-
-  const filteredOrders = orders.filter(o => {
-    const matchesLocation = o.location === locationTab;
-    const matchesPressure = pressureFilter === "all" || o.pressure === parseInt(pressureFilter);
-    // Match gas type filter - empty array means all, otherwise check if the order's gas_type_id is in the selected list
-    const matchesGasType = gasTypeFilter.length === 0 || (o.gas_type_id && gasTypeFilter.includes(o.gas_type_id));
-    const matchesDate = !dateFilter || o.scheduled_date === format(dateFilter, "yyyy-MM-dd");
-    const matchesStatus = statusFilter === "all" || o.status === statusFilter;
-    const matchesGrade = gradeFilter === "all" || o.gas_grade === gradeFilter;
-    const matchesCustomer = customerFilter === "all" || o.customer_name === customerFilter;
-    return matchesLocation && matchesPressure && matchesGasType && matchesDate && matchesStatus && matchesGrade && matchesCustomer;
+    if (dateFilter && o.scheduled_date !== format(dateFilter, "yyyy-MM-dd")) return false;
+    if (customerFilter !== "all" && o.customer_name !== customerFilter) return false;
+    if (productFilter && !o.gas_type.toLowerCase().includes(productFilter.toLowerCase())) return false;
+    return true;
   });
 
   const sortedOrders = [...filteredOrders].sort((a, b) => {
     let comparison = 0;
     switch (sortColumn) {
-      case "order_number":
       case "customer_name":
       case "gas_type":
-      case "status":
         comparison = (a[sortColumn] || "").localeCompare(b[sortColumn] || "");
         break;
       case "cylinder_count":
-      case "pressure":
+      case "cylinder_size":
         comparison = a[sortColumn] - b[sortColumn];
         break;
       case "scheduled_date":
-        comparison = new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime();
+        comparison = a.scheduled_date.localeCompare(b.scheduled_date);
         break;
     }
     return sortDirection === "asc" ? comparison : -comparison;
   });
 
-  const todayCount = filteredOrders
-    .filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd") && o.status !== "cancelled")
-    .reduce((sum, o) => sum + o.cylinder_count, 0);
+  const countForLocation = (loc: LocationTab) =>
+    orders.filter((o) => {
+      if (o.location !== loc) return false;
+      if (monthFilter !== 0) {
+        const month = parseInt(o.scheduled_date.split("-")[1], 10);
+        return month === monthFilter;
+      }
+      return true;
+    }).length;
 
-  // Location-specific counts for tab badges
-  const emmenCount = orders.filter(o => o.location === "sol_emmen").length;
-  const tilburgCount = orders.filter(o => o.location === "sol_tilburg").length;
+  const emmenCount = countForLocation("sol_emmen");
+  const tilburgCount = countForLocation("sol_tilburg");
+  const totalCylinderCount = filteredOrders.reduce((sum, o) => sum + o.cylinder_count, 0);
 
-  // Total counts for the selected period (all orders, not filtered by location)
-  const totalOrderCount = orders.length;
-  const totalCylinderCount = orders.reduce((sum, o) => sum + o.cylinder_count, 0);
+  const periodLabel =
+    monthFilter === 0 ? `${yearFilter}` : `${monthNames[monthFilter - 1]} ${yearFilter}`;
 
-  // Filtered counts for current view
-  const filteredOrderCount = filteredOrders.length;
-  const filteredCylinderCount = filteredOrders.reduce((sum, o) => sum + o.cylinder_count, 0);
-
-  // Period label for display
-  const periodLabel = monthFilter === 0
-    ? `${yearFilter}`
-    : `${monthNames[monthFilter - 1]} ${yearFilter}`;
-
-  // Check if any filters are active
-  const hasActiveFilters = pressureFilter !== "all" ||
-    gasTypeFilter.length > 0 ||
+  const hasActiveFilters =
     dateFilter !== undefined ||
-    statusFilter !== "all" ||
-    gradeFilter !== "all" ||
     customerFilter !== "all" ||
+    productFilter !== "" ||
     yearFilter !== new Date().getFullYear() ||
     monthFilter !== new Date().getMonth() + 1;
 
   const clearFilters = () => {
-    setPressureFilter("all");
-    setGasTypeFilter([]);
     setDateFilter(undefined);
-    setStatusFilter("all");
-    setGradeFilter("all");
     setCustomerFilter("all");
+    setProductFilter("");
     setYearFilter(new Date().getFullYear());
     setMonthFilter(new Date().getMonth() + 1);
   };
 
-  const handleExportToExcel = async () => {
-    setIsExporting(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Je bent niet ingelogd");
-        return;
-      }
-
-      const params = new URLSearchParams();
-      if (monthFilter === 0 && yearFilter) {
-        params.set("year", yearFilter.toString());
-      }
-
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const url = `${supabaseUrl}/functions/v1/export-cylinder-orders${params.toString() ? `?${params}` : ""}`;
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Export mislukt");
-      }
-
-      const blob = await res.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = downloadUrl;
-      a.download = res.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1] || "gascilinder-orders.csv";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(downloadUrl);
-      toast.success("Export gedownload");
-    } catch (error) {
-      console.error("Export error:", error);
-      toast.error("Fout bij exporteren");
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  // Render the order content (table, filters, stats)
   const renderOrderContent = () => (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Filling queue */}
       <div className="lg:col-span-2">
         <Card className="glass-card">
           <CardHeader>
@@ -536,11 +248,9 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
               <div>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Calendar className="h-5 w-5" />
-                  Vulwachtrij - {locationTab === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg"}
+                  Vulwachtrij – {locationTab === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg"}
                 </CardTitle>
-                <CardDescription>
-                  Geplande vulorders voor gascilinders
-                </CardDescription>
+                <CardDescription>Productiedata gascilinders</CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
@@ -589,12 +299,7 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
                   </SelectContent>
                 </Select>
                 {hasActiveFilters && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9"
-                    onClick={clearFilters}
-                  >
+                  <Button variant="outline" size="sm" className="h-9" onClick={clearFilters}>
                     <X className="h-4 w-4 mr-1" />
                     Wis filters
                   </Button>
@@ -607,14 +312,14 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
               <div className="rounded-md border">
                 <div className="border-b bg-muted/30 p-3">
                   <div className="flex gap-4">
-                    {Array.from({ length: 7 }).map((_, i) => (
+                    {Array.from({ length: 5 }).map((_, i) => (
                       <div key={i} className="h-4 w-20 rounded bg-muted animate-pulse" />
                     ))}
                   </div>
                 </div>
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-4 p-3 border-b last:border-0">
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 5 }).map((_, j) => (
                       <div key={j} className="h-4 w-20 rounded bg-muted animate-pulse" />
                     ))}
                   </div>
@@ -623,189 +328,105 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
             ) : filteredOrders.length === 0 ? (
               <EmptyState
                 variant={hasActiveFilters ? "search" : "gascylinder"}
-                title={hasActiveFilters ? "Geen vulorders gevonden" : "Geen vulorders gepland"}
-                description={hasActiveFilters
-                  ? "Pas de filters aan of voeg een nieuwe order toe."
-                  : "Voeg een nieuwe vulorder toe om te beginnen."}
+                title="Geen vulorders gevonden"
+                description={
+                  hasActiveFilters
+                    ? "Pas de filters aan."
+                    : "Geen productiedata voor deze periode."
+                }
                 size="md"
               />
             ) : (
-              <>
-                {/* Mobile Card Layout */}
-                <div className="md:hidden space-y-3">
-                  {sortedOrders.map((order) => (
-                    <MobileOrderCard
-                      key={order.id}
-                      id={order.id}
-                      customerName={order.customer_name}
-                      scheduledDate={order.scheduled_date}
-                      status={order.status}
-                      onStatusChange={handleStatusChange}
-                      onEdit={() => handleEditOrder(order)}
-                      onDelete={() => handleDeleteClick(order)}
-                      canEdit={permissions?.canEditOrders}
-                      canDelete={permissions?.canDeleteOrders}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>
+                      <div className="space-y-1">
+                        <div
+                          className="flex items-center cursor-pointer select-none"
+                          onClick={() => handleSort("customer_name")}
+                        >
+                          Klant<SortIcon column="customer_name" />
+                        </div>
+                        <Select value={customerFilter} onValueChange={(v) => setCustomerFilter(v)}>
+                          <SelectTrigger className="h-7 text-xs bg-background w-full">
+                            <SelectValue placeholder="Alle" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border shadow-lg z-50 max-h-[300px]">
+                            <SelectItem value="all">Alle klanten</SelectItem>
+                            {uniqueCustomers.map((customer) => (
+                              <SelectItem key={customer} value={customer}>{customer}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="space-y-1">
+                        <div
+                          className="flex items-center cursor-pointer select-none"
+                          onClick={() => handleSort("gas_type")}
+                        >
+                          Product<SortIcon column="gas_type" />
+                        </div>
+                        <Input
+                          placeholder="Filter..."
+                          value={productFilter}
+                          onChange={(e) => setProductFilter(e.target.value)}
+                          className="h-7 text-xs bg-background w-full"
+                        />
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort("cylinder_count")}
                     >
-                      <OrderDetail
-                        label="Gastype"
-                        value={
-                          <div className="flex items-center gap-1.5">
-                            <div
-                              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: getGasTypeColor(order) }}
-                            />
-                            <span className="truncate">{getGasTypeLabel(order)}</span>
-                          </div>
-                        }
-                      />
-                      <OrderDetail label="Aantal" value={`${order.cylinder_count} cilinders`} />
-                      <OrderDetail label="Druk" value={`${order.pressure} bar`} />
-                      <OrderDetail label="Graad" value={order.gas_grade === "medical" ? "Medisch" : "Technisch"} />
-                    </MobileOrderCard>
+                      <div className="flex items-center">
+                        Aantal<SortIcon column="cylinder_count" />
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort("cylinder_size")}
+                    >
+                      <div className="flex items-center">
+                        Capaciteit<SortIcon column="cylinder_size" />
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:bg-muted/50 select-none"
+                      onClick={() => handleSort("scheduled_date")}
+                    >
+                      <div className="flex items-center">
+                        Datum<SortIcon column="scheduled_date" />
+                      </div>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedOrders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">{order.customer_name}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: getGasColor(order.gas_type, "#6b7280") }}
+                          />
+                          {order.gas_type}
+                        </div>
+                      </TableCell>
+                      <TableCell>{order.cylinder_count}</TableCell>
+                      <TableCell>
+                        {order.cylinder_size > 0 ? `${order.cylinder_size} L` : "–"}
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(order.scheduled_date), "dd-MM-yyyy")}
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </div>
-
-                {/* Desktop Table Layout */}
-                <div className="hidden md:block">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>
-                          <div className="space-y-1">
-                            <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("customer_name")}>
-                              Klant<SortIcon column="customer_name" />
-                            </div>
-                            <Select value={customerFilter} onValueChange={(v) => setCustomerFilter(v)}>
-                              <SelectTrigger className="h-7 text-xs bg-background w-full">
-                                <SelectValue placeholder="Alle" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-background border shadow-lg z-50 max-h-[300px]">
-                                <SelectItem value="all">Alle klanten</SelectItem>
-                                {uniqueCustomers.map((customer) => (
-                                  <SelectItem key={customer} value={customer}>{customer}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </TableHead>
-                        <TableHead>
-                          <div className="space-y-1">
-                            <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("gas_type")}>
-                              Gastype<SortIcon column="gas_type" />
-                            </div>
-                            <GasTypeMultiSelect
-                              gasTypes={gasTypes}
-                              selectedGasTypes={gasTypeFilter}
-                              onSelectionChange={setGasTypeFilter}
-                              className="w-full"
-                            />
-                          </div>
-                        </TableHead>
-                        <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("cylinder_count")}>
-                          <div className="flex items-center">Aantal<SortIcon column="cylinder_count" /></div>
-                        </TableHead>
-                        <TableHead>
-                          <div className="space-y-1">
-                            <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("pressure")}>
-                              Druk<SortIcon column="pressure" />
-                            </div>
-                            <Select value={pressureFilter} onValueChange={(v) => setPressureFilter(v as PressureFilter)}>
-                              <SelectTrigger className="h-7 text-xs bg-background w-full">
-                                <SelectValue placeholder="Alle" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-background border shadow-lg z-50">
-                                <SelectItem value="all">Alle</SelectItem>
-                                <SelectItem value="200">200 bar</SelectItem>
-                                <SelectItem value="300">300 bar</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </TableHead>
-                        <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("scheduled_date")}>
-                          <div className="flex items-center">Datum<SortIcon column="scheduled_date" /></div>
-                        </TableHead>
-                        <TableHead>
-                          <div className="space-y-1">
-                            <div className="flex items-center cursor-pointer select-none" onClick={() => handleSort("status")}>
-                              Status<SortIcon column="status" />
-                            </div>
-                            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-                              <SelectTrigger className="h-7 text-xs bg-background w-full">
-                                <SelectValue placeholder="Alle" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-background border shadow-lg z-50">
-                                <SelectItem value="all">Alle</SelectItem>
-                                <SelectItem value="pending">Gepland</SelectItem>
-                                <SelectItem value="in_progress">Bezig</SelectItem>
-                                <SelectItem value="completed">Voltooid</SelectItem>
-                                <SelectItem value="cancelled">Geannuleerd</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </TableHead>
-                        <TableHead className="text-right">Acties</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sortedOrders.map((order) => (
-                        <TableRow key={order.id}>
-                          <TableCell className="font-medium">{order.customer_name}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: getGasTypeColor(order) }}
-                              />
-                              {getGasTypeLabel(order)}
-                            </div>
-                          </TableCell>
-                          <TableCell>{order.cylinder_count}</TableCell>
-                          <TableCell>{order.pressure} bar</TableCell>
-                          <TableCell>{format(new Date(order.scheduled_date), "dd-MM-yyyy")}</TableCell>
-                          <TableCell>
-                            <Select
-                              value={order.status}
-                              onValueChange={(v) => handleStatusChange(order.id, v)}
-                            >
-                              <SelectTrigger className="h-8 w-[110px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="bg-background border shadow-lg z-50">
-                                <SelectItem value="pending">Gepland</SelectItem>
-                                <SelectItem value="in_progress">Bezig</SelectItem>
-                                <SelectItem value="completed">Voltooid</SelectItem>
-                                <SelectItem value="cancelled">Geannuleerd</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              {permissions?.canEditOrders && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleEditOrder(order)}
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {permissions?.canDeleteOrders && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDeleteClick(order)}
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </>
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
@@ -816,58 +437,19 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
         <Card className="glass-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Gauge className="h-5 w-5" />
-              Dagelijkse Voortgang
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span>Cilinders vandaag</span>
-                <span className="font-medium">{todayCount}</span>
-              </div>
-              <Progress value={Math.min((todayCount / 50) * 100, 100)} className="h-2" />
-            </div>
-            <div className="grid grid-cols-2 gap-4 pt-2">
-              <div className="text-center p-3 rounded-lg bg-muted/50">
-                <span className="text-muted-foreground text-xs">Orders</span>
-                <p className="font-medium">
-                  {filteredOrders.filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd")).length}
-                </p>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-muted/50">
-                <span className="text-muted-foreground text-xs">Voltooid</span>
-                <p className="font-medium">
-                  {filteredOrders.filter(o =>
-                    o.scheduled_date === format(new Date(), "yyyy-MM-dd") &&
-                    o.status === "completed"
-                  ).length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Capaciteit
+              <Cylinder className="h-5 w-5" />
+              Samenvatting
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Vandaag</span>
-                <span className="font-medium">
-                  {filteredOrders.filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd")).length}
-                </span>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <span className="text-muted-foreground text-xs">Regels</span>
+                <p className="font-medium text-lg">{filteredOrders.length}</p>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Orders</span>
-                <span className="font-medium">
-                  {filteredOrders.filter(o => o.scheduled_date === format(new Date(), "yyyy-MM-dd")).length}
-                </span>
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <span className="text-muted-foreground text-xs">Cilinders</span>
+                <p className="font-medium text-lg">{formatNumber(totalCylinderCount)}</p>
               </div>
             </div>
           </CardContent>
@@ -885,51 +467,23 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
             Gascilinders Vulling
           </h2>
           <div className="flex flex-wrap items-center gap-3 mt-1">
-            <p className="text-sm text-muted-foreground">
-              {periodLabel}
-            </p>
+            <p className="text-sm text-muted-foreground">{periodLabel}</p>
             <Badge variant="secondary" className="text-xs">
-              {formatNumber(totalOrderCount)} orders
+              {formatNumber(filteredOrders.length)} regels
             </Badge>
             <Badge variant="outline" className="text-xs">
               {formatNumber(totalCylinderCount)} cilinders
             </Badge>
-            {(filteredOrderCount !== totalOrderCount) && (
-              <span className="text-xs text-muted-foreground">
-                (gefilterd: {formatNumber(filteredOrderCount)} orders, {formatNumber(filteredCylinderCount)} cilinders)
-              </span>
-            )}
           </div>
-        </div>
-        <div className="flex gap-2">
-          {isAdmin && (
-            <>
-              <Button variant="outline" onClick={handleExportToExcel} disabled={isExporting}>
-                {isExporting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Excel export
-              </Button>
-              <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Excel import
-              </Button>
-            </>
-          )}
-          {permissions?.canCreateOrders && (
-            <Button variant="accent" onClick={() => setDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nieuwe vulorder
-            </Button>
-          )}
         </div>
       </div>
 
-      {/* Location Tabs - only show when user can view all locations */}
       {showLocationTabs ? (
-        <Tabs value={locationTab} onValueChange={(v) => setLocationTab(v as LocationTab)} className="w-full">
+        <Tabs
+          value={locationTab}
+          onValueChange={(v) => setLocationTab(v as LocationTab)}
+          className="w-full"
+        >
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="sol_emmen" className="flex items-center gap-2">
               <MapPin className="h-4 w-4" />
@@ -942,7 +496,6 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
               <Badge variant="secondary" className="ml-1 text-xs">{tilburgCount}</Badge>
             </TabsTrigger>
           </TabsList>
-
           <TabsContent value={locationTab} className="mt-6">
             {renderOrderContent()}
           </TabsContent>
@@ -955,64 +508,11 @@ export function GasCylinderPlanning({ onDataChanged, location = "all" }: GasCyli
               {locationTab === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg"}
             </span>
             <Badge variant="secondary" className="text-xs">
-              {filteredOrders.length} orders
+              {filteredOrders.length} regels
             </Badge>
           </div>
           {renderOrderContent()}
         </div>
-      )}
-
-      <CreateGasCylinderOrderDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onCreated={handleOrderCreated}
-      />
-
-      <GasCylinderOrderDialog
-        order={selectedOrder}
-        open={editDialogOpen}
-        onOpenChange={handleEditDialogClose}
-        onUpdate={handleOrderUpdated}
-        canEdit={permissions?.canEditOrders}
-      />
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Order verwijderen</AlertDialogTitle>
-            <AlertDialogDescription>
-              Weet je zeker dat je order {orderToDelete?.order_number} wilt verwijderen?
-              Deze actie kan niet ongedaan worden gemaakt.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuleren</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Verwijderen
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <ExcelImportDialog
-        open={importDialogOpen}
-        onOpenChange={setImportDialogOpen}
-        onImported={() => {
-          fetchOrders();
-          onDataChanged?.();
-        }}
-      />
-
-      {/* Floating Action Button for mobile */}
-      {permissions.canCreateOrders && (
-        <FloatingActionButton
-          onClick={() => setDialogOpen(true)}
-          label="Nieuwe gascilinder order"
-          variant="accent"
-        />
       )}
     </div>
   );

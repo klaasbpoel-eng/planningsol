@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, lazy, Suspense, useCallback } from "react";
 import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 
 // Type definitions for RPC responses
 interface DailyProductionData {
@@ -52,6 +53,7 @@ interface CustomerTotalsData {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -214,104 +216,140 @@ export function ProductionReports({
 
   const fetchReportData = async () => {
     setLoading(true);
-
     try {
       const fromDate = format(dateRange.from, "yyyy-MM-dd");
       const toDate = format(dateRange.to, "yyyy-MM-dd");
-
-      // Calculate previous period (same length, immediately before)
       const periodLength = differenceInDays(dateRange.to, dateRange.from);
       const prevTo = subDays(dateRange.from, 1);
       const prevFrom = subDays(prevTo, periodLength);
       const prevFromDate = format(prevFrom, "yyyy-MM-dd");
       const prevToDate = format(prevTo, "yyyy-MM-dd");
-
-      console.log("[ProductionReports] Fetching data for period:", { fromDate, toDate, location });
-
       const locationParam = location === "all" ? null : location;
+      const isTilburg = location === "sol_tilburg";
 
-      // Helper to match Supabase RPC response structure { data, error }
-      const fetchSafely = async (fn: () => Promise<any>) => {
-        try {
-          const data = await fn();
-          return { data, error: null };
-        } catch (error) {
-          return { data: null, error };
+      // Paginate all Productie rows for a date range
+      const fetchRows = async (fDate: string, tDate: string): Promise<any[]> => {
+        const fromYear = parseInt(fDate.substring(0, 4));
+        const toYear = parseInt(tDate.substring(0, 4));
+        const years = Array.from({ length: toYear - fromYear + 1 }, (_, i) => fromYear + i);
+        const allRows: any[] = [];
+        for (const year of years) {
+          const PAGE = 1000;
+          let from = 0;
+          while (true) {
+            const { data } = await (supabase.from("Productie" as never) as any)
+              .select("Datum,Locatie,Product,Capaciteit,Aantal,Klant")
+              .eq("Jaar", year)
+              .range(from, from + PAGE - 1);
+            if (!data || data.length === 0) break;
+            allRows.push(...data);
+            if (data.length < PAGE) break;
+            from += PAGE;
+          }
         }
+        return allRows.filter((row: any) => {
+          const raw: string = row.Datum || "";
+          if (!raw) return false;
+          const iso = raw.includes("T") ? raw.substring(0, 10)
+            : (() => { const p = raw.split("-"); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+          if (iso < fDate || iso > tDate) return false;
+          if (locationParam) {
+            const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+            if (loc !== locationParam) return false;
+          }
+          return true;
+        });
       };
 
-      // Fetch all data in parallel using api.reports
-      const [
-        dailyRes,
-        gasTypeRes,
-        cylinderEffRes,
-        dryIceEffRes,
-        prevCylinderEffRes,
-        prevDryIceEffRes,
-        customerTotalsRes,
-        gasCategoryRes,
-        gasTypesRes
-      ] = await Promise.all([
-        // Daily production data for charts (with digital filter)
-        fetchSafely(() => api.reports.getDailyProductionByPeriod(fromDate, toDate, locationParam, hideDigital)),
-        // Gas type distribution (with digital filter)
-        fetchSafely(() => api.reports.getGasTypeDistribution(fromDate, toDate, locationParam, hideDigital)),
-        // Current period efficiency stats (cylinders, with digital filter)
-        fetchSafely(() => api.reports.getProductionEfficiency(fromDate, toDate, locationParam, hideDigital)),
-        // Current period efficiency stats (dry ice)
-        fetchSafely(() => api.reports.getDryIceEfficiency(fromDate, toDate, locationParam)),
-        // Previous period efficiency (cylinders, with digital filter)
-        fetchSafely(() => api.reports.getProductionEfficiency(prevFromDate, prevToDate, locationParam, hideDigital)),
-        // Previous period efficiency (dry ice)
-        fetchSafely(() => api.reports.getDryIceEfficiency(prevFromDate, prevToDate, locationParam)),
-        // Customer totals for ranking
-        fetchSafely(() => api.reports.getCustomerTotals(fromDate, toDate, locationParam, hideDigital)),
-        // Gas category distribution (with digital filter)
-        fetchSafely(() => api.reports.getGasCategoryDistribution(fromDate, toDate, locationParam, hideDigital)),
-        // Gas types (for digital flag)
-        fetchSafely(() => api.gasTypes.getAllIncludingInactive())
+      const getDryIce = async (f: string, t: string) => {
+        if (isTilburg) return [{ total_kg: 0, total_orders: 0, completed_orders: 0, pending_orders: 0, cancelled_orders: 0 }];
+        try { return await api.reports.getDryIceEfficiency(f, t, null); }
+        catch { return [{ total_kg: 0, total_orders: 0, completed_orders: 0, pending_orders: 0, cancelled_orders: 0 }]; }
+      };
+
+      const [currentRows, prevRows, dryIceData, prevDryIceData] = await Promise.all([
+        fetchRows(fromDate, toDate),
+        fetchRows(prevFromDate, prevToDate),
+        getDryIce(fromDate, toDate),
+        getDryIce(prevFromDate, prevToDate),
       ]);
 
-      // Build digital lookup from gas types
-      const digitalMap = new Map<string, boolean>();
-      (gasTypesRes.data || []).forEach((gt: any) => {
-        if (gt.id) digitalMap.set(gt.id, gt.is_digital === true);
-      });
-      setHasDigitalTypes(Array.from(digitalMap.values()).some(v => v));
+      // Build EfficiencyData from Productie rows (no status in Productie, all = completed)
+      const buildEfficiency = (rows: any[]): EfficiencyData => {
+        const total = rows.reduce((sum, r) => sum + (r.Aantal || 0), 0);
+        return { total_orders: rows.length, completed_orders: rows.length, pending_orders: 0, cancelled_orders: 0, efficiency_rate: 100, total_cylinders: total, completed_cylinders: total };
+      };
 
-      // Set data, enriching gas type distribution with digital flag
-      setDailyProduction(dailyRes.data || []);
-      const enrichedGasTypes = (gasTypeRes.data || []).map((item: any) => ({
-        ...item,
-        is_digital: item.gas_type_id ? digitalMap.get(item.gas_type_id) || false : false,
-      }));
-      setGasTypeDistributionData(enrichedGasTypes);
-      setGasCategoryDistributionData((gasCategoryRes.data as any) || []);
-      setCustomerTotals(customerTotalsRes.data || []);
-
-      // Set current period efficiency data
-      const cylEff = cylinderEffRes.data?.[0] || null;
-      const dryIceEff = dryIceEffRes.data?.[0] || null;
+      const cylEff = buildEfficiency(currentRows);
+      const prevCylEff = buildEfficiency(prevRows);
       setCylinderEfficiency(cylEff);
-      setDryIceEfficiency(dryIceEff);
-
-      // Set previous period efficiency data
-      const prevCylEff = prevCylinderEffRes.data?.[0] || null;
-      const prevDryIceEff = prevDryIceEffRes.data?.[0] || null;
       setPrevCylinderEfficiency(prevCylEff);
+
+      const dryIceEff = (dryIceData as any)?.[0] || null;
+      const prevDryIceEff = (prevDryIceData as any)?.[0] || null;
+      setDryIceEfficiency(dryIceEff);
       setPrevDryIceEfficiency(prevDryIceEff);
 
-      // Calculate previous period stats for trend calculations
       setPreviousPeriodStats({
-        cylinderOrders: prevCylEff?.total_orders || 0,
-        totalCylinders: prevCylEff?.total_cylinders || 0,
+        cylinderOrders: prevCylEff.total_orders,
+        totalCylinders: prevCylEff.total_cylinders,
         dryIceOrders: prevDryIceEff?.total_orders || 0,
         totalDryIce: prevDryIceEff?.total_kg || 0,
-        completed: (prevCylEff?.completed_orders || 0) + (prevDryIceEff?.completed_orders || 0),
-        pending: (prevCylEff?.pending_orders || 0) + (prevDryIceEff?.pending_orders || 0)
+        completed: prevCylEff.completed_orders + (prevDryIceEff?.completed_orders || 0),
+        pending: prevDryIceEff?.pending_orders || 0,
       });
 
-      // Clear individual orders (no longer needed for overview statistics)
+      // Daily production grouped by date
+      const dailyMap = new Map<string, number>();
+      for (const row of currentRows) {
+        const raw: string = row.Datum || "";
+        const iso = raw.includes("T") ? raw.substring(0, 10)
+          : (() => { const p = raw.split("-"); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+        if (iso) dailyMap.set(iso, (dailyMap.get(iso) || 0) + (row.Aantal || 0));
+      }
+      setDailyProduction(
+        Array.from(dailyMap.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([date, count]) => ({ production_date: date, cylinder_count: count, dry_ice_kg: 0 }))
+      );
+
+      // Gas type distribution grouped by Product
+      const typeMap = new Map<string, number>();
+      for (const row of currentRows) {
+        const name = row.Product || "Onbekend";
+        typeMap.set(name, (typeMap.get(name) || 0) + (row.Aantal || 0));
+      }
+      setGasTypeDistributionData(
+        Array.from(typeMap.entries())
+          .map(([name, total]) => ({ gas_type_id: null, gas_type_name: name, gas_type_color: "", total_cylinders: total, is_digital: false }))
+          .sort((a, b) => b.total_cylinders - a.total_cylinders)
+      );
+      setHasDigitalTypes(false);
+
+      // Category distribution grouped by Capaciteit (cylinder size)
+      const catMap = new Map<string, number>();
+      for (const row of currentRows) {
+        const cap = row.Capaciteit != null ? `${row.Capaciteit}L` : "Onbekend";
+        catMap.set(cap, (catMap.get(cap) || 0) + (row.Aantal || 0));
+      }
+      setGasCategoryDistributionData(
+        Array.from(catMap.entries())
+          .map(([cat, total]) => ({ category_id: null, category_name: cat, total_cylinders: total }))
+          .sort((a, b) => b.total_cylinders - a.total_cylinders)
+      );
+
+      // Customer totals grouped by Klant
+      const custMap = new Map<string, number>();
+      for (const row of currentRows) {
+        const name = row.Klant || "Onbekend";
+        custMap.set(name, (custMap.get(name) || 0) + (row.Aantal || 0));
+      }
+      setCustomerTotals(
+        Array.from(custMap.entries())
+          .map(([name, total]) => ({ customer_id: null, customer_name: name, total_cylinders: total, total_dry_ice_kg: 0 }))
+          .sort((a, b) => b.total_cylinders - a.total_cylinders)
+      );
+
       setCylinderOrders([]);
       setDryIceOrders([]);
     } catch (error) {
@@ -484,35 +522,21 @@ export function ProductionReports({
       {/* Compact Toolbar */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-card/60 backdrop-blur-md border rounded-lg p-2 shadow-sm sticky top-0 z-10">
         <div className="flex flex-wrap items-center gap-2">
-          <ToggleGroup type="single" variant="outline" size="sm" value={getActivePreset()} onValueChange={(val) => val && setPresetRange(val)} className="hidden lg:flex">
-            <ToggleGroupItem value="week">Deze week</ToggleGroupItem>
-            <ToggleGroupItem value="month">Deze maand</ToggleGroupItem>
-            <ToggleGroupItem value="last-month">Vorige maand</ToggleGroupItem>
-            <ToggleGroupItem value="quarter">Kwartaal</ToggleGroupItem>
-            <ToggleGroupItem value="last-year">Vorig jaar</ToggleGroupItem>
-            <ToggleGroupItem value="this-year">Jaar</ToggleGroupItem>
-          </ToggleGroup>
-
-          {/* Mobile date presets - horizontal scroll */}
-          <div className="flex lg:hidden overflow-x-auto scrollbar-none -mx-1 px-1 gap-1.5">
-            {[
-              { value: "week", label: "Week" },
-              { value: "month", label: "Maand" },
-              { value: "last-month", label: "Vorige" },
-              { value: "quarter", label: "Kwartaal" },
-              { value: "this-year", label: "Jaar" },
-            ].map((preset) => (
-              <Button
-                key={preset.value}
-                variant={getActivePreset() === preset.value ? "default" : "outline"}
-                size="sm"
-                className="h-7 text-xs shrink-0 px-2.5"
-                onClick={() => setPresetRange(preset.value)}
-              >
-                {preset.label}
-              </Button>
-            ))}
-          </div>
+          {/* Periode preset dropdown */}
+          <Select value={getActivePreset() || "custom"} onValueChange={(val) => val !== "custom" && setPresetRange(val)}>
+            <SelectTrigger className="w-36 h-9">
+              <SelectValue placeholder="Kies periode" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week">Deze week</SelectItem>
+              <SelectItem value="month">Deze maand</SelectItem>
+              <SelectItem value="last-month">Vorige maand</SelectItem>
+              <SelectItem value="quarter">Kwartaal</SelectItem>
+              <SelectItem value="last-year">Vorig jaar</SelectItem>
+              <SelectItem value="this-year">Dit jaar</SelectItem>
+              {getActivePreset() === "" && <SelectItem value="custom">Aangepast</SelectItem>}
+            </SelectContent>
+          </Select>
 
           <div className="flex items-center gap-2 bg-background border rounded-md px-2 py-1 h-9">
             <Popover>
@@ -685,45 +709,46 @@ export function ProductionReports({
         />
       </div>
 
-      {/* Detailed Tabs & Dashboard */}
+      {/* Detailed Tabs & Dashboard — sidebar layout */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={cn("grid w-full max-w-5xl bg-muted/50 backdrop-blur-sm h-9", showDryIce ? "grid-cols-7" : "grid-cols-6")}>
-          <TabsTrigger value="overview" className="text-xs gap-1.5">
-            <BarChart3 className="h-3 w-3" />
-            <span className="hidden xs:inline">Dashboard</span>
-          </TabsTrigger>
-          <TabsTrigger value="monthly" className="text-xs gap-1.5">
-            <CalendarIcon className="h-3 w-3" />
-            <span className="hidden sm:inline">Maandrapport</span>
-            <span className="sm:hidden">Maand</span>
-          </TabsTrigger>
-          <TabsTrigger value="insights" className="text-xs gap-1.5">
-            <Sparkles className="h-3 w-3" />
-            <span className="hidden xs:inline">Insights</span>
-          </TabsTrigger>
-          <TabsTrigger value="cylinders" className="text-xs gap-1.5">
-            <Cylinder className="h-3 w-3" />
-            <span>Cilinders</span>
-          </TabsTrigger>
-          {showDryIce && (
-            <TabsTrigger value="dryice" className="text-xs gap-1.5">
-              <Snowflake className="h-3 w-3" />
-              <span>Droogijs</span>
+        <div className="flex flex-col md:flex-row gap-4 items-start">
+          {/* Sidebar navigation */}
+          <TabsList className="flex md:flex-col h-auto w-full md:w-44 bg-card border shadow-sm rounded-xl p-1.5 gap-0.5 overflow-x-auto md:overflow-x-visible scrollbar-none md:shrink-0 md:sticky md:top-[4.5rem]">
+            <TabsTrigger value="overview" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
+              <BarChart3 className="h-4 w-4 shrink-0" />
+              Dashboard
             </TabsTrigger>
-          )}
-          <TabsTrigger value="locations" className="text-xs gap-1.5">
-            <Building2 className="h-3 w-3" />
-            <span className="hidden sm:inline">Locaties</span>
-            <span className="sm:hidden">Loc.</span>
-          </TabsTrigger>
-          <TabsTrigger value="comparison" className="text-xs gap-1.5">
-            <GitCompare className="h-3 w-3" />
-            <span className="hidden sm:inline">Vergelijking</span>
-            <span className="sm:hidden">Vgl.</span>
-          </TabsTrigger>
-        </TabsList>
+            <TabsTrigger value="monthly" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
+              <CalendarIcon className="h-4 w-4 shrink-0" />
+              Maandrapport
+            </TabsTrigger>
+            <TabsTrigger value="insights" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
+              <Sparkles className="h-4 w-4 shrink-0" />
+              Insights
+            </TabsTrigger>
+            <TabsTrigger value="cylinders" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
+              <Cylinder className="h-4 w-4 shrink-0" />
+              Cilinders
+            </TabsTrigger>
+            {showDryIce && (
+              <TabsTrigger value="dryice" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
+                <Snowflake className="h-4 w-4 shrink-0" />
+                Droogijs
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="locations" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
+              <Building2 className="h-4 w-4 shrink-0" />
+              Locaties
+            </TabsTrigger>
+            <TabsTrigger value="comparison" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
+              <GitCompare className="h-4 w-4 shrink-0" />
+              Vergelijking
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="overview" className="mt-4 space-y-4">
+          {/* Content area */}
+          <div className="flex-1 min-w-0 w-full">
+        <TabsContent value="overview" className="mt-0 space-y-4">
           {/* Dashboard Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Main Chart - Spans 2 cols */}
@@ -839,14 +864,14 @@ export function ProductionReports({
         </TabsContent>
 
         {/* Monthly Report */}
-        <TabsContent value="monthly" className="mt-4">
+        <TabsContent value="monthly" className="mt-0">
           <Suspense fallback={<ChartLoadingFallback />}>
             <MonthlyReport hideDigital={hideDigital} />
           </Suspense>
         </TabsContent>
 
         {/* Other tabs content placeholders (using existing components) */}
-        <TabsContent value="insights" className="mt-4">
+        <TabsContent value="insights" className="mt-0">
           <Suspense fallback={<ChartLoadingFallback />}>
             <CustomerSegmentation
               location={location}
@@ -858,7 +883,7 @@ export function ProductionReports({
           </Suspense>
         </TabsContent>
 
-        <TabsContent value="cylinders" className="mt-4 space-y-4">
+        <TabsContent value="cylinders" className="mt-0 space-y-4">
           <Suspense fallback={<ChartLoadingFallback />}>
             <CumulativeGasTypeChart
               location={location === "all" ? undefined : location}
@@ -881,7 +906,7 @@ export function ProductionReports({
         </TabsContent>
 
         {showDryIce && (
-          <TabsContent value="dryice" className="mt-4">
+          <TabsContent value="dryice" className="mt-0">
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <Snowflake className="h-10 w-10 mb-3 text-cyan-400/40" />
               <p className="text-sm font-medium">Gedetailleerde droogijs rapportage</p>
@@ -890,18 +915,20 @@ export function ProductionReports({
           </TabsContent>
         )}
 
-        <TabsContent value="locations" className="mt-4">
+        <TabsContent value="locations" className="mt-0">
           <Suspense fallback={<ChartLoadingFallback />}>
             <LocationComparisonReport hideDigital={hideDigital} onHideDigitalChange={setHideDigital} />
           </Suspense>
         </TabsContent>
 
-        <TabsContent value="comparison" className="mt-4">
+        <TabsContent value="comparison" className="mt-0">
           <Suspense fallback={<ChartLoadingFallback />}>
             <YearComparisonReport location={location === "all" ? null : location} hideDigital={hideDigital} onHideDigitalChange={setHideDigital} />
           </Suspense>
         </TabsContent>
 
+          </div>
+        </div>
       </Tabs>
     </div>
   );

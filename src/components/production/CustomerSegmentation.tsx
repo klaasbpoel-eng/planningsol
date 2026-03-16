@@ -19,7 +19,7 @@ import {
   ChevronUp,
   AlertTriangle
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { cn, formatNumber } from "@/lib/utils";
 import { FadeIn } from "@/components/ui/fade-in";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -68,18 +68,75 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
 
   const fetchCustomerSegments = async () => {
     setLoading(true);
-
     const locationParam = location === "all" ? null : location;
 
     try {
-      const data = await api.reports.getCustomerSegments(currentYear, locationParam, fromDateStr, toDateStr, hideDigital);
-      if (data) {
-        setCustomers(data as CustomerSegment[]);
+      const fDate = fromDateStr ?? `${currentYear}-01-01`;
+      const tDate = toDateStr ?? `${currentYear}-12-31`;
+      const fromYear = parseInt(fDate.substring(0, 4));
+      const toYear = parseInt(tDate.substring(0, 4));
+
+      const fetchRows = async (from: string, to: string): Promise<any[]> => {
+        const years = Array.from({ length: parseInt(to.substring(0,4)) - parseInt(from.substring(0,4)) + 1 }, (_, i) => parseInt(from.substring(0,4)) + i);
+        const all: any[] = [];
+        for (const yr of years) {
+          const PAGE = 1000; let offset = 0;
+          while (true) {
+            const { data } = await (supabase.from("Productie" as never) as any)
+              .select("Datum,Locatie,Aantal,Klant").eq("Jaar", yr).range(offset, offset + PAGE - 1);
+            if (!data || data.length === 0) break;
+            all.push(...data); if (data.length < PAGE) break; offset += PAGE;
+          }
+        }
+        return all.filter((row: any) => {
+          const raw: string = row.Datum || "";
+          if (!raw) return false;
+          const iso = raw.includes("T") ? raw.substring(0,10) : (() => { const p = raw.split("-"); return p.length===3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+          if (iso < from || iso > to) return false;
+          if (locationParam) { const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg"; if (loc !== locationParam) return false; }
+          return true;
+        });
+      };
+
+      // Prev period: same duration immediately before
+      const periodDays = Math.ceil((new Date(tDate).getTime() - new Date(fDate).getTime()) / 86400000);
+      const prevTo = new Date(fDate); prevTo.setDate(prevTo.getDate() - 1);
+      const prevFrom = new Date(prevTo); prevFrom.setDate(prevFrom.getDate() - periodDays);
+      const prevFDate = prevFrom.toISOString().substring(0,10);
+      const prevTDate = prevTo.toISOString().substring(0,10);
+
+      const [currentRows, prevRows] = await Promise.all([fetchRows(fDate, tDate), fetchRows(prevFDate, prevTDate)]);
+
+      // Group by customer
+      const custMap = new Map<string, { total: number; count: number; dates: string[] }>();
+      for (const row of currentRows) {
+        const name = row.Klant || "Onbekend";
+        const iso = (row.Datum || "").includes("T") ? row.Datum.substring(0,10) : row.Datum;
+        const c = custMap.get(name) || { total: 0, count: 0, dates: [] };
+        c.total += row.Aantal || 0; c.count++; if (iso) c.dates.push(iso);
+        custMap.set(name, c);
       }
+      const prevMap = new Map<string, number>();
+      for (const row of prevRows) { const n = row.Klant || "Onbekend"; prevMap.set(n, (prevMap.get(n)||0) + (row.Aantal||0)); }
+
+      const sorted = Array.from(custMap.entries()).sort((a, b) => b[1].total - a[1].total);
+      const goldCut = Math.ceil(sorted.length * 0.2);
+      const silverCut = Math.ceil(sorted.length * 0.5);
+
+      const segments: CustomerSegment[] = sorted.map(([name, d], i) => {
+        const tier: "gold"|"silver"|"bronze" = i < goldCut ? "gold" : i < silverCut ? "silver" : "bronze";
+        const prev = prevMap.get(name) || 0;
+        const trend: "new"|"growing"|"stable"|"declining" = prev === 0 ? "new"
+          : d.total > prev * 1.1 ? "growing" : d.total < prev * 0.9 ? "declining" : "stable";
+        const dates = [...d.dates].sort();
+        return { customer_id: name, customer_name: name, total_cylinders: d.total, total_dry_ice_kg: 0,
+          order_count: d.count, first_order_date: dates[0]||"", last_order_date: dates[dates.length-1]||"",
+          avg_order_size: d.count > 0 ? Math.round((d.total/d.count)*10)/10 : 0, tier, trend };
+      });
+      setCustomers(segments);
     } catch (error) {
       console.error("[CustomerSegmentation] Error fetching segments:", error);
     }
-
     setLoading(false);
   };
 

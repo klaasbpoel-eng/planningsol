@@ -7,6 +7,7 @@ import { formatNumber } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getGasColor } from "@/constants/gasColors";
+import { supabase } from "@/integrations/supabase/client";
 import {
   BarChart,
   Bar,
@@ -76,19 +77,57 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [emmenMonthly, tilburgMonthly, emmenGasType, tilburgGasType, gasTypesRes] = await Promise.all([
-        api.reports.getMonthlyOrderTotals(selectedYear, "cylinder", "sol_emmen", hideDigital).catch(() => []),
-        api.reports.getMonthlyOrderTotals(selectedYear, "cylinder", "sol_tilburg", hideDigital).catch(() => []),
-        api.reports.getMonthlyCylinderTotalsByGasType(selectedYear, "sol_emmen", hideDigital).catch(() => []),
-        api.reports.getMonthlyCylinderTotalsByGasType(selectedYear, "sol_tilburg", hideDigital).catch(() => []),
-        api.gasTypes.getAll().catch(() => ({ data: [] })),
+      // Helper: paginate Productie table for a given year and location
+      const PAGE = 1000;
+      const fetchAllRowsForYear = async (year: number, locationParam: string): Promise<any[]> => {
+        const locFilter = locationParam === "sol_emmen"
+          ? "SOL Nederland-Depot Emmen"
+          : "SOL Nederland-Tilburg";
+        const allRows: any[] = [];
+        let from = 0;
+        while (true) {
+          const { data, error } = await (supabase.from("Productie" as never) as any)
+            .select("Datum, Product, Aantal")
+            .eq("Jaar", year)
+            .eq("Locatie", locFilter)
+            .range(from, from + PAGE - 1);
+          if (error) break;
+          if (!data || data.length === 0) break;
+          allRows.push(...data);
+          if (data.length < PAGE) break;
+          from += PAGE;
+        }
+        return allRows;
+      };
+
+      // Helper: get month from a Datum field
+      const getRowMonth = (row: any): number | null => {
+        const raw = row.Datum;
+        if (!raw) return null;
+        const iso = raw.includes("T") ? raw.substring(0, 10) : raw;
+        if (!iso || iso.length < 7) return null;
+        return parseInt(iso.substring(5, 7));
+      };
+
+      // Fetch rows for both locations
+      const [emmenRows, tilburgRows] = await Promise.all([
+        fetchAllRowsForYear(selectedYear, "sol_emmen"),
+        fetchAllRowsForYear(selectedYear, "sol_tilburg"),
       ]);
 
-      // Process monthly data
-      const emmenMap = new Map<number, number>();
-      const tilburgMap = new Map<number, number>();
-      (emmenMonthly || []).forEach((item: any) => emmenMap.set(item.month, Number(item.total_value) || 0));
-      (tilburgMonthly || []).forEach((item: any) => tilburgMap.set(item.month, Number(item.total_value) || 0));
+      // Aggregate monthly totals per location
+      const buildMonthlyMap = (rows: any[]): Map<number, number> => {
+        const m = new Map<number, number>();
+        for (const row of rows) {
+          const month = getRowMonth(row);
+          if (!month) continue;
+          m.set(month, (m.get(month) || 0) + (Number(row.Aantal) || 0));
+        }
+        return m;
+      };
+
+      const emmenMap = buildMonthlyMap(emmenRows);
+      const tilburgMap = buildMonthlyMap(tilburgRows);
 
       const monthly: MonthlyLocationData[] = MONTH_NAMES.map((name, idx) => {
         const m = idx + 1;
@@ -100,40 +139,44 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
       setEmmenTotal(monthly.reduce((s, m) => s + m.emmen, 0));
       setTilburgTotal(monthly.reduce((s, m) => s + m.tilburg, 0));
 
-      // Build digital gas type map
-      const digitalMap = new Map<string, boolean>();
-      const gasTypesData = gasTypesRes?.data || [];
-      (gasTypesData as any[]).forEach((gt: any) => {
-        if (gt.id) digitalMap.set(gt.name || gt.id, gt.is_digital === true);
-      });
-      setDigitalGasTypeIds(new Set(
-        (gasTypesData as any[]).filter((gt: any) => gt.is_digital).map((gt: any) => gt.name)
-      ));
-      setHasDigitalTypes((gasTypesData as any[]).some((gt: any) => gt.is_digital));
+      // No digital types from Productie
+      setHasDigitalTypes(false);
+      setDigitalGasTypeIds(new Set());
 
-      // Process gas type data
-      const gasMap = new Map<string, { name: string; color: string; emmen: number; tilburg: number }>();
-      (emmenGasType || []).forEach((item: any) => {
-        const name = item.gas_type_name || "Onbekend";
-        const existing = gasMap.get(name) || { name, color: item.gas_type_color || "#3b82f6", emmen: 0, tilburg: 0 };
-        existing.emmen += Number(item.total_cylinders) || 0;
-        gasMap.set(name, existing);
+      // Aggregate gas type totals per location
+      const buildGasMap = (rows: any[], loc: "emmen" | "tilburg"): Map<string, { emmen: number; tilburg: number }> => {
+        const gasMap = new Map<string, { emmen: number; tilburg: number }>();
+        for (const row of rows) {
+          const name = row.Product || "Onbekend";
+          const existing = gasMap.get(name) || { emmen: 0, tilburg: 0 };
+          existing[loc] += Number(row.Aantal) || 0;
+          gasMap.set(name, existing);
+        }
+        return gasMap;
+      };
+
+      const emmenGasMap = buildGasMap(emmenRows, "emmen");
+      const tilburgGasMap = buildGasMap(tilburgRows, "tilburg");
+
+      // Merge both maps
+      const combinedGasMap = new Map<string, { emmen: number; tilburg: number }>();
+      emmenGasMap.forEach((val, name) => {
+        combinedGasMap.set(name, { emmen: val.emmen, tilburg: 0 });
       });
-      (tilburgGasType || []).forEach((item: any) => {
-        const name = item.gas_type_name || "Onbekend";
-        const existing = gasMap.get(name) || { name, color: item.gas_type_color || "#3b82f6", emmen: 0, tilburg: 0 };
-        existing.tilburg += Number(item.total_cylinders) || 0;
-        gasMap.set(name, existing);
+      tilburgGasMap.forEach((val, name) => {
+        const existing = combinedGasMap.get(name) || { emmen: 0, tilburg: 0 };
+        existing.tilburg += val.tilburg;
+        combinedGasMap.set(name, existing);
       });
 
-      const gasData: GasTypeLocationData[] = Array.from(gasMap.values())
-        .map(g => ({
-          gas_type_name: g.name,
-          gas_type_color: getGasColor(g.name, g.color),
-          is_digital: digitalMap.get(g.name) || false,
-          emmen: g.emmen,
-          tilburg: g.tilburg,
-          total: g.emmen + g.tilburg,
+      const gasData: GasTypeLocationData[] = Array.from(combinedGasMap.entries())
+        .map(([name, vals]) => ({
+          gas_type_name: name,
+          gas_type_color: getGasColor(name, "#3b82f6"),
+          is_digital: false,
+          emmen: vals.emmen,
+          tilburg: vals.tilburg,
+          total: vals.emmen + vals.tilburg,
         }))
         .sort((a, b) => b.total - a.total);
       setGasTypeData(gasData);

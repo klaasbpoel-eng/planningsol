@@ -5,9 +5,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown, Minus, Trophy } from "lucide-react";
-import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { getGasColor } from "@/constants/gasColors";
+import { supabase } from "@/integrations/supabase/client";
 import {
   LineChart,
   Line,
@@ -81,39 +81,79 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
 
     const locationParam = location !== "all" ? location : null;
 
-    const [result1, result2] = await Promise.all([
-      api.reports.getMonthlyCylinderTotalsByGasType(selectedYear1, locationParam)
-        .then(data => ({ data, error: null }))
-        .catch(error => ({ data: null, error })),
-      api.reports.getMonthlyCylinderTotalsByGasType(selectedYear2, locationParam)
-        .then(data => ({ data, error: null }))
-        .catch(error => ({ data: null, error }))
+    const fetchAllRowsForYear = async (year: number): Promise<any[]> => {
+      const PAGE = 1000;
+      const allRows: any[] = [];
+      let from = 0;
+      while (true) {
+        const { data } = await (supabase.from("Productie" as never) as any)
+          .select("Datum,Locatie,Product,Capaciteit,Aantal")
+          .eq("Jaar", year)
+          .range(from, from + PAGE - 1);
+        if (!data || data.length === 0) break;
+        if (locationParam) {
+          allRows.push(...data.filter((r: any) =>
+            (r.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg") === locationParam
+          ));
+        } else {
+          allRows.push(...data);
+        }
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      return allRows;
+    };
+
+    const computeMonthlyCylinderTotalsByGasType = (rows: any[]): { month: number; gas_type_name: string; gas_type_color: string; total_cylinders: number }[] => {
+      const map = new Map<string, { month: number; gas_type_name: string; gas_type_color: string; total_cylinders: number }>();
+      rows.forEach((r: any) => {
+        const raw: string = r.Datum || "";
+        const iso = raw.includes("T") ? raw.substring(0, 10) : raw.split("-").reverse().join("-");
+        const month = parseInt(iso.substring(5, 7));
+        if (!month || isNaN(month)) return;
+        const gas_type_name = r.Product || "Onbekend";
+        const key = `${month}_${gas_type_name}`;
+        if (!map.has(key)) {
+          map.set(key, { month, gas_type_name, gas_type_color: "", total_cylinders: 0 });
+        }
+        map.get(key)!.total_cylinders += Number(r.Aantal) || 0;
+      });
+      return Array.from(map.values());
+    };
+
+    const [rows1, rows2] = await Promise.all([
+      fetchAllRowsForYear(selectedYear1),
+      fetchAllRowsForYear(selectedYear2)
     ]);
 
-    const processData = (data: any[]): GasTypeData[] => {
+    const aggregated1 = computeMonthlyCylinderTotalsByGasType(rows1);
+    const aggregated2 = computeMonthlyCylinderTotalsByGasType(rows2);
+
+    const processData = (data: { month: number; gas_type_name: string; gas_type_color: string; total_cylinders: number }[]): GasTypeData[] => {
       const gasTypeMap = new Map<string, GasTypeData>();
 
-      data?.forEach((item: { month: number; gas_type_id: string; gas_type_name: string; gas_type_color: string; total_cylinders: number }) => {
-        if (!item.gas_type_id) return;
+      data?.forEach((item) => {
+        const id = item.gas_type_name || "Onbekend";
+        if (!id) return;
 
-        if (!gasTypeMap.has(item.gas_type_id)) {
-          gasTypeMap.set(item.gas_type_id, {
-            id: item.gas_type_id,
+        if (!gasTypeMap.has(id)) {
+          gasTypeMap.set(id, {
+            id,
             name: item.gas_type_name || "Onbekend",
             color: getGasColor(item.gas_type_name || "", item.gas_type_color || "#94a3b8"),
             months: new Array(12).fill(0)
           });
         }
 
-        const gasType = gasTypeMap.get(item.gas_type_id)!;
+        const gasType = gasTypeMap.get(id)!;
         gasType.months[item.month - 1] = Number(item.total_cylinders) || 0;
       });
 
       return Array.from(gasTypeMap.values());
     };
 
-    const year1Data = processData(result1.data || []);
-    const year2Data = processData(result2.data || []);
+    const year1Data = processData(aggregated1);
+    const year2Data = processData(aggregated2);
 
     // Collect all unique gas types from both years
     const gasTypeMap = new Map<string, { id: string; name: string; color: string }>();

@@ -37,7 +37,7 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
             const today = format(new Date(), "yyyy-MM-dd");
             const [tasksRes, ordersRes, leaveRes] = await Promise.all([
                 supabase.from("tasks").select("id", { count: "exact", head: true }).in("status", ["pending", "in_progress"]),
-                supabase.from("gas_cylinder_orders").select("id", { count: "exact", head: true }).eq("scheduled_date", today),
+                (supabase.from("Productie" as never) as any).select("id", { count: "exact", head: true }).eq("Jaar", new Date().getFullYear()),
                 supabase.from("time_off_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
             ]);
             setStats({

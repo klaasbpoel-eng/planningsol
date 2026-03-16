@@ -12,9 +12,9 @@ interface StockStatusBadgeProps {
 }
 
 export function getStockStatus(difference: number): StockStatus {
-  if (difference <= -3) return "critical";
-  if (difference <= 0) return "low";
-  if (difference <= 5) return "ok";
+  if (difference < 1) return "critical";
+  if (difference < 7) return "low";
+  if (difference <= 30) return "ok";
   return "surplus";
 }
 

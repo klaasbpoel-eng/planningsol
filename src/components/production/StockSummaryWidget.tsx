@@ -58,75 +58,49 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     getUser();
   }, []);
 
-  // Fetch stock data via Edge Function (bypasses PostgREST schema cache)
+  // Fetch stock data via RPC (server-side JOIN between Voorraad and Afname)
   const fetchStockFromDB = useCallback(async () => {
     setIsLoadingDB(true);
     setDbError(null);
     try {
-      // Query Voorraad and Afname via supabase client (same project as stock_products)
-      const [{ data: voorraadRaw, error: vErr }, { data: afnameRaw, error: aErr }] = await Promise.all([
-        supabase.from("Voorraad" as never).select("CD_SUBCODE,DS_SUBCODE,DS_CENTER_DESCRIPTION,Aantal"),
-        supabase.from("Afname" as never).select("SubCode,SubCodeDescription,CenterDescription,Aantal"),
-      ]);
+      const { data: rpcData, error: rpcErr } = await (supabase as any)
+        .rpc("get_voorraad_met_afname");
 
-      if (vErr || aErr) {
-        setDbError((vErr ?? aErr)!.message);
+      if (rpcErr) {
+        setDbError(rpcErr.message);
         return;
       }
 
-      // Normalize to common shape
-      type StockRow = { subcode: string; description: string; center: string; aantal: number };
-      type VRow = Record<string, unknown>;
-      const voorraadRows: StockRow[] = ((voorraadRaw as VRow[]) ?? []).map((r) => ({
-        subcode: String(r["CD_SUBCODE"] ?? ""),
-        description: String(r["DS_SUBCODE"] ?? ""),
-        center: String(r["DS_CENTER_DESCRIPTION"] ?? ""),
-        aantal: Number(r["Aantal"] ?? 0),
-      }));
-      const afnameRows: StockRow[] = ((afnameRaw as VRow[]) ?? []).map((r) => ({
-        subcode: String(r["SubCode"] ?? ""),
-        description: String(r["SubCodeDescription"] ?? ""),
-        center: String(r["CenterDescription"] ?? ""),
-        aantal: Number(r["Aantal"] ?? 0),
-      }));
+      const rows: Array<{
+        sub_code: string;
+        omschrijving: string;
+        locatie: string;
+        voorraad: number;
+        voorraad_leeg?: number;
+        afname: number;
+        verschil: number;
+      }> = rpcData ?? [];
 
-      const normalizeCenter = (center: string): "emmen" | "tilburg" =>
-        center?.toLowerCase().includes("emmen") ? "emmen" : "tilburg";
-
-      const stockMap = new Map<string, { description: string; aantal: number }>();
-      for (const row of voorraadRows) {
-        const key = `${row.subcode}||${normalizeCenter(row.center)}`;
-        const ex = stockMap.get(key);
-        if (ex) ex.aantal += Number(row.aantal);
-        else stockMap.set(key, { description: row.description, aantal: Number(row.aantal) });
-      }
-
-      const consumptionMap = new Map<string, { description: string; aantal: number }>();
-      for (const row of afnameRows) {
-        const key = `${row.subcode}||${normalizeCenter(row.center)}`;
-        const ex = consumptionMap.get(key);
-        if (ex) ex.aantal += Number(row.aantal);
-        else consumptionMap.set(key, { description: row.description, aantal: Number(row.aantal) });
-      }
-
-      // Outer join — show all products from either table
-      const allKeys = new Set([...stockMap.keys(), ...consumptionMap.keys()]);
       const emmenItems: StockItem[] = [];
       const tilburgItems: StockItem[] = [];
-      for (const key of allKeys) {
-        const [subcode, center] = key.split("||");
-        const stock = stockMap.get(key);
-        const consumption = consumptionMap.get(key);
-        const numberOnStock = stock?.aantal ?? 0;
-        const averageConsumption = consumption?.aantal ?? 0;
+
+      for (const row of rows) {
+        const voorraad = Number(row.voorraad) || 0;
+        const afname = Number(row.afname) || 0;
+        // Dekking in days = voorraad / (afname per dag). Assuming afname is monthly (P90), daily afname is afname / 30.
+        // If afname is 0, dekking is very high (let's say 999 days).
+        const dailyAfname = afname > 0 ? (afname / 90) : 0;
+        const dekking = dailyAfname > 0 ? (voorraad / dailyAfname) : (voorraad > 0 ? 999 : 0);
+
         const item: StockItem = {
-          subCode: subcode,
-          description: stock?.description ?? consumption?.description ?? subcode,
-          numberOnStock,
-          averageConsumption,
-          difference: numberOnStock - averageConsumption,
+          subCode: row.sub_code,
+          description: row.omschrijving || row.sub_code,
+          numberOnStock: voorraad,
+          numberEmpty: Number(row.voorraad_leeg) || 0,
+          averageConsumption: afname,
+          difference: dekking, // Now represents days of coverage
         };
-        if (center === "emmen") emmenItems.push(item);
+        if (row.locatie === "emmen") emmenItems.push(item);
         else tilburgItems.push(item);
       }
 
@@ -187,8 +161,15 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
               ...existing,
               averageConsumption: existing.averageConsumption + item.averageConsumption,
               numberOnStock: existing.numberOnStock + item.numberOnStock,
-              difference: (existing.numberOnStock + item.numberOnStock) - (existing.averageConsumption + item.averageConsumption),
+              numberEmpty: existing.numberEmpty + item.numberEmpty,
+              difference: Math.min(existing.difference, item.difference), // Keep lowest coverage when combining locations for safety, or recalculate dekking:
             });
+            // Recalculate dekking for combined:
+            const combinedVoorraad = combined.get(item.subCode)!.numberOnStock;
+            const combinedAfname = combined.get(item.subCode)!.averageConsumption;
+            const dailyAfname = combinedAfname > 0 ? (combinedAfname / 90) : 0;
+            const dekking = dailyAfname > 0 ? (combinedVoorraad / dailyAfname) : (combinedVoorraad > 0 ? 999 : 0);
+            combined.get(item.subCode)!.difference = dekking;
           } else {
             combined.set(item.subCode, { ...item });
           }
@@ -415,7 +396,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
                             if (!dialogSearch) return true;
                             const q = dialogSearch.toLowerCase();
                             return item.description.toLowerCase().includes(q) || item.subCode.toLowerCase().includes(q);
-                          }).map((item) => (
+                          }).sort((a, b) => a.difference - b.difference).map((item) => (
                             <div
                               key={item.subCode}
                               className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
@@ -430,19 +411,25 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
                               </div>
                               <div className="text-right ml-3 flex-shrink-0 space-y-1">
                                 <div className="flex items-center justify-end gap-2 text-xs">
-                                  <span className="text-muted-foreground">Voorraad:</span>
-                                  <span className="font-semibold w-8 text-right">{formatNumber(item.numberOnStock, 0)}</span>
+                                  <span className="text-muted-foreground">Voorraad vol:</span>
+                                  <span className="font-semibold w-12 text-right text-green-600 dark:text-green-400">{formatNumber(item.numberOnStock, 0)}</span>
                                 </div>
+                                {(item.numberEmpty > 0) && (
+                                  <div className="flex items-center justify-end gap-2 text-xs">
+                                    <span className="text-muted-foreground">Voorraad leeg:</span>
+                                    <span className="font-semibold w-12 text-right text-orange-500">{formatNumber(item.numberEmpty, 0)}</span>
+                                  </div>
+                                )}
                                 <div className="flex items-center justify-end gap-2 text-xs">
-                                  <span className="text-muted-foreground">Gem. verbr:</span>
-                                  <span className="font-semibold w-8 text-right">{formatNumber(item.averageConsumption, 0)}</span>
+                                  <span className="text-muted-foreground">P90 afname:</span>
+                                  <span className="font-semibold w-12 text-right">{formatNumber(item.averageConsumption, 2)}</span>
                                 </div>
                                 <div className={cn(
                                   "flex items-center justify-end gap-2 text-xs font-semibold",
-                                  item.difference < 0 ? "text-red-500" : item.difference > 0 ? "text-green-500" : "text-muted-foreground"
+                                  item.difference < 3 ? "text-red-500" : item.difference < 7 ? "text-orange-500" : item.difference <= 30 ? "text-green-500" : "text-cyan-500"
                                 )}>
-                                  <span>Verschil:</span>
-                                  <span className="w-8 text-right">{item.difference > 0 ? "+" : ""}{formatNumber(item.difference, 0)}</span>
+                                  <span>Dekking:</span>
+                                  <span className="w-12 text-right">{formatNumber(item.difference, 1)} dgn</span>
                                 </div>
                               </div>
                             </div>

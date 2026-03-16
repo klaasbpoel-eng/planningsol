@@ -5,8 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown, Minus, Trophy, Ruler } from "lucide-react";
-import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import {
   LineChart,
   Line,
@@ -100,35 +100,68 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
   const fetchBothYearsData = async () => {
     setLoading(true);
 
-    // Fetch cylinder sizes metadata for capacity info
-    const { data: cylinderSizesData } = await api.cylinderSizes.getAll();
-
-    const cylinderSizeCapacities = new Map<string, number | null>();
-    cylinderSizesData?.forEach((cs: any) => {
-      cylinderSizeCapacities.set(cs.name, cs.capacity_liters);
-    });
-
     const locationParam = location !== "all" ? location : null;
 
-    const [result1, result2] = await Promise.all([
-      api.reports.getMonthlyCylinderTotalsBySize(selectedYear1, locationParam, hideDigital)
-        .then(data => ({ data, error: null }))
-        .catch(error => ({ data: null, error })),
-      api.reports.getMonthlyCylinderTotalsBySize(selectedYear2, locationParam, hideDigital)
-        .then(data => ({ data, error: null }))
-        .catch(error => ({ data: null, error }))
+    const fetchAllRowsForYear = async (year: number): Promise<any[]> => {
+      const PAGE = 1000;
+      const allRows: any[] = [];
+      let from = 0;
+      while (true) {
+        const { data } = await (supabase.from("Productie" as never) as any)
+          .select("Datum,Locatie,Product,Capaciteit,Aantal")
+          .eq("Jaar", year)
+          .range(from, from + PAGE - 1);
+        if (!data || data.length === 0) break;
+        if (locationParam) {
+          allRows.push(...data.filter((r: any) =>
+            (r.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg") === locationParam
+          ));
+        } else {
+          allRows.push(...data);
+        }
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      return allRows;
+    };
+
+    const computeMonthlyCylinderTotalsBySize = (rows: any[]): { month: number; cylinder_size: string; capacityLiters: number | null; total_cylinders: number }[] => {
+      const map = new Map<string, { month: number; cylinder_size: string; capacityLiters: number | null; total_cylinders: number }>();
+      rows.forEach((r: any) => {
+        const raw: string = r.Datum || "";
+        const iso = raw.includes("T") ? raw.substring(0, 10) : raw.split("-").reverse().join("-");
+        const month = parseInt(iso.substring(5, 7));
+        if (!month || isNaN(month)) return;
+        const cap = r.Capaciteit;
+        const cylinder_size = (cap !== null && cap !== undefined && cap !== 0) ? `${cap}L` : "Onbekend";
+        const capacityLiters: number | null = (cap !== null && cap !== undefined && cap !== 0) ? Number(cap) : null;
+        const key = `${month}_${cylinder_size}`;
+        if (!map.has(key)) {
+          map.set(key, { month, cylinder_size, capacityLiters, total_cylinders: 0 });
+        }
+        map.get(key)!.total_cylinders += Number(r.Aantal) || 0;
+      });
+      return Array.from(map.values());
+    };
+
+    const [rows1, rows2] = await Promise.all([
+      fetchAllRowsForYear(selectedYear1),
+      fetchAllRowsForYear(selectedYear2)
     ]);
 
-    const processData = (data: any[]): CylinderSizeData[] => {
+    const aggregated1 = computeMonthlyCylinderTotalsBySize(rows1);
+    const aggregated2 = computeMonthlyCylinderTotalsBySize(rows2);
+
+    const processData = (data: { month: number; cylinder_size: string; capacityLiters: number | null; total_cylinders: number }[]): CylinderSizeData[] => {
       const sizeMap = new Map<string, CylinderSizeData>();
 
-      data?.forEach((item: { month: number; cylinder_size: string; total_cylinders: number }) => {
+      data?.forEach((item) => {
         if (!item.cylinder_size) return;
 
         if (!sizeMap.has(item.cylinder_size)) {
           sizeMap.set(item.cylinder_size, {
             name: item.cylinder_size,
-            capacityLiters: cylinderSizeCapacities.get(item.cylinder_size) ?? null,
+            capacityLiters: item.capacityLiters,
             months: new Array(12).fill(0)
           });
         }
@@ -140,8 +173,8 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
       return Array.from(sizeMap.values());
     };
 
-    const year1Data = processData(result1.data || []);
-    const year2Data = processData(result2.data || []);
+    const year1Data = processData(aggregated1);
+    const year2Data = processData(aggregated2);
 
     // Collect all unique cylinder sizes from both years
     const sizeMap = new Map<string, CylinderSizeInfo>();

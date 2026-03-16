@@ -27,6 +27,7 @@ export interface StockItem {
   description: string;
   averageConsumption: number;
   numberOnStock: number;
+  numberEmpty: number;
   difference: number;
   filledInEmmen?: boolean;
 }
@@ -109,6 +110,9 @@ export function StockExcelImportDialog({
               if (cellStr.includes("verschil") || cellStr.includes("difference") || cellStr.includes("diff") || cellStr.includes("verscil")) {
                 columnMap.difference = idx;
               }
+              if (cellStr.includes("leeg") || cellStr.includes("empty")) {
+                columnMap.numberEmpty = idx;
+              }
               if (cellStr.includes("vullocatie") || cellStr.includes("locatie vulling") || cellStr.includes("filled") || cellStr.includes("emmen") || cellStr.includes("vulplaats")) {
                 columnMap.filledInEmmen = idx;
               }
@@ -119,7 +123,7 @@ export function StockExcelImportDialog({
 
         // Fallback to fixed indices if header not found
         if (headerRowIndex === -1) {
-          columnMap = { subCode: 0, description: 1, averageConsumption: 2, numberOnStock: 3, difference: 4 };
+          columnMap = { subCode: 0, description: 1, averageConsumption: 2, numberOnStock: 3, difference: 4, numberEmpty: -1 };
           headerRowIndex = 0;
         }
 
@@ -143,6 +147,12 @@ export function StockExcelImportDialog({
           const avgConsumption = parseFloat(String(row[columnMap.averageConsumption ?? 2] || "0").replace(",", "."));
           const stockCount = parseFloat(String(row[columnMap.numberOnStock ?? 3] || "0").replace(",", "."));
           
+          let emptyCount = 0;
+          if (columnMap.numberEmpty !== undefined && columnMap.numberEmpty !== -1 && row[columnMap.numberEmpty] !== undefined) {
+             emptyCount = parseFloat(String(row[columnMap.numberEmpty] || "0").replace(",", "."));
+          }
+          if (isNaN(emptyCount)) emptyCount = 0;
+
           // Calculate difference if not provided
           let difference: number;
           if (columnMap.difference !== undefined && row[columnMap.difference] !== undefined) {
@@ -168,6 +178,7 @@ export function StockExcelImportDialog({
             description: description || "Onbekend product",
             averageConsumption: Math.round(avgConsumption),
             numberOnStock: Math.round(stockCount),
+            numberEmpty: Math.round(emptyCount),
             difference: Math.round(difference),
             filledInEmmen,
           });
