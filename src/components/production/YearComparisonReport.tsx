@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users, Building2, Ruler, Sparkles } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Minus, Cylinder, Snowflake, Award, AlertTriangle, X, Filter, Users, Building2, Ruler, Sparkles, Calendar } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +65,7 @@ interface GasTypeYearComparison {
   previousYear: number;
   change: number;
   changePercent: number;
+  rankDelta?: number; // positive = moved up, negative = moved down
 }
 
 interface MonthlyGasTypeChartData {
@@ -118,6 +119,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   const showDryIce = location !== "sol_tilburg";
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [ytdMode, setYtdMode] = useState<boolean>(true);
   const [cylinderData, setCylinderData] = useState<MonthlyData[]>([]);
   const [dryIceData, setDryIceData] = useState<MonthlyData[]>([]);
   const [cylinderTotals, setCylinderTotals] = useState<YearlyTotals | null>(null);
@@ -328,6 +330,10 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   }, [cylinderSizeComparison, selectedCylinderSizes]);
 
   useEffect(() => {
+    setYtdMode(selectedYear === new Date().getFullYear());
+  }, [selectedYear]);
+
+  useEffect(() => {
     // Generate years from 2024 to current year + 1
     const currentYear = new Date().getFullYear();
     const years: number[] = [];
@@ -361,7 +367,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
     if (selectedYear) {
       fetchYearComparisonData();
     }
-  }, [selectedYear, location, hideDigital]);
+  }, [selectedYear, location, hideDigital, ytdMode]);
 
   const fetchYearComparisonData = async () => {
     setLoading(true);
@@ -500,10 +506,19 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
 
     try {
       // Fetch rows from Productie for current and previous year in parallel
-      const [currentRows, previousRows] = await Promise.all([
+      const [allCurrentRows, allPreviousRows] = await Promise.all([
         fetchAllRowsForYear(currentYear, locationFilter),
         fetchAllRowsForYear(previousYear, locationFilter),
       ]);
+
+      // Apply YTD filter: only include months up to today's month for fair comparison
+      const todayMonth = new Date().getMonth() + 1;
+      const currentRows = ytdMode
+        ? allCurrentRows.filter(row => { const m = getRowMonth(row); return m !== null && m <= todayMonth; })
+        : allCurrentRows;
+      const previousRows = ytdMode
+        ? allPreviousRows.filter(row => { const m = getRowMonth(row); return m !== null && m <= todayMonth; })
+        : allPreviousRows;
 
       // Dry ice data still uses the old API (not in Productie)
       const [currentDryIceRes, previousDryIceRes] = await Promise.all([
@@ -791,7 +806,18 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       });
     });
 
+    // Compute rank deltas: rank by previousYear first, then by currentYear
+    const prevRanked = [...comparison].sort((a, b) => b.previousYear - a.previousYear);
+    const prevRankMap = new Map<string, number>();
+    prevRanked.forEach((gt, idx) => prevRankMap.set(gt.gas_type_id, idx + 1));
+
     comparison.sort((a, b) => b.currentYear - a.currentYear);
+
+    comparison.forEach((gt, idx) => {
+      const currentRank = idx + 1;
+      const prevRank = prevRankMap.get(gt.gas_type_id);
+      gt.rankDelta = prevRank !== undefined ? prevRank - currentRank : undefined;
+    });
 
     // Build monthly chart data
     const currentMonthlyData: MonthlyGasTypeChartData[] = [];
@@ -907,6 +933,11 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           </CardTitle>
           <CardDescription>
             Vergelijk productiedata per maand met het voorgaande jaar
+            {ytdMode && (
+              <span className="ml-1 text-primary font-medium">
+                — YTD: jan t/m {new Date().toLocaleString("nl-NL", { month: "long" })} voor beide jaren
+              </span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -928,6 +959,21 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
               <span className="text-sm text-muted-foreground">
                 vs {selectedYear - 1}
               </span>
+              <Button
+                variant={ytdMode ? "default" : "outline"}
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => setYtdMode(!ytdMode)}
+                title={ytdMode ? `YTD actief: jan – ${new Date().toLocaleString("nl-NL", { month: "short" })} voor beide jaren` : "Klik om YTD in te schakelen (vergelijk dezelfde periode)"}
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                YTD
+              </Button>
+              {ytdMode && (
+                <span className="text-xs text-muted-foreground">
+                  jan – {new Date().toLocaleString("nl-NL", { month: "short" })}
+                </span>
+              )}
             </div>
           </div>
 
@@ -1049,7 +1095,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <Cylinder className="h-5 w-5 text-orange-500" />
-              Cilinders Jaartotaal
+              Cilinders {ytdMode ? "YTD Totaal" : "Jaartotaal"}
               {hideDigital && hasDigitalTypes && (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal">
                   Alleen fysiek
@@ -1099,7 +1145,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Snowflake className="h-5 w-5 text-cyan-500" />
-                Droogijs Jaartotaal (kg)
+                Droogijs {ytdMode ? "YTD Totaal" : "Jaartotaal"} (kg)
                 {selectedCustomers.length > 0 && (
                   <Badge variant="secondary" className="ml-2">
                     {selectedCustomers.length} klant(en) gefilterd
@@ -1377,19 +1423,33 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                       {filteredGasTypeComparison.map((gasType) => (
                         <div
                           key={gasType.gas_type_id}
-                          className="flex items-center justify-between p-3 rounded-lg border bg-card/50"
+                          className={`flex items-center justify-between p-3 rounded-lg border bg-card/50 ${gasType.changePercent <= -30 ? "border-red-500/40 bg-red-500/5" : ""}`}
                         >
                           <div className="flex items-center gap-3">
                             <div
-                              className="w-3 h-3 rounded-full"
+                              className="w-3 h-3 rounded-full flex-shrink-0"
                               style={{ backgroundColor: gasType.gas_type_color }}
                             />
                             <span className="font-medium">{gasType.gas_type_name}</span>
                             {digitalGasTypeIds.has(gasType.gas_type_id) && (
                               <Badge variant="outline" className="text-[9px] px-1 py-0 border-sky-400/40 text-sky-500 bg-sky-400/10">ⓓ</Badge>
                             )}
+                            {gasType.changePercent <= -30 && (
+                              <Badge variant="destructive" className="text-[9px] px-1.5 py-0 gap-0.5">
+                                <AlertTriangle className="h-2.5 w-2.5" />
+                                Groot verlies
+                              </Badge>
+                            )}
                           </div>
-                          <div className="flex items-center gap-4 text-sm">
+                          <div className="flex items-center gap-3 text-sm">
+                            {gasType.rankDelta !== undefined && gasType.rankDelta !== 0 && (
+                              <span
+                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${gasType.rankDelta > 0 ? "text-green-600 bg-green-500/10" : "text-red-500 bg-red-500/10"}`}
+                                title={`Rang: ${gasType.rankDelta > 0 ? `+${gasType.rankDelta} plekken gestegen` : `${gasType.rankDelta} plekken gedaald`} t.o.v. ${selectedYear - 1}`}
+                              >
+                                {gasType.rankDelta > 0 ? `↑${gasType.rankDelta}` : `↓${Math.abs(gasType.rankDelta)}`}
+                              </span>
+                            )}
                             <div className="text-right">
                               <div className="font-medium">{formatNumber(gasType.currentYear, 0)}</div>
                               <div className="text-xs text-muted-foreground">
@@ -1628,8 +1688,20 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                     {displayGasTypes.map((gasType) => (
                       <div
                         key={gasType.gas_type_id}
-                        className="p-3 rounded-lg border bg-card/50 text-center"
+                        className={`p-3 rounded-lg border bg-card/50 text-center relative ${gasType.changePercent <= -30 ? "border-red-500/40 bg-red-500/5" : ""}`}
                       >
+                        {gasType.rankDelta !== undefined && gasType.rankDelta !== 0 && (
+                          <span
+                            className={`absolute top-1.5 right-1.5 text-[9px] font-bold px-1 py-0.5 rounded leading-none ${gasType.rankDelta > 0 ? "text-green-600 bg-green-500/15" : "text-red-500 bg-red-500/15"}`}
+                          >
+                            {gasType.rankDelta > 0 ? `↑${gasType.rankDelta}` : `↓${Math.abs(gasType.rankDelta)}`}
+                          </span>
+                        )}
+                        {gasType.changePercent <= -30 && (
+                          <span className="absolute top-1.5 left-1.5 text-[9px] text-red-500" title="Groot verlies (>30%)">
+                            <AlertTriangle className="h-3 w-3" />
+                          </span>
+                        )}
                         <div
                           className="w-3 h-3 rounded-full mx-auto mb-2"
                           style={{ backgroundColor: gasType.gas_type_color }}
@@ -1882,6 +1954,12 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {(() => {
+            const activeMonths = filteredCylinderDataByCustomer.filter(m => m.currentYear > 0 || m.previousYear > 0);
+            const avgGrowth = activeMonths.length > 0
+              ? parseFloat((activeMonths.reduce((s, m) => s + m.changePercent, 0) / activeMonths.length).toFixed(1))
+              : null;
+            return (
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart
               data={filteredCylinderDataByCustomer.map((c, i) => ({
@@ -1908,6 +1986,15 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                 domain={['dataMin - 10', 'dataMax + 10']}
               />
               <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+              {avgGrowth !== null && (
+                <ReferenceLine
+                  y={avgGrowth}
+                  stroke="#f97316"
+                  strokeDasharray="5 3"
+                  strokeOpacity={0.6}
+                  label={{ value: `Gem: ${avgGrowth >= 0 ? "+" : ""}${avgGrowth}%`, fill: "#f97316", fontSize: 10, position: "insideTopRight" }}
+                />
+              )}
               <Tooltip
                 contentStyle={{
                   borderRadius: "10px",
@@ -1946,6 +2033,8 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
               )}
             </AreaChart>
           </ResponsiveContainer>
+            );
+          })()}
         </CardContent>
       </Card>
 
