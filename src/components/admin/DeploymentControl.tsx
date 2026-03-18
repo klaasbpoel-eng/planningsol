@@ -9,12 +9,12 @@ import { Label } from "@/components/ui/label";
 
 export function DeploymentControl() {
     const [isLoading, setIsLoading] = useState(false);
-    const [selectedSource, setSelectedSource] = useState<string>("cloud");
+    const [selectedSource, setSelectedSource] = useState<string>("external_supabase");
 
     const handleDeploy = async () => {
         setIsLoading(true);
         try {
-            const { data, error } = await supabase.functions.invoke('trigger-github-workflow', {
+            const { error } = await supabase.functions.invoke('trigger-github-workflow', {
                 body: {
                     primary_source: selectedSource
                 }

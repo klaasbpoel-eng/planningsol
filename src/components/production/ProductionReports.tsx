@@ -80,6 +80,7 @@ const ProductionHeatMap = lazy(() => import("./ProductionHeatMap").then(m => ({ 
 const CustomerSegmentation = lazy(() => import("./CustomerSegmentation").then(m => ({ default: m.CustomerSegmentation })));
 const LocationComparisonReport = lazy(() => import("./LocationComparisonReport").then(m => ({ default: m.LocationComparisonReport })));
 const MonthlyReport = lazy(() => import("./MonthlyReport").then(m => ({ default: m.MonthlyReport })));
+const YearlyReport = lazy(() => import("./YearlyReport").then(m => ({ default: m.YearlyReport })));
 
 
 
@@ -722,6 +723,10 @@ export function ProductionReports({
               <CalendarIcon className="h-4 w-4 shrink-0" />
               Maandrapport
             </TabsTrigger>
+            <TabsTrigger value="yearly" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
+              <CalendarIcon className="h-4 w-4 shrink-0" />
+              Jaarrapport
+            </TabsTrigger>
             <TabsTrigger value="insights" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
               <Sparkles className="h-4 w-4 shrink-0" />
               Insights
@@ -867,6 +872,13 @@ export function ProductionReports({
         <TabsContent value="monthly" className="mt-0">
           <Suspense fallback={<ChartLoadingFallback />}>
             <MonthlyReport hideDigital={hideDigital} />
+          </Suspense>
+        </TabsContent>
+
+        {/* Yearly Report */}
+        <TabsContent value="yearly" className="mt-0">
+          <Suspense fallback={<ChartLoadingFallback />}>
+            <YearlyReport />
           </Suspense>
         </TabsContent>
 

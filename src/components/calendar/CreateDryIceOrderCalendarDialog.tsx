@@ -27,7 +27,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 interface CreateDryIceOrderCalendarDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: () => void;
+  onCreate: (orders?: any[]) => void;
   initialDate?: Date;
 }
 
@@ -267,35 +267,28 @@ export function CreateDryIceOrderCalendarDialog({
         .single();
 
       if (parentError) throw parentError;
-      if (!parentOrder) throw new Error("Failed to create parent order");
-
-      // Insert child orders if any
-      if (orderDates.length > 1) {
-        const childOrders = orderDates.slice(1).map((date, index) => ({
+      const { data: insertedChildren, error: childrenError } = orderDates.length > 1 ? await supabase
+        .from("dry_ice_orders")
+        .insert(orderDates.slice(1).map((date, index) => ({
           ...baseOrderData,
           order_number: `${parentOrderNumber}-${index + 1}`,
           scheduled_date: format(date, "yyyy-MM-dd"),
           parent_order_id: parentOrder.id
-        }));
+        })))
+        .select() : { data: [], error: null };
 
-        const { error: childrenError } = await supabase
-          .from("dry_ice_orders")
-          .insert(childOrders);
+      if (childrenError) throw childrenError;
 
-        if (childrenError) throw childrenError;
-      }
+      const createdOrders = [parentOrder, ...(insertedChildren || [])];
 
-      // We don't need 'ordersToInsert', we know the count
-      const ordersToInsert = orderDates; // mapping for count usage below
-
-      const orderCount = ordersToInsert.length;
+      const orderCount = orderDates.length;
       toast.success(
         orderCount > 1
           ? `${orderCount} droogijs orders aangemaakt`
           : "Droogijs order aangemaakt"
       );
       resetForm();
-      onCreate();
+      onCreate(createdOrders);
       onOpenChange(false);
     } catch (error) {
       console.error("Error creating order:", error);

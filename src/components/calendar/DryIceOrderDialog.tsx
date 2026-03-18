@@ -70,7 +70,7 @@ interface DryIceOrderDialogProps {
   order: DryIceOrderWithDetails | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUpdate: () => void;
+  onUpdate: (deletedId?: string, deletedType?: "dryice" | "gascylinder", updatedItem?: any) => void;
   isAdmin?: boolean;
   canEdit?: boolean;
   productTypes?: DryIceProductType[];
@@ -176,21 +176,26 @@ export function DryIceOrderDialog({
         delete seriesFields.status;
         const seriesId = order.parent_order_id || order.id;
         await api.dryIceOrders.updateSeriesFields(seriesId, seriesFields);
-        await api.dryIceOrders.update(order.id, {
+        const { data } = await supabase.from("dry_ice_orders").update({
           ...updateFields,
           scheduled_date: scheduledDate ? format(scheduledDate, "yyyy-MM-dd") : order.scheduled_date,
-        });
+        }).eq("id", order.id).select().single();
         toast.success("Hele reeks bijgewerkt");
+
+        setIsEditing(false);
+        onUpdate(); // full reload for series
+        return;
       } else {
-        await api.dryIceOrders.update(order.id, {
+        const { data } = await supabase.from("dry_ice_orders").update({
           ...updateFields,
           scheduled_date: scheduledDate ? format(scheduledDate, "yyyy-MM-dd") : order.scheduled_date,
-        });
+        }).eq("id", order.id).select().single();
         toast.success("Droogijs order bijgewerkt");
-      }
 
-      setIsEditing(false);
-      onUpdate();
+        setIsEditing(false);
+        onUpdate(undefined, "dryice", data);
+        return;
+      }
     } catch (error) {
       console.error("Error updating order:", error);
       toast.error("Fout bij opslaan");
@@ -209,15 +214,19 @@ export function DryIceOrderDialog({
         const seriesId = order.parent_order_id || order.id;
         await api.dryIceOrders.deleteSeries(seriesId);
         toast.success("Volledige reeks verwijderd");
+
+        setShowDeleteConfirm(false);
+        onOpenChange(false);
+        onUpdate(); // full reload for series
       } else {
         // Delete only this specific order
         await api.dryIceOrders.delete(order.id);
         toast.success("Droogijs order verwijderd");
-      }
 
-      setShowDeleteConfirm(false);
-      onOpenChange(false);
-      onUpdate();
+        setShowDeleteConfirm(false);
+        onOpenChange(false);
+        onUpdate(order.id, "dryice");
+      }
     } catch (error) {
       console.error("Error deleting order:", error);
       toast.error("Fout bij verwijderen", {

@@ -35,7 +35,7 @@ type DayPart = "full_day" | "morning" | "afternoon" | "hours";
 interface CreateLeaveRequestDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: () => void;
+  onCreate: (requests?: any[]) => void;
   initialDate?: Date;
   profiles: Profile[];
   currentUserId?: string;
@@ -157,7 +157,7 @@ export function CreateLeaveRequestDialog({
         ? `[${startTime}-${endTime}]${reason.trim() ? ` ${reason.trim()}` : ""}`
         : reason.trim() || null;
 
-      await api.timeOffRequests.create({
+      const createdRequest = await api.timeOffRequests.create({
         profile_id: profileId,
         type_id: typeId,
         start_date: format(startDate, "yyyy-MM-dd"),
@@ -176,7 +176,7 @@ export function CreateLeaveRequestDialog({
       });
 
       resetForm();
-      onCreate();
+      onCreate([createdRequest]);
       onOpenChange(false);
     } catch (error) {
       console.error("Error creating leave request:", error);

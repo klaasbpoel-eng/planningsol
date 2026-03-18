@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -99,6 +99,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
   const [ambulanceTrips, setAmbulanceTrips] = useState<AmbulanceTripWithCustomers[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const isFetching = useRef(false);
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
@@ -215,6 +216,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     fetchData();
   }, [currentUser]);
   const fetchData = async () => {
+    if (isFetching.current) return;
+    isFetching.current = true;
+    setLoading(true);
     try {
       setFetchError(null);
       let user = currentUser;
@@ -353,6 +357,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
+      isFetching.current = false;
     }
   };
   const handleItemClick = (item: CalendarItem, e: React.MouseEvent) => {
@@ -386,8 +391,14 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     setSelectedAmbulanceTrip(trip);
     setAmbulanceTripDialogOpen(true);
   };
-  const handleDialogUpdate = () => {
-    fetchData();
+  const handleDialogUpdate = (deletedId?: string, deletedType?: "task" | "timeoff") => {
+    if (deletedId && deletedType === "task") {
+      setTasks(prev => prev.filter(t => t.id !== deletedId));
+    } else if (deletedId && deletedType === "timeoff") {
+      setRequests(prev => prev.filter(r => r.id !== deletedId));
+    } else {
+      fetchData();
+    }
   };
   const handleDayClick = (day: Date, e: React.MouseEvent) => {
     // Only open create menu if admin and clicking on empty area (not on an item)

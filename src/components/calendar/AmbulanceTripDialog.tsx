@@ -58,7 +58,7 @@ interface AmbulanceTripDialogProps {
   trip: AmbulanceTripWithCustomers | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUpdate: () => void;
+  onUpdate: (deletedId?: string, deletedType?: "ambulance", updatedItem?: any) => void;
   isAdmin: boolean;
 }
 
@@ -189,12 +189,18 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
         }
 
         toast.success("Gehele reeks bijgewerkt");
+
+        setEditing(false);
+        onUpdate();
+        return;
       } else {
         // Update only this trip (including date)
-        const { error: tripError } = await supabase
+        const { data, error: tripError } = await supabase
           .from("ambulance_trips" as any)
           .update({ ...updateData, scheduled_date: format(editDate, "yyyy-MM-dd") })
-          .eq("id", trip.id);
+          .eq("id", trip.id)
+          .select()
+          .single();
         if (tripError) throw tripError;
 
         // Update customers for this trip only
@@ -209,13 +215,18 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
               customer_name: c.customer_name.trim(),
             })));
           if (custError) throw custError;
+
+          (data as any).customers = validCustomers;
+        } else {
+          (data as any).customers = [];
         }
 
         toast.success("Ambulance rit bijgewerkt");
-      }
 
-      setEditing(false);
-      onUpdate();
+        setEditing(false);
+        onUpdate(undefined, "ambulance", data);
+        return;
+      }
     } catch (error) {
       console.error("Error updating trip:", error);
       toast.error("Fout bij bijwerken");
@@ -247,6 +258,9 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
           .eq("series_id", trip.series_id);
         if (error) throw error;
         toast.success("Gehele reeks verwijderd");
+
+        onOpenChange(false);
+        onUpdate();
       } else {
         // Delete customers first
         await supabase.from("ambulance_trip_customers" as any).delete().eq("trip_id", trip.id);
@@ -257,9 +271,10 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
           .eq("id", trip.id);
         if (error) throw error;
         toast.success("Ambulance rit verwijderd");
+
+        onOpenChange(false);
+        onUpdate(trip.id, "ambulance");
       }
-      onOpenChange(false);
-      onUpdate();
     } catch (error) {
       console.error("Error deleting trip:", error);
       toast.error("Fout bij verwijderen");

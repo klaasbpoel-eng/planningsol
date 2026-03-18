@@ -86,7 +86,7 @@ interface GasCylinderOrderDialogProps {
   order: GasCylinderOrder | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUpdate: () => void;
+  onUpdate: (deletedId?: string, deletedType?: "dryice" | "gascylinder", updatedItem?: any) => void;
   isAdmin?: boolean;
   canEdit?: boolean;
 }
@@ -232,18 +232,23 @@ export function GasCylinderOrderDialog({
         delete seriesFields.scheduled_date;
         await api.gasCylinderOrders.updateSeriesFields(order.series_id, seriesFields);
         // Also update this specific order's date and status
-        await api.gasCylinderOrders.update(order.id, {
+        const { data } = await supabase.from("gas_cylinder_orders").update({
           status: updateFields.status,
           scheduled_date: updateFields.scheduled_date,
-        });
+        }).eq("id", order.id).select().single();
         toast.success("Gehele reeks bijgewerkt");
-      } else {
-        await api.gasCylinderOrders.update(order.id, updateFields);
-        toast.success("Gascilinder order bijgewerkt");
-      }
 
-      setIsEditing(false);
-      onUpdate();
+        setIsEditing(false);
+        onUpdate(); // full reload for series
+        return;
+      } else {
+        const { data } = await supabase.from("gas_cylinder_orders").update(updateFields).eq("id", order.id).select().single();
+        toast.success("Gascilinder order bijgewerkt");
+
+        setIsEditing(false);
+        onUpdate(undefined, "gascylinder", data);
+        return;
+      }
     } catch (error) {
       console.error("Error updating order:", error);
       toast.error("Fout bij opslaan", {
@@ -268,14 +273,18 @@ export function GasCylinderOrderDialog({
           .or(`id.eq.${order.series_id},series_id.eq.${order.series_id}`);
         if (error) throw error;
         toast.success("Gehele reeks verwijderd");
+
+        setShowDeleteConfirm(false);
+        onOpenChange(false);
+        onUpdate(); // full reload for series
       } else {
         await api.gasCylinderOrders.delete(order.id);
         toast.success("Gascilinder order verwijderd");
-      }
 
-      setShowDeleteConfirm(false);
-      onOpenChange(false);
-      onUpdate();
+        setShowDeleteConfirm(false);
+        onOpenChange(false);
+        onUpdate(order.id, "gascylinder");
+      }
     } catch (error) {
       console.error("Error deleting order:", error);
       toast.error("Fout bij verwijderen", {

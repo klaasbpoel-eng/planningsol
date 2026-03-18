@@ -52,7 +52,7 @@ import {
 import { format, parseISO } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
+import { getPrimarySupabaseClient } from "@/lib/api";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -80,7 +80,7 @@ interface CalendarItemDialogProps {
   item: CalendarItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUpdate: () => void;
+  onUpdate: (deletedId?: string, deletedType?: "task" | "timeoff", updatedItem?: any) => void;
   isAdmin?: boolean;
   profiles?: Profile[];
   timeOffTypes?: TimeOffType[];
@@ -170,28 +170,41 @@ export function CalendarItemDialog({
           end_time: taskEndTime || null,
         };
 
+        const db = getPrimarySupabaseClient();
         if (applyToSeries && taskData.series_id) {
           // Update all tasks in the series (keep their own dates)
-          const { error } = await supabase
+          const { error } = await db
             .from("tasks")
             .update(updatePayload)
             .eq("series_id", taskData.series_id);
           if (error) throw error;
           toast.success("Gehele reeks bijgewerkt");
+
+          setIsEditing(false);
+          // For series, a full refresh is safest as multiple items changed
+          onUpdate();
+          return;
         } else {
           // Update only this task (including date)
-          const { error } = await supabase
+          const { data, error } = await db
             .from("tasks")
             .update({
               ...updatePayload,
               due_date: taskDueDate ? format(taskDueDate, "yyyy-MM-dd") : item.data.due_date,
             })
-            .eq("id", item.data.id);
+            .eq("id", item.data.id)
+            .select()
+            .single();
           if (error) throw error;
           toast.success("Taak bijgewerkt");
+
+          setIsEditing(false);
+          onUpdate(undefined, "task", data);
+          return;
         }
       } else if (item.type === "timeoff") {
-        const { error } = await supabase
+        const db = getPrimarySupabaseClient();
+        const { data, error } = await db
           .from("time_off_requests")
           .update({
             status: timeOffStatus as "pending" | "approved" | "rejected",
@@ -200,10 +213,16 @@ export function CalendarItemDialog({
             end_date: timeOffEndDate ? format(timeOffEndDate, "yyyy-MM-dd") : item.data.end_date,
             type_id: timeOffTypeId || null,
           })
-          .eq("id", item.data.id);
+          .eq("id", item.data.id)
+          .select()
+          .single();
 
         if (error) throw error;
         toast.success("Verlofaanvraag bijgewerkt");
+
+        setIsEditing(false);
+        onUpdate(undefined, "timeoff", data);
+        return;
       }
 
       setIsEditing(false);
@@ -229,7 +248,8 @@ export function CalendarItemDialog({
 
       if (itemType === "task") {
         const taskData = itemData as TaskWithProfile;
-        let query = supabase.from("tasks").delete();
+        const db = getPrimarySupabaseClient();
+        let query = db.from("tasks").delete();
 
         if (deleteSeries && taskData.series_id) {
           query = query.eq("series_id", taskData.series_id);
@@ -248,7 +268,8 @@ export function CalendarItemDialog({
         // For single task deletion, we could potentially keep undo logic but it complicates the code significantly with the new series logic check
 
       } else if (itemType === "timeoff") {
-        const { error } = await supabase
+        const db = getPrimarySupabaseClient();
+        const { error } = await db
           .from("time_off_requests")
           .delete()
           .eq("id", itemData.id);
@@ -260,7 +281,14 @@ export function CalendarItemDialog({
 
       setShowDeleteConfirm(false);
       onOpenChange(false);
-      onUpdate();
+      // For series deletes, pass no ID so parent does a full refetch
+      if (itemType === "task" && !(deleteSeries && (itemData as TaskWithProfile).series_id)) {
+        onUpdate(itemData.id, "task");
+      } else if (itemType === "timeoff") {
+        onUpdate(itemData.id, "timeoff");
+      } else {
+        onUpdate(); // series delete → full refetch
+      }
     } catch (error) {
       console.error("Error deleting item:", error);
       toast.error("Fout bij verwijderen", {

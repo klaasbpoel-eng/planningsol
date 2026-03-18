@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
+import { getPrimarySupabaseClient } from "@/lib/api";
 import { toast } from "sonner";
 import {
   ChevronLeft,
@@ -99,6 +100,8 @@ interface TimeOffItem {
   end_date: string;
   status: string;
   day_part: string | null;
+  profile_id: string | null;
+  type_id: string | null;
   profiles: { full_name: string | null } | null;
   time_off_types: { name: string; color: string } | null;
 }
@@ -198,6 +201,8 @@ export function DailyOverview() {
     });
   }, []);
 
+  const isFetching = useRef(false);
+
   // Create dialog state
   const [createAmbulanceOpen, setCreateAmbulanceOpen] = useState(false);
   const [createDryIceOpen, setCreateDryIceOpen] = useState(false);
@@ -219,9 +224,10 @@ export function DailyOverview() {
   // Fetch admin-specific data for dialogs
   useEffect(() => {
     if (!isAdmin) return;
+    const db = getPrimarySupabaseClient();
     Promise.all([
-      supabase.from("profiles").select("id, full_name, user_id").order("full_name"),
-      supabase.from("time_off_types").select("*").eq("is_active", true).order("name"),
+      db.from("profiles").select("id, full_name, user_id").order("full_name"),
+      db.from("time_off_types").select("*").eq("is_active", true).order("name"),
     ]).then(([profilesRes, typesRes]) => {
       setAdminProfiles(profilesRes.data ?? []);
       setAdminTimeOffTypes(typesRes.data ?? []);
@@ -428,26 +434,29 @@ export function DailyOverview() {
   const toStr = format(queryRange.to, "yyyy-MM-dd");
 
   const fetchData = useCallback(async () => {
+    if (isFetching.current) return;
+    isFetching.current = true;
     setLoading(true);
+    const db = getPrimarySupabaseClient();
+    try {
     const [tasksRes, timeOffRes, dryIceRes, gasRes, ambulanceRes] = await Promise.all([
-      supabase
+      db
         .from("tasks")
         .select("id, title, due_date, start_time, end_time, status, priority, assigned_to, notes, type_id, series_id, task_types:type_id(name, color)")
         .gte("due_date", fromStr)
         .lte("due_date", toStr),
-      supabase
+      db
         .from("time_off_requests")
-        .select("id, start_date, end_date, status, day_part, profiles:profile_id(full_name), time_off_types:type_id(name, color)")
+        .select("id, start_date, end_date, status, day_part, profile_id, type_id")
         .lte("start_date", toStr)
-        .gte("end_date", fromStr)
-        .in("status", ["approved", "pending"]),
-      supabase
+        .gte("end_date", fromStr),
+      db
         .from("dry_ice_orders")
         .select("id, customer_name, quantity_kg, box_count, status, scheduled_date, notes, parent_order_id, dry_ice_packaging:packaging_id(name, capacity_kg)")
         .gte("scheduled_date", fromStr)
         .lte("scheduled_date", toStr),
       Promise.resolve({ data: [] as GasCylinderOrder[], error: null }),
-      supabase
+      db
         .from("ambulance_trips")
         .select("id, scheduled_date, cylinders_2l_300_o2, cylinders_2l_200_o2, cylinders_5l_o2_integrated, cylinders_1l_pindex_o2, cylinders_10l_o2_integrated, cylinders_5l_air_integrated, cylinders_2l_air_integrated, model_5l, status, notes, series_id, ambulance_trip_customers(customer_number, customer_name)")
         .gte("scheduled_date", fromStr)
@@ -455,10 +464,10 @@ export function DailyOverview() {
     ]);
 
     const rawTasks = (tasksRes.data as unknown as TaskItem[]) ?? [];
-    
+
     const assigneeIds = [...new Set(rawTasks.map(t => t.assigned_to).filter(Boolean))];
     if (assigneeIds.length > 0) {
-      const { data: profiles } = await supabase
+      const { data: profiles } = await db
         .from("profiles_limited")
         .select("id, full_name")
         .in("id", assigneeIds as string[]);
@@ -467,7 +476,27 @@ export function DailyOverview() {
     }
     setTasks(rawTasks);
 
-    const allTimeOff = (timeOffRes.data as TimeOffItem[] | null) ?? [];
+    const rawTimeOff = (timeOffRes.data as TimeOffItem[] | null) ?? [];
+
+    // Manually map profiles and time_off_types to avoid PostgREST join issues
+    const leaveProfileIds = [...new Set(rawTimeOff.map(t => t.profile_id).filter(Boolean))] as string[];
+    const leaveTypeIds = [...new Set(rawTimeOff.map(t => t.type_id).filter(Boolean))] as string[];
+    const [profilesRes, typesRes] = await Promise.all([
+      leaveProfileIds.length > 0
+        ? db.from("profiles").select("id, full_name").in("id", leaveProfileIds)
+        : Promise.resolve({ data: [] }),
+      leaveTypeIds.length > 0
+        ? db.from("time_off_types").select("id, name, color").in("id", leaveTypeIds)
+        : Promise.resolve({ data: [] }),
+    ]);
+    const profileMap = new Map((profilesRes.data ?? []).map((p: any) => [p.id, p.full_name]));
+    const typeMap = new Map((typesRes.data ?? []).map((t: any) => [t.id, { name: t.name, color: t.color }]));
+    const allTimeOff: TimeOffItem[] = rawTimeOff.map(t => ({
+      ...t,
+      profiles: t.profile_id ? { full_name: profileMap.get(t.profile_id) ?? null } : null,
+      time_off_types: t.type_id ? (typeMap.get(t.type_id) ?? null) : null,
+    }));
+
     const allDryIce = (dryIceRes.data as DryIceOrder[] | null) ?? [];
     const allGas = (gasRes.data as GasCylinderOrder[] | null) ?? [];
     const allAmbulance = (ambulanceRes.data as AmbulanceTrip[] | null) ?? [];
@@ -491,8 +520,12 @@ export function DailyOverview() {
     } else {
       setLookaheadActive(false);
     }
-
-    setLoading(false);
+    } catch (err) {
+      console.error("DailyOverview fetchData error:", err);
+    } finally {
+      setLoading(false);
+      isFetching.current = false;
+    }
   }, [fromStr, toStr, viewMode, currentDate]);
 
   useEffect(() => {
@@ -552,7 +585,7 @@ export function DailyOverview() {
   // Click handlers
   const handleDryIceClick = async (order: DryIceOrder) => {
     markSeriesAsSeen(order.parent_order_id, order.id);
-    const { data } = await supabase
+    const { data } = await getPrimarySupabaseClient()
       .from("dry_ice_orders")
       .select("*, product_type_info:product_type_id(id, name, description, is_active, sort_order, created_at, updated_at), packaging_info:packaging_id(id, name, capacity_kg, description, is_active, sort_order, created_at, updated_at)")
       .eq("id", order.id)
@@ -565,7 +598,7 @@ export function DailyOverview() {
 
   const handleGasClick = async (order: GasCylinderOrder) => {
     markSeriesAsSeen(order.series_id, order.id);
-    const { data } = await supabase
+    const { data } = await getPrimarySupabaseClient()
       .from("gas_cylinder_orders")
       .select("*, gas_type_ref:gas_type_id(id, name, color)")
       .eq("id", order.id)
@@ -578,7 +611,7 @@ export function DailyOverview() {
 
   const handleAmbulanceClick = async (trip: AmbulanceTrip) => {
     markSeriesAsSeen(trip.series_id, trip.id);
-    const { data } = await supabase
+    const { data } = await getPrimarySupabaseClient()
       .from("ambulance_trips")
       .select("*, ambulance_trip_customers(*)")
       .eq("id", trip.id)
@@ -631,7 +664,7 @@ export function DailyOverview() {
     const oldItem = prev.find(i => i.id === id);
     const oldStatus = oldItem?.status;
     setter((items: any[]) => items.map(i => i.id === id ? { ...i, status: newStatus } : i));
-    const { error } = await supabase.from(table).update({ status: newStatus }).eq("id", id);
+    const { error } = await getPrimarySupabaseClient().from(table).update({ status: newStatus }).eq("id", id);
     if (error) {
       setter(prev);
       toast.error("Status wijzigen mislukt");

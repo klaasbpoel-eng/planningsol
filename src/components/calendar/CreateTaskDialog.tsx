@@ -38,7 +38,7 @@ type TaskType = Database["public"]["Tables"]["task_types"]["Row"] & {
 interface CreateTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: () => void;
+  onCreate: (tasks?: any[]) => void;
   initialDate?: Date;
   profiles: Profile[];
   currentUserId?: string;
@@ -178,7 +178,7 @@ export function CreateTaskDialog({
       );
 
       resetForm();
-      onCreate();
+      onCreate(createdTasks);
       onOpenChange(false);
     } catch (error) {
       console.error("Error creating task:", error);

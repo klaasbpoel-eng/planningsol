@@ -30,7 +30,7 @@ import { CustomerSelect } from "./CustomerSelect";
 interface CreateGasCylinderOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: () => void;
+  onCreated: (orders?: any[]) => void;
   initialDate?: Date;
 }
 
@@ -303,26 +303,29 @@ export function CreateGasCylinderOrderDialog({
       const parentOrder = await api.gasCylinderOrders.create(parentData);
       const parentId = parentOrder?.id;
 
+      const createdOrders = [parentOrder];
+
       // If recurring, set series_id on parent and create children
       if (isRecurring && parentId) {
         await api.gasCylinderOrders.update(parentId, { series_id: parentId });
 
         if (orderDates.length > 1) {
           for (let i = 1; i < orderDates.length; i++) {
-            await api.gasCylinderOrders.create({
+            const childOrder = await api.gasCylinderOrders.create({
               ...parentData,
               order_number: `${parentOrderNumber}-${i}`,
               scheduled_date: format(orderDates[i], "yyyy-MM-dd"),
               series_id: parentId,
               status: "pending" as const,
             });
+            if (childOrder) createdOrders.push(childOrder);
           }
         }
       }
 
       toast.success(isRecurring ? `${orderDates.length} vulorders aangemaakt` : "Vulorder aangemaakt");
       resetForm();
-      onCreated();
+      onCreated(createdOrders);
       onOpenChange(false);
     } catch (error: any) {
       console.error("Error creating order:", error);

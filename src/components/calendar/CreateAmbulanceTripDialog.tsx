@@ -30,7 +30,7 @@ interface CustomerRow {
 interface CreateAmbulanceTripDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: () => void;
+  onCreate: (trips?: any[]) => void;
   initialDate?: Date;
 }
 
@@ -155,6 +155,8 @@ export function CreateAmbulanceTripDialog({
       const validCustomers = customers.filter(c => c.customer_number.trim() || c.customer_name.trim());
       const seriesId = dates.length > 1 ? crypto.randomUUID() : null;
 
+      const createdTrips: any[] = [];
+
       for (const date of dates) {
         const { data: trip, error: tripError } = await supabase
           .from("ambulance_trips" as any)
@@ -177,23 +179,31 @@ export function CreateAmbulanceTripDialog({
 
         if (tripError) throw tripError;
 
-        if (validCustomers.length > 0 && trip) {
-          const { error: custError } = await supabase
-            .from("ambulance_trip_customers" as any)
-            .insert(
-              validCustomers.map(c => ({
-                trip_id: (trip as any).id,
-                customer_number: c.customer_number.trim(),
-                customer_name: c.customer_name.trim(),
-              }))
-            );
-          if (custError) throw custError;
+        if (trip) {
+          if (validCustomers.length > 0) {
+            const { error: custError } = await supabase
+              .from("ambulance_trip_customers" as any)
+              .insert(
+                validCustomers.map(c => ({
+                  trip_id: (trip as any).id,
+                  customer_number: c.customer_number.trim(),
+                  customer_name: c.customer_name.trim(),
+                }))
+              );
+            if (custError) throw custError;
+
+            // Optional: attach customers to trip object so parent knows customers
+            (trip as any).customers = validCustomers;
+          } else {
+             (trip as any).customers = [];
+          }
+          createdTrips.push(trip);
         }
       }
 
       toast.success(dates.length > 1 ? `${dates.length} ambulance ritten ingepland` : "Ambulance rit ingepland");
       resetForm();
-      onCreate();
+      onCreate(createdTrips);
       onOpenChange(false);
     } catch (error) {
       console.error("Error creating ambulance trip:", error);
