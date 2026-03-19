@@ -383,6 +383,14 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       setDialogOpen(true);
     }
   };
+
+  const handleCalendarDialogOpenChange = (nextOpen: boolean) => {
+    setDialogOpen(nextOpen);
+    if (!nextOpen) {
+      setSelectedItem(null);
+    }
+  };
+
   const handleDryIceOrderClick = (order: DryIceOrderWithDetails, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedDryIceOrder(order);

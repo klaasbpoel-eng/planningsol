@@ -620,7 +620,14 @@ export function CalendarItemDialog({
         </Dialog>
 
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialog
+          open={showDeleteConfirm}
+          onOpenChange={(nextOpen) => {
+            if (!deleting) {
+              setShowDeleteConfirm(nextOpen);
+            }
+          }}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Taak verwijderen</AlertDialogTitle>
@@ -637,14 +644,20 @@ export function CalendarItemDialog({
               {item?.type === "task" && (item.data as TaskWithProfile).series_id ? (
                 <>
                   <AlertDialogAction
-                    onClick={() => handleDelete(false)}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void handleDelete(false);
+                    }}
                     disabled={deleting}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     Alleen deze
                   </AlertDialogAction>
                   <AlertDialogAction
-                    onClick={() => handleDelete(true)}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void handleDelete(true);
+                    }}
                     disabled={deleting}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
@@ -653,7 +666,10 @@ export function CalendarItemDialog({
                 </>
               ) : (
                 <AlertDialogAction
-                  onClick={() => handleDelete(false)}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void handleDelete(false);
+                  }}
                   disabled={deleting}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
@@ -673,239 +689,16 @@ export function CalendarItemDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <div className="flex items-center gap-3">
-              <div className={cn("p-2 rounded-lg", getTypeColor(request.type).replace("text-", "bg-").split(" ")[0] + "/10")}>
-                <Palmtree className={cn("h-5 w-5", getTypeColor(request.type).includes("primary") ? "text-primary" : getTypeColor(request.type).includes("destructive") ? "text-destructive" : "text-accent")} />
-              </div>
-              <div className="flex-1">
-                <DialogTitle className="text-lg">
-                  {isEditing ? "Verlofaanvraag bewerken" : "Verlofaanvraag details"}
-                </DialogTitle>
-                <DialogDescription>
-                  {isEditing ? "Bewerk de aanvraaggegevens hieronder" : "Bekijk de details van deze verlofaanvraag"}
-                </DialogDescription>
-              </div>
-            </div>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            {isEditing ? (
-              <>
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select value={timeOffStatus} onValueChange={setTimeOffStatus}>
-                    <SelectTrigger className="bg-background">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-background border shadow-lg z-50">
-                      <SelectItem value="pending">In behandeling</SelectItem>
-                      <SelectItem value="approved">Goedgekeurd</SelectItem>
-                      <SelectItem value="rejected">Afgewezen</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {timeOffTypes.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Categorie</Label>
-                    <Select value={timeOffTypeId || "none"} onValueChange={(val) => setTimeOffTypeId(val === "none" ? null : val)}>
-                      <SelectTrigger className="bg-background">
-                        <SelectValue placeholder="Selecteer categorie" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-background border shadow-lg z-50">
-                        <SelectItem value="none">Geen categorie</SelectItem>
-                        {timeOffTypes.map((type) => (
-                          <SelectItem key={type.id} value={type.id}>
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: type.color }} />
-                              {type.name}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Startdatum</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !timeOffStartDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarDays className="mr-2 h-4 w-4" />
-                          {timeOffStartDate ? format(timeOffStartDate, "d MMM yyyy", { locale: nl }) : "Selecteer datum"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={timeOffStartDate}
-                          onSelect={setTimeOffStartDate}
-                          locale={nl}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Einddatum</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !timeOffEndDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarDays className="mr-2 h-4 w-4" />
-                          {timeOffEndDate ? format(timeOffEndDate, "d MMM yyyy", { locale: nl }) : "Selecteer datum"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={timeOffEndDate}
-                          onSelect={setTimeOffEndDate}
-                          locale={nl}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="reason">Reden</Label>
-                  <Textarea
-                    id="reason"
-                    value={timeOffReason}
-                    onChange={(e) => setTimeOffReason(e.target.value)}
-                    placeholder="Optionele reden voor de aanvraag"
-                    rows={3}
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <Badge className={cn(getTypeColor(request.type))}>
-                      {getTypeLabel(request.type)}
-                    </Badge>
-                    {request.leave_type && (
-                      <Badge variant="outline" className="flex items-center gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: request.leave_type.color }} />
-                        {request.leave_type.name}
-                      </Badge>
-                    )}
-                    <Badge className={cn(getStatusColor(request.status))}>
-                      {getStatusLabel(request.status)}
-                    </Badge>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 pt-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Medewerker:</span>
-                      <span className="font-medium">{getEmployeeName(request)}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-sm">
-                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Periode:</span>
-                      <span className="font-medium">
-                        {format(parseISO(request.start_date), "d MMM yyyy", { locale: nl })} - {format(parseISO(request.end_date), "d MMM yyyy", { locale: nl })}
-                      </span>
-                    </div>
-
-                    {request.day_part && request.day_part !== "full_day" && (
-                      <div className="flex items-center gap-2 text-sm">
-                        {request.day_part === "morning" ? (
-                          <Sun className="h-4 w-4 text-amber-500" />
-                        ) : (
-                          <Sunset className="h-4 w-4 text-orange-500" />
-                        )}
-                        <span className="text-muted-foreground">Dagdeel:</span>
-                        <span className="font-medium">{getDayPartLabel(request.day_part)}</span>
-                      </div>
-                    )}
-
-                    {request.reason && (
-                      <div className="pt-2">
-                        <div className="flex items-start gap-2 text-sm">
-                          <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5" />
-                          <div>
-                            <span className="text-muted-foreground">Reden:</span>
-                            <p className="font-medium mt-0.5">{request.reason}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pt-2 border-t">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      <span>Aangevraagd op {format(parseISO(request.created_at), "d MMM yyyy 'om' HH:mm", { locale: nl })}</span>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            {isEditing ? (
-              <>
-                <Button variant="outline" onClick={cancelEditing} disabled={saving}>
-                  <X className="h-4 w-4 mr-2" />
-                  Annuleren
-                </Button>
-                <Button onClick={handleSave} disabled={saving}>
-                  <Save className="h-4 w-4 mr-2" />
-                  {saving ? "Opslaan..." : "Opslaan"}
-                </Button>
-              </>
-            ) : (
-              <>
-                {isAdmin && (
-                  <Button
-                    variant="destructive"
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="sm:mr-auto"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Verwijderen
-                  </Button>
-                )}
-                <Button variant="outline" onClick={handleClose}>
-                  Sluiten
-                </Button>
-                {isAdmin && (
-                  <Button onClick={startEditing}>
-                    <Edit2 className="h-4 w-4 mr-2" />
-                    Bewerken
-                  </Button>
-                )}
-              </>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+...
       {/* Delete Confirmation Dialog for Time Off */}
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+      <AlertDialog
+        open={showDeleteConfirm}
+        onOpenChange={(nextOpen) => {
+          if (!deleting) {
+            setShowDeleteConfirm(nextOpen);
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Verlofaanvraag verwijderen</AlertDialogTitle>
@@ -917,7 +710,10 @@ export function CalendarItemDialog({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => handleDelete(false)}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDelete(false);
+              }}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
