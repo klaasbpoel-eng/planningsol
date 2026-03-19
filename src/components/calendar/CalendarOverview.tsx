@@ -391,11 +391,17 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     setSelectedAmbulanceTrip(trip);
     setAmbulanceTripDialogOpen(true);
   };
-  const handleDialogUpdate = (deletedId?: string, deletedType?: "task" | "timeoff") => {
+  const handleDialogUpdate = (deletedId?: string, deletedType?: string, updatedItem?: any) => {
     if (deletedId && deletedType === "task") {
       setTasks(prev => prev.filter(t => t.id !== deletedId));
     } else if (deletedId && deletedType === "timeoff") {
       setRequests(prev => prev.filter(r => r.id !== deletedId));
+    } else if (deletedId && deletedType === "dryice") {
+      setDryIceOrders(prev => prev.filter(o => o.id !== deletedId));
+    } else if (deletedId && deletedType === "gascylinder") {
+      setGasCylinderOrders(prev => prev.filter(o => o.id !== deletedId));
+    } else if (deletedId && deletedType === "ambulance") {
+      setAmbulanceTrips(prev => prev.filter(t => t.id !== deletedId));
     } else {
       fetchData();
     }
