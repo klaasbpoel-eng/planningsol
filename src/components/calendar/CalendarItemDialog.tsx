@@ -97,7 +97,6 @@ export function CalendarItemDialog({
 }: CalendarItemDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [applyToSeries, setApplyToSeries] = useState(false);
 
@@ -239,63 +238,47 @@ export function CalendarItemDialog({
 
   const handleDelete = async (deleteSeries: boolean = false) => {
     if (!item) return;
-    setDeleting(true);
 
+    const itemData = { ...item.data };
+    const itemType = item.type;
+    const isSeriesDelete = itemType === "task" && deleteSeries && !!(itemData as TaskWithProfile).series_id;
+
+    // Close dialog immediately — don't wait for API call
+    setShowDeleteConfirm(false);
+    onOpenChange(false);
+
+    // Optimistically remove from parent state right away
+    if (!isSeriesDelete) {
+      if (itemType === "task") onUpdate(itemData.id, "task");
+      else if (itemType === "timeoff") onUpdate(itemData.id, "timeoff");
+    }
+
+    // Do the actual API call in the background
     try {
-      // Store item data for potential undo
-      const itemData = { ...item.data };
-      const itemType = item.type;
-
       if (itemType === "task") {
         const taskData = itemData as TaskWithProfile;
         const db = getPrimarySupabaseClient();
         let query = db.from("tasks").delete();
-
-        if (deleteSeries && taskData.series_id) {
-          query = query.eq("series_id", taskData.series_id);
-        } else {
-          query = query.eq("id", taskData.id);
-        }
-
+        query = deleteSeries && taskData.series_id
+          ? query.eq("series_id", taskData.series_id)
+          : query.eq("id", taskData.id);
         const { error } = await query;
-
         if (error) throw error;
-
-        const message = deleteSeries ? "Reeks verwijderd" : "Taak verwijderd";
-        toast.success(message);
-
-        // Undo logic is complex for series deletion, so simplified here to just success message
-        // For single task deletion, we could potentially keep undo logic but it complicates the code significantly with the new series logic check
-
+        toast.success(deleteSeries ? "Reeks verwijderd" : "Taak verwijderd");
       } else if (itemType === "timeoff") {
         const db = getPrimarySupabaseClient();
-        const { error } = await db
-          .from("time_off_requests")
-          .delete()
-          .eq("id", itemData.id);
-
+        const { error } = await db.from("time_off_requests").delete().eq("id", itemData.id);
         if (error) throw error;
-
         toast.success("Verlofaanvraag verwijderd");
       }
 
-      setShowDeleteConfirm(false);
-      onOpenChange(false);
-      // For series deletes, pass no ID so parent does a full refetch
-      if (itemType === "task" && !(deleteSeries && (itemData as TaskWithProfile).series_id)) {
-        onUpdate(itemData.id, "task");
-      } else if (itemType === "timeoff") {
-        onUpdate(itemData.id, "timeoff");
-      } else {
-        onUpdate(); // series delete → full refetch
-      }
+      // Series delete: silently refresh to sync all affected items
+      if (isSeriesDelete) onUpdate();
     } catch (error) {
       console.error("Error deleting item:", error);
-      toast.error("Fout bij verwijderen", {
-        description: "Probeer het opnieuw",
-      });
-    } finally {
-      setDeleting(false);
+      toast.error("Fout bij verwijderen", { description: "Probeer het opnieuw" });
+      // Revert: silent refetch to restore removed item
+      onUpdate();
     }
   };
 
@@ -638,35 +621,18 @@ export function CalendarItemDialog({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel
-                disabled={deleting}
-                onClick={(event) => {
-                  if (deleting) {
-                    event.preventDefault();
-                  }
-                }}
-              >
-                Annuleren
-              </AlertDialogCancel>
+              <AlertDialogCancel>Annuleren</AlertDialogCancel>
 
               {item?.type === "task" && (item.data as TaskWithProfile).series_id ? (
                 <>
                   <AlertDialogAction
-                    onClick={(event) => {
-                      event.preventDefault();
-                      void handleDelete(false);
-                    }}
-                    disabled={deleting}
+                    onClick={() => handleDelete(false)}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     Alleen deze
                   </AlertDialogAction>
                   <AlertDialogAction
-                    onClick={(event) => {
-                      event.preventDefault();
-                      void handleDelete(true);
-                    }}
-                    disabled={deleting}
+                    onClick={() => handleDelete(true)}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     Hele reeks
@@ -674,14 +640,10 @@ export function CalendarItemDialog({
                 </>
               ) : (
                 <AlertDialogAction
-                  onClick={(event) => {
-                    event.preventDefault();
-                    void handleDelete(false);
-                  }}
-                  disabled={deleting}
+                  onClick={() => handleDelete(false)}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  {deleting ? "Verwijderen..." : "Verwijderen"}
+                  Verwijderen
                 </AlertDialogAction>
               )}
             </AlertDialogFooter>
@@ -939,25 +901,12 @@ export function CalendarItemDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={deleting}
-              onClick={(event) => {
-                if (deleting) {
-                  event.preventDefault();
-                }
-              }}
-            >
-              Annuleren
-            </AlertDialogCancel>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault();
-                void handleDelete(false);
-              }}
-              disabled={deleting}
+              onClick={() => handleDelete(false)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting ? "Verwijderen..." : "Verwijderen"}
+              Verwijderen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

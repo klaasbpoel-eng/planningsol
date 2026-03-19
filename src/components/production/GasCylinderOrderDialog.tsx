@@ -103,7 +103,6 @@ export function GasCylinderOrderDialog({
   const hasEditPermission = canEdit !== undefined ? canEdit : isAdmin;
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [applyToSeries, setApplyToSeries] = useState(false);
   const [deleteSeries, setDeleteSeries] = useState(false);
@@ -261,37 +260,30 @@ export function GasCylinderOrderDialog({
 
   const handleDelete = async (deleteAll?: boolean) => {
     if (!order) return;
-    setDeleting(true);
+    const isSeriesDelete = !!(deleteAll && order.series_id);
+
+    // Close dialog immediately — optimistic UX
+    setShowDeleteConfirm(false);
+    onOpenChange(false);
+    if (!isSeriesDelete) onUpdate(order.id, "gascylinder");
 
     try {
-      if (deleteAll && order.series_id) {
-        // Delete all orders in the series
-        const client = supabase;
-        const { error } = await client
+      if (isSeriesDelete) {
+        const { error } = await supabase
           .from("gas_cylinder_orders")
           .delete()
           .or(`id.eq.${order.series_id},series_id.eq.${order.series_id}`);
         if (error) throw error;
         toast.success("Gehele reeks verwijderd");
-
-        setShowDeleteConfirm(false);
-        onOpenChange(false);
-        onUpdate(); // full reload for series
+        onUpdate();
       } else {
         await api.gasCylinderOrders.delete(order.id);
         toast.success("Gascilinder order verwijderd");
-
-        setShowDeleteConfirm(false);
-        onOpenChange(false);
-        onUpdate(order.id, "gascylinder");
       }
     } catch (error) {
       console.error("Error deleting order:", error);
-      toast.error("Fout bij verwijderen", {
-        description: "Probeer het opnieuw",
-      });
-    } finally {
-      setDeleting(false);
+      toast.error("Fout bij verwijderen", { description: "Probeer het opnieuw" });
+      onUpdate(); // silent revert
     }
   };
 
@@ -675,34 +667,17 @@ export function GasCylinderOrderDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={deleting}
-              onClick={(event) => {
-                if (deleting) {
-                  event.preventDefault();
-                }
-              }}
-            >
-              Annuleren
-            </AlertDialogCancel>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
             {order.series_id ? (
               <>
                 <AlertDialogAction
-                  onClick={(event) => {
-                    event.preventDefault();
-                    void handleDelete(false);
-                  }}
-                  disabled={deleting}
+                  onClick={() => handleDelete(false)}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
                   Alleen deze
                 </AlertDialogAction>
                 <AlertDialogAction
-                  onClick={(event) => {
-                    event.preventDefault();
-                    void handleDelete(true);
-                  }}
-                  disabled={deleting}
+                  onClick={() => handleDelete(true)}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
                   Hele reeks
@@ -710,14 +685,10 @@ export function GasCylinderOrderDialog({
               </>
             ) : (
               <AlertDialogAction
-                onClick={(event) => {
-                  event.preventDefault();
-                  void handleDelete(false);
-                }}
-                disabled={deleting}
+                onClick={() => handleDelete(false)}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                {deleting ? "Verwijderen..." : "Verwijderen"}
+                Verwijderen
               </AlertDialogAction>
             )}
           </AlertDialogFooter>
