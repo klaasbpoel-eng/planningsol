@@ -305,6 +305,12 @@ export function CalendarItemDialog({
     onOpenChange(false);
   };
 
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      handleClose();
+    }
+  };
+
   if (!item) return null;
 
   const getTypeLabel = (type: string) => {
@@ -379,7 +385,7 @@ export function CalendarItemDialog({
 
     return (
       <>
-        <Dialog open={open} onOpenChange={handleClose}>
+        <Dialog open={open} onOpenChange={handleDialogOpenChange}>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <div className="flex items-center gap-3">
@@ -632,19 +638,34 @@ export function CalendarItemDialog({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
+              <AlertDialogCancel
+                disabled={deleting}
+                onClick={(event) => {
+                  if (deleting) {
+                    event.preventDefault();
+                  }
+                }}
+              >
+                Annuleren
+              </AlertDialogCancel>
 
               {item?.type === "task" && (item.data as TaskWithProfile).series_id ? (
                 <>
                   <AlertDialogAction
-                    onClick={() => handleDelete(false)}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void handleDelete(false);
+                    }}
                     disabled={deleting}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     Alleen deze
                   </AlertDialogAction>
                   <AlertDialogAction
-                    onClick={() => handleDelete(true)}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void handleDelete(true);
+                    }}
                     disabled={deleting}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
@@ -653,7 +674,10 @@ export function CalendarItemDialog({
                 </>
               ) : (
                 <AlertDialogAction
-                  onClick={() => handleDelete(false)}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void handleDelete(false);
+                  }}
                   disabled={deleting}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
@@ -672,7 +696,7 @@ export function CalendarItemDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={handleClose}>
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <div className="flex items-center gap-3">
@@ -915,9 +939,21 @@ export function CalendarItemDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
+            <AlertDialogCancel
+              disabled={deleting}
+              onClick={(event) => {
+                if (deleting) {
+                  event.preventDefault();
+                }
+              }}
+            >
+              Annuleren
+            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => handleDelete(false)}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDelete(false);
+              }}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
