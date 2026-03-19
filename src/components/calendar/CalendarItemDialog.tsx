@@ -886,16 +886,17 @@ export function CalendarItemDialog({
                     variant="destructive"
                     onClick={() => setShowDeleteConfirm(true)}
                     className="sm:mr-auto"
+                    disabled={deleting || saving}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Verwijderen
                   </Button>
                 )}
-                <Button variant="outline" onClick={handleClose}>
+                <Button variant="outline" onClick={handleClose} disabled={deleting || saving}>
                   Sluiten
                 </Button>
                 {isAdmin && (
-                  <Button onClick={startEditing}>
+                  <Button onClick={startEditing} disabled={deleting || saving}>
                     <Edit2 className="h-4 w-4 mr-2" />
                     Bewerken
                   </Button>
@@ -907,7 +908,12 @@ export function CalendarItemDialog({
       </Dialog>
 
       {/* Delete Confirmation Dialog for Time Off */}
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+      <AlertDialog
+        open={showDeleteConfirm}
+        onOpenChange={(nextOpen) => {
+          if (!deleting) setShowDeleteConfirm(nextOpen);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Verlofaanvraag verwijderen</AlertDialogTitle>
@@ -917,12 +923,13 @@ export function CalendarItemDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => handleDelete(false)}
+              onClick={() => void handleDelete(false)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
             >
-              Verwijderen
+              {deleting ? "Verwijderen..." : "Verwijderen"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
