@@ -97,6 +97,7 @@ export function CalendarItemDialog({
 }: CalendarItemDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [applyToSeries, setApplyToSeries] = useState(false);
 
@@ -114,8 +115,6 @@ export function CalendarItemDialog({
   const [timeOffStartDate, setTimeOffStartDate] = useState<Date | undefined>();
   const [timeOffEndDate, setTimeOffEndDate] = useState<Date | undefined>();
   const [timeOffTypeId, setTimeOffTypeId] = useState<string | null>(null);
-
-
 
   const startEditing = () => {
     if (item?.type === "task") {
@@ -135,6 +134,8 @@ export function CalendarItemDialog({
       setTimeOffEndDate(parseISO(request.end_date));
       setTimeOffTypeId(request.type_id || null);
     }
+
+    setShowDeleteConfirm(false);
     setIsEditing(true);
   };
 
@@ -147,8 +148,14 @@ export function CalendarItemDialog({
     return taskStartTime < taskEndTime;
   };
 
+  const closeDialogSafely = () => {
+    setShowDeleteConfirm(false);
+    setIsEditing(false);
+    requestAnimationFrame(() => onOpenChange(false));
+  };
+
   const handleSave = async () => {
-    if (!item) return;
+    if (!item || deleting) return;
 
     // Validate time order for tasks
     if (item.type === "task" && taskStartTime && taskEndTime && !validateTimeOrder()) {
@@ -237,23 +244,14 @@ export function CalendarItemDialog({
   };
 
   const handleDelete = async (deleteSeries: boolean = false) => {
-    if (!item) return;
+    if (!item || deleting || saving) return;
 
     const itemData = { ...item.data };
     const itemType = item.type;
     const isSeriesDelete = itemType === "task" && deleteSeries && !!(itemData as TaskWithProfile).series_id;
 
-    // Close dialog immediately — don't wait for API call
-    setShowDeleteConfirm(false);
-    onOpenChange(false);
+    setDeleting(true);
 
-    // Optimistically remove from parent state right away
-    if (!isSeriesDelete) {
-      if (itemType === "task") onUpdate(itemData.id, "task");
-      else if (itemType === "timeoff") onUpdate(itemData.id, "timeoff");
-    }
-
-    // Do the actual API call in the background
     try {
       if (itemType === "task") {
         const taskData = itemData as TaskWithProfile;
@@ -262,30 +260,39 @@ export function CalendarItemDialog({
         query = deleteSeries && taskData.series_id
           ? query.eq("series_id", taskData.series_id)
           : query.eq("id", taskData.id);
+
         const { error } = await query;
         if (error) throw error;
+
         toast.success(deleteSeries ? "Reeks verwijderd" : "Taak verwijderd");
       } else if (itemType === "timeoff") {
         const db = getPrimarySupabaseClient();
         const { error } = await db.from("time_off_requests").delete().eq("id", itemData.id);
         if (error) throw error;
+
         toast.success("Verlofaanvraag verwijderd");
       }
 
-      // Series delete: silently refresh to sync all affected items
-      if (isSeriesDelete) onUpdate();
+      if (isSeriesDelete) {
+        onUpdate();
+      } else if (itemType === "task") {
+        onUpdate(itemData.id, "task");
+      } else {
+        onUpdate(itemData.id, "timeoff");
+      }
+
+      closeDialogSafely();
     } catch (error) {
       console.error("Error deleting item:", error);
       toast.error("Fout bij verwijderen", { description: "Probeer het opnieuw" });
-      // Revert: silent refetch to restore removed item
-      onUpdate();
+    } finally {
+      setDeleting(false);
     }
   };
 
   const handleClose = () => {
-    setIsEditing(false);
-    setShowDeleteConfirm(false);
-    onOpenChange(false);
+    if (deleting || saving) return;
+    closeDialogSafely();
   };
 
   const handleDialogOpenChange = (nextOpen: boolean) => {
