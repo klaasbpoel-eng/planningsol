@@ -91,6 +91,7 @@ export function DryIceOrderDialog({
   const hasEditPermission = canEdit !== undefined ? canEdit : isAdmin;
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteScope, setDeleteScope] = useState<'single' | 'series'>('single');
   const [applyToSeries, setApplyToSeries] = useState(false);
@@ -204,30 +205,34 @@ export function DryIceOrderDialog({
   };
 
   const handleDelete = async (scope: 'single' | 'series' = 'single') => {
-    if (!order) return;
+    if (!order || deleting) return;
     const isSeriesDelete = scope === 'series' && !!(order.is_recurring || order.parent_order_id);
-
-    // Close dialog immediately — don't wait for API call
-    setShowDeleteConfirm(false);
-    onOpenChange(false);
-    if (!isSeriesDelete) onUpdate(order.id, "dryice");
+    setDeleting(true);
 
     try {
       if (isSeriesDelete) {
         const seriesId = order.parent_order_id || order.id;
         await api.dryIceOrders.deleteSeries(seriesId);
         toast.success("Volledige reeks verwijderd");
+
+        setShowDeleteConfirm(false);
+        onOpenChange(false);
         onUpdate();
       } else {
         await api.dryIceOrders.delete(order.id);
         toast.success("Droogijs order verwijderd");
+
+        setShowDeleteConfirm(false);
+        onOpenChange(false);
+        onUpdate(order.id, "dryice");
       }
     } catch (error) {
       console.error("Error deleting order:", error);
       toast.error("Fout bij verwijderen", {
         description: "Probeer het opnieuw",
       });
-      onUpdate(); // silent revert
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -236,6 +241,12 @@ export function DryIceOrderDialog({
     setShowDeleteConfirm(false);
     setDeleteScope('single');
     onOpenChange(false);
+  };
+
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      handleClose();
+    }
   };
 
   if (!order) return null;
