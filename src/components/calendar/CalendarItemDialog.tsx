@@ -939,9 +939,21 @@ export function CalendarItemDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
+            <AlertDialogCancel
+              disabled={deleting}
+              onClick={(event) => {
+                if (deleting) {
+                  event.preventDefault();
+                }
+              }}
+            >
+              Annuleren
+            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => handleDelete(false)}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDelete(false);
+              }}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
