@@ -497,7 +497,10 @@ export function DailyOverview() {
       time_off_types: t.type_id ? (typeMap.get(t.type_id) ?? null) : null,
     }));
 
-    const allDryIce = (dryIceRes.data as DryIceOrder[] | null) ?? [];
+    const allDryIce = ((dryIceRes.data || []) as any[]).map((d: any) => ({
+      ...d,
+      dry_ice_packaging: Array.isArray(d.dry_ice_packaging) ? d.dry_ice_packaging[0] ?? null : d.dry_ice_packaging ?? null,
+    })) as DryIceOrder[];
     const allGas = (gasRes.data as GasCylinderOrder[] | null) ?? [];
     const allAmbulance = (ambulanceRes.data as AmbulanceTrip[] | null) ?? [];
 
