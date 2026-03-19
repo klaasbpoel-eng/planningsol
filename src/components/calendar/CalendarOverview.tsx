@@ -336,9 +336,16 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
           .from("ambulance_trip_customers" as any)
           .select("*")
           .in("trip_id", tripIds);
+          
+        const customersByTrip = new Map<string, any[]>();
+        (tripCustomers || []).forEach((c: any) => {
+          if (!customersByTrip.has(c.trip_id)) customersByTrip.set(c.trip_id, []);
+          customersByTrip.get(c.trip_id)!.push(c);
+        });
+
         ambulanceTripsWithCustomers = tripsRaw.map((t: any) => ({
           ...t,
-          customers: (tripCustomers || []).filter((c: any) => c.trip_id === t.id),
+          customers: customersByTrip.get(t.id) || [],
         }));
       }
 
@@ -391,11 +398,120 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     setSelectedAmbulanceTrip(trip);
     setAmbulanceTripDialogOpen(true);
   };
-  const handleDialogUpdate = (deletedId?: string, deletedType?: "task" | "timeoff") => {
-    if (deletedId && deletedType === "task") {
-      setTasks(prev => prev.filter(t => t.id !== deletedId));
-    } else if (deletedId && deletedType === "timeoff") {
-      setRequests(prev => prev.filter(r => r.id !== deletedId));
+  const handleDialogUpdate = (
+    deletedId?: string, 
+    deletedType?: "task" | "timeoff" | "dryice" | "gascylinder" | "ambulance",
+    updatedItem?: any
+  ) => {
+    if (deletedId && deletedType) {
+      if (deletedType === "task") setTasks(prev => prev.filter(t => t.id !== deletedId));
+      else if (deletedType === "timeoff") setRequests(prev => prev.filter(r => r.id !== deletedId));
+      else if (deletedType === "dryice") setDryIceOrders(prev => prev.filter(o => o.id !== deletedId));
+      else if (deletedType === "gascylinder") setGasCylinderOrders(prev => prev.filter(o => o.id !== deletedId));
+      else if (deletedType === "ambulance") setAmbulanceTrips(prev => prev.filter(t => t.id !== deletedId));
+    } else if (updatedItem && deletedType) {
+      if (deletedType === "task") {
+        const enriched = { 
+          ...updatedItem, 
+          profile: updatedItem.assigned_to ? profiles.find(p => p.user_id === updatedItem.assigned_to) || null : null,
+          task_type: taskTypes.find(t => t.id === updatedItem.type_id) || null
+        };
+        setTasks(prev => prev.map(t => t.id === updatedItem.id ? enriched : t));
+      }
+      else if (deletedType === "timeoff") {
+        const enriched = {
+          ...updatedItem,
+          profile: updatedItem.profile_id ? profiles.find(p => p.id === updatedItem.profile_id) : profiles.find(p => p.user_id === updatedItem.user_id) || null,
+          leave_type: updatedItem.type_id ? timeOffTypes.find(t => t.id === updatedItem.type_id) || null : null
+        };
+        setRequests(prev => prev.map(r => r.id === updatedItem.id ? enriched : r));
+      }
+      else if (deletedType === "dryice") {
+        const enriched = {
+          ...updatedItem,
+          product_type_info: dryIceProductTypes.find(t => t.id === updatedItem.product_type_id) || null,
+          packaging_info: dryIcePackaging.find(p => p.id === updatedItem.packaging_id) || null
+        };
+        setDryIceOrders(prev => prev.map(o => o.id === updatedItem.id ? enriched : o));
+      }
+      else if (deletedType === "gascylinder") {
+        const enriched = {
+          ...updatedItem,
+          gas_type_info: gasTypes.find(t => t.id === updatedItem.gas_type_id) || null
+        };
+        setGasCylinderOrders(prev => prev.map(o => o.id === updatedItem.id ? enriched : o));
+      }
+      else if (deletedType === "ambulance") {
+        const enriched = {
+          ...updatedItem,
+          customers: updatedItem.customers || []
+        };
+        setAmbulanceTrips(prev => prev.map(t => t.id === updatedItem.id ? enriched : t));
+      }
+    } else {
+      fetchData(); // Fallback for series updates where id is null
+    }
+  };
+
+  const handleTaskCreated = (createdTasks?: any[]) => {
+    if (createdTasks && createdTasks.length > 0) {
+      const enrichedTasks = createdTasks.map(task => ({
+        ...task,
+        profile: task.assigned_to ? profiles.find(p => p.user_id === task.assigned_to) || null : null,
+        task_type: taskTypes.find(t => t.id === task.type_id) || null
+      }));
+      setTasks(prev => [...prev, ...enrichedTasks]);
+    } else {
+      fetchData();
+    }
+  };
+
+  const handleLeaveRequestCreated = (createdRequests?: any[]) => {
+    if (createdRequests && createdRequests.length > 0) {
+      const enrichedRequests = createdRequests.map(request => ({
+        ...request,
+        profile: request.profile_id ? profiles.find(p => p.id === request.profile_id) : profiles.find(p => p.user_id === request.user_id) || null,
+        leave_type: request.type_id ? timeOffTypes.find(t => t.id === request.type_id) || null : null
+      }));
+      setRequests(prev => [...prev, ...enrichedRequests]);
+    } else {
+      fetchData();
+    }
+  };
+
+  const handleDryIceOrderCreated = (createdOrders?: any[]) => {
+    if (createdOrders && createdOrders.length > 0) {
+      const enrichedOrders = createdOrders.map(order => ({
+        ...order,
+        product_type_info: dryIceProductTypes.find(t => t.id === order.product_type_id) || null,
+        packaging_info: dryIcePackaging.find(p => p.id === order.packaging_id) || null
+      }));
+      setDryIceOrders(prev => [...prev, ...enrichedOrders]);
+    } else {
+      fetchData();
+    }
+  };
+
+  const handleGasCylinderOrderCreated = (createdOrders?: any[]) => {
+    if (createdOrders && createdOrders.length > 0) {
+      const enrichedOrders = createdOrders.map(order => ({
+        ...order,
+        gas_type_info: gasTypes.find(t => t.id === order.gas_type_id) || null
+      }));
+      setGasCylinderOrders(prev => [...prev, ...enrichedOrders]);
+    } else {
+      fetchData();
+    }
+  };
+
+  const handleAmbulanceTripCreated = (createdTrips?: any[]) => {
+    if (createdTrips && createdTrips.length > 0) {
+      // Ambulance payload created in modal either has empty customers arr or none by default
+      const enrichedTrips = createdTrips.map(trip => ({
+        ...trip,
+        customers: trip.customers || []
+      }));
+      setAmbulanceTrips(prev => [...prev, ...enrichedTrips]);
     } else {
       fetchData();
     }
@@ -427,9 +543,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     setShowCreateMenu(false);
     setCreateGasCylinderDialogOpen(true);
   };
-  const handleTaskCreated = () => {
-    fetchData();
-  };
+
   const handleUndoAction = async (action: typeof lastAction) => {
     if (!action) return;
     if (action.type === "task_move") {
@@ -746,8 +860,17 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
 
     // Dry ice with parent_order_id
     const dryIceSeriesMap = new Map<string, DryIceOrderWithDetails[]>();
+    const parentOrderIds = new Set<string>();
+    
+    // Pre-calculate parent IDs to upgrade O(N^2) check to O(N)
+    for (const order of dryIceOrders) {
+      if (order.parent_order_id) {
+        parentOrderIds.add(order.parent_order_id);
+      }
+    }
+
     dryIceOrders.forEach(o => {
-      const sid = o.parent_order_id || (dryIceOrders.some(x => x.parent_order_id === o.id) ? o.id : null);
+      const sid = o.parent_order_id || (parentOrderIds.has(o.id) ? o.id : null);
       if (sid) {
         if (!dryIceSeriesMap.has(sid)) dryIceSeriesMap.set(sid, []);
         dryIceSeriesMap.get(sid)!.push(o);
@@ -981,89 +1104,127 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       setExtendingSeriesId(null);
     }
   };
-  const getItemsForDay = (day: Date): CalendarItem[] => {
-    const items: CalendarItem[] = [];
-    if (showTimeOff) {
-      filteredRequests.forEach(request => {
-        if (selectedStatus === "all" && request.status === "rejected") return;
+  const tasksByDate = useMemo(() => {
+    const map = new Map<string, TaskWithProfile[]>();
+    filteredTasks.forEach(t => {
+      if (!t.due_date) return;
+      const dateStr = t.due_date.split('T')[0]; 
+      if (!map.has(dateStr)) map.set(dateStr, []);
+      map.get(dateStr)!.push(t);
+    });
+    return map;
+  }, [filteredTasks]);
+
+  const dryIceByDate = useMemo(() => {
+    const map = new Map<string, DryIceOrderWithDetails[]>();
+    filteredDryIceOrders.forEach(o => {
+      if (!o.scheduled_date) return;
+      const dateStr = o.scheduled_date.split('T')[0];
+      if (!map.has(dateStr)) map.set(dateStr, []);
+      map.get(dateStr)!.push(o);
+    });
+    return map;
+  }, [filteredDryIceOrders]);
+
+  const gasCylinderByDate = useMemo(() => {
+    const map = new Map<string, GasCylinderOrderWithDetails[]>();
+    filteredGasCylinderOrders.forEach(o => {
+      if (!o.scheduled_date) return;
+      const dateStr = o.scheduled_date.split('T')[0];
+      if (!map.has(dateStr)) map.set(dateStr, []);
+      map.get(dateStr)!.push(o);
+    });
+    return map;
+  }, [filteredGasCylinderOrders]);
+
+  const ambulanceByDate = useMemo(() => {
+    const map = new Map<string, AmbulanceTripWithCustomers[]>();
+    ambulanceTrips.forEach(t => {
+      if (!t.scheduled_date) return;
+      const dateStr = t.scheduled_date.split('T')[0];
+      if (!map.has(dateStr)) map.set(dateStr, []);
+      map.get(dateStr)!.push(t);
+    });
+    return map;
+  }, [ambulanceTrips]);
+
+  const requestsByDate = useMemo(() => {
+    const map = new Map<string, RequestWithProfile[]>();
+    filteredRequests.forEach(request => {
+      if (selectedStatus === "all" && request.status === "rejected") return;
+      if (!request.start_date || !request.end_date) return;
+      
+      try {
         const start = parseISO(request.start_date);
         const end = parseISO(request.end_date);
-        if (isWithinInterval(day, {
-          start,
-          end
-        })) {
-          items.push({
-            type: "timeoff",
-            data: request
-          });
-        }
-      });
+        const days = eachDayOfInterval({ start, end });
+        
+        days.forEach(day => {
+          const dateStr = format(day, "yyyy-MM-dd");
+          if (!map.has(dateStr)) map.set(dateStr, []);
+          map.get(dateStr)!.push(request);
+        });
+      } catch (e) {
+        // Ignore invalid dates
+      }
+    });
+    return map;
+  }, [filteredRequests, selectedStatus]);
+
+  const getItemsForDay = (day: Date): CalendarItem[] => {
+    const items: CalendarItem[] = [];
+    const dateStr = format(day, "yyyy-MM-dd");
+
+    if (showTimeOff) {
+      const dayRequests = requestsByDate.get(dateStr) || [];
+      dayRequests.forEach(request => items.push({ type: "timeoff", data: request }));
     }
+
     if (showTasks) {
-      filteredTasks.forEach(task => {
-        if (isSameDay(parseISO(task.due_date), day)) {
-          items.push({
-            type: "task",
-            data: task
-          });
-        }
-      });
+      const dayTasks = tasksByDate.get(dateStr) || [];
+      dayTasks.forEach(task => items.push({ type: "task", data: task }));
     }
+
     if (showDryIce) {
-      filteredDryIceOrders.forEach(order => {
-        if (isSameDay(parseISO(order.scheduled_date), day)) {
-          items.push({
-            type: "dryice",
-            data: order
-          });
-        }
-      });
+      const dayDryIce = dryIceByDate.get(dateStr) || [];
+      dayDryIce.forEach(order => items.push({ type: "dryice", data: order }));
     }
+
     if (showGasCylinders) {
-      filteredGasCylinderOrders.forEach(order => {
-        if (isSameDay(parseISO(order.scheduled_date), day)) {
-          items.push({
-            type: "gascylinder",
-            data: order
-          });
-        }
-      });
+      const dayGas = gasCylinderByDate.get(dateStr) || [];
+      dayGas.forEach(order => items.push({ type: "gascylinder", data: order }));
     }
+
     if (showAmbulance) {
-      ambulanceTrips.forEach(trip => {
-        if (isSameDay(parseISO(trip.scheduled_date), day)) {
-          items.push({
-            type: "ambulance",
-            data: trip
-          });
-        }
-      });
+      const dayAmbulance = ambulanceByDate.get(dateStr) || [];
+      dayAmbulance.forEach(trip => items.push({ type: "ambulance", data: trip }));
     }
+
     return items;
   };
+
   const getRequestsForDay = (day: Date): RequestWithProfile[] => {
     if (!showTimeOff) return [];
-    return filteredRequests.filter(request => {
-      if (selectedStatus === "all" && request.status === "rejected") return false;
-      const start = parseISO(request.start_date);
-      const end = parseISO(request.end_date);
-      return isWithinInterval(day, {
-        start,
-        end
-      });
-    });
+    const dateStr = format(day, "yyyy-MM-dd");
+    return requestsByDate.get(dateStr) || [];
   };
+
   const getTasksForDay = (day: Date): TaskWithProfile[] => {
     if (!showTasks) return [];
-    return filteredTasks.filter(task => isSameDay(parseISO(task.due_date), day));
+    const dateStr = format(day, "yyyy-MM-dd");
+    return tasksByDate.get(dateStr) || [];
   };
+
   const getDryIceOrdersForDay = (day: Date): DryIceOrderWithDetails[] => {
     if (!showDryIce) return [];
-    return filteredDryIceOrders.filter(order => isSameDay(parseISO(order.scheduled_date), day));
+    const dateStr = format(day, "yyyy-MM-dd");
+    return dryIceByDate.get(dateStr) || [];
   };
+
   const getGasCylinderOrdersForDay = (day: Date): GasCylinderOrderWithDetails[] => {
     if (!showGasCylinders) return [];
-    return filteredGasCylinderOrders.filter(order => isSameDay(parseISO(order.scheduled_date), day));
+    const dateStr = format(day, "yyyy-MM-dd");
+    return gasCylinderByDate.get(dateStr) || [];
   };
   const getDryIceStatusColor = (status: string) => {
     switch (status) {
@@ -1387,89 +1548,32 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
 
   // List View - Shows all items in a chronological list
   const renderListView = () => {
-    // Combine and sort all items by date
-    const allItems: {
-      date: Date;
-      item: CalendarItem;
-    }[] = [];
-    if (showTimeOff) {
-      filteredRequests.forEach(request => {
-        if (selectedStatus === "all" && request.status === "rejected") return;
-        allItems.push({
-          date: parseISO(request.start_date),
-          item: {
-            type: "timeoff",
-            data: request
-          }
-        });
-      });
-    }
-    if (showTasks) {
-      filteredTasks.forEach(task => {
-        allItems.push({
-          date: parseISO(task.due_date),
-          item: {
-            type: "task",
-            data: task
-          }
-        });
-      });
-    }
-    if (showDryIce) {
-      filteredDryIceOrders.forEach(order => {
-        allItems.push({
-          date: parseISO(order.scheduled_date),
-          item: {
-            type: "dryice",
-            data: order
-          }
-        });
-      });
-    }
-    if (showGasCylinders) {
-      filteredGasCylinderOrders.forEach(order => {
-        allItems.push({
-          date: parseISO(order.scheduled_date),
-          item: {
-            type: "gascylinder",
-            data: order
-          }
-        });
-      });
-    }
-    if (showAmbulance) {
-      ambulanceTrips.forEach(trip => {
-        allItems.push({
-          date: parseISO(trip.scheduled_date),
-          item: {
-            type: "ambulance",
-            data: trip
-          }
-        });
-      });
-    }
-
-    // Sort by date ascending
-    allItems.sort((a, b) => a.date.getTime() - b.date.getTime());
-
-    // Group by date
-    const groupedItems = allItems.reduce((acc, {
-      date,
-      item
-    }) => {
-      const dateKey = format(date, "yyyy-MM-dd");
-      if (!acc[dateKey]) {
-        acc[dateKey] = {
-          date,
-          items: []
-        };
-      }
-      acc[dateKey].items.push(item);
-      return acc;
-    }, {} as Record<string, {
+    // Combine items from the fast grouped maps to avoid repeated parseISO
+    const groupedItems: Record<string, {
       date: Date;
       items: CalendarItem[];
-    }>);
+    }> = {};
+
+    const addItemsFromMap = (map: Map<string, any[]>, type: "timeoff" | "task" | "dryice" | "gascylinder" | "ambulance") => {
+      map.forEach((items, dateStr) => {
+        if (!groupedItems[dateStr]) {
+          groupedItems[dateStr] = {
+            date: parseISO(dateStr),
+            items: []
+          };
+        }
+        items.forEach(item => {
+          groupedItems[dateStr].items.push({ type, data: item } as CalendarItem);
+        });
+      });
+    };
+
+    if (showTimeOff) addItemsFromMap(requestsByDate, "timeoff");
+    if (showTasks) addItemsFromMap(tasksByDate, "task");
+    if (showDryIce) addItemsFromMap(dryIceByDate, "dryice");
+    if (showGasCylinders) addItemsFromMap(gasCylinderByDate, "gascylinder");
+    if (showAmbulance) addItemsFromMap(ambulanceByDate, "ambulance");
+
     const sortedGroups = Object.values(groupedItems).sort((a, b) => a.date.getTime() - b.date.getTime());
     if (sortedGroups.length === 0) {
       return <div className="text-center text-muted-foreground py-16 bg-muted/30 rounded-xl animate-fade-in">
@@ -1905,7 +2009,8 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
           const dayTasks = getTasksForDay(day);
           const dayDryIceOrders = getDryIceOrdersForDay(day);
           const dayGasCylinderOrders = getGasCylinderOrdersForDay(day);
-          const dayAmbulanceTrips = showAmbulance ? ambulanceTrips.filter(t => isSameDay(parseISO(t.scheduled_date), day)) : [];
+          const dateStr = format(day, "yyyy-MM-dd");
+          const dayAmbulanceTrips = showAmbulance ? (ambulanceByDate.get(dateStr) || []) : [];
           const allItems = [...dayRequests.map(r => ({
             type: 'timeoff' as const,
             item: r
@@ -2188,23 +2293,11 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
           start: monthStart,
           end: monthEnd
         });
-        const monthRequests = showTimeOff ? filteredRequests.filter(request => {
-          if (request.status === "rejected") return false;
-          const start = parseISO(request.start_date);
-          const end = parseISO(request.end_date);
-          return monthDays.some(day => isWithinInterval(day, {
-            start,
-            end
-          }));
-        }) : [];
-        const monthTasks = showTasks ? filteredTasks.filter(task => {
-          const dueDate = parseISO(task.due_date);
-          return monthDays.some(day => isSameDay(day, dueDate));
-        }) : [];
-        const monthDryIceOrders = showDryIce ? filteredDryIceOrders.filter(order => {
-          const scheduledDate = parseISO(order.scheduled_date);
-          return monthDays.some(day => isSameDay(day, scheduledDate));
-        }) : [];
+        
+        const monthRequests = showTimeOff ? monthDays.flatMap(day => getRequestsForDay(day)).filter((r, i, arr) => arr.findIndex(x => x.id === r.id) === i) : [];
+        const monthTasks = showTasks ? monthDays.flatMap(day => getTasksForDay(day)).filter((t, i, arr) => arr.findIndex(x => x.id === t.id) === i) : [];
+        const monthDryIceOrders = showDryIce ? monthDays.flatMap(day => getDryIceOrdersForDay(day)).filter((o, i, arr) => arr.findIndex(x => x.id === o.id) === i) : [];
+        
         const totalItems = monthRequests.length + monthTasks.length + monthDryIceOrders.length;
         const isCurrentMonth = isSameMonth(month, new Date());
         return <Card key={month.toISOString()} className={cn("cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl border-border/50 bg-card/80 backdrop-blur-sm overflow-hidden group", isCurrentMonth && "ring-2 ring-primary/50 shadow-lg shadow-primary/10")} onClick={() => {
@@ -2531,16 +2624,16 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     <CreateTaskDialog open={createTaskDialogOpen} onOpenChange={setCreateTaskDialogOpen} onCreate={handleTaskCreated} initialDate={createDate} profiles={profiles} currentUserId={currentUserId} />
 
     {/* Create Leave Request Dialog */}
-    <CreateLeaveRequestDialog open={createLeaveDialogOpen} onOpenChange={setCreateLeaveDialogOpen} onCreate={handleTaskCreated} initialDate={createDate} profiles={profiles} currentUserId={currentUserId} currentProfileId={currentProfileId} isAdmin={isAdmin} />
+    <CreateLeaveRequestDialog open={createLeaveDialogOpen} onOpenChange={setCreateLeaveDialogOpen} onCreate={handleLeaveRequestCreated} initialDate={createDate} profiles={profiles} currentUserId={currentUserId} currentProfileId={currentProfileId} isAdmin={isAdmin} />
 
     {/* Create Dry Ice Order Dialog */}
-    <CreateDryIceOrderCalendarDialog open={createDryIceDialogOpen} onOpenChange={setCreateDryIceDialogOpen} onCreate={handleTaskCreated} initialDate={createDate} />
+    <CreateDryIceOrderCalendarDialog open={createDryIceDialogOpen} onOpenChange={setCreateDryIceDialogOpen} onCreate={handleDryIceOrderCreated} initialDate={createDate} />
 
     {/* Create Gas Cylinder Order Dialog */}
-    <CreateGasCylinderOrderDialog open={createGasCylinderDialogOpen} onOpenChange={setCreateGasCylinderDialogOpen} onCreated={handleTaskCreated} initialDate={createDate} />
+    <CreateGasCylinderOrderDialog open={createGasCylinderDialogOpen} onOpenChange={setCreateGasCylinderDialogOpen} onCreated={handleGasCylinderOrderCreated} initialDate={createDate} />
 
     {/* Create Ambulance Trip Dialog */}
-    <CreateAmbulanceTripDialog open={createAmbulanceDialogOpen} onOpenChange={setCreateAmbulanceDialogOpen} onCreate={handleTaskCreated} initialDate={createDate} />
+    <CreateAmbulanceTripDialog open={createAmbulanceDialogOpen} onOpenChange={setCreateAmbulanceDialogOpen} onCreate={handleAmbulanceTripCreated} initialDate={createDate} />
 
     {/* Ambulance Trip Dialog */}
     <AmbulanceTripDialog trip={selectedAmbulanceTrip} open={ambulanceTripDialogOpen} onOpenChange={setAmbulanceTripDialogOpen} onUpdate={handleDialogUpdate} isAdmin={isAdmin} />
