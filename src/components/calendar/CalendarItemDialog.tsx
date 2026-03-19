@@ -305,6 +305,12 @@ export function CalendarItemDialog({
     onOpenChange(false);
   };
 
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      handleClose();
+    }
+  };
+
   if (!item) return null;
 
   const getTypeLabel = (type: string) => {
