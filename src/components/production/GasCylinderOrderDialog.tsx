@@ -303,6 +303,12 @@ export function GasCylinderOrderDialog({
     onOpenChange(false);
   };
 
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      handleClose();
+    }
+  };
+
   if (!order) return null;
 
   const getStatusLabel = (status: string) => {
@@ -373,7 +379,7 @@ export function GasCylinderOrderDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={handleClose}>
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="sm:max-w-[500px] w-[95%] rounded-lg">
           <DialogHeader>
             <div className="flex items-center gap-3">
@@ -669,18 +675,33 @@ export function GasCylinderOrderDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
+            <AlertDialogCancel
+              disabled={deleting}
+              onClick={(event) => {
+                if (deleting) {
+                  event.preventDefault();
+                }
+              }}
+            >
+              Annuleren
+            </AlertDialogCancel>
             {order.series_id ? (
               <>
                 <AlertDialogAction
-                  onClick={() => handleDelete(false)}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void handleDelete(false);
+                  }}
                   disabled={deleting}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
                   Alleen deze
                 </AlertDialogAction>
                 <AlertDialogAction
-                  onClick={() => handleDelete(true)}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void handleDelete(true);
+                  }}
                   disabled={deleting}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
@@ -689,7 +710,10 @@ export function GasCylinderOrderDialog({
               </>
             ) : (
               <AlertDialogAction
-                onClick={() => handleDelete(false)}
+                onClick={(event) => {
+                  event.preventDefault();
+                  void handleDelete(false);
+                }}
                 disabled={deleting}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
