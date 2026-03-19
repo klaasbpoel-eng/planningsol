@@ -379,7 +379,7 @@ export function GasCylinderOrderDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={handleClose}>
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="sm:max-w-[500px] w-[95%] rounded-lg">
           <DialogHeader>
             <div className="flex items-center gap-3">
