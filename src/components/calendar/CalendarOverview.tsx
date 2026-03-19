@@ -215,10 +215,10 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     getUser();
     fetchData();
   }, [currentUser]);
-  const fetchData = async () => {
+  const fetchData = async (silent = false) => {
     if (isFetching.current) return;
     isFetching.current = true;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       setFetchError(null);
       let user = currentUser;
@@ -363,7 +363,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
       isFetching.current = false;
     }
   };
@@ -449,7 +449,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         setAmbulanceTrips(prev => prev.map(t => t.id === updatedItem.id ? enriched : t));
       }
     } else {
-      fetchData(); // Fallback for series updates where id is null
+      fetchData(true); // Silent fallback for series updates — no skeleton
     }
   };
 
@@ -462,7 +462,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       }));
       setTasks(prev => [...prev, ...enrichedTasks]);
     } else {
-      fetchData();
+      fetchData(true);
     }
   };
 
@@ -475,7 +475,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       }));
       setRequests(prev => [...prev, ...enrichedRequests]);
     } else {
-      fetchData();
+      fetchData(true);
     }
   };
 
@@ -488,7 +488,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       }));
       setDryIceOrders(prev => [...prev, ...enrichedOrders]);
     } else {
-      fetchData();
+      fetchData(true);
     }
   };
 
@@ -500,7 +500,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       }));
       setGasCylinderOrders(prev => [...prev, ...enrichedOrders]);
     } else {
-      fetchData();
+      fetchData(true);
     }
   };
 
@@ -512,7 +512,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       }));
       setAmbulanceTrips(prev => [...prev, ...enrichedTrips]);
     } else {
-      fetchData();
+      fetchData(true);
     }
   };
   const handleDayClick = (day: Date, e: React.MouseEvent) => {
@@ -641,7 +641,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         toast.success("Reeks verplaatst", {
           description: `Orders verplaatst`
         });
-        fetchData();
+        fetchData(true);
 
       } catch (error) {
         console.error("Error moving series:", error);
@@ -667,10 +667,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       toast.success("Order verplaatst", {
         description: `${orderNumber} (${customerName}) verplaatst naar ${format(parseISO(newDate), "d MMM yyyy", { locale: nl })}`
       });
-      fetchData(); // Refresh to be sure
     } catch (error) {
       console.error("Error move dry ice order:", error);
-      fetchData(); // Revert
+      fetchData(true); // Silent revert
       toast.error("Fout bij verplaatsen order");
     }
   };
@@ -1095,7 +1094,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         toast.success(`${newDates.length} ambulance ritten toegevoegd aan de reeks`);
       }
 
-      fetchData();
+      fetchData(true);
     } catch (error: any) {
       console.error("Error extending series:", error);
       toast.error("Fout bij verlengen reeks: " + (error.message || "Onbekende fout"));

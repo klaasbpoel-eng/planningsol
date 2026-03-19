@@ -236,8 +236,14 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
   };
 
   const handleDelete = async () => {
+    const isSeriesDelete = !!trip.series_id;
+
+    // Close dialog immediately — don't wait for API call
+    onOpenChange(false);
+    if (!isSeriesDelete) onUpdate(trip.id, "ambulance");
+
     try {
-      if (trip.series_id) {
+      if (isSeriesDelete) {
         // First get all trip IDs in the series
         const { data: seriesTrips } = await supabase
           .from("ambulance_trips" as any)
@@ -245,24 +251,19 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
           .eq("series_id", trip.series_id);
 
         if (seriesTrips && seriesTrips.length > 0) {
-          // Delete customers for all trips in the series first
           for (const st of seriesTrips) {
             await supabase.from("ambulance_trip_customers" as any).delete().eq("trip_id", (st as any).id);
           }
         }
 
-        // Now delete all trips in the series
         const { error } = await supabase
           .from("ambulance_trips" as any)
           .delete()
           .eq("series_id", trip.series_id);
         if (error) throw error;
         toast.success("Gehele reeks verwijderd");
-
-        onOpenChange(false);
         onUpdate();
       } else {
-        // Delete customers first
         await supabase.from("ambulance_trip_customers" as any).delete().eq("trip_id", trip.id);
 
         const { error } = await supabase
@@ -271,13 +272,11 @@ export function AmbulanceTripDialog({ trip, open, onOpenChange, onUpdate, isAdmi
           .eq("id", trip.id);
         if (error) throw error;
         toast.success("Ambulance rit verwijderd");
-
-        onOpenChange(false);
-        onUpdate(trip.id, "ambulance");
       }
     } catch (error) {
       console.error("Error deleting trip:", error);
       toast.error("Fout bij verwijderen");
+      onUpdate(); // silent revert
     }
   };
 
