@@ -399,7 +399,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     setAmbulanceTripDialogOpen(true);
   };
   const handleDialogUpdate = (
-    deletedId?: string, 
+    deletedId?: string,
     deletedType?: "task" | "timeoff" | "dryice" | "gascylinder" | "ambulance",
     updatedItem?: any
   ) => {
@@ -411,8 +411,8 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       else if (deletedType === "ambulance") setAmbulanceTrips(prev => prev.filter(t => t.id !== deletedId));
     } else if (updatedItem && deletedType) {
       if (deletedType === "task") {
-        const enriched = { 
-          ...updatedItem, 
+        const enriched = {
+          ...updatedItem,
           profile: updatedItem.assigned_to ? profiles.find(p => p.user_id === updatedItem.assigned_to) || null : null,
           task_type: taskTypes.find(t => t.id === updatedItem.type_id) || null
         };
@@ -506,7 +506,6 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
 
   const handleAmbulanceTripCreated = (createdTrips?: any[]) => {
     if (createdTrips && createdTrips.length > 0) {
-      // Ambulance payload created in modal either has empty customers arr or none by default
       const enrichedTrips = createdTrips.map(trip => ({
         ...trip,
         customers: trip.customers || []
