@@ -595,16 +595,17 @@ export function CalendarItemDialog({
                       variant="destructive"
                       onClick={() => setShowDeleteConfirm(true)}
                       className="sm:mr-auto"
+                      disabled={deleting || saving}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Verwijderen
                     </Button>
                   )}
-                  <Button variant="outline" onClick={handleClose}>
+                  <Button variant="outline" onClick={handleClose} disabled={deleting || saving}>
                     Sluiten
                   </Button>
                   {isAdmin && (
-                    <Button onClick={startEditing}>
+                    <Button onClick={startEditing} disabled={deleting || saving}>
                       <Edit2 className="h-4 w-4 mr-2" />
                       Bewerken
                     </Button>
@@ -616,7 +617,12 @@ export function CalendarItemDialog({
         </Dialog>
 
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialog
+          open={showDeleteConfirm}
+          onOpenChange={(nextOpen) => {
+            if (!deleting) setShowDeleteConfirm(nextOpen);
+          }}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Taak verwijderen</AlertDialogTitle>
@@ -628,29 +634,32 @@ export function CalendarItemDialog({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Annuleren</AlertDialogCancel>
+              <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
 
               {item?.type === "task" && (item.data as TaskWithProfile).series_id ? (
                 <>
                   <AlertDialogAction
-                    onClick={() => handleDelete(false)}
+                    onClick={() => void handleDelete(false)}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={deleting}
                   >
-                    Alleen deze
+                    {deleting ? "Verwijderen..." : "Alleen deze"}
                   </AlertDialogAction>
                   <AlertDialogAction
-                    onClick={() => handleDelete(true)}
+                    onClick={() => void handleDelete(true)}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={deleting}
                   >
-                    Hele reeks
+                    {deleting ? "Verwijderen..." : "Hele reeks"}
                   </AlertDialogAction>
                 </>
               ) : (
                 <AlertDialogAction
-                  onClick={() => handleDelete(false)}
+                  onClick={() => void handleDelete(false)}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={deleting}
                 >
-                  Verwijderen
+                  {deleting ? "Verwijderen..." : "Verwijderen"}
                 </AlertDialogAction>
               )}
             </AlertDialogFooter>
