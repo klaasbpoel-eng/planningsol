@@ -638,19 +638,34 @@ export function CalendarItemDialog({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
+              <AlertDialogCancel
+                disabled={deleting}
+                onClick={(event) => {
+                  if (deleting) {
+                    event.preventDefault();
+                  }
+                }}
+              >
+                Annuleren
+              </AlertDialogCancel>
 
               {item?.type === "task" && (item.data as TaskWithProfile).series_id ? (
                 <>
                   <AlertDialogAction
-                    onClick={() => handleDelete(false)}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void handleDelete(false);
+                    }}
                     disabled={deleting}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     Alleen deze
                   </AlertDialogAction>
                   <AlertDialogAction
-                    onClick={() => handleDelete(true)}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void handleDelete(true);
+                    }}
                     disabled={deleting}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
@@ -659,7 +674,10 @@ export function CalendarItemDialog({
                 </>
               ) : (
                 <AlertDialogAction
-                  onClick={() => handleDelete(false)}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void handleDelete(false);
+                  }}
                   disabled={deleting}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
