@@ -303,6 +303,12 @@ export function GasCylinderOrderDialog({
     onOpenChange(false);
   };
 
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      handleClose();
+    }
+  };
+
   if (!order) return null;
 
   const getStatusLabel = (status: string) => {
