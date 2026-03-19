@@ -944,12 +944,7 @@ export function CalendarItemDialog({
       </Dialog>
 
       {/* Delete Confirmation Dialog for Time Off */}
-      <AlertDialog
-        open={showDeleteConfirm}
-        onOpenChange={(nextOpen) => {
-          if (!deleting) setShowDeleteConfirm(nextOpen);
-        }}
-      >
+      <AlertDialog open={showDeleteConfirm} onOpenChange={handleDeleteConfirmOpenChange}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Verlofaanvraag verwijderen</AlertDialogTitle>
@@ -959,9 +954,20 @@ export function CalendarItemDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Annuleren</AlertDialogCancel>
+            <AlertDialogCancel
+              disabled={deleting}
+              onClick={(event) => {
+                event.preventDefault();
+                handleDeleteConfirmOpenChange(false);
+              }}
+            >
+              Annuleren
+            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => void handleDelete(false)}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDelete(false);
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={deleting}
             >
