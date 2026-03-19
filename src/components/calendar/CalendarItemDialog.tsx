@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -35,7 +35,7 @@ import {
   Trash2,
   Sun,
   Sunset,
-  Link2
+  Link2,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatTimeRange, getDayPartLabel, hasTimeInfo } from "@/lib/calendar-utils";
@@ -93,7 +93,7 @@ export function CalendarItemDialog({
   onUpdate,
   isAdmin = false,
   profiles = [],
-  timeOffTypes = []
+  timeOffTypes = [],
 }: CalendarItemDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -116,6 +116,20 @@ export function CalendarItemDialog({
   const [timeOffEndDate, setTimeOffEndDate] = useState<Date | undefined>();
   const [timeOffTypeId, setTimeOffTypeId] = useState<string | null>(null);
 
+  const resetTransientState = () => {
+    setShowDeleteConfirm(false);
+    setIsEditing(false);
+    setApplyToSeries(false);
+  };
+
+  useEffect(() => {
+    if (!open) {
+      resetTransientState();
+      setSaving(false);
+      setDeleting(false);
+    }
+  }, [open, item?.type, item?.data.id]);
+
   const startEditing = () => {
     if (item?.type === "task") {
       const task = item.data as TaskWithProfile;
@@ -133,6 +147,7 @@ export function CalendarItemDialog({
       setTimeOffStartDate(parseISO(request.start_date));
       setTimeOffEndDate(parseISO(request.end_date));
       setTimeOffTypeId(request.type_id || null);
+      setApplyToSeries(false);
     }
 
     setShowDeleteConfirm(false);
@@ -141,6 +156,7 @@ export function CalendarItemDialog({
 
   const cancelEditing = () => {
     setIsEditing(false);
+    setApplyToSeries(false);
   };
 
   const validateTimeOrder = (): boolean => {
@@ -148,10 +164,10 @@ export function CalendarItemDialog({
     return taskStartTime < taskEndTime;
   };
 
-  const closeDialogSafely = () => {
-    setShowDeleteConfirm(false);
-    setIsEditing(false);
-    requestAnimationFrame(() => onOpenChange(false));
+  const closeDialog = () => {
+    if (deleting || saving) return;
+    resetTransientState();
+    onOpenChange(false);
   };
 
   const handleSave = async () => {
@@ -273,6 +289,9 @@ export function CalendarItemDialog({
         toast.success("Verlofaanvraag verwijderd");
       }
 
+      resetTransientState();
+      onOpenChange(false);
+
       if (isSeriesDelete) {
         onUpdate();
       } else if (itemType === "task") {
@@ -280,8 +299,6 @@ export function CalendarItemDialog({
       } else {
         onUpdate(itemData.id, "timeoff");
       }
-
-      closeDialogSafely();
     } catch (error) {
       console.error("Error deleting item:", error);
       toast.error("Fout bij verwijderen", { description: "Probeer het opnieuw" });
@@ -291,14 +308,21 @@ export function CalendarItemDialog({
   };
 
   const handleClose = () => {
-    if (deleting || saving) return;
-    closeDialogSafely();
+    closeDialog();
   };
 
   const handleDialogOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) {
-      handleClose();
+    if (nextOpen) {
+      onOpenChange(true);
+      return;
     }
+
+    closeDialog();
+  };
+
+  const handleDeleteConfirmOpenChange = (nextOpen: boolean) => {
+    if (deleting) return;
+    setShowDeleteConfirm(nextOpen);
   };
 
   if (!item) return null;
