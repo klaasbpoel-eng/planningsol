@@ -35,20 +35,9 @@ import {
   Trash2,
   Sun,
   Sunset,
-  Link2,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatTimeRange, getDayPartLabel, hasTimeInfo } from "@/lib/calendar-utils";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { format, parseISO } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -98,7 +87,7 @@ export function CalendarItemDialog({
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [applyToSeries, setApplyToSeries] = useState(false);
 
   // Task edit state
@@ -117,7 +106,7 @@ export function CalendarItemDialog({
   const [timeOffTypeId, setTimeOffTypeId] = useState<string | null>(null);
 
   const resetTransientState = () => {
-    setShowDeleteConfirm(false);
+    setConfirmDelete(false);
     setIsEditing(false);
     setApplyToSeries(false);
   };
@@ -150,7 +139,7 @@ export function CalendarItemDialog({
       setApplyToSeries(false);
     }
 
-    setShowDeleteConfirm(false);
+    setConfirmDelete(false);
     setIsEditing(true);
   };
 
@@ -318,11 +307,6 @@ export function CalendarItemDialog({
     }
 
     closeDialog();
-  };
-
-  const handleDeleteConfirmOpenChange = (nextOpen: boolean) => {
-    if (deleting) return;
-    setShowDeleteConfirm(nextOpen);
   };
 
   if (!item) return null;
@@ -612,12 +596,48 @@ export function CalendarItemDialog({
                     {saving ? "Opslaan..." : "Opslaan"}
                   </Button>
                 </>
+              ) : confirmDelete ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setConfirmDelete(false)}
+                    disabled={deleting || saving}
+                  >
+                    Annuleren
+                  </Button>
+                  {task.series_id ? (
+                    <>
+                      <Button
+                        variant="destructive"
+                        onClick={() => void handleDelete(false)}
+                        disabled={deleting || saving}
+                      >
+                        {deleting ? "Verwijderen..." : "Alleen deze"}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => void handleDelete(true)}
+                        disabled={deleting || saving}
+                      >
+                        {deleting ? "Verwijderen..." : "Hele reeks"}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="destructive"
+                      onClick={() => void handleDelete(false)}
+                      disabled={deleting || saving}
+                    >
+                      {deleting ? "Verwijderen..." : "Definitief verwijderen"}
+                    </Button>
+                  )}
+                </>
               ) : (
                 <>
                   {isAdmin && (
                     <Button
                       variant="destructive"
-                      onClick={() => setShowDeleteConfirm(true)}
+                      onClick={() => setConfirmDelete(true)}
                       className="sm:mr-auto"
                       disabled={deleting || saving}
                     >
@@ -640,67 +660,6 @@ export function CalendarItemDialog({
           </DialogContent>
         </Dialog>
 
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={showDeleteConfirm} onOpenChange={handleDeleteConfirmOpenChange}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Taak verwijderen</AlertDialogTitle>
-              <AlertDialogDescription>
-                {item?.type === "task" && (item.data as TaskWithProfile).series_id
-                  ? "Dit is een terugkerende taak. Wil je alleen deze taak verwijderen of de hele reeks?"
-                  : "Weet je zeker dat je deze taak wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt."
-                }
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel
-                disabled={deleting}
-                onClick={(event) => {
-                  event.preventDefault();
-                  handleDeleteConfirmOpenChange(false);
-                }}
-              >
-                Annuleren
-              </AlertDialogCancel>
-
-              {item?.type === "task" && (item.data as TaskWithProfile).series_id ? (
-                <>
-                  <AlertDialogAction
-                    onClick={(event) => {
-                      event.preventDefault();
-                      void handleDelete(false);
-                    }}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    disabled={deleting}
-                  >
-                    {deleting ? "Verwijderen..." : "Alleen deze"}
-                  </AlertDialogAction>
-                  <AlertDialogAction
-                    onClick={(event) => {
-                      event.preventDefault();
-                      void handleDelete(true);
-                    }}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    disabled={deleting}
-                  >
-                    {deleting ? "Verwijderen..." : "Hele reeks"}
-                  </AlertDialogAction>
-                </>
-              ) : (
-                <AlertDialogAction
-                  onClick={(event) => {
-                    event.preventDefault();
-                    void handleDelete(false);
-                  }}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  disabled={deleting}
-                >
-                  {deleting ? "Verwijderen..." : "Verwijderen"}
-                </AlertDialogAction>
-              )}
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </>
     );
   }
@@ -915,12 +874,29 @@ export function CalendarItemDialog({
                   {saving ? "Opslaan..." : "Opslaan"}
                 </Button>
               </>
+            ) : confirmDelete ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={deleting || saving}
+                >
+                  Annuleren
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => void handleDelete(false)}
+                  disabled={deleting || saving}
+                >
+                  {deleting ? "Verwijderen..." : "Definitief verwijderen"}
+                </Button>
+              </>
             ) : (
               <>
                 {isAdmin && (
                   <Button
                     variant="destructive"
-                    onClick={() => setShowDeleteConfirm(true)}
+                    onClick={() => setConfirmDelete(true)}
                     className="sm:mr-auto"
                     disabled={deleting || saving}
                   >
@@ -943,39 +919,6 @@ export function CalendarItemDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog for Time Off */}
-      <AlertDialog open={showDeleteConfirm} onOpenChange={handleDeleteConfirmOpenChange}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Verlofaanvraag verwijderen</AlertDialogTitle>
-            <AlertDialogDescription>
-              Weet je zeker dat je deze verlofaanvraag wilt verwijderen?
-              Deze actie kan niet ongedaan worden gemaakt.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={deleting}
-              onClick={(event) => {
-                event.preventDefault();
-                handleDeleteConfirmOpenChange(false);
-              }}
-            >
-              Annuleren
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault();
-                void handleDelete(false);
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deleting}
-            >
-              {deleting ? "Verwijderen..." : "Verwijderen"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }
