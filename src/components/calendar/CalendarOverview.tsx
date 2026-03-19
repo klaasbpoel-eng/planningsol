@@ -383,6 +383,14 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       setDialogOpen(true);
     }
   };
+
+  const handleCalendarDialogOpenChange = (nextOpen: boolean) => {
+    setDialogOpen(nextOpen);
+    if (!nextOpen) {
+      setSelectedItem(null);
+    }
+  };
+
   const handleDryIceOrderClick = (order: DryIceOrderWithDetails, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedDryIceOrder(order);
@@ -2558,7 +2566,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     } | {
       type: "task";
       data: TaskWithProfile;
-    } : null} open={dialogOpen && selectedItem?.type !== "dryice"} onOpenChange={setDialogOpen} onUpdate={handleDialogUpdate} isAdmin={isAdmin} profiles={profiles} timeOffTypes={timeOffTypes} />
+    } : null} open={dialogOpen && selectedItem?.type !== "dryice"} onOpenChange={handleCalendarDialogOpenChange} onUpdate={handleDialogUpdate} isAdmin={isAdmin} profiles={profiles} timeOffTypes={timeOffTypes} />
 
     {/* Dry Ice Order Dialog */}
     <DryIceOrderDialog order={selectedDryIceOrder} open={dryIceDialogOpen} onOpenChange={setDryIceDialogOpen} onUpdate={handleDialogUpdate} isAdmin={isAdmin} productTypes={dryIceProductTypes} packagingOptions={dryIcePackaging} />
