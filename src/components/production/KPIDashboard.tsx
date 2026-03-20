@@ -17,6 +17,7 @@ import {
   Users,
   ListOrdered,
   MapPin,
+  Target,
 } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
 import { FadeIn } from "@/components/ui/fade-in";
@@ -505,6 +506,48 @@ export function KPIDashboard({
                   </div>
                 </div>
               </div>
+
+              {/* Jaardoelstelling voortgang */}
+              {!isCustomPeriod && (() => {
+                try {
+                  const stored = localStorage.getItem(`yearly-targets-${currentYear}`);
+                  const t = stored ? JSON.parse(stored) : null;
+                  if (!t || (t.emmen === 0 && t.tilburg === 0)) return null;
+                  const totalTarget = (t.emmen || 0) + (t.tilburg || 0);
+                  const rows = [
+                    { label: "SOL Emmen", color: "bg-blue-500", colorText: "text-blue-500", current: currentStats?.emmen_cylinders || 0, target: t.emmen || 0 },
+                    { label: "SOL Tilburg", color: "bg-sky-400", colorText: "text-sky-400", current: currentStats?.tilburg_cylinders || 0, target: t.tilburg || 0 },
+                    { label: "Totaal", color: "bg-primary", colorText: "text-primary", current: currentStats?.total_cylinders || 0, target: totalTarget },
+                  ].filter(r => r.target > 0);
+                  return (
+                    <div className="mt-4 pt-4 border-t border-border/50">
+                      <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                        <Target className="h-3 w-3" />
+                        Jaardoelstelling {currentYear} — YTD voortgang
+                      </div>
+                      <div className="space-y-2.5">
+                        {rows.map(({ label, color, colorText, current, target }) => {
+                          const pct = Math.min(100, Math.round((current / target) * 100));
+                          return (
+                            <div key={label}>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className={`font-medium ${colorText}`}>{label}</span>
+                                <span className="text-muted-foreground font-mono">
+                                  {formatNumber(current, 0)} / {formatNumber(target, 0)}
+                                  <span className="ml-2 font-semibold text-foreground">{pct}%</span>
+                                </span>
+                              </div>
+                              <div className="w-full bg-muted/50 rounded-full h-1.5">
+                                <div className={`h-1.5 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                } catch { return null; }
+              })()}
 
               {/* Anomaly Alerts Panel */}
               {activeAnomalies.length > 0 && (

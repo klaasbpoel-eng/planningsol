@@ -23,6 +23,7 @@ import {
   BarChart3,
   Ruler,
   Settings2,
+  Target,
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -767,17 +768,63 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
       </CardHeader>
       <CardContent>
         {emmenData && tilburgData && totalData ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="border rounded-lg p-4 border-blue-500/20">
-              <LocationColumn data={emmenData} prevData={prevEmmenData} color="text-blue-500" />
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="border rounded-lg p-4 border-blue-500/20">
+                <LocationColumn data={emmenData} prevData={prevEmmenData} color="text-blue-500" />
+              </div>
+              <div className="border rounded-lg p-4 border-sky-400/20">
+                <LocationColumn data={tilburgData} prevData={prevTilburgData} color="text-sky-400" />
+              </div>
+              <div className="border rounded-lg p-4 border-primary/20 bg-primary/[0.02]">
+                <LocationColumn data={totalData} prevData={prevTotalData} color="text-primary" />
+              </div>
             </div>
-            <div className="border rounded-lg p-4 border-sky-400/20">
-              <LocationColumn data={tilburgData} prevData={prevTilburgData} color="text-sky-400" />
-            </div>
-            <div className="border rounded-lg p-4 border-primary/20 bg-primary/[0.02]">
-              <LocationColumn data={totalData} prevData={prevTotalData} color="text-primary" />
-            </div>
-          </div>
+
+            {/* Maand doelstelling voortgang */}
+            {(() => {
+              try {
+                const year = parseInt(selectedMonth.substring(0, 4));
+                const stored = localStorage.getItem(`yearly-targets-${year}`);
+                const t = stored ? JSON.parse(stored) : null;
+                if (!t || (t.emmen === 0 && t.tilburg === 0)) return null;
+                const monthlyEmmen = Math.round((t.emmen || 0) / 12);
+                const monthlyTilburg = Math.round((t.tilburg || 0) / 12);
+                const monthlyTotal = monthlyEmmen + monthlyTilburg;
+                const rows = [
+                  { label: "SOL Emmen", colorBar: "bg-blue-500", colorText: "text-blue-500", current: emmenData.totalCylinders, target: monthlyEmmen },
+                  { label: "SOL Tilburg", colorBar: "bg-sky-400", colorText: "text-sky-400", current: tilburgData.totalCylinders, target: monthlyTilburg },
+                  { label: "Totaal", colorBar: "bg-primary", colorText: "text-primary", current: totalData.totalCylinders, target: monthlyTotal },
+                ].filter(r => r.target > 0);
+                if (rows.length === 0) return null;
+                return (
+                  <div className="mt-4 pt-4 border-t space-y-2.5">
+                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                      <Target className="h-3 w-3" />
+                      Maand doelstelling (1/12 van jaartarget {year})
+                    </div>
+                    {rows.map(({ label, colorBar, colorText, current, target }) => {
+                      const pct = Math.min(100, Math.round((current / target) * 100));
+                      return (
+                        <div key={label}>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className={`font-medium ${colorText}`}>{label}</span>
+                            <span className="text-muted-foreground font-mono">
+                              {formatNumber(current, 0)} / {formatNumber(target, 0)}
+                              <span className={`ml-2 font-semibold ${pct >= 100 ? "text-green-500" : pct >= 80 ? "text-foreground" : "text-destructive"}`}>{pct}%</span>
+                            </span>
+                          </div>
+                          <div className="w-full bg-muted/50 rounded-full h-1.5">
+                            <div className={`h-1.5 rounded-full transition-all ${colorBar}`} style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              } catch { return null; }
+            })()}
+          </>
         ) : (
           <p className="text-center text-muted-foreground py-12">Geen data beschikbaar</p>
         )}
