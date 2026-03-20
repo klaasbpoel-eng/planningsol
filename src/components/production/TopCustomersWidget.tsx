@@ -297,7 +297,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
                     variant={customer.changePercent >= 0 ? "default" : "destructive"}
                     className="text-xs"
                   >
-                    {customer.changePercent >= 0 ? "+" : ""}{customer.changePercent.toFixed(0)}%
+                    {customer.changePercent >= 999 ? ">+999%" : customer.changePercent <= -999 ? "<-999%" : `${customer.changePercent >= 0 ? "+" : ""}${customer.changePercent.toFixed(0)}%`}
                   </Badge>
                 </div>
               </div>

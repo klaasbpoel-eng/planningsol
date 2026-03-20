@@ -190,6 +190,34 @@ export function Header({
         </div>
 
 
+        {/* Desktop navigation */}
+        {!isMobile && (
+          <nav className="hidden md:flex items-center gap-0.5">
+            {NAV_GROUPS.map((group, gi) => (
+              <div key={group.label} className="flex items-center">
+                {gi > 0 && <span className="w-px h-4 bg-border/50 mx-1" />}
+                {group.items.map((item) => (
+                  <Link key={item.path} to={item.path}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-8 gap-1.5 px-2.5 text-xs",
+                        isActive(item.path)
+                          ? "bg-primary/10 text-primary font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {item.icon}
+                      <span>{item.shortLabel || item.label}</span>
+                    </Button>
+                  </Link>
+                ))}
+              </div>
+            ))}
+          </nav>
+        )}
+
         {/* Right side - Actions */}
         <div className="flex items-center gap-2 shrink-0">
           {/* Today quick-link */}

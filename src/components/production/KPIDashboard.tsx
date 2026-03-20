@@ -44,6 +44,7 @@ interface KPIDashboardProps {
   // kept for API compatibility with parent
   hideDigital?: boolean;
   onHideDigitalChange?: (value: boolean) => void;
+  onNavigateToReports?: () => void;
 }
 
 interface ProductieRow {
@@ -165,12 +166,14 @@ export function KPIDashboard({
   location,
   refreshKey = 0,
   dateRange,
+  onNavigateToReports,
 }: KPIDashboardProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [currentStats, setCurrentStats] = useState<ProductieStats | null>(null);
   const [previousStats, setPreviousStats] = useState<ProductieStats | null>(null);
   const [weeklyData, setWeeklyData] = useState<SparklineData[]>([]);
   const [historicalWeeklyData, setHistoricalWeeklyData] = useState<number[]>([]);
+  const [newCustomersYtd, setNewCustomersYtd] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const currentYear = new Date().getFullYear();
@@ -201,6 +204,8 @@ export function KPIDashboard({
     setLoading(true);
     try {
       const locationParam = location === "all" ? null : location;
+
+      setNewCustomersYtd(0);
 
       if (dateRange) {
         const fromStr = toLocalDateString(dateRange.from);
@@ -245,6 +250,12 @@ export function KPIDashboard({
         setCurrentStats(calculateStats(currentRows, undefined, undefined, locationParam));
         setPreviousStats(calculateStats(previousRows, undefined, undefined, locationParam));
 
+        // New customers YTD: in current year but not in previous year
+        const currentCustomerSet = new Set(currentRows.map(r => r.Klant).filter(Boolean));
+        const prevCustomerSet = new Set(previousRows.map(r => r.Klant).filter(Boolean));
+        const newCount = [...currentCustomerSet].filter(c => !prevCustomerSet.has(c)).length;
+        setNewCustomersYtd(newCount);
+
         // Combine both years for sparkline (handles year boundary weeks)
         const sparkline = computeWeeklySparkline(
           [...currentRows, ...previousRows],
@@ -266,8 +277,15 @@ export function KPIDashboard({
   }, [fetchKPIData, refreshKey]);
 
   const calculateTrend = (current: number, previous: number): number => {
-    if (previous === 0) return current > 0 ? 100 : 0;
-    return Math.round(((current - previous) / previous) * 100);
+    if (previous === 0) return current > 0 ? 999 : 0;
+    const pct = Math.round(((current - previous) / previous) * 100);
+    return Math.max(-999, Math.min(999, pct));
+  };
+
+  const formatTrend = (value: number): string => {
+    if (value >= 999) return ">+999%";
+    if (value <= -999) return "<-999%";
+    return `${value > 0 ? "+" : ""}${value}%`;
   };
 
   const volumeTrend = useMemo(() => {
@@ -362,7 +380,11 @@ export function KPIDashboard({
             <FadeIn show={true}>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Volume */}
-                <div className="p-4 rounded-xl bg-gradient-to-br from-orange-500/10 to-orange-500/5 border border-orange-500/20">
+                <div
+                  className={cn("p-4 rounded-xl bg-gradient-to-br from-orange-500/10 to-orange-500/5 border border-orange-500/20", onNavigateToReports && "cursor-pointer hover:ring-1 hover:ring-orange-500/40 transition-all")}
+                  onClick={onNavigateToReports}
+                  title={onNavigateToReports ? "Bekijk rapportage" : undefined}
+                >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <BarChart3 className="h-4 w-4 text-orange-500" />
@@ -370,9 +392,14 @@ export function KPIDashboard({
                         {isCustomPeriod ? "Volume periode" : "Volume YTD"}
                       </span>
                     </div>
-                    <div className={cn("flex items-center gap-1 text-xs font-medium", getTrendColor(volumeTrend))}>
-                      {getTrendIcon(volumeTrend)}
-                      <span>{volumeTrend > 0 ? "+" : ""}{volumeTrend}%</span>
+                    <div className={cn("flex flex-col items-end gap-0", "")}>
+                      <div className={cn("flex items-center gap-1 text-xs font-medium", getTrendColor(volumeTrend))}>
+                        {getTrendIcon(volumeTrend)}
+                        <span>{formatTrend(volumeTrend)}</span>
+                      </div>
+                      {!isCustomPeriod && (
+                        <span className="text-[10px] text-muted-foreground">vs. {currentYear - 1}</span>
+                      )}
                     </div>
                   </div>
                   <div className="text-3xl font-bold text-orange-500">
@@ -382,15 +409,24 @@ export function KPIDashboard({
                 </div>
 
                 {/* Records */}
-                <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+                <div
+                  className={cn("p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20", onNavigateToReports && "cursor-pointer hover:ring-1 hover:ring-primary/40 transition-all")}
+                  onClick={onNavigateToReports}
+                  title={onNavigateToReports ? "Bekijk rapportage" : undefined}
+                >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <ListOrdered className="h-4 w-4 text-primary" />
                       <span className="text-xs font-medium text-muted-foreground">Regels</span>
                     </div>
-                    <div className={cn("flex items-center gap-1 text-xs font-medium", getTrendColor(recordsTrend))}>
-                      {getTrendIcon(recordsTrend)}
-                      <span>{recordsTrend > 0 ? "+" : ""}{recordsTrend}%</span>
+                    <div className={cn("flex flex-col items-end gap-0", "")}>
+                      <div className={cn("flex items-center gap-1 text-xs font-medium", getTrendColor(recordsTrend))}>
+                        {getTrendIcon(recordsTrend)}
+                        <span>{formatTrend(recordsTrend)}</span>
+                      </div>
+                      {!isCustomPeriod && (
+                        <span className="text-[10px] text-muted-foreground">vs. {currentYear - 1}</span>
+                      )}
                     </div>
                   </div>
                   <div className="text-3xl font-bold text-primary">
@@ -413,6 +449,11 @@ export function KPIDashboard({
                   <p className="text-xs text-muted-foreground mt-1">
                     Gem. {avgPerRecord} cil./regel
                   </p>
+                  {!isCustomPeriod && newCustomersYtd > 0 && (
+                    <p className="text-xs text-success mt-0.5 font-medium">
+                      +{newCustomersYtd} nieuw dit jaar
+                    </p>
+                  )}
                 </div>
 
                 {/* Weekly Trend Sparkline */}
@@ -515,8 +556,8 @@ export function KPIDashboard({
                   if (!t || (t.emmen === 0 && t.tilburg === 0)) return null;
                   const totalTarget = (t.emmen || 0) + (t.tilburg || 0);
                   const rows = [
-                    { label: "SOL Emmen", color: "bg-blue-500", colorText: "text-blue-500", current: currentStats?.emmen_cylinders || 0, target: t.emmen || 0 },
-                    { label: "SOL Tilburg", color: "bg-sky-400", colorText: "text-sky-400", current: currentStats?.tilburg_cylinders || 0, target: t.tilburg || 0 },
+                    { label: "SOL Emmen", color: "bg-orange-500", colorText: "text-orange-500", current: currentStats?.emmen_cylinders || 0, target: t.emmen || 0 },
+                    { label: "SOL Tilburg", color: "bg-blue-500", colorText: "text-blue-500", current: currentStats?.tilburg_cylinders || 0, target: t.tilburg || 0 },
                     { label: "Totaal", color: "bg-primary", colorText: "text-primary", current: currentStats?.total_cylinders || 0, target: totalTarget },
                   ].filter(r => r.target > 0);
                   return (

@@ -68,6 +68,8 @@ import {
   Clock,
   GitCompare,
   Sparkles,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { ChartSkeleton, StatCardSkeleton } from "@/components/ui/skeletons";
 import { StatCard } from "@/components/ui/stat-card";
@@ -100,13 +102,14 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  AreaChart,
+  ComposedChart,
   Area,
   BarChart,
   Bar,
   Legend,
   Cell,
-  LabelList
+  LabelList,
+  ReferenceArea,
 } from "recharts";
 
 type DateRange = {
@@ -220,11 +223,27 @@ export function ProductionReports({
     try {
       const fromDate = format(dateRange.from, "yyyy-MM-dd");
       const toDate = format(dateRange.to, "yyyy-MM-dd");
-      const periodLength = differenceInDays(dateRange.to, dateRange.from);
-      const prevTo = subDays(dateRange.from, 1);
-      const prevFrom = subDays(prevTo, periodLength);
-      const prevFromDate = format(prevFrom, "yyyy-MM-dd");
-      const prevToDate = format(prevTo, "yyyy-MM-dd");
+
+      // YTD mode: Jan 1 to today → compare same period last year
+      const nowCheck = new Date();
+      const ytd = dateRange.from.getMonth() === 0 && dateRange.from.getDate() === 1
+        && dateRange.to.getFullYear() === dateRange.from.getFullYear()
+        && dateRange.to <= nowCheck;
+
+      let prevFromDate: string, prevToDate: string;
+      if (ytd) {
+        const prevYr = dateRange.from.getFullYear() - 1;
+        const prevEnd = new Date(dateRange.to);
+        prevEnd.setFullYear(prevYr);
+        prevFromDate = `${prevYr}-01-01`;
+        prevToDate = format(prevEnd, "yyyy-MM-dd");
+      } else {
+        const periodLength = differenceInDays(dateRange.to, dateRange.from);
+        const prevTo = subDays(dateRange.from, 1);
+        const prevFrom = subDays(prevTo, periodLength);
+        prevFromDate = format(prevFrom, "yyyy-MM-dd");
+        prevToDate = format(prevTo, "yyyy-MM-dd");
+      }
       const locationParam = location === "all" ? null : location;
       const isTilburg = location === "sol_tilburg";
 
@@ -314,6 +333,34 @@ export function ProductionReports({
           .map(([date, count]) => ({ production_date: date, cylinder_count: count, dry_ice_kg: 0 }))
       );
 
+      // Prev year daily data keyed by day-offset from prevFromDate
+      const prevDailyMap = new Map<string, number>();
+      for (const row of prevRows) {
+        const raw: string = row.Datum || "";
+        if (!raw) continue;
+        const iso = raw.includes("T") ? raw.substring(0, 10)
+          : (() => { const p = raw.split("-"); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+        if (iso) prevDailyMap.set(iso, (prevDailyMap.get(iso) || 0) + (row.Aantal || 0));
+      }
+      const prevStart = new Date(prevFromDate);
+      const prevEnd = new Date(prevToDate);
+      const prevTotalDays = differenceInDays(prevEnd, prevStart) + 1;
+      const prevOffsetArr: number[] = Array(prevTotalDays).fill(0);
+      prevDailyMap.forEach((count, isoDate) => {
+        const offset = differenceInDays(new Date(isoDate), prevStart);
+        if (offset >= 0 && offset < prevTotalDays) prevOffsetArr[offset] = count;
+      });
+      setPrevDailyByOffset(prevOffsetArr);
+
+      // Location split (for KPI cards when location === "all")
+      const emmenCyl = currentRows
+        .filter(r => r.Locatie?.toLowerCase().includes("emmen"))
+        .reduce((s: number, r: any) => s + (r.Aantal || 0), 0);
+      const tilburgCyl = currentRows
+        .filter(r => !r.Locatie?.toLowerCase().includes("emmen"))
+        .reduce((s: number, r: any) => s + (r.Aantal || 0), 0);
+      setLocationSplit({ emmen: emmenCyl, tilburg: tilburgCyl });
+
       // Gas type distribution grouped by Product
       const typeMap = new Map<string, number>();
       for (const row of currentRows) {
@@ -362,8 +409,9 @@ export function ProductionReports({
 
   // Helper function to calculate trend percentage
   const calculateTrend = (current: number, previous: number): number => {
-    if (previous === 0) return current > 0 ? 100 : 0;
-    return Math.round(((current - previous) / previous) * 100);
+    if (previous === 0) return current > 0 ? 999 : 0;
+    const pct = Math.round(((current - previous) / previous) * 100);
+    return Math.max(-999, Math.min(999, pct));
   };
 
   const setPresetRange = (preset: string) => {
@@ -387,7 +435,7 @@ export function ProductionReports({
         setDateRange({ from: startOfYear(lastYear), to: endOfYear(lastYear) });
         break;
       case "this-year":
-        setDateRange({ from: startOfYear(now), to: endOfYear(now) });
+        setDateRange({ from: startOfYear(now), to: now });
         break;
     }
   };
@@ -406,8 +454,8 @@ export function ProductionReports({
     const lastYear = subYears(now, 1);
     if (isSameDay(from, startOfYear(lastYear)) && isSameDay(to, endOfYear(lastYear))) return "last-year";
 
-    // This year
-    if (isSameDay(from, startOfYear(now)) && isSameDay(to, endOfYear(now))) return "this-year";
+    // This year (YTD: Jan 1 to any date this year)
+    if (isSameDay(from, startOfYear(now)) && from.getFullYear() === to.getFullYear() && to.getFullYear() === now.getFullYear()) return "this-year";
 
     return "";
   };
@@ -431,15 +479,57 @@ export function ProductionReports({
     totalKg: dryIceEfficiency?.total_kg || 0
   }), [dryIceEfficiency]);
 
+  // Prev year daily data (by day-offset index from prev period start)
+  const [prevDailyByOffset, setPrevDailyByOffset] = useState<number[]>([]);
+  // Location split for KPI (emmen/tilburg cylinders)
+  const [locationSplit, setLocationSplit] = useState<{ emmen: number; tilburg: number }>({ emmen: 0, tilburg: 0 });
+  // Chart toggles
+  const [showPrevYear, setShowPrevYear] = useState(false);
+  const [cumulativeChart, setCumulativeChart] = useState(false);
+
+  // Detect YTD mode: period starts on Jan 1 of current year and ends today or earlier
+  const isYtdMode = useMemo(() => {
+    const now = new Date();
+    return dateRange.from.getMonth() === 0 && dateRange.from.getDate() === 1
+      && dateRange.to.getFullYear() === dateRange.from.getFullYear()
+      && dateRange.to <= now;
+  }, [dateRange]);
+
   // Prepare chart data from RPC response
   const ordersPerDay = useMemo(() => {
-    return dailyProduction.map(item => ({
+    return dailyProduction.map((item, idx) => ({
       date: item.production_date,
       cylinders: Number(item.cylinder_count) || 0,
       dryIce: Number(item.dry_ice_kg) || 0,
-      displayDate: format(new Date(item.production_date), "d MMM", { locale: nl })
+      displayDate: format(new Date(item.production_date), "d MMM", { locale: nl }),
+      prevCylinders: prevDailyByOffset[idx] || 0,
     }));
-  }, [dailyProduction]);
+  }, [dailyProduction, prevDailyByOffset]);
+
+  // Chart data: cumulative running totals when cumulativeChart is on
+  const chartData = useMemo(() => {
+    if (!cumulativeChart) return ordersPerDay.map(d => ({ ...d, targetRamp: undefined as number | undefined }));
+    let yearTarget = 0;
+    if (isYtdMode) {
+      try {
+        const yearStr = String(dateRange.from.getFullYear());
+        const stored = localStorage.getItem(`yearly-targets-${yearStr}`);
+        if (stored) {
+          const t = JSON.parse(stored);
+          yearTarget = location === "sol_emmen" ? (t.emmen || 0)
+            : location === "sol_tilburg" ? (t.tilburg || 0)
+            : (t.emmen || 0) + (t.tilburg || 0);
+        }
+      } catch {}
+    }
+    let cumCyl = 0, cumPrev = 0;
+    return ordersPerDay.map((d, i) => {
+      cumCyl += d.cylinders;
+      cumPrev += d.prevCylinders || 0;
+      const targetRamp = yearTarget > 0 ? Math.round((yearTarget / 365) * (i + 1)) : undefined;
+      return { ...d, cylinders: cumCyl, prevCylinders: cumPrev, targetRamp };
+    });
+  }, [ordersPerDay, cumulativeChart, isYtdMode, dateRange.from, location]);
 
   // Check if dry ice data is all zeros (hide from chart when irrelevant)
   const hasDryIceData = useMemo(() => {
@@ -562,6 +652,11 @@ export function ProductionReports({
               </PopoverContent>
             </Popover>
           </div>
+          {isYtdMode && (
+            <Badge variant="outline" className="text-[10px] h-7 px-2 text-primary border-primary/40 font-medium">
+              YTD vs. vorig jaar
+            </Badge>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -710,6 +805,32 @@ export function ProductionReports({
         />
       </div>
 
+      {/* Locatie uitsplitsing — shown when location is "all" and data loaded */}
+      {location === "all" && (locationSplit.emmen > 0 || locationSplit.tilburg > 0) && (() => {
+        const total = locationSplit.emmen + locationSplit.tilburg;
+        const emmenPct = total > 0 ? Math.round((locationSplit.emmen / total) * 100) : 0;
+        const tilburgPct = total > 0 ? 100 - emmenPct : 0;
+        return (
+          <div className="flex items-center gap-3 px-1 text-xs text-muted-foreground">
+            <span className="shrink-0 font-medium">Verdeling locaties:</span>
+            <div className="flex-1 flex items-center h-2 rounded-full overflow-hidden bg-muted/30">
+              <div className="h-full bg-orange-500/70 transition-all" style={{ width: `${emmenPct}%` }} />
+              <div className="h-full bg-blue-500/70 transition-all" style={{ width: `${tilburgPct}%` }} />
+            </div>
+            <span className="shrink-0 flex items-center gap-3">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-orange-500/80 shrink-0" />
+                Emmen {formatNumber(locationSplit.emmen, 0)} ({emmenPct}%)
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-blue-500/80 shrink-0" />
+                Tilburg {formatNumber(locationSplit.tilburg, 0)} ({tilburgPct}%)
+              </span>
+            </span>
+          </div>
+        );
+      })()}
+
       {/* Detailed Tabs & Dashboard — sidebar layout */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex flex-col md:flex-row gap-4 items-start">
@@ -758,18 +879,52 @@ export function ProductionReports({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Main Chart - Spans 2 cols */}
             <Card className="lg:col-span-2 shadow-sm" id="production-chart">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-base font-medium">Productie per dag</CardTitle>
-                <ToggleGroup type="single" value={productionChartView} onValueChange={(v) => v && setProductionChartView(v as any)} size="sm">
-                  <ToggleGroupItem value="both" size="sm" className="h-7 text-xs">Beide</ToggleGroupItem>
-                  <ToggleGroupItem value="cylinders" size="sm" className="h-7 text-xs">Cilinders</ToggleGroupItem>
-                  {showDryIce && <ToggleGroupItem value="dryIce" size="sm" className="h-7 text-xs">Droogijs</ToggleGroupItem>}
-                </ToggleGroup>
+              <CardHeader className="pb-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-base font-medium">Productie per dag</CardTitle>
+                    {isYtdMode && (
+                      <Badge variant="outline" className="text-[10px] h-5 text-primary border-primary/40">YTD</Badge>
+                    )}
+                    {cumulativeChart && (
+                      <Badge variant="outline" className="text-[10px] h-5 text-amber-600 border-amber-400/40">Cumulatief</Badge>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Button
+                      variant={showPrevYear ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 text-xs gap-1"
+                      onClick={() => setShowPrevYear(!showPrevYear)}
+                    >
+                      <TrendingUp className="h-3 w-3" />
+                      Vorig jaar
+                    </Button>
+                    <Button
+                      variant={cumulativeChart ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 text-xs gap-1"
+                      onClick={() => setCumulativeChart(!cumulativeChart)}
+                    >
+                      <TrendingUp className="h-3 w-3" />
+                      Cumulatief
+                    </Button>
+                    {showDryIce && hasDryIceData ? (
+                      <ToggleGroup type="single" value={productionChartView} onValueChange={(v) => v && setProductionChartView(v as any)} size="sm">
+                        <ToggleGroupItem value="both" size="sm" className="h-7 text-xs">Beide</ToggleGroupItem>
+                        <ToggleGroupItem value="cylinders" size="sm" className="h-7 text-xs">Cilinders</ToggleGroupItem>
+                        <ToggleGroupItem value="dryIce" size="sm" className="h-7 text-xs">Droogijs</ToggleGroupItem>
+                      </ToggleGroup>
+                    ) : (
+                      <span className="text-xs text-muted-foreground px-2 h-7 flex items-center">Cilinders</span>
+                    )}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 {ordersPerDay.length > 0 ? (
                   <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={ordersPerDay}>
+                    <ComposedChart data={chartData}>
                       <defs>
                         <linearGradient id="gradientCylinders" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#f97316" stopOpacity={0.3} />
@@ -779,23 +934,54 @@ export function ProductionReports({
                           <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.3} />
                           <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.02} />
                         </linearGradient>
+                        <linearGradient id="gradientPrevYear" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.25} />
+                          <stop offset="100%" stopColor="#94a3b8" stopOpacity={0.02} />
+                        </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                       <XAxis dataKey="displayDate" className="text-xs" tickLine={false} axisLine={false} />
-                      <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} tickLine={false} axisLine={false} />
+                      <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} tickLine={false} axisLine={false} domain={[(dataMin: number) => Math.max(0, Math.floor(dataMin * 0.85)), 'auto']} />
+                      {/* Weekend shading */}
+                      {chartData.map((item, idx) => {
+                        const d = new Date(item.date);
+                        const day = d.getDay();
+                        if (day === 0 || day === 6) {
+                          return (
+                            <ReferenceArea
+                              key={`weekend-${idx}`}
+                              x1={item.displayDate}
+                              x2={item.displayDate}
+                              fill="hsl(var(--muted))"
+                              fillOpacity={0.5}
+                              stroke="none"
+                            />
+                          );
+                        }
+                        return null;
+                      })}
                       <Tooltip
                         contentStyle={{ borderRadius: "10px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", backgroundColor: "hsl(var(--background))", padding: "10px 14px", fontSize: "13px" }}
                         labelStyle={{ fontWeight: 600, marginBottom: 4, color: "hsl(var(--foreground))" }}
                         itemStyle={{ padding: "2px 0" }}
                       />
                       <Legend />
+                      {/* Prev year ghost area */}
+                      {showPrevYear && (productionChartView === "both" || productionChartView === "cylinders") && (
+                        <Area type="monotone" dataKey="prevCylinders" name={`Vorig jaar cilinders`} stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 2" fill="url(#gradientPrevYear)" dot={false} activeDot={{ r: 3 }} />
+                      )}
+                      {/* Current year areas */}
                       {(productionChartView === "both" || productionChartView === "cylinders") && (
                         <Area type="monotone" dataKey="cylinders" name="Cilinders" stroke="#f97316" strokeWidth={2} fill="url(#gradientCylinders)" dot={false} activeDot={{ r: 4, strokeWidth: 2 }} />
                       )}
                       {(productionChartView === "both" || productionChartView === "dryIce") && hasDryIceData && (
                         <Area type="monotone" dataKey="dryIce" name="Droogijs" stroke="#06b6d4" strokeWidth={2} fill="url(#gradientDryIce)" dot={false} activeDot={{ r: 4, strokeWidth: 2 }} />
                       )}
-                    </AreaChart>
+                      {/* Target ramp line (cumulative mode only) */}
+                      {cumulativeChart && chartData.some(d => d.targetRamp !== undefined) && (
+                        <Area type="linear" dataKey="targetRamp" name="Doelstelling" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="5 3" fill="none" dot={false} activeDot={false} legendType="plainline" />
+                      )}
+                    </ComposedChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
@@ -848,10 +1034,14 @@ export function ProductionReports({
                   {(distributionView === "type" ? gasTypeDistribution : gasCategoryDistribution).length > MAX_DISTRIBUTION_ITEMS && (
                     <button
                       onClick={() => setShowAllDistribution(!showAllDistribution)}
-                      className="text-xs text-primary hover:underline w-full text-center pt-2"
+                      className="flex items-center gap-1 mx-auto mt-2 text-xs text-primary hover:text-primary/80 font-medium border border-primary/30 rounded-md px-3 py-1.5 hover:bg-primary/5 transition-colors"
                       type="button"
                     >
-                      {showAllDistribution ? "Toon minder" : `Toon alle ${(distributionView === "type" ? gasTypeDistribution : gasCategoryDistribution).length} types`}
+                      {showAllDistribution ? (
+                        <><ChevronUp className="h-3 w-3" />Toon minder</>
+                      ) : (
+                        <><ChevronDown className="h-3 w-3" />Toon alle {(distributionView === "type" ? gasTypeDistribution : gasCategoryDistribution).length} types</>
+                      )}
                     </button>
                   )}
                   </>

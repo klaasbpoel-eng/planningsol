@@ -174,8 +174,9 @@ export function ProductionPlanning({
   }, []);
 
   const calculateTrend = (current: number, previous: number): number => {
-    if (previous === 0) return current > 0 ? 100 : 0;
-    return Math.round(((current - previous) / previous) * 100);
+    if (previous === 0) return current > 0 ? 999 : 0;
+    const pct = Math.round(((current - previous) / previous) * 100);
+    return Math.max(-999, Math.min(999, pct));
   };
 
   const handleDateRangeChange = useCallback((newRange: DateRange) => {
@@ -288,7 +289,7 @@ export function ProductionPlanning({
     <div className="space-y-6">
       {/* KPI Dashboard - only for non-operators */}
       {showKPIDashboard && (
-        <KPIDashboard location={selectedLocation} refreshKey={refreshKey} dateRange={dateRange} hideDigital={hideDigital} onHideDigitalChange={setHideDigital} />
+        <KPIDashboard location={selectedLocation} refreshKey={refreshKey} dateRange={dateRange} hideDigital={hideDigital} onHideDigitalChange={setHideDigital} onNavigateToReports={() => setActiveTab("rapportage")} />
       )}
 
       {/* Location Filter */}
