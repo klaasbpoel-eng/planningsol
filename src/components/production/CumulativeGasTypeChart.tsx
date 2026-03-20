@@ -17,6 +17,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ReferenceLine,
 } from "recharts";
 
 interface GasTypeData {
@@ -555,6 +556,16 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
                   return `${info?.name || gasTypeId} (${year})`;
                 }}
               />
+              {/* YTD marker: vertical line at current month when either selected year is the current year */}
+              {(selectedYear1 === new Date().getFullYear() || selectedYear2 === new Date().getFullYear()) && (
+                <ReferenceLine
+                  x={MONTH_NAMES[new Date().getMonth()]}
+                  stroke="hsl(var(--foreground))"
+                  strokeDasharray="4 4"
+                  strokeOpacity={0.4}
+                  label={{ value: "Nu", position: "top", fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                />
+              )}
               {selectedGasTypes.flatMap(gasTypeId => {
                 const info = getGasTypeInfo(gasTypeId);
                 return [

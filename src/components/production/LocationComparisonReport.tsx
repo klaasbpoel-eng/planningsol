@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Building2, TrendingUp, TrendingDown, Minus, Cylinder, Sparkles } from "lucide-react";
+import { Loader2, Building2, TrendingUp, TrendingDown, Minus, Cylinder, Sparkles, Calendar } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +55,10 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
   const hideDigital = externalHideDigital ?? false;
   const setHideDigital = (val: boolean) => onHideDigitalChange?.(val);
   const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const currentYear = new Date().getFullYear();
+  const todayMonth = new Date().getMonth() + 1;
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [ytdMode, setYtdMode] = useState<boolean>(true);
   const [monthlyData, setMonthlyData] = useState<MonthlyLocationData[]>([]);
   const [gasTypeData, setGasTypeData] = useState<GasTypeLocationData[]>([]);
   const [emmenTotal, setEmmenTotal] = useState(0);
@@ -64,11 +67,15 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
   const [digitalGasTypeIds, setDigitalGasTypeIds] = useState<Set<string>>(new Set());
 
   const availableYears = useMemo(() => {
-    const currentYear = new Date().getFullYear();
     const years: number[] = [];
     for (let y = currentYear + 1; y >= 2024; y--) years.push(y);
     return years;
   }, []);
+
+  // Auto-enable YTD when switching to current year
+  useEffect(() => {
+    setYtdMode(selectedYear === currentYear);
+  }, [selectedYear]);
 
   useEffect(() => {
     fetchData();
@@ -195,14 +202,14 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
 
   // Filtered totals (recalculate when hiding digital)
   const filteredEmmenTotal = useMemo(() => {
-    if (!hideDigital) return emmenTotal;
+    if (!hideDigital) return displayEmmenTotal;
     return filteredGasTypeData.reduce((s, gt) => s + gt.emmen, 0);
-  }, [hideDigital, emmenTotal, filteredGasTypeData]);
+  }, [hideDigital, displayEmmenTotal, filteredGasTypeData]);
 
   const filteredTilburgTotal = useMemo(() => {
-    if (!hideDigital) return tilburgTotal;
+    if (!hideDigital) return displayTilburgTotal;
     return filteredGasTypeData.reduce((s, gt) => s + gt.tilburg, 0);
-  }, [hideDigital, tilburgTotal, filteredGasTypeData]);
+  }, [hideDigital, displayTilburgTotal, filteredGasTypeData]);
 
   const grandTotal = filteredEmmenTotal + filteredTilburgTotal;
   const emmenPercent = grandTotal > 0 ? Math.round((filteredEmmenTotal / grandTotal) * 100) : 0;
@@ -219,14 +226,23 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
     };
   }, [gasTypeData]);
 
+  // YTD-filtered monthly data: only months up to today when ytdMode is active
+  const displayMonthlyData = useMemo(() => {
+    if (!ytdMode) return monthlyData;
+    return monthlyData.filter(m => m.month <= todayMonth);
+  }, [monthlyData, ytdMode, todayMonth]);
+
+  const displayEmmenTotal = useMemo(() => displayMonthlyData.reduce((s, m) => s + m.emmen, 0), [displayMonthlyData]);
+  const displayTilburgTotal = useMemo(() => displayMonthlyData.reduce((s, m) => s + m.tilburg, 0), [displayMonthlyData]);
+
   const cumulativeData = useMemo(() => {
     let cumE = 0, cumT = 0;
-    return monthlyData.map(m => {
+    return displayMonthlyData.map(m => {
       cumE += m.emmen;
       cumT += m.tilburg;
       return { monthName: m.monthName, cumEmmen: cumE, cumTilburg: cumT, cumTotal: cumE + cumT };
     });
-  }, [monthlyData]);
+  }, [displayMonthlyData]);
 
   if (loading) {
     return (
@@ -249,7 +265,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
             Vergelijk cilindervullingen tussen SOL Emmen en SOL Tilburg
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm text-muted-foreground">Jaar:</span>
           <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
             <SelectTrigger className="w-[100px] h-8">
@@ -261,6 +277,15 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
               ))}
             </SelectContent>
           </Select>
+          <Button
+            variant={ytdMode ? "default" : "outline"}
+            size="sm"
+            className="h-8 text-xs gap-1"
+            onClick={() => setYtdMode(!ytdMode)}
+          >
+            <Calendar className="h-3 w-3" />
+            YTD
+          </Button>
           {hasDigitalTypes && (
             <Button
               variant={hideDigital ? "default" : "outline"}
@@ -377,11 +402,11 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
       <Card className="shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">Cilinders per maand</CardTitle>
-          <CardDescription>Maandelijkse vergelijking {selectedYear}</CardDescription>
+          <CardDescription>{ytdMode ? `YTD t/m ${MONTH_NAMES[todayMonth - 1]} ${selectedYear}` : `Maandelijkse vergelijking ${selectedYear}`}</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={monthlyData} margin={{ left: 10, right: 10 }}>
+            <BarChart data={displayMonthlyData} margin={{ left: 10, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
               <XAxis dataKey="monthName" className="text-xs" tickLine={false} axisLine={false} />
               <YAxis className="text-xs" tickFormatter={(v) => formatNumber(v, 0)} tickLine={false} axisLine={false} />
@@ -413,8 +438,8 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Locatie</th>
-                  {MONTH_NAMES.map(m => (
-                    <th key={m} className="text-right py-2 px-1 font-medium text-muted-foreground">{m}</th>
+                  {displayMonthlyData.map(m => (
+                    <th key={m.month} className="text-right py-2 px-1 font-medium text-muted-foreground">{m.monthName}</th>
                   ))}
                   <th className="text-right py-2 pl-3 font-semibold">Totaal</th>
                 </tr>
@@ -425,28 +450,28 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                     <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
                     Emmen
                   </td>
-                  {monthlyData.map(m => (
+                  {displayMonthlyData.map(m => (
                     <td key={m.month} className="text-right py-2 px-1 tabular-nums">
                       {formatNumber(m.emmen, 0)}
                     </td>
                   ))}
-                  <td className="text-right py-2 pl-3 font-semibold tabular-nums">{formatNumber(emmenTotal, 0)}</td>
+                  <td className="text-right py-2 pl-3 font-semibold tabular-nums">{formatNumber(displayEmmenTotal, 0)}</td>
                 </tr>
                 <tr className="border-b">
                   <td className="py-2 pr-4 font-medium flex items-center gap-1.5">
                     <div className="h-2.5 w-2.5 rounded-full bg-sky-400" />
                     Tilburg
                   </td>
-                  {monthlyData.map(m => (
+                  {displayMonthlyData.map(m => (
                     <td key={m.month} className="text-right py-2 px-1 tabular-nums">
                       {formatNumber(m.tilburg, 0)}
                     </td>
                   ))}
-                  <td className="text-right py-2 pl-3 font-semibold tabular-nums">{formatNumber(tilburgTotal, 0)}</td>
+                  <td className="text-right py-2 pl-3 font-semibold tabular-nums">{formatNumber(displayTilburgTotal, 0)}</td>
                 </tr>
                 <tr>
                   <td className="py-2 pr-4 font-semibold">Totaal</td>
-                  {monthlyData.map(m => (
+                  {displayMonthlyData.map(m => (
                     <td key={m.month} className="text-right py-2 px-1 font-semibold tabular-nums">
                       {formatNumber(m.total, 0)}
                     </td>
@@ -463,7 +488,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
       <Card className="shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">Cumulatief verloop</CardTitle>
-          <CardDescription>Lopend totaal cilinders per locatie — {selectedYear}</CardDescription>
+          <CardDescription>{ytdMode ? `YTD t/m ${MONTH_NAMES[todayMonth - 1]} ${selectedYear}` : `Lopend totaal cilinders per locatie — ${selectedYear}`}</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={350}>

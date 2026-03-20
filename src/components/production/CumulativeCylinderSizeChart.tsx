@@ -15,6 +15,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceLine,
 } from "recharts";
 
 interface CylinderSizeData {
@@ -584,6 +585,16 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
                   return [formatNumber(value, 0), `${sizeName} (${year})`];
                 }}
               />
+              {/* YTD marker: vertical line at current month when either selected year is the current year */}
+              {(selectedYear1 === new Date().getFullYear() || selectedYear2 === new Date().getFullYear()) && (
+                <ReferenceLine
+                  x={MONTH_NAMES[new Date().getMonth()]}
+                  stroke="hsl(var(--foreground))"
+                  strokeDasharray="4 4"
+                  strokeOpacity={0.4}
+                  label={{ value: "Nu", position: "top", fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                />
+              )}
               {selectedSizes.map(sizeName => {
                 const color = cylinderSizeColors.get(sizeName) || "#94a3b8";
                 return [
