@@ -741,10 +741,21 @@ export function DailyOverview() {
     return texts.some(t => t && t.toLowerCase().includes(q));
   }, [debouncedSearch]);
 
-  const filteredTasks = useMemo(() => tasks.filter(t =>
-    matchesStatus(t.status) &&
-    matchesAny([t.task_types?.name, t.title, t.notes, t.assignee_name])
-  ), [tasks, matchesAny, matchesStatus]);
+  const filteredTasks = useMemo(() => {
+    const filtered = tasks.filter(t =>
+      matchesStatus(t.status) &&
+      matchesAny([t.task_types?.name, t.title, t.notes, t.assignee_name])
+    );
+    // Sort: items mét start_time eerst (oplopend), dan items zonder tijd
+    return filtered.slice().sort((a, b) => {
+      const at = a.start_time;
+      const bt = b.start_time;
+      if (at && bt) return at.localeCompare(bt);
+      if (at && !bt) return -1;
+      if (!at && bt) return 1;
+      return 0;
+    });
+  }, [tasks, matchesAny, matchesStatus]);
 
   const filteredDryIce = useMemo(() => dryIceOrders.filter(o =>
     matchesStatus(o.status) && matchesAny([o.customer_name, o.notes, o.dry_ice_packaging?.name])
@@ -1474,8 +1485,21 @@ export function DailyOverview() {
                           onToggle={() => toggleSection("tasks")}
                           onAdd={isAdmin ? () => setCreateTaskOpen(true) : undefined}
                         >
-                          {dayTasks.map((t) => (
-                            <ContextMenu key={t.id}>
+                          {dayTasks.map((t, idx) => {
+                            // Toon tijd-as scheidslijn vóór de eerste taak zonder start_time
+                            const showNoTimeDivider =
+                              !t.start_time &&
+                              idx > 0 &&
+                              !!dayTasks[idx - 1]?.start_time;
+                            return (
+                            <div key={t.id}>
+                            {showNoTimeDivider && (
+                              <div className="flex items-center gap-2 pt-1 mt-1 mb-1 border-t border-current/10 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                                <Clock className="h-3 w-3" />
+                                <span>Geen tijd</span>
+                              </div>
+                            )}
+                            <ContextMenu>
                               <ContextMenuTrigger asChild>
                                 <div
                                   className={`flex items-center gap-2 text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${
@@ -1504,7 +1528,9 @@ export function DailyOverview() {
                                 {renderStatusMenu(t.status, (s) => handleQuickStatus("tasks", t.id, s, setTasks))}
                               </ContextMenuContent>
                             </ContextMenu>
-                          ))}
+                            </div>
+                            );
+                          })}
                         </Section>
                       )}
 
@@ -1803,6 +1829,10 @@ function StatusBadge({ status, onStatusChange, isMobile, onStatusSelect }: {
       variant={variant}
       className={`ml-auto text-[10px] shrink-0 ${onStatusChange ? "cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all" : ""} ${isMobile ? "px-2.5 py-1 min-h-[28px] text-[11px]" : ""}`}
       onClick={!isMobile && onStatusChange ? (e: React.MouseEvent) => { e.stopPropagation(); onStatusChange(); } : undefined}
+      role={onStatusChange ? "button" : undefined}
+      tabIndex={onStatusChange ? 0 : undefined}
+      aria-label={`Status: ${statusLabels[status] || status}${onStatusChange ? " — klik om te wijzigen" : ""}`}
+      title={statusLabels[status] || status}
     >
       {statusLabels[status] || status}
     </Badge>
