@@ -1485,23 +1485,21 @@ export function DailyOverview() {
                           onToggle={() => toggleSection("tasks")}
                           onAdd={isAdmin ? () => setCreateTaskOpen(true) : undefined}
                         >
-                          {dayTasks.map((t) => (
-                            (() => {
+                          {dayTasks.map((t, idx) => {
                             // Toon tijd-as scheidslijn vóór de eerste taak zonder start_time
-                            const idx = dayTasks.indexOf(t);
                             const showNoTimeDivider =
                               !t.start_time &&
                               idx > 0 &&
                               !!dayTasks[idx - 1]?.start_time;
                             return (
-                            <>
+                            <div key={t.id}>
                             {showNoTimeDivider && (
-                              <div className="flex items-center gap-2 pt-1 mt-1 border-t border-current/10 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                              <div className="flex items-center gap-2 pt-1 mt-1 mb-1 border-t border-current/10 text-[10px] uppercase tracking-wide text-muted-foreground/70">
                                 <Clock className="h-3 w-3" />
                                 <span>Geen tijd</span>
                               </div>
                             )}
-                            <ContextMenu key={t.id}>
+                            <ContextMenu>
                               <ContextMenuTrigger asChild>
                                 <div
                                   className={`flex items-center gap-2 text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${
@@ -1530,10 +1528,9 @@ export function DailyOverview() {
                                 {renderStatusMenu(t.status, (s) => handleQuickStatus("tasks", t.id, s, setTasks))}
                               </ContextMenuContent>
                             </ContextMenu>
-                            </>
+                            </div>
                             );
-                            })()
-                          ))}
+                          })}
                         </Section>
                       )}
 
