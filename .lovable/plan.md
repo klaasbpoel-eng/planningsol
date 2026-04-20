@@ -1,134 +1,71 @@
 
-# Backend Verbeterplan
 
-Na een volledige doorlichting van de database, RLS policies, edge functions en security scan.
+# UI/UX Aanbevelingen — Dagelijks Overzicht
 
----
+Op basis van de huidige schermafbeelding en de structuur van `DailyOverview.tsx` (1813 regels, 5 kolommen, dichte informatieweergave) heb ik een aantal observaties en concrete verbeteringen geïdentificeerd. Hieronder de prioriteitsvolgorde.
 
-## 🔴 KRITIEK — Security
+## Hoofdobservaties
 
-### 1. Privilege escalation via profiel-update
+1. **Visuele hiërarchie is plat** — de 5 kolommen (Ambulance/Droogijs/Taken/Afwezig/Gas) hebben allemaal dezelfde gewichtsverdeling, ongeacht hoeveel content erin staat. De Ambulance-kolom puilt uit met klantcodes terwijl Afwezig leeg is.
+2. **Statusbar bovenin is cryptisch** — `0/3 afgerond`, drie losse badges (1, 120 kg, 1) zonder labels. Vereist mentale parsing.
+3. **Filter-row neemt veel ruimte** — zoekveld + Alles/Open/Afgerond pillen + info-banner = 3 regels boven de eigenlijke data.
+4. **Klantenlijst in Ambulance-kaart** is een ruwe dump (10+ codes onder elkaar) zonder groepering of telling.
+5. **Geen visueel onderscheid tussen "vandaag heeft werk" en "rustig"** — lege kolommen ogen even prominent als volle.
+6. **Acties verstopt** — `+` knoppen per kolom zijn klein; geen quick-add vanuit toetsenbord zichtbaar (wel `⌘K` in header maar niet in context).
+7. **Geen tijd-as** — items worden opgesomd zonder volgorde naar uur, terwijl een dagoverzicht juist tijdgebaseerd is.
 
-**Probleem:** Gebruikers kunnen hun eigen `production_location` op NULL zetten via de "Users can update own profile" policy. Hierdoor activeert de fallback `OR (get_user_production_location(auth.uid()) IS NULL)` in de RLS policies van `dry_ice_orders`, `gas_cylinder_orders`, `internal_orders`, `pgs_substances` en `bulk_storage_tanks`, waardoor ze data van ALLE locaties kunnen inzien.
+## Voorgestelde verbeteringen (geprioriteerd)
 
-**Oplossing:** Maak een restrictieve update-policy op profiles die gevoelige kolommen (`production_location`, `is_approved`, `approved_by`, `approved_at`) uitsluit voor gewone gebruikers. Alleen admins mogen deze velden wijzigen.
+### Prio 1 — Duidelijkere koptekst & samenvatting
+- Vervang `0/3 afgerond` + losse badges door één **samenvattingsstrook**:
+  `Vandaag · 3 items · 1 ambulancerit · 120 kg droogijs · 1 taak · iedereen aanwezig`
+- Maak de progress-bar dikker (h-2) en geef een label: "Voortgang van de dag".
+- Verplaats `Print / Compact / Fullscreen / Toetsenbord / Mark-all-done` naar een **overflow-menu** (drie puntjes); houd alleen Dag/Week + datum-navigatie zichtbaar.
 
-**SQL:**
-```sql
--- Drop de bestaande te brede policy
-DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+### Prio 2 — Tijd-as in dagweergave
+- Sorteer items binnen elke kolom op `start_time` en toon de tijd als prefix (bv. `08:30 — Sanquin Groningen`).
+- Items zonder tijd onderaan onder een aparte sectie "Geen tijd".
+- Optioneel: smalle linker tijdkolom (06–18 uur) waarlangs items horizontaal uitlijnen — alleen in dag-view.
 
--- Gebruikers mogen alleen niet-gevoelige velden wijzigen
-CREATE POLICY "Users can update own profile safe fields"
-ON public.profiles FOR UPDATE
-TO authenticated
-USING (user_id = auth.uid())
-WITH CHECK (
-  user_id = auth.uid()
-  AND production_location IS NOT DISTINCT FROM (SELECT p.production_location FROM public.profiles p WHERE p.user_id = auth.uid())
-  AND is_approved IS NOT DISTINCT FROM (SELECT p.is_approved FROM public.profiles p WHERE p.user_id = auth.uid())
-  AND approved_by IS NOT DISTINCT FROM (SELECT p.approved_by FROM public.profiles p WHERE p.user_id = auth.uid())
-  AND approved_at IS NOT DISTINCT FROM (SELECT p.approved_at FROM public.profiles p WHERE p.user_id = auth.uid())
-);
+### Prio 3 — Compactere & rustigere kolomkaarten
+- Gebruik **collapsible sections** binnen de Ambulance-kaart: Cilinders / Klanten (met telling: "Klanten · 11"). Standaard alleen titel+telling, klikken toont detail.
+- Geef lege kolommen een afgezwakte stijl (border-dashed, lichtere text, kleine illustratie) zodat ze visueel terugtreden.
+- Maak kolombreedtes **flexibel** (CSS grid met `minmax`) zodat een kolom met veel content meer ruimte krijgt en lege kolommen smaller worden.
+
+### Prio 4 — Duidelijker statusgedrag
+- Vervang de "Nieuw"-badge door een subtiele linker accent-bar (2px) op de kaart — minder visueel lawaai.
+- Status-badges (Gepland/Bezig/Voltooid) krijgen een vast icoon (klok/play/check) zodat ze ook zonder kleur leesbaar zijn.
+- Voltooide items collapsen automatisch in een "Afgerond (n)" sectie onderaan elke kolom.
+
+### Prio 5 — Filter & zoek minder dominant
+- Maak het zoekveld smaller (max-w-sm) en plaats de Alles/Open/Afgerond als segmented-control rechts ernaast op één regel.
+- Verberg de info-banner ("Er staan nog 11 items…") na 5 seconden of plaats hem als subtiele tekst onder de datumnavigatie.
+
+### Prio 6 — Quick actions & toetsenbord
+- Toon onder de kolomtitel een hint bij hover: "N = nieuw, K = doorzoeken".
+- Voeg per kolom een **inline quick-add** toe (één regel input die verschijnt na klik op `+`) i.p.v. direct een dialog te openen voor simpele taken.
+- FAB rechtsonder voor "Nieuw item" met menu naar alle 5 types (mobile-first).
+
+### Prio 7 — Mobiele weergave
+- Op mobiel: 5 kolommen → 1 verticale stapel met **horizontale chip-tabs** bovenaan (Alle · Ambulance · Droogijs · …).
+- Swipe-gestures voor dag-navigatie.
+
+## Niet-functionele aanbevelingen
+
+- **Refactor**: `DailyOverview.tsx` is 1813 regels — splits in `<DayHeader>`, `<DaySummaryBar>`, `<ColumnCard>`, `<AmbulanceColumn>`, `<DryIceColumn>`, etc. Maakt toekomstige iteraties veel sneller.
+- **Toegankelijkheid**: voeg `aria-label` toe aan kleur-afhankelijke statusbadges; controleer contrast van de "Nieuw"-badge op witte achtergrond.
+- **Performance**: memoiseer de zware kolomberekeningen per dag (lijkt nu bij elke render herberekend).
+
+## Volgorde van uitvoering (voorstel)
+
+```text
+Stap 1: Header + samenvattingsstrook opschonen          (klein, hoge impact)
+Stap 2: Kolomkaarten — collapsible secties + lege staat (medium)
+Stap 3: Tijd-as / sortering op start_time               (medium)
+Stap 4: Refactor in subcomponenten                      (groot, geen UX-impact)
+Stap 5: Mobiele tab-layout + FAB                        (medium)
+Stap 6: Quick-add inline + statusgedrag verfijnen       (klein-medium)
 ```
 
----
+Geef aan welke stappen je wilt uitvoeren — ik kan ze los of gecombineerd implementeren. Stap 1 + 2 samen geven al een merkbare rust en duidelijkheid op het scherm.
 
-### 2. Te brede read-access op toolbox, customer_locations en customer_products
-
-**Probleem:** Meerdere tabellen hebben `USING (true)` policies die alle data blootstellen aan iedere ingelogde gebruiker.
-
-**Oplossing:**
-- `toolbox_session_participants`: Beperk tot eigen deelname + admins/supervisors
-- `toolbox_sessions`: Beperk tot admins/supervisors/instructeurs
-- `customer_locations`: Beperk tot admins/supervisors/operators
-- `customer_products`: Verwijder de brede policy, vertrouw op bestaande scoped policies
-
----
-
-## 🟠 EDGE FUNCTIONS — Verbeteringen
-
-### 3. CORS hardcoded op productie-domein
-
-**Probleem:** Alle edge functions hebben `Access-Control-Allow-Origin` hardcoded op `https://planning.solnederland.nl`. Dit blokkeert requests vanuit de Lovable preview (`*.lovable.app`) en lokale dev.
-
-**Oplossing:** CORS origin dynamisch maken op basis van de request origin, met een whitelist.
-
-```typescript
-const ALLOWED_ORIGINS = [
-  "https://planning.solnederland.nl",
-  "https://planningsol.lovable.app",
-];
-
-function getCorsHeaders(req: Request) {
-  const origin = req.headers.get("Origin") || "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, ...",
-  };
-}
-```
-
-### 4. `complete-past-dry-ice-orders` — Geen authenticatie
-
-**Probleem:** Deze functie (`verify_jwt = false`) heeft GEEN auth-check in de code. Iedereen kan het endpoint aanroepen. Hoewel het alleen een monitoring-query uitvoert (geen writes), is het een informatielek.
-
-**Oplossing:** Voeg een admin-check toe of een gedeelde secret-key verificatie.
-
-### 5. `fetch-published-site` — SSRF-risico
-
-**Probleem:** Deze functie accepteert een willekeurige URL en fetcht de content. Dit is een Server-Side Request Forgery (SSRF) kwetsbaarheid — een aanvaller kan interne services benaderen.
-
-**Oplossing:** Valideer de URL tegen een whitelist van toegestane domeinen (bijv. alleen `planning.solnederland.nl`).
-
-### 6. `query-mysql` — SQL via request body
-
-**Probleem:** De functie accepteert een volledige SQL-query + databasecredentials via de request body. Hoewel er auth vereist is, kan iedere ingelogde gebruiker willekeurige queries uitvoeren op de externe MySQL database.
-
-**Oplossing:** Beperk tot admin-only of gebruik een voorgedefinieerde set queries.
-
-### 7. CORS headers inconsistent
-
-**Probleem:** Sommige functions gebruiken de korte CORS headers (`authorization, x-client-info, apikey, content-type`), andere de lange versie met `x-supabase-client-*`. Dit kan leiden tot CORS-fouten op bepaalde browsers.
-
-**Oplossing:** Standaardiseer alle functions naar de volledige CORS headers.
-
----
-
-## 🟡 DATABASE — Optimalisaties
-
-### 8. Ontbrekende verify_jwt configuratie
-
-**Probleem:** Niet alle edge functions hebben `verify_jwt` in `config.toml` gedefinieerd: `export-cylinder-orders`, `fetch-published-site`, `query-mysql`, `reset-dry-ice-orders`, `reset-gas-cylinder-orders`. Standaard is `verify_jwt = true`, maar het is beter dit expliciet te maken.
-
-### 9. Dubbele RPC-functies
-
-**Probleem:** Er zijn meerdere overloaded versies van dezelfde functies:
-- `get_customer_segments` (3 versies)
-- `get_production_efficiency` (3 versies)
-- `get_production_efficiency_by_period` (2 versies)
-- `get_monthly_order_totals` (2 versies)
-- `get_daily_production_totals` (2 versies)
-- `get_daily_production_by_period` (2 versies)
-- Etc.
-
-Dit komt door herhaalde migraties die nieuwe parameters toevoegen zonder de oude versie op te ruimen.
-
-**Oplossing:** Opruimen van oude functie-versies via een migratie.
-
----
-
-## Prioriteitsoverzicht
-
-| # | Onderdeel | Risico | Complexiteit |
-|---|-----------|--------|-------------|
-| 1 | Profile privilege escalation | 🔴 Kritiek | Middel |
-| 2 | Te brede RLS read policies | 🟠 Hoog | Laag |
-| 3 | CORS dynamisch maken | 🟡 Medium | Laag |
-| 4 | complete-past-dry-ice auth | 🟠 Hoog | Laag |
-| 5 | fetch-published-site SSRF | 🟠 Hoog | Laag |
-| 6 | query-mysql admin-only | 🟠 Hoog | Laag |
-| 7 | CORS headers standaardiseren | 🟡 Laag | Laag |
-| 8 | verify_jwt expliciet maken | 🟡 Laag | Laag |
-| 9 | Dubbele RPC functies opruimen | 🟡 Laag | Middel |
