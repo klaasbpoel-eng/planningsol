@@ -15,6 +15,7 @@ interface GasTypeDistributionData {
   gas_type_color: string;
   total_cylinders: number;
   is_digital?: boolean;
+  is_external?: boolean;
 }
 
 interface GasCategoryDistributionData {
@@ -70,6 +71,7 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
+  EyeOff,
 } from "lucide-react";
 import { ChartSkeleton, StatCardSkeleton } from "@/components/ui/skeletons";
 import { StatCard } from "@/components/ui/stat-card";
@@ -92,7 +94,7 @@ const ChartLoadingFallback = () => (
 );
 import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, differenceInDays, subDays, startOfYear, endOfYear, subYears, isSameDay, isSameMonth, isSameYear } from "date-fns";
 import { nl } from "date-fns/locale";
-import { cn, formatNumber } from "@/lib/utils";
+import { cn, formatNumber, normalizeDatum } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ReportExportButtons } from "./ReportExportButtons";
@@ -151,6 +153,8 @@ interface ProductionReportsProps {
   onDateRangeChange?: (range: DateRange) => void;
   hideDigital?: boolean;
   onHideDigitalChange?: (value: boolean) => void;
+  hideExternal?: boolean;
+  onHideExternalChange?: (value: boolean) => void;
 }
 
 import { getGasColor } from "@/constants/gasColors";
@@ -162,7 +166,9 @@ export function ProductionReports({
   dateRange: externalDateRange,
   onDateRangeChange,
   hideDigital: externalHideDigital,
-  onHideDigitalChange
+  onHideDigitalChange,
+  hideExternal: externalHideExternal,
+  onHideExternalChange
 }: ProductionReportsProps) {
   const [loading, setLoading] = useState(true);
 
@@ -172,7 +178,10 @@ export function ProductionReports({
   const [gasCategoryDistributionData, setGasCategoryDistributionData] = useState<GasCategoryDistributionData[]>([]);
   const hideDigital = externalHideDigital ?? false;
   const setHideDigital = (val: boolean) => onHideDigitalChange?.(val);
+  const hideExternal = externalHideExternal ?? false;
+  const setHideExternal = (val: boolean) => onHideExternalChange?.(val);
   const [hasDigitalTypes, setHasDigitalTypes] = useState(false);
+  const [hasExternalTypes, setHasExternalTypes] = useState(false);
   const [cylinderEfficiency, setCylinderEfficiency] = useState<EfficiencyData | null>(null);
   const [dryIceEfficiency, setDryIceEfficiency] = useState<DryIceEfficiencyData | null>(null);
   const [prevCylinderEfficiency, setPrevCylinderEfficiency] = useState<EfficiencyData | null>(null);
@@ -197,6 +206,7 @@ export function ProductionReports({
   const [cylinderOrders, setCylinderOrders] = useState<GasCylinderOrder[]>([]);
   const [dryIceOrders, setDryIceOrders] = useState<DryIceOrder[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
+  const [productieView, setProductieView] = useState<"monthly" | "yearly">("monthly");
   const [productionChartView, setProductionChartView] = useState<"both" | "cylinders" | "dryIce">("both");
   const [distributionView, setDistributionView] = useState<"type" | "category">("type");
 
@@ -216,7 +226,7 @@ export function ProductionReports({
 
   useEffect(() => {
     fetchReportData();
-  }, [dateRange, refreshKey, location, hideDigital]);
+  }, [dateRange, refreshKey, location, hideDigital, hideExternal]);
 
   const fetchReportData = async () => {
     setLoading(true);
@@ -238,11 +248,8 @@ export function ProductionReports({
         prevFromDate = `${prevYr}-01-01`;
         prevToDate = format(prevEnd, "yyyy-MM-dd");
       } else {
-        const periodLength = differenceInDays(dateRange.to, dateRange.from);
-        const prevTo = subDays(dateRange.from, 1);
-        const prevFrom = subDays(prevTo, periodLength);
-        prevFromDate = format(prevFrom, "yyyy-MM-dd");
-        prevToDate = format(prevTo, "yyyy-MM-dd");
+        prevFromDate = format(subYears(dateRange.from, 1), "yyyy-MM-dd");
+        prevToDate = format(subYears(dateRange.to, 1), "yyyy-MM-dd");
       }
       const locationParam = location === "all" ? null : location;
       const isTilburg = location === "sol_tilburg";
@@ -255,23 +262,30 @@ export function ProductionReports({
         const allRows: any[] = [];
         for (const year of years) {
           const PAGE = 1000;
-          let from = 0;
-          while (true) {
-            const { data } = await (supabase.from("Productie" as never) as any)
-              .select("Datum,Locatie,Product,Capaciteit,Aantal,Klant")
-              .eq("Jaar", year)
-              .range(from, from + PAGE - 1);
-            if (!data || data.length === 0) break;
-            allRows.push(...data);
-            if (data.length < PAGE) break;
-            from += PAGE;
+          // Get total row count for this year first, then load all pages in parallel
+          const { count } = await (supabase.from("Productie" as never) as any)
+            .select("*", { count: "exact", head: true })
+            .eq("Jaar", year);
+          const totalRows = count || 0;
+          if (totalRows === 0) continue;
+          const numPages = Math.ceil(totalRows / PAGE);
+          const pageResults = await Promise.all(
+            Array.from({ length: numPages }, (_, i) =>
+              (supabase.from("Productie" as never) as any)
+                .select("Datum,Locatie,Product,Capaciteit,Aantal,Klant")
+                .eq("Jaar", year)
+                .order("id")
+                .range(i * PAGE, (i + 1) * PAGE - 1)
+            )
+          );
+          for (const { data } of pageResults) {
+            if (data) allRows.push(...data);
           }
         }
         return allRows.filter((row: any) => {
           const raw: string = row.Datum || "";
           if (!raw) return false;
-          const iso = raw.includes("T") ? raw.substring(0, 10)
-            : (() => { const p = raw.split("-"); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+          const iso = normalizeDatum(raw);
           if (iso < fDate || iso > tDate) return false;
           if (locationParam) {
             const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
@@ -287,12 +301,14 @@ export function ProductionReports({
         catch { return [{ total_kg: 0, total_orders: 0, completed_orders: 0, pending_orders: 0, cancelled_orders: 0 }]; }
       };
 
-      const [currentRows, prevRows, dryIceData, prevDryIceData] = await Promise.all([
+      const [currentRows, prevRows, dryIceData, prevDryIceData, gasTypesData] = await Promise.all([
         fetchRows(fromDate, toDate),
         fetchRows(prevFromDate, prevToDate),
         getDryIce(fromDate, toDate),
         getDryIce(prevFromDate, prevToDate),
+        api.gasTypes.getAllIncludingInactive(),
       ]);
+      const gasTypeMap = new Map<string, any>(gasTypesData?.map(gt => [gt.name, gt]) || []);
 
       // Build EfficiencyData from Productie rows (no status in Productie, all = completed)
       const buildEfficiency = (rows: any[]): EfficiencyData => {
@@ -322,9 +338,7 @@ export function ProductionReports({
       // Daily production grouped by date
       const dailyMap = new Map<string, number>();
       for (const row of currentRows) {
-        const raw: string = row.Datum || "";
-        const iso = raw.includes("T") ? raw.substring(0, 10)
-          : (() => { const p = raw.split("-"); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+        const iso = normalizeDatum((row.Datum || "").toString());
         if (iso) dailyMap.set(iso, (dailyMap.get(iso) || 0) + (row.Aantal || 0));
       }
       setDailyProduction(
@@ -336,10 +350,7 @@ export function ProductionReports({
       // Prev year daily data keyed by day-offset from prevFromDate
       const prevDailyMap = new Map<string, number>();
       for (const row of prevRows) {
-        const raw: string = row.Datum || "";
-        if (!raw) continue;
-        const iso = raw.includes("T") ? raw.substring(0, 10)
-          : (() => { const p = raw.split("-"); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+        const iso = normalizeDatum((row.Datum || "").toString());
         if (iso) prevDailyMap.set(iso, (prevDailyMap.get(iso) || 0) + (row.Aantal || 0));
       }
       const prevStart = new Date(prevFromDate);
@@ -367,12 +378,29 @@ export function ProductionReports({
         const name = row.Product || "Onbekend";
         typeMap.set(name, (typeMap.get(name) || 0) + (row.Aantal || 0));
       }
+      let hasDigital = false;
+      let hasExternal = false;
       setGasTypeDistributionData(
         Array.from(typeMap.entries())
-          .map(([name, total]) => ({ gas_type_id: null, gas_type_name: name, gas_type_color: "", total_cylinders: total, is_digital: false }))
+          .map(([name, total]) => {
+            const gt = gasTypeMap.get(name);
+            const isDig = gt?.is_digital || false;
+            const isExt = gt?.is_external || false;
+            if (isDig) hasDigital = true;
+            if (isExt) hasExternal = true;
+            return {
+              gas_type_id: gt?.id || null,
+              gas_type_name: name,
+              gas_type_color: gt?.color || "",
+              total_cylinders: total,
+              is_digital: isDig,
+              is_external: isExt,
+            };
+          })
           .sort((a, b) => b.total_cylinders - a.total_cylinders)
       );
-      setHasDigitalTypes(false);
+      setHasDigitalTypes(hasDigital);
+      setHasExternalTypes(hasExternal);
 
       // Category distribution grouped by Capaciteit (cylinder size)
       const catMap = new Map<string, number>();
@@ -522,14 +550,20 @@ export function ProductionReports({
         }
       } catch {}
     }
-    let cumCyl = 0, cumPrev = 0;
+    // Build prefix sum over ALL calendar days so weekends/holidays are included in prev-year cumulative
+    const prevPrefix: number[] = [];
+    { let s = 0; for (const v of prevDailyByOffset) { s += v; prevPrefix.push(s); } }
+    let cumCyl = 0;
     return ordersPerDay.map((d, i) => {
       cumCyl += d.cylinders;
-      cumPrev += d.prevCylinders || 0;
+      // Calendar offset from period start → use ISO string to avoid local/UTC timezone mismatch
+      const periodStartIso = format(dateRange.from, "yyyy-MM-dd");
+      const calOffset = differenceInDays(new Date(d.date), new Date(periodStartIso));
+      const cumPrev = calOffset >= 0 && calOffset < prevPrefix.length ? prevPrefix[calOffset] : 0;
       const targetRamp = yearTarget > 0 ? Math.round((yearTarget / 365) * (i + 1)) : undefined;
       return { ...d, cylinders: cumCyl, prevCylinders: cumPrev, targetRamp };
     });
-  }, [ordersPerDay, cumulativeChart, isYtdMode, dateRange.from, location]);
+  }, [ordersPerDay, cumulativeChart, isYtdMode, dateRange.from, location, prevDailyByOffset]);
 
   // Check if dry ice data is all zeros (hide from chart when irrelevant)
   const hasDryIceData = useMemo(() => {
@@ -538,9 +572,10 @@ export function ProductionReports({
 
   // Gas type distribution from RPC (already aggregated)
   const gasTypeDistribution = useMemo(() => {
-    const filtered = hideDigital
-      ? gasTypeDistributionData.filter(item => !item.is_digital)
-      : gasTypeDistributionData;
+    let filtered = gasTypeDistributionData;
+    if (hideDigital) filtered = filtered.filter(item => !item.is_digital);
+    if (hideExternal) filtered = filtered.filter(item => !item.is_external);
+    
     return filtered.map(item => {
       const name = item.gas_type_name || "";
       const color = getGasColor(name, item.gas_type_color || "#8b5cf6");
@@ -669,6 +704,17 @@ export function ProductionReports({
             >
               <Sparkles className="h-3 w-3" />
               {hideDigital ? "Toon digitaal" : "Verberg digitaal"}
+            </Button>
+          )}
+          {hasExternalTypes && (
+            <Button
+              variant={hideExternal ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs gap-1"
+              onClick={() => setHideExternal(!hideExternal)}
+            >
+              <EyeOff className="h-3 w-3" />
+              {hideExternal ? "Toon extern" : "Verberg extern"}
             </Button>
           )}
           <ReportExportButtons
@@ -840,13 +886,9 @@ export function ProductionReports({
               <BarChart3 className="h-4 w-4 shrink-0" />
               Dashboard
             </TabsTrigger>
-            <TabsTrigger value="monthly" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
+            <TabsTrigger value="productie" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
               <CalendarIcon className="h-4 w-4 shrink-0" />
-              Maandrapport
-            </TabsTrigger>
-            <TabsTrigger value="yearly" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
-              <CalendarIcon className="h-4 w-4 shrink-0" />
-              Jaarrapport
+              Productie
             </TabsTrigger>
             <TabsTrigger value="insights" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
               <Sparkles className="h-4 w-4 shrink-0" />
@@ -856,12 +898,6 @@ export function ProductionReports({
               <Cylinder className="h-4 w-4 shrink-0" />
               Cilinders
             </TabsTrigger>
-            {showDryIce && (
-              <TabsTrigger value="dryice" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
-                <Snowflake className="h-4 w-4 shrink-0" />
-                Droogijs
-              </TabsTrigger>
-            )}
             <TabsTrigger value="locations" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
               <Building2 className="h-4 w-4 shrink-0" />
               Locaties
@@ -1058,17 +1094,34 @@ export function ProductionReports({
           </div>
         </TabsContent>
 
-        {/* Monthly Report */}
-        <TabsContent value="monthly" className="mt-0">
+        {/* Productie: Maand / Jaar sub-toggle */}
+        <TabsContent value="productie" className="mt-0 space-y-4">
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant={productieView === "monthly" ? "default" : "outline"}
+              className="h-8 text-xs px-4"
+              onClick={() => setProductieView("monthly")}
+            >
+              <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+              Maand
+            </Button>
+            <Button
+              size="sm"
+              variant={productieView === "yearly" ? "default" : "outline"}
+              className="h-8 text-xs px-4"
+              onClick={() => setProductieView("yearly")}
+            >
+              <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+              Jaar
+            </Button>
+          </div>
           <Suspense fallback={<ChartLoadingFallback />}>
-            <MonthlyReport hideDigital={hideDigital} />
-          </Suspense>
-        </TabsContent>
-
-        {/* Yearly Report */}
-        <TabsContent value="yearly" className="mt-0">
-          <Suspense fallback={<ChartLoadingFallback />}>
-            <YearlyReport />
+            {productieView === "monthly" ? (
+              <MonthlyReport hideDigital={hideDigital} hideExternal={hideExternal} />
+            ) : (
+              <YearlyReport hideDigital={hideDigital} />
+            )}
           </Suspense>
         </TabsContent>
 
@@ -1081,6 +1134,8 @@ export function ProductionReports({
               dateRange={dateRange}
               hideDigital={hideDigital}
               hasDigitalTypes={hasDigitalTypes}
+              hideExternal={hideExternal}
+              hasExternalTypes={hasExternalTypes}
             />
           </Suspense>
         </TabsContent>
@@ -1091,11 +1146,15 @@ export function ProductionReports({
               location={location === "all" ? undefined : location}
               hideDigital={hideDigital}
               hasDigitalTypes={hasDigitalTypes}
+              hideExternal={hideExternal}
+              hasExternalTypes={hasExternalTypes}
             />
             <CumulativeCylinderSizeChart
               location={location === "all" ? undefined : location}
               hideDigital={hideDigital}
               hasDigitalTypes={hasDigitalTypes}
+              hideExternal={hideExternal}
+              hasExternalTypes={hasExternalTypes}
             />
             <ProductionHeatMap
               location={location}
@@ -1103,29 +1162,22 @@ export function ProductionReports({
               dateRange={dateRange}
               hideDigital={hideDigital}
               hasDigitalTypes={hasDigitalTypes}
+              hideExternal={hideExternal}
+              hasExternalTypes={hasExternalTypes}
             />
           </Suspense>
         </TabsContent>
 
-        {showDryIce && (
-          <TabsContent value="dryice" className="mt-0">
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <Snowflake className="h-10 w-10 mb-3 text-cyan-400/40" />
-              <p className="text-sm font-medium">Gedetailleerde droogijs rapportage</p>
-              <p className="text-xs mt-1">Binnenkort beschikbaar</p>
-            </div>
-          </TabsContent>
-        )}
 
         <TabsContent value="locations" className="mt-0">
           <Suspense fallback={<ChartLoadingFallback />}>
-            <LocationComparisonReport hideDigital={hideDigital} onHideDigitalChange={setHideDigital} />
+            <LocationComparisonReport hideDigital={hideDigital} onHideDigitalChange={setHideDigital} hideExternal={hideExternal} onHideExternalChange={setHideExternal} />
           </Suspense>
         </TabsContent>
 
         <TabsContent value="comparison" className="mt-0">
           <Suspense fallback={<ChartLoadingFallback />}>
-            <YearComparisonReport location={location === "all" ? null : location} hideDigital={hideDigital} onHideDigitalChange={setHideDigital} />
+            <YearComparisonReport location={location === "all" ? null : location} hideDigital={hideDigital} onHideDigitalChange={setHideDigital} hideExternal={hideExternal} onHideExternalChange={setHideExternal} />
           </Suspense>
         </TabsContent>
 

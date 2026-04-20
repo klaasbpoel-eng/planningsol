@@ -27,7 +27,8 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, normalizeDatum } from "@/lib/utils";
+import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
 import { toast } from "sonner";
 import { exportToExcel, exportToPDF } from "@/lib/export-utils";
 
@@ -121,7 +122,7 @@ const loadToggles = (): SectionToggles => {
   return DEFAULT_TOGGLES;
 };
 
-export function YearlyReport() {
+export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean }) {
   const currentYear = new Date().getFullYear();
   const today = new Date();
   const todayMMDD = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -145,6 +146,7 @@ export function YearlyReport() {
   const [targets, setTargets] = useState<{ emmen: number; tilburg: number }>({ emmen: 0, tilburg: 0 });
   const [editingTargets, setEditingTargets] = useState(false);
   const [targetInputs, setTargetInputs] = useState({ emmen: "", tilburg: "" });
+  const [cumulativeMode, setCumulativeMode] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(TOGGLES_STORAGE_KEY, JSON.stringify(toggles));
@@ -165,13 +167,16 @@ export function YearlyReport() {
     setEditingTargets(false);
   }, [selectedYear]);
 
-  // Load multi-year trend once on mount (always full-year data)
+  // Load multi-year trend (always full-year data), re-run when hideDigital changes
   useEffect(() => {
     const loadTrend = async () => {
       setTrendLoading(true);
       const years: number[] = [];
       for (let y = currentYear - 4; y <= currentYear; y++) years.push(y);
       try {
+        const digitalNames = hideDigital ? await buildDigitalProductNames() : new Set<string>();
+        const filterDigital = (rows: any[]) =>
+          digitalNames.size > 0 ? rows.filter((r: any) => !digitalNames.has(r.Product)) : rows;
         const results = await Promise.all(
           years.map(async (y) => {
             const from = `${y}-01-01`;
@@ -180,8 +185,8 @@ export function YearlyReport() {
               fetchProductieForPeriod(from, to, "sol_emmen"),
               fetchProductieForPeriod(from, to, "sol_tilburg"),
             ]);
-            const emmen = emmenRows.reduce((s: number, r: any) => s + (r.Aantal || 0), 0);
-            const tilburg = tilburgRows.reduce((s: number, r: any) => s + (r.Aantal || 0), 0);
+            const emmen = filterDigital(emmenRows).reduce((s: number, r: any) => s + (r.Aantal || 0), 0);
+            const tilburg = filterDigital(tilburgRows).reduce((s: number, r: any) => s + (r.Aantal || 0), 0);
             return { year: y, emmen, tilburg, total: emmen + tilburg };
           }),
         );
@@ -194,7 +199,7 @@ export function YearlyReport() {
     };
     loadTrend();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [hideDigital]);
 
   const yearOptions = useMemo(() => {
     const options = [];
@@ -210,30 +215,35 @@ export function YearlyReport() {
   const prevFromDate = `${prevYear}-01-01`;
   const prevToDate = ytdMode ? `${prevYear}-${todayMMDD}` : `${prevYear}-12-31`;
 
-  const parseDatum = (raw: string): string => {
-    if (!raw) return "";
-    if (raw.includes("T")) return raw.substring(0, 10);
-    const p = raw.split("-");
-    return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : raw;
-  };
+  // (Removed parseDatum in favor of normalizeDatum from utils)
 
   const fetchProductieForPeriod = async (from: string, to: string, locationParam: string): Promise<any[]> => {
     const year = parseInt(from.substring(0, 4));
     const PAGE = 1000;
-    let offset = 0;
     const allRows: any[] = [];
-    while (true) {
-      const { data } = await (supabase.from("Productie" as never) as any)
-        .select("Datum,Locatie,Product,Capaciteit,Aantal,Klant")
-        .eq("Jaar", year)
-        .range(offset, offset + PAGE - 1);
-      if (!data || data.length === 0) break;
-      allRows.push(...data);
-      if (data.length < PAGE) break;
-      offset += PAGE;
+    const { count } = await (supabase.from("Productie" as never) as any)
+      .select("*", { count: "exact", head: true })
+      .eq("Jaar", year);
+    const totalRows = count || 0;
+    if (totalRows > 0) {
+      const numPages = Math.ceil(totalRows / PAGE);
+      const pageResults = await Promise.all(
+        Array.from({ length: numPages }, (_, i) =>
+          (supabase.from("Productie" as never) as any)
+            .select("Datum,Locatie,Product,Capaciteit,Aantal,Klant")
+            .eq("Jaar", year)
+            .order("id")
+            .range(i * PAGE, (i + 1) * PAGE - 1)
+        )
+      );
+      for (const { data } of pageResults) {
+        if (data) allRows.push(...data);
+      }
     }
     return allRows.filter((row: any) => {
-      const iso = parseDatum(row.Datum || "");
+      const raw = String(row.Datum || "");
+      if (!raw) return false;
+      const iso = normalizeDatum(raw);
       if (!iso || iso < from || iso > to) return false;
       const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
       return loc === locationParam;
@@ -245,28 +255,38 @@ export function YearlyReport() {
     label: string,
     from: string,
     to: string,
+    digitalNames: Set<string> = new Set(),
+    preloadedRows?: any[],
   ): Promise<YearLocationKPI> => {
     const isTilburg = location === "sol_tilburg";
-    const [rows, dryIceEffRes] = await Promise.all([
-      fetchProductieForPeriod(from, to, location),
+    const locFilter = (rows: any[]) => rows.filter((row: any) => {
+      const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+      return loc === location;
+    });
+    const [rawRows, dryIceEffRes] = await Promise.all([
+      preloadedRows ? Promise.resolve(locFilter(preloadedRows)) : fetchProductieForPeriod(from, to, location),
       isTilburg
         ? Promise.resolve([{ total_kg: 0, total_orders: 0 }])
         : api.reports.getDryIceEfficiency(from, to, location).catch(() => [{ total_kg: 0, total_orders: 0 }]),
     ]);
 
-    const totalCyl = rows.reduce((sum, r) => sum + (r.Aantal || 0), 0);
+    const rows = digitalNames.size > 0
+      ? rawRows.filter((r: any) => !digitalNames.has(r.Product))
+      : rawRows;
+
+    const totalCyl = rows.reduce((sum, r) => sum + (Number(r.Aantal) || 0), 0);
     const cylOrders = rows.length;
 
     // Monthly breakdown
     const monthlyMap = new Map<number, { cylinders: number; orders: number }>();
     for (let m = 1; m <= 12; m++) monthlyMap.set(m, { cylinders: 0, orders: 0 });
     for (const row of rows) {
-      const iso = parseDatum(row.Datum || "");
+      const iso = normalizeDatum(row.Datum || "");
       if (!iso) continue;
       const month = parseInt(iso.substring(5, 7));
       if (month >= 1 && month <= 12) {
         const entry = monthlyMap.get(month)!;
-        entry.cylinders += row.Aantal || 0;
+        entry.cylinders += Number(row.Aantal) || 0;
         entry.orders += 1;
       }
     }
@@ -281,7 +301,7 @@ export function YearlyReport() {
     const custMap = new Map<string, number>();
     for (const row of rows) {
       const name = (row.Klant || "Onbekend").trim();
-      custMap.set(name, (custMap.get(name) || 0) + (row.Aantal || 0));
+      custMap.set(name, (custMap.get(name) || 0) + (Number(row.Aantal) || 0));
     }
     const topCustomers = Array.from(custMap.entries())
       .sort((a, b) => b[1] - a[1])
@@ -293,7 +313,7 @@ export function YearlyReport() {
     const typeMap = new Map<string, number>();
     for (const row of rows) {
       const name = row.Product || "Onbekend";
-      typeMap.set(name, (typeMap.get(name) || 0) + (row.Aantal || 0));
+      typeMap.set(name, (typeMap.get(name) || 0) + (Number(row.Aantal) || 0));
     }
     const gasTypeDistribution = Array.from(typeMap.entries())
       .sort((a, b) => b[1] - a[1])
@@ -304,7 +324,7 @@ export function YearlyReport() {
     const sizeMap = new Map<string, number>();
     for (const row of rows) {
       const size = row.Capaciteit != null ? `${row.Capaciteit}L` : "Onbekend";
-      sizeMap.set(size, (sizeMap.get(size) || 0) + (row.Aantal || 0));
+      sizeMap.set(size, (sizeMap.get(size) || 0) + (Number(row.Aantal) || 0));
     }
     const sizeDistribution = Array.from(sizeMap.entries())
       .sort((a, b) => b[1] - a[1])
@@ -332,11 +352,12 @@ export function YearlyReport() {
     const load = async () => {
       setLoading(true);
       try {
+        const digitalNames = hideDigital ? await buildDigitalProductNames() : new Set<string>();
         const [emmen, tilburg, prevEmmen, prevTilburg] = await Promise.all([
-          fetchLocationData("sol_emmen", "SOL Emmen", fromDate, toDate),
-          fetchLocationData("sol_tilburg", "SOL Tilburg", fromDate, toDate),
-          fetchLocationData("sol_emmen", "SOL Emmen", prevFromDate, prevToDate),
-          fetchLocationData("sol_tilburg", "SOL Tilburg", prevFromDate, prevToDate),
+          fetchLocationData("sol_emmen", "SOL Emmen", fromDate, toDate, digitalNames),
+          fetchLocationData("sol_tilburg", "SOL Tilburg", fromDate, toDate, digitalNames),
+          fetchLocationData("sol_emmen", "SOL Emmen", prevFromDate, prevToDate, digitalNames),
+          fetchLocationData("sol_tilburg", "SOL Tilburg", prevFromDate, prevToDate, digitalNames),
         ]);
         setEmmenData(emmen);
         setTilburgData(tilburg);
@@ -349,7 +370,7 @@ export function YearlyReport() {
       }
     };
     load();
-  }, [fromDate, toDate, prevFromDate, prevToDate]);
+  }, [fromDate, toDate, prevFromDate, prevToDate, hideDigital]);
 
   const totalData = useMemo((): YearLocationKPI | null => {
     if (!emmenData || !tilburgData) return null;
@@ -589,14 +610,47 @@ export function YearlyReport() {
     data,
     prevData,
     color,
+    targets: colTargets,
+    cumulativeMode: isCumulative,
   }: {
     data: YearLocationKPI;
     prevData: YearLocationKPI | null;
     color: string;
+    targets: { emmen: number; tilburg: number };
+    cumulativeMode: boolean;
   }) => {
     const totalGas = data.gasTypeDistribution.reduce((sum, g) => sum + g.count, 0);
     const prevTotalGas = prevData?.gasTypeDistribution.reduce((sum, g) => sum + g.count, 0) ?? 0;
-    const maxMonthCylinders = Math.max(...data.monthlyBreakdown.map((m) => m.cylinders), 1);
+
+    // Yearly target for this location
+    const yearTarget = data.location === "sol_emmen" ? (colTargets.emmen || 0)
+      : data.location === "sol_tilburg" ? (colTargets.tilburg || 0)
+      : (colTargets.emmen || 0) + (colTargets.tilburg || 0);
+    const monthlyTarget = yearTarget > 0 ? Math.round(yearTarget / 12) : 0;
+
+    // Prev year monthly data
+    const prevMonthly = prevData?.monthlyBreakdown || [];
+
+    // Compute cumulative or regular display data
+    const displayData = isCumulative
+      ? data.monthlyBreakdown.map((m, i) => ({
+          ...m,
+          cylinders: data.monthlyBreakdown.slice(0, i + 1).reduce((s, x) => s + x.cylinders, 0),
+        }))
+      : data.monthlyBreakdown;
+    const displayPrev = isCumulative
+      ? prevMonthly.map((m, i) => ({
+          ...m,
+          cylinders: prevMonthly.slice(0, i + 1).reduce((s, x) => s + x.cylinders, 0),
+        }))
+      : prevMonthly;
+
+    const maxDisplayVal = Math.max(
+      ...displayData.map(m => m.cylinders),
+      ...displayPrev.map(m => m.cylinders),
+      isCumulative ? yearTarget : monthlyTarget,
+      1
+    );
 
     return (
       <div className="space-y-4">
@@ -638,19 +692,53 @@ export function YearlyReport() {
               Maandoverzicht
             </div>
             <div className="bg-muted/30 rounded-lg p-2.5">
-              <div className="flex items-end gap-0.5 h-16">
-                {data.monthlyBreakdown.map((m) => {
-                  const pct = (m.cylinders / maxMonthCylinders) * 100;
+              <div className="flex items-end gap-0.5" style={{ height: "72px" }}>
+                {displayData.map((m, idx) => {
+                  const monthTarget = isCumulative
+                    ? Math.round((yearTarget * m.month) / 12)
+                    : monthlyTarget;
+                  const pct = (m.cylinders / maxDisplayVal) * 100;
+                  const prevM = displayPrev[idx];
+                  const prevPct = prevM ? (prevM.cylinders / maxDisplayVal) * 100 : 0;
+                  const targetPct = monthTarget > 0 ? (monthTarget / maxDisplayVal) * 100 : 0;
                   const isFuture = ytdMode && parseInt(selectedYear) === currentYear && m.month > todayMonth;
+                  const trendVsPrev = prevM && prevM.cylinders > 0
+                    ? Math.round(((m.cylinders - prevM.cylinders) / prevM.cylinders) * 100)
+                    : null;
+
+                  let barColor = "bg-primary/70 hover:bg-primary";
+                  if (!isFuture && monthlyTarget > 0) {
+                    const compareVal = isCumulative ? monthTarget : monthlyTarget;
+                    if (m.cylinders >= compareVal) barColor = "bg-green-500/70 hover:bg-green-500";
+                    else if (m.cylinders < compareVal * 0.8) barColor = "bg-red-500/70 hover:bg-red-500";
+                  }
+
                   return (
                     <TooltipProvider key={m.month} delayDuration={100}>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="flex-1 flex flex-col items-center gap-0.5 cursor-default">
-                            <div
-                              className={`w-full rounded-sm transition-colors ${isFuture ? "bg-muted/50" : "bg-primary/70 hover:bg-primary"}`}
-                              style={{ height: `${isFuture ? 4 : Math.max(pct, 2)}%` }}
-                            />
+                            <div className="relative w-full" style={{ height: "60px" }}>
+                              {/* Ghost bar — prev year */}
+                              {!isFuture && prevM && prevM.cylinders > 0 && (
+                                <div
+                                  className="absolute bottom-0 w-full rounded-sm bg-muted-foreground/20"
+                                  style={{ height: `${Math.max(prevPct, 2)}%` }}
+                                />
+                              )}
+                              {/* Dashed target line */}
+                              {!isFuture && monthTarget > 0 && targetPct > 0 && (
+                                <div
+                                  className="absolute w-full border-t-2 border-dashed border-amber-500/80 pointer-events-none"
+                                  style={{ bottom: `${Math.min(targetPct, 98)}%` }}
+                                />
+                              )}
+                              {/* Current year bar */}
+                              <div
+                                className={`absolute bottom-0 w-full rounded-sm transition-colors ${isFuture ? "bg-muted/50" : barColor}`}
+                                style={{ height: `${isFuture ? 4 : Math.max(pct, 2)}%` }}
+                              />
+                            </div>
                             <span className={`text-[8px] leading-none ${isFuture ? "text-muted-foreground/40" : "text-muted-foreground"}`}>
                               {m.label}
                             </span>
@@ -663,7 +751,23 @@ export function YearlyReport() {
                           ) : (
                             <>
                               <p>{formatNumber(m.cylinders, 0)} cilinders</p>
-                              <p>{m.orders} orders</p>
+                              <p className="text-muted-foreground">{m.orders} orders</p>
+                              {prevM && prevM.cylinders > 0 && (
+                                <p className="text-muted-foreground/80">
+                                  {prevYear}: {formatNumber(prevM.cylinders, 0)}
+                                  {trendVsPrev !== null && (
+                                    <span className={trendVsPrev > 0 ? " text-green-600" : " text-red-500"}>
+                                      {" "}{trendVsPrev > 0 ? "+" : ""}{trendVsPrev}%
+                                    </span>
+                                  )}
+                                </p>
+                              )}
+                              {monthTarget > 0 && (
+                                <p className={m.cylinders >= monthTarget ? "text-green-600" : "text-amber-500"}>
+                                  Doel: {formatNumber(monthTarget, 0)}{" "}
+                                  ({m.cylinders >= monthTarget ? "✓" : `${Math.round((m.cylinders / monthTarget) * 100)}%`})
+                                </p>
+                              )}
                             </>
                           )}
                         </TooltipContent>
@@ -671,6 +775,22 @@ export function YearlyReport() {
                     </TooltipProvider>
                   );
                 })}
+              </div>
+              {/* Legend */}
+              <div className="flex flex-wrap gap-3 mt-2 pt-1.5 border-t border-muted/40">
+                <span className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                  <span className="w-3 h-1.5 rounded-sm bg-primary/60 shrink-0" />{selectedYear}
+                </span>
+                {displayPrev.some((m) => m.cylinders > 0) && (
+                  <span className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                    <span className="w-3 h-1.5 rounded-sm bg-muted-foreground/25 shrink-0" />{prevYear}
+                  </span>
+                )}
+                {monthlyTarget > 0 && (
+                  <span className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                    <span className="w-4 border-t border-dashed border-amber-500/80 shrink-0" />Doel
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -789,7 +909,9 @@ export function YearlyReport() {
             </div>
             <div className="space-y-1">
               {data.topCustomers.length > 0 ? (
-                data.topCustomers.map((c, i) => (
+                data.topCustomers.map((c, i) => {
+                  const isNew = prevData ? !prevData.allCustomerNames.includes(c.name) : false;
+                  return (
                   <div
                     key={c.name}
                     className="flex items-center justify-between text-xs py-1 px-2 rounded hover:bg-muted/30"
@@ -803,10 +925,16 @@ export function YearlyReport() {
                         {i + 1}
                       </span>
                       <span className="truncate">{c.name}</span>
+                      {isNew && (
+                        <Badge className="text-[9px] h-4 px-1 bg-green-500/10 text-green-700 border border-green-500/30 font-medium ml-0.5 shrink-0">
+                          Nieuw
+                        </Badge>
+                      )}
                     </span>
                     <span className="font-mono font-medium shrink-0 ml-2">{formatNumber(c.cylinders, 0)}</span>
                   </div>
-                ))
+                  );
+                })
               ) : (
                 <p className="text-xs text-muted-foreground italic px-2">Geen data</p>
               )}
@@ -931,6 +1059,26 @@ export function YearlyReport() {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={cumulativeMode ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCumulativeMode(!cumulativeMode)}
+                    className="gap-1.5"
+                  >
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Cumulatief</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs max-w-[220px]">
+                  {cumulativeMode
+                    ? "Cumulatief actief: maandoverzicht toont oplopende YTD totalen"
+                    : "Klik voor cumulatieve weergave in het maandoverzicht"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <Button
               variant={showSettings ? "default" : "outline"}
               size="sm"
@@ -995,13 +1143,13 @@ export function YearlyReport() {
         {emmenData && tilburgData && totalData ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="border rounded-lg p-4 border-blue-500/20">
-              <LocationColumn data={emmenData} prevData={prevEmmenData} color="text-blue-500" />
+              <LocationColumn data={emmenData} prevData={prevEmmenData} color="text-blue-500" targets={targets} cumulativeMode={cumulativeMode} />
             </div>
             <div className="border rounded-lg p-4 border-sky-400/20">
-              <LocationColumn data={tilburgData} prevData={prevTilburgData} color="text-sky-400" />
+              <LocationColumn data={tilburgData} prevData={prevTilburgData} color="text-sky-400" targets={targets} cumulativeMode={cumulativeMode} />
             </div>
             <div className="border rounded-lg p-4 border-primary/20 bg-primary/[0.02]">
-              <LocationColumn data={totalData} prevData={prevTotalData} color="text-primary" />
+              <LocationColumn data={totalData} prevData={prevTotalData} color="text-primary" targets={targets} cumulativeMode={cumulativeMode} />
             </div>
           </div>
         ) : (
