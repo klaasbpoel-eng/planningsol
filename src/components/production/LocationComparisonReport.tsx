@@ -200,21 +200,6 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
     return gasTypeData.filter(gt => !gt.is_digital);
   }, [gasTypeData, hideDigital]);
 
-  // Filtered totals (recalculate when hiding digital)
-  const filteredEmmenTotal = useMemo(() => {
-    if (!hideDigital) return displayEmmenTotal;
-    return filteredGasTypeData.reduce((s, gt) => s + gt.emmen, 0);
-  }, [hideDigital, displayEmmenTotal, filteredGasTypeData]);
-
-  const filteredTilburgTotal = useMemo(() => {
-    if (!hideDigital) return displayTilburgTotal;
-    return filteredGasTypeData.reduce((s, gt) => s + gt.tilburg, 0);
-  }, [hideDigital, displayTilburgTotal, filteredGasTypeData]);
-
-  const grandTotal = filteredEmmenTotal + filteredTilburgTotal;
-  const emmenPercent = grandTotal > 0 ? Math.round((filteredEmmenTotal / grandTotal) * 100) : 0;
-  const tilburgPercent = grandTotal > 0 ? Math.round((filteredTilburgTotal / grandTotal) * 100) : 0;
-
   const digitalPhysicalSplit = useMemo(() => {
     const digital = gasTypeData.filter(gt => gt.is_digital).reduce((s, gt) => s + gt.total, 0);
     const physical = gasTypeData.filter(gt => !gt.is_digital).reduce((s, gt) => s + gt.total, 0);
@@ -234,6 +219,21 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
 
   const displayEmmenTotal = useMemo(() => displayMonthlyData.reduce((s, m) => s + m.emmen, 0), [displayMonthlyData]);
   const displayTilburgTotal = useMemo(() => displayMonthlyData.reduce((s, m) => s + m.tilburg, 0), [displayMonthlyData]);
+
+  // Filtered totals (recalculate when hiding digital) — declared after displayEmmen/Tilburg totals exist
+  const filteredEmmenTotal = useMemo(() => {
+    if (!hideDigital) return displayEmmenTotal;
+    return filteredGasTypeData.reduce((s, gt) => s + gt.emmen, 0);
+  }, [hideDigital, displayEmmenTotal, filteredGasTypeData]);
+
+  const filteredTilburgTotal = useMemo(() => {
+    if (!hideDigital) return displayTilburgTotal;
+    return filteredGasTypeData.reduce((s, gt) => s + gt.tilburg, 0);
+  }, [hideDigital, displayTilburgTotal, filteredGasTypeData]);
+
+  const grandTotal = filteredEmmenTotal + filteredTilburgTotal;
+  const emmenPercent = grandTotal > 0 ? Math.round((filteredEmmenTotal / grandTotal) * 100) : 0;
+  const tilburgPercent = grandTotal > 0 ? Math.round((filteredTilburgTotal / grandTotal) * 100) : 0;
 
   const cumulativeData = useMemo(() => {
     let cumE = 0, cumT = 0;

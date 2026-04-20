@@ -1118,7 +1118,7 @@ export function ProductionReports({
           </div>
           <Suspense fallback={<ChartLoadingFallback />}>
             {productieView === "monthly" ? (
-              <MonthlyReport hideDigital={hideDigital} hideExternal={hideExternal} />
+              <MonthlyReport hideDigital={hideDigital} />
             ) : (
               <YearlyReport hideDigital={hideDigital} />
             )}
@@ -1134,8 +1134,6 @@ export function ProductionReports({
               dateRange={dateRange}
               hideDigital={hideDigital}
               hasDigitalTypes={hasDigitalTypes}
-              hideExternal={hideExternal}
-              hasExternalTypes={hasExternalTypes}
             />
           </Suspense>
         </TabsContent>
@@ -1146,15 +1144,11 @@ export function ProductionReports({
               location={location === "all" ? undefined : location}
               hideDigital={hideDigital}
               hasDigitalTypes={hasDigitalTypes}
-              hideExternal={hideExternal}
-              hasExternalTypes={hasExternalTypes}
             />
             <CumulativeCylinderSizeChart
               location={location === "all" ? undefined : location}
               hideDigital={hideDigital}
               hasDigitalTypes={hasDigitalTypes}
-              hideExternal={hideExternal}
-              hasExternalTypes={hasExternalTypes}
             />
             <ProductionHeatMap
               location={location}
@@ -1162,8 +1156,6 @@ export function ProductionReports({
               dateRange={dateRange}
               hideDigital={hideDigital}
               hasDigitalTypes={hasDigitalTypes}
-              hideExternal={hideExternal}
-              hasExternalTypes={hasExternalTypes}
             />
           </Suspense>
         </TabsContent>
@@ -1171,13 +1163,13 @@ export function ProductionReports({
 
         <TabsContent value="locations" className="mt-0">
           <Suspense fallback={<ChartLoadingFallback />}>
-            <LocationComparisonReport hideDigital={hideDigital} onHideDigitalChange={setHideDigital} hideExternal={hideExternal} onHideExternalChange={setHideExternal} />
+            <LocationComparisonReport hideDigital={hideDigital} onHideDigitalChange={setHideDigital} />
           </Suspense>
         </TabsContent>
 
         <TabsContent value="comparison" className="mt-0">
           <Suspense fallback={<ChartLoadingFallback />}>
-            <YearComparisonReport location={location === "all" ? null : location} hideDigital={hideDigital} onHideDigitalChange={setHideDigital} hideExternal={hideExternal} onHideExternalChange={setHideExternal} />
+            <YearComparisonReport location={location === "all" ? null : location} hideDigital={hideDigital} onHideDigitalChange={setHideDigital} />
           </Suspense>
         </TabsContent>
 
