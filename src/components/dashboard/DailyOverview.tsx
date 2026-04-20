@@ -741,10 +741,21 @@ export function DailyOverview() {
     return texts.some(t => t && t.toLowerCase().includes(q));
   }, [debouncedSearch]);
 
-  const filteredTasks = useMemo(() => tasks.filter(t =>
-    matchesStatus(t.status) &&
-    matchesAny([t.task_types?.name, t.title, t.notes, t.assignee_name])
-  ), [tasks, matchesAny, matchesStatus]);
+  const filteredTasks = useMemo(() => {
+    const filtered = tasks.filter(t =>
+      matchesStatus(t.status) &&
+      matchesAny([t.task_types?.name, t.title, t.notes, t.assignee_name])
+    );
+    // Sort: items mét start_time eerst (oplopend), dan items zonder tijd
+    return filtered.slice().sort((a, b) => {
+      const at = a.start_time;
+      const bt = b.start_time;
+      if (at && bt) return at.localeCompare(bt);
+      if (at && !bt) return -1;
+      if (!at && bt) return 1;
+      return 0;
+    });
+  }, [tasks, matchesAny, matchesStatus]);
 
   const filteredDryIce = useMemo(() => dryIceOrders.filter(o =>
     matchesStatus(o.status) && matchesAny([o.customer_name, o.notes, o.dry_ice_packaging?.name])
