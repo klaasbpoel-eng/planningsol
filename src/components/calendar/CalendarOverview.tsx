@@ -276,12 +276,12 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       ] = await Promise.all([
         // Use supabase directly (not api which may use external/MySQL source)
         safeFetch<Profile[]>(
-          supabase.from("profiles").select("*").order("full_name")
+          Promise.resolve(supabase.from("profiles").select("*").order("full_name"))
             .then(({ data, error }) => { if (error) throw error; return data ?? []; }),
           "profiles"
         ),
         safeFetch<TimeOffRequest[]>(
-          supabase.from("time_off_requests").select("*").order("start_date", { ascending: false })
+          Promise.resolve(supabase.from("time_off_requests").select("*").order("start_date", { ascending: false }))
             .then(({ data, error }) => { if (error) throw error; return data ?? []; }),
           "requests"
         ),
