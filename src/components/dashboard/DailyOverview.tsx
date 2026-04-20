@@ -1737,16 +1737,23 @@ function Section({
   onAdd?: () => void;
   children: React.ReactNode;
 }) {
+  const isEmpty = count === 0;
   return (
-    <div className={`rounded-lg border p-3 ${bgClass || ""}`}>
+    <div
+      className={`rounded-lg border p-3 transition-opacity ${
+        isEmpty
+          ? "border-dashed bg-muted/20 opacity-60 hover:opacity-100"
+          : bgClass || ""
+      }`}
+    >
       <div className="flex items-center gap-2 mb-2">
         <button
           onClick={onToggle}
           className="flex items-center gap-2 flex-1 min-w-0 text-left min-h-[44px] md:min-h-0 rounded-md px-1 -mx-1 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         >
-          <span className={color}>{icon}</span>
-          <span className="text-sm font-medium">{label}</span>
-          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${badgeClass}`}>
+          <span className={isEmpty ? "text-muted-foreground" : color}>{icon}</span>
+          <span className={`text-sm font-medium ${isEmpty ? "text-muted-foreground" : ""}`}>{label}</span>
+          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${isEmpty ? "bg-muted text-muted-foreground" : badgeClass}`}>
             {count}
           </span>
           <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform print:hidden ${collapsed ? "-rotate-90" : ""}`} />
@@ -1766,7 +1773,13 @@ function Section({
         )}
       </div>
       {!collapsed && (
-        <div className="divide-y divide-current/5 space-y-2 md:space-y-1.5">{children}</div>
+        <div className="divide-y divide-current/5 space-y-2 md:space-y-1.5">
+          {isEmpty ? (
+            <p className="text-xs text-muted-foreground/70 italic py-1">Geen items</p>
+          ) : (
+            children
+          )}
+        </div>
       )}
     </div>
   );
