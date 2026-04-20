@@ -665,13 +665,6 @@ export function ProductionPlanning({
           </TabsContent>
         )}
 
-        {showAdvancedTabs && (
-          <TabsContent value="routeplanning" className="mt-6">
-            <Suspense fallback={<TabLoadingFallback />}>
-              <RoutePlanning selectedLocation={selectedLocation} />
-            </Suspense>
-          </TabsContent>
-        )}
       </Tabs>
     </div >
   );
