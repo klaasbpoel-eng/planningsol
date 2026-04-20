@@ -1829,6 +1829,10 @@ function StatusBadge({ status, onStatusChange, isMobile, onStatusSelect }: {
       variant={variant}
       className={`ml-auto text-[10px] shrink-0 ${onStatusChange ? "cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all" : ""} ${isMobile ? "px-2.5 py-1 min-h-[28px] text-[11px]" : ""}`}
       onClick={!isMobile && onStatusChange ? (e: React.MouseEvent) => { e.stopPropagation(); onStatusChange(); } : undefined}
+      role={onStatusChange ? "button" : undefined}
+      tabIndex={onStatusChange ? 0 : undefined}
+      aria-label={`Status: ${statusLabels[status] || status}${onStatusChange ? " — klik om te wijzigen" : ""}`}
+      title={statusLabels[status] || status}
     >
       {statusLabels[status] || status}
     </Badge>
