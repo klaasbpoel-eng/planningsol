@@ -8,7 +8,6 @@ import { PageLayout } from "@/components/layout/PageLayout";
 import { BrandedLoader } from "@/components/ui/branded-loader";
 import { CalendarDays } from "lucide-react";
 import { DailyOverview } from "@/components/dashboard/DailyOverview";
-import { RecreateKijlstraBtn } from "@/components/dashboard/RecreateKijlstraBtn";
 import type { User } from "@supabase/supabase-js";
 
 const DailyOverviewPage = () => {
@@ -47,9 +46,6 @@ const DailyOverviewPage = () => {
       description="Bekijk alle taken, orders en verlof per dag of week."
       titleIcon={<CalendarDays className="h-8 w-8" />}
     >
-      <div className="mb-4 flex gap-4">
-        <RecreateKijlstraBtn />
-      </div>
       <DailyOverview />
     </PageLayout>
   );

@@ -15,8 +15,6 @@ const DryIcePlanning = lazy(() => import("./DryIcePlanning").then(m => ({ defaul
 const GasMixtureRecipemaker = lazy(() => import("./GasMixtureRecipemaker"));
 const SiteMap = lazy(() => import("./SiteMap").then(m => ({ default: m.SiteMap })));
 const PGSRegistry = lazy(() => import("./PGSRegistry").then(m => ({ default: m.PGSRegistry })));
-const VoorraadBeheer = lazy(() => import("./VoorraadBeheer").then(m => ({ default: m.VoorraadBeheer })));
-const RoutePlanning = lazy(() => import("./route-planning"));
 
 
 // ... (existing code)
@@ -559,14 +557,6 @@ export function ProductionPlanning({
                 <span className="hidden sm:inline">Rapportage</span>
                 <span className="sm:hidden">Stats</span>
               </TabsTrigger>
-              <TabsTrigger
-                value="voorraadbeheer"
-                className="data-[state=active]:bg-amber-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
-              >
-                <Package className="h-4 w-4 flex-shrink-0" />
-                <span className="hidden sm:inline">Voorraadbeheer</span>
-                <span className="sm:hidden">Voorraad</span>
-              </TabsTrigger>
             </>
           )}
           {showRecipemaker && (
@@ -647,15 +637,6 @@ export function ProductionPlanning({
               </Suspense>
             </TabsContent>
 
-            <TabsContent value="voorraadbeheer" className="mt-6">
-              <Suspense fallback={<TabLoadingFallback />}>
-                <VoorraadBeheer
-                  selectedLocation={selectedLocation}
-                  refreshKey={refreshKey}
-                />
-              </Suspense>
-            </TabsContent>
-
           </>
         )}
 
@@ -684,13 +665,6 @@ export function ProductionPlanning({
           </TabsContent>
         )}
 
-        {showAdvancedTabs && (
-          <TabsContent value="routeplanning" className="mt-6">
-            <Suspense fallback={<TabLoadingFallback />}>
-              <RoutePlanning selectedLocation={selectedLocation} />
-            </Suspense>
-          </TabsContent>
-        )}
       </Tabs>
     </div >
   );
