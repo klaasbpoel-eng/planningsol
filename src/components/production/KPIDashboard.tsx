@@ -19,7 +19,7 @@ import {
   MapPin,
   Target,
 } from "lucide-react";
-import { cn, formatNumber } from "@/lib/utils";
+import { cn, formatNumber, normalizeDatum } from "@/lib/utils";
 import { FadeIn } from "@/components/ui/fade-in";
 import {
   LineChart,
@@ -29,6 +29,7 @@ import {
 } from "recharts";
 import { analyzeAnomalies } from "@/hooks/useAnomalyDetection";
 import { AnomalyAlertBadge, AnomalyAlertsPanel } from "./AnomalyAlertBadge";
+import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
 
 type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 
@@ -44,6 +45,8 @@ interface KPIDashboardProps {
   // kept for API compatibility with parent
   hideDigital?: boolean;
   onHideDigitalChange?: (value: boolean) => void;
+  hideExternal?: boolean;
+  onHideExternalChange?: (value: boolean) => void;
   onNavigateToReports?: () => void;
 }
 
@@ -77,17 +80,7 @@ function mapLocatie(locatie: string): "sol_emmen" | "sol_tilburg" {
   return locatie.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
 }
 
-// Convert datum to "YYYY-MM-DD"
-// Handles ISO "2020-01-02T00:00:00.000Z", ISO date "2020-01-02", and legacy "DD-MM-YYYY"
-function mapDatum(datum: string): string {
-  if (!datum) return "";
-  if (datum.includes("T")) return datum.substring(0, 10);
-  const parts = datum.split("-");
-  if (parts.length === 3 && parts[0].length === 4) return datum; // already YYYY-MM-DD
-  if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`; // DD-MM-YYYY → YYYY-MM-DD
-  return datum;
-}
-
+// (Removed mapDatum in favor of normalizeDatum from utils)
 const toLocalDateString = (date: Date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -105,7 +98,7 @@ function calculateStats(
 
   if (fromDate || toDate) {
     filtered = filtered.filter((row) => {
-      const date = mapDatum(row.Datum);
+      const date = normalizeDatum(row.Datum);
       if (fromDate && date < fromDate) return false;
       if (toDate && date > toDate) return false;
       return true;
@@ -145,7 +138,7 @@ function computeWeeklySparkline(
     const endStr = toLocalDateString(weekEnd);
 
     let weekRows = rows.filter((r) => {
-      const date = mapDatum(r.Datum);
+      const date = normalizeDatum(r.Datum);
       return date >= startStr && date <= endStr;
     });
 
@@ -166,6 +159,7 @@ export function KPIDashboard({
   location,
   refreshKey = 0,
   dateRange,
+  hideDigital = false,
   onNavigateToReports,
 }: KPIDashboardProps) {
   const [isOpen, setIsOpen] = useState(true);
@@ -188,6 +182,7 @@ export function KPIDashboard({
         const { data } = await (supabase.from("Productie" as never) as any)
           .select("id,Jaar,Datum,Locatie,Product,Aantal,Klant")
           .eq("Jaar", year)
+          .order("id")
           .range(from, from + PAGE - 1);
         if (!data || data.length === 0) break;
         allRows.push(...data);
@@ -207,6 +202,10 @@ export function KPIDashboard({
 
       setNewCustomersYtd(0);
 
+      const digitalNames = hideDigital ? await buildDigitalProductNames() : new Set<string>();
+      const filterDigital = (rows: ProductieRow[]) =>
+        hideDigital ? rows.filter(r => !digitalNames.has(r.Product)) : rows;
+
       if (dateRange) {
         const fromStr = toLocalDateString(dateRange.from);
         const toStr = toLocalDateString(dateRange.to);
@@ -215,7 +214,9 @@ export function KPIDashboard({
 
         // Fetch all years needed for current period
         const yearsNeeded = Array.from({ length: toYear - fromYear + 1 }, (_, i) => fromYear + i);
-        const allCurrentRows = (await Promise.all(yearsNeeded.map(fetchProductieForYear))).flat();
+        const allCurrentRows = filterDigital(
+          (await Promise.all(yearsNeeded.map(fetchProductieForYear))).flat()
+        );
 
         setCurrentStats(calculateStats(allCurrentRows, fromStr, toStr, locationParam));
 
@@ -231,9 +232,10 @@ export function KPIDashboard({
         const prevToStr = toLocalDateString(prevTo);
 
         const prevYear = prevFrom.getFullYear();
-        const prevRows = prevYear >= fromYear
+        const rawPrevRows = prevYear >= fromYear
           ? allCurrentRows
           : await fetchProductieForYear(prevYear);
+        const prevRows = filterDigital(rawPrevRows);
         setPreviousStats(calculateStats(prevRows, prevFromStr, prevToStr, locationParam));
 
         const sparklineEnd = new Date(Math.min(dateRange.to.getTime(), Date.now()));
@@ -242,10 +244,12 @@ export function KPIDashboard({
         setHistoricalWeeklyData(sparkline.slice(0, -1).map((w) => w.value));
       } else {
         // Year mode
-        const [currentRows, previousRows] = await Promise.all([
+        const [rawCurrentRows, rawPreviousRows] = await Promise.all([
           fetchProductieForYear(currentYear),
           fetchProductieForYear(currentYear - 1),
         ]);
+        const currentRows = filterDigital(rawCurrentRows);
+        const previousRows = filterDigital(rawPreviousRows);
 
         setCurrentStats(calculateStats(currentRows, undefined, undefined, locationParam));
         setPreviousStats(calculateStats(previousRows, undefined, undefined, locationParam));
@@ -270,7 +274,7 @@ export function KPIDashboard({
     } finally {
       setLoading(false);
     }
-  }, [location, dateRange, currentYear, fetchProductieForYear]);
+  }, [location, dateRange, currentYear, fetchProductieForYear, hideDigital]);
 
   useEffect(() => {
     fetchKPIData();

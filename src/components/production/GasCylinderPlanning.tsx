@@ -109,7 +109,7 @@ export function GasCylinderPlanning({ location = "all" }: GasCylinderPlanningPro
     "Juli", "Augustus", "September", "Oktober", "November", "December",
   ];
 
-  const uniqueCustomers = [...new Set(orders.map((o) => o.customer_name))].sort();
+  const uniqueCustomers = [...new Set(orders.map((o) => o.customer_name))].filter(Boolean).sort();
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -144,7 +144,11 @@ export function GasCylinderPlanning({ location = "all" }: GasCylinderPlanningPro
           .range(from, from + PAGE - 1);
         if (error) {
           console.error("Error fetching Productie:", error);
-          toast.error(`Fout bij ophalen productiedata: ${error.message}`);
+          const detail = [error.code, error.hint, error.details].filter(Boolean).join(" | ");
+          toast.error(`Fout bij ophalen productiedata: ${error.message}`, {
+            description: detail || undefined,
+            duration: 10000,
+          });
           setOrders([]);
           setLoading(false);
           return;
@@ -165,7 +169,8 @@ export function GasCylinderPlanning({ location = "all" }: GasCylinderPlanningPro
       })));
     } catch (err) {
       console.error("Fetch error:", err);
-      toast.error("Fout bij ophalen productiedata");
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Fout bij ophalen productiedata: ${msg}`, { duration: 10000 });
       setOrders([]);
     }
     setLoading(false);
@@ -421,7 +426,7 @@ export function GasCylinderPlanning({ location = "all" }: GasCylinderPlanningPro
                         {order.cylinder_size > 0 ? `${order.cylinder_size} L` : "–"}
                       </TableCell>
                       <TableCell>
-                        {format(new Date(order.scheduled_date), "dd-MM-yyyy")}
+                        {order.scheduled_date ? format(new Date(order.scheduled_date), "dd-MM-yyyy") : "–"}
                       </TableCell>
                     </TableRow>
                   ))}

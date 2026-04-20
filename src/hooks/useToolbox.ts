@@ -64,7 +64,15 @@ export function useToolboxes(includeAll = false) {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setToolboxes((data as any) || []);
+      // Deduplicate by title — keep the entry with the highest sort_order / most recent created_at (already ordered)
+      const seen = new Set<string>();
+      const unique = ((data as any) || []).filter((t: ToolboxItem) => {
+        const key = t.title.trim().toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      setToolboxes(unique);
     } catch (error) {
       console.error("Error fetching toolboxes:", error);
       toast.error("Fout bij het laden van toolboxes");
@@ -81,11 +89,18 @@ export function useToolboxes(includeAll = false) {
 export function useToolboxSections(toolboxId: string | null) {
   const [sections, setSections] = useState<ToolboxSection[]>([]);
   const [loading, setLoading] = useState(false);
+  // Track which ID was actually fetched — isReady only true once fetch completes for current ID
+  const [loadedId, setLoadedId] = useState<string | null>(null);
 
   const fetch = useCallback(async () => {
-    if (!toolboxId) { setSections([]); return; }
+    if (!toolboxId) {
+      setSections([]);
+      setLoadedId(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from("toolbox_sections" as any)
         .select("*")
@@ -94,6 +109,7 @@ export function useToolboxSections(toolboxId: string | null) {
 
       if (error) throw error;
       setSections((data as any) || []);
+      setLoadedId(toolboxId);
     } catch (error) {
       console.error("Error fetching sections:", error);
     } finally {
@@ -103,7 +119,10 @@ export function useToolboxSections(toolboxId: string | null) {
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  return { sections, loading, refetch: fetch, setSections };
+  // isReady: fetch completed AND result belongs to the current toolboxId
+  const isReady = loadedId === toolboxId && !loading;
+
+  return { sections, loading, isReady, refetch: fetch, setSections };
 }
 
 export function useToolboxCompletions(toolboxId?: string) {

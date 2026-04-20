@@ -175,6 +175,7 @@ export function SOLPGSImportDialog({
               if (c === "capacity") colMap.capacity = idx;
               if (c === "locationid") colMap.locationId = idx;
               if (c === "ds_center_description") colMap.dsCenterDescription = idx;
+              if (c === "aantal" || c === "quantity") colMap.aantal = idx;
             });
             break;
           }
@@ -205,6 +206,10 @@ export function SOLPGSImportDialog({
           const dsCenterDesc = colMap.dsCenterDescription !== undefined
             ? String(row[colMap.dsCenterDescription] || "").trim()
             : "";
+          const parsedAantal = colMap.aantal !== undefined 
+            ? parseFloat(String(row[colMap.aantal] || "1").replace(',', '.')) 
+            : 1;
+          const aantal = isNaN(parsedAantal) ? 1 : parsedAantal;
 
           if (isNaN(capacity) || capacity <= 0) continue;
 
@@ -226,7 +231,8 @@ export function SOLPGSImportDialog({
           }
 
           const gasKeyword = extractGasKeyword(descForGas);
-          const weight = locInfo.isFull ? detectGasWeight(descForGas, capacity) : 0;
+          const weightPerCyl = locInfo.isFull ? detectGasWeight(descForGas, capacity) : 0;
+          const weight = weightPerCyl * aantal;
 
           if (!weightMap.has(gasKeyword)) {
             weightMap.set(gasKeyword, { emmen: getLocData(), tilburg: getLocData() });
@@ -245,10 +251,10 @@ export function SOLPGSImportDialog({
             weightKg: 0,
           };
           if (locInfo.isFull) {
-            cyl.countVol++;
+            cyl.countVol += aantal;
             cyl.weightKg += weight;
           } else {
-            cyl.countLeeg++;
+            cyl.countLeeg += aantal;
           }
           locData.cylinders.set(cylKey, cyl);
         }

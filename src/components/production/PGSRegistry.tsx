@@ -36,11 +36,13 @@ import {
   Activity,
   Container,
   CalendarClock,
-  FileSpreadsheet,
   Link2,
-  HelpCircle,
-  Filter,
   Calculator,
+  Zap,
+  Info,
+  Plus,
+  HelpCircle,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatNumber } from "@/lib/utils";
@@ -48,8 +50,7 @@ import * as XLSX from "xlsx";
 import { getGasColor } from "@/constants/gasColors";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { SOLPGSImportDialog } from "./SOLPGSImportDialog";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // GHS pictogram config with diamond styling
 const GHS_CONFIG: Record<string, { label: string; src: string }> = {
@@ -206,6 +207,14 @@ interface CylinderBreakdownItem {
   weightKg: number;
 }
 
+/** Live breakdown item calculated from "Voorraad" table */
+interface LiveBreakdownItem {
+  description: string;  // ContainerTypeDescr or ContentDescription
+  capacity: number;     // Capacity in liters
+  count: number;        // sum of Aantal
+  weightKg: number;     // Aantal × Capacity × gas density (for full)
+}
+
 interface PGSSubstance {
   id: string;
   gas_type_id: string | null;
@@ -227,6 +236,10 @@ interface PGSSubstance {
   cylinder_breakdown?: CylinderBreakdownItem[];
   gas_type_name?: string;
   gas_type_color?: string;
+  // Live fields calculated from "Voorraad" table
+  live?: boolean;
+  liveStockKg?: number;
+  liveCylinderBreakdown?: LiveBreakdownItem[];
 }
 
 interface BulkTank {
@@ -249,6 +262,64 @@ interface BulkTank {
   wms_classification: string | null;
   gas_type_name?: string;
   gas_type_color?: string;
+}
+
+/** Paginated fetch helper — same pattern as VoorraadBeheer */
+async function fetchAllRows(tableName: string): Promise<any[]> {
+  const all: any[] = [];
+  const PAGE = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await (supabase.from(tableName as never) as any)
+      .select("*")
+      .range(from, from + PAGE - 1);
+    if (error) { console.error(`[fetchAllRows] "${tableName}":`, error); break; }
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
+}
+
+/** Build live breakdown + stock for a substance from matched Voorraad rows */
+function buildLiveData(matched: any[]): { liveStockKg: number; liveCylinderBreakdown: LiveBreakdownItem[] } {
+  const map = new Map<string, LiveBreakdownItem>();
+  for (const row of matched) {
+    const rawDesc = row.ContentDescription || row.CD_CONTENT_TYPE || "";
+    const containerDesc = row.ContainerTypeDescr || "";
+    const isLeeg = rawDesc.toLowerCase().includes("leeg") || rawDesc.toLowerCase().includes("empty") || 
+                   containerDesc.toLowerCase().includes("leeg") || containerDesc.toLowerCase().includes("empty") ||
+                   (row.DS_CENTER_DESCRIPTION || "").toLowerCase().includes("leeg");
+
+    const desc = rawDesc || containerDesc;
+    const key = `${desc}__${row.Capacity || 0}`;
+    const density = getGasKgPerLiter(desc);
+    const aantal = Number(row.Aantal) || 0;
+    const cap = Number(row.Capacity) || 0;
+
+    const weight = (!isLeeg && density !== null) ? aantal * cap * density : 0;
+
+    const ex = map.get(key);
+    if (ex) { 
+      ex.count += aantal;
+      ex.weightKg += weight; 
+    }
+    else { 
+      map.set(key, { 
+        description: desc, 
+        capacity: cap, 
+        count: aantal,
+        weightKg: weight 
+      }); 
+    }
+  }
+  const liveCylinderBreakdown = [...map.values()].sort((a, b) => {
+    if (a.description === b.description) return b.capacity - a.capacity;
+    return a.description.localeCompare(b.description);
+  });
+  const liveStockKg = liveCylinderBreakdown.reduce((s, b) => s + b.weightKg, 0);
+  return { liveStockKg, liveCylinderBreakdown };
 }
 
 interface PGSRegistryProps {
@@ -278,11 +349,38 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
   const [pictogramMode, setPictogramMode] = useState<PictogramMode>(() => {
     return (localStorage.getItem("pgs-pictogram-mode") as PictogramMode) || "ghs";
   });
-  const [solImportOpen, setSolImportOpen] = useState(false);
-  const [filterUnknown, setFilterUnknown] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkingSubstance, setLinkingSubstance] = useState<PGSSubstance | null>(null);
   const [allGasTypes, setAllGasTypes] = useState<{ id: string; name: string }[]>([]);
+  const [detailEditOpen, setDetailEditOpen] = useState(false);
+  const [detailEditSaving, setDetailEditSaving] = useState(false);
+  const [detailEditForm, setDetailEditForm] = useState({
+    id: "",
+    gas_type_name: "",
+    pgs_guideline: "",
+    location: "",
+    max_allowed_kg: 0,
+    current_stock_kg: 0,
+    hazard_symbols: [] as string[],
+    gevi_number: "",
+    storage_class: "",
+    wms_classification: "",
+    un_number: "",
+    risk_phrases: "",
+    safety_phrases: "",
+    storage_location: "",
+  });
+
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addSaving, setAddSaving] = useState(false);
+  const [addForm, setAddForm] = useState({
+    gas_type_name: "",
+    location: "sol_emmen" as "sol_emmen" | "sol_tilburg",
+    pgs_guideline: "PGS 9",
+    max_allowed_kg: "" as string | number,
+    current_stock_kg: "" as string | number,
+    un_number: "",
+  });
   const [cylinderSizes, setCylinderSizes] = useState<Array<{ id: string; name: string; capacity_liters: number | null }>>([]);
 
   const handlePictogramModeChange = (value: string) => {
@@ -305,7 +403,11 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
         query = query.eq("location", locationTab as "sol_emmen" | "sol_tilburg");
       }
 
-      const { data, error } = await query;
+      // Parallel: fetch substances + gas types + live Voorraad
+      const [{ data, error }, voorraadRows] = await Promise.all([
+        query,
+        fetchAllRows("Voorraad"),
+      ]);
       if (error) throw error;
 
       const gasTypeIds = [...new Set((data || []).map(s => s.gas_type_id).filter(Boolean))];
@@ -322,13 +424,33 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
         }
       }
 
-      setSubstances((data || []).map(s => ({
-        ...s,
-        hazard_symbols: s.hazard_symbols || [],
-        cylinder_breakdown: (Array.isArray(s.cylinder_breakdown) ? s.cylinder_breakdown : []) as unknown as CylinderBreakdownItem[],
-        gas_type_name: s.gas_type_id ? stripPurity(gasTypeMap[s.gas_type_id]?.name) || "Onbekend" : "Onbekend",
-        gas_type_color: s.gas_type_id ? getGasColor(stripPurity(gasTypeMap[s.gas_type_id]?.name) || "", gasTypeMap[s.gas_type_id]?.color || "#6b7280") : "#6b7280",
-      })));
+      setSubstances((data || []).map(s => {
+        const gasTypeName = s.gas_type_id ? stripPurity(gasTypeMap[s.gas_type_id]?.name) || "Onbekend" : "Onbekend";
+        const gasTypeColor = s.gas_type_id ? getGasColor(stripPurity(gasTypeMap[s.gas_type_id]?.name) || "", gasTypeMap[s.gas_type_id]?.color || "#6b7280") : "#6b7280";
+
+        // Match Voorraad rows: same location + gas name keyword in ContentDescription
+        const normalizedGasName = gasTypeName.toLowerCase();
+        const matched = gasTypeName !== "Onbekend" ? voorraadRows.filter(row => {
+          const loc = (row.DS_CENTER_DESCRIPTION || "").toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+          const descForGas = row.ContentDescription || row.CD_CONTENT_TYPE || "";
+          const content = descForGas.toLowerCase();
+          return loc === s.location && normalizedGasName && content.includes(normalizedGasName);
+        }) : [];
+
+        const { liveStockKg, liveCylinderBreakdown } = buildLiveData(matched);
+        const live = matched.length > 0;
+
+        return {
+          ...s,
+          hazard_symbols: s.hazard_symbols || [],
+          cylinder_breakdown: (Array.isArray(s.cylinder_breakdown) ? s.cylinder_breakdown : []) as unknown as CylinderBreakdownItem[],
+          gas_type_name: gasTypeName,
+          gas_type_color: gasTypeColor,
+          live,
+          liveStockKg,
+          liveCylinderBreakdown,
+        };
+      }));
     } catch (err) {
       console.error("Error fetching PGS data:", err);
       toast.error("Fout bij ophalen PGS-gegevens");
@@ -404,6 +526,127 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     } catch (err) {
       console.error("Error linking gas type:", err);
       toast.error("Fout bij koppelen gastype");
+    }
+  };
+
+  const handleAddSubstance = async () => {
+    const name = addForm.gas_type_name.trim();
+    const maxKg = Number(addForm.max_allowed_kg);
+    if (!name || maxKg <= 0) {
+      toast.error("Vul een gasnaam en de maximale hoeveelheid in");
+      return;
+    }
+    setAddSaving(true);
+    try {
+      // Look up existing gas_type by name (case-insensitive), or create new
+      const existing = allGasTypes.find(gt => gt.name.toLowerCase() === name.toLowerCase());
+      let gasTypeId: string;
+      if (existing) {
+        gasTypeId = existing.id;
+      } else {
+        const { data: newType, error: typeErr } = await supabase
+          .from("gas_types")
+          .insert({ name, color: "#6b7280", is_active: true })
+          .select("id")
+          .single();
+        if (typeErr || !newType) throw typeErr ?? new Error("Aanmaken gastype mislukt");
+        gasTypeId = newType.id;
+      }
+      const { error } = await supabase.from("pgs_substances").insert({
+        gas_type_id: gasTypeId,
+        location: addForm.location,
+        pgs_guideline: addForm.pgs_guideline,
+        max_allowed_kg: maxKg,
+        current_stock_kg: Number(addForm.current_stock_kg) || 0,
+        is_active: true,
+        hazard_symbols: [],
+        cylinder_breakdown: [],
+        un_number: addForm.un_number.trim() || null,
+      });
+      if (error) throw error;
+      toast.success(`${name} toegevoegd aan het PGS Register`);
+      setAddDialogOpen(false);
+      setAddForm({ gas_type_name: "", location: "sol_emmen", pgs_guideline: "PGS 9", max_allowed_kg: "", current_stock_kg: "", un_number: "" });
+      fetchSubstances();
+    } catch (err) {
+      console.error(err);
+      toast.error("Fout bij opslaan");
+    } finally {
+      setAddSaving(false);
+    }
+  };
+
+  const openDetailEdit = (substance: PGSSubstance) => {
+    setDetailEditForm({
+      id: substance.id,
+      gas_type_name: substance.gas_type_name || "",
+      pgs_guideline: substance.pgs_guideline,
+      location: substance.location,
+      max_allowed_kg: substance.max_allowed_kg,
+      current_stock_kg: substance.current_stock_kg,
+      hazard_symbols: substance.hazard_symbols || [],
+      gevi_number: substance.gevi_number || "",
+      storage_class: substance.storage_class || "",
+      wms_classification: substance.wms_classification || "",
+      un_number: substance.un_number || "",
+      risk_phrases: substance.risk_phrases || "",
+      safety_phrases: substance.safety_phrases || "",
+      storage_location: substance.storage_location || "",
+    });
+    setDetailEditOpen(true);
+  };
+
+  const deleteDetailEdit = async () => {
+    if (!confirm("Weet je zeker dat je dit gas wilt verbergen uit het register? (Je kunt het later via de database weer terughalen indien nodig).")) return;
+    setDetailEditSaving(true);
+    try {
+      const { error } = await supabase
+        .from("pgs_substances")
+        .update({
+          is_active: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", detailEditForm.id);
+      if (error) throw error;
+      toast.success("Gas succesvol verborgen");
+      setDetailEditOpen(false);
+      fetchSubstances();
+    } catch (err) {
+      console.error(err);
+      toast.error("Fout bij verbergen");
+    } finally {
+      setDetailEditSaving(false);
+    }
+  };
+
+  const saveDetailEdit = async () => {
+    setDetailEditSaving(true);
+    try {
+      const { error } = await supabase
+        .from("pgs_substances")
+        .update({
+          max_allowed_kg: detailEditForm.max_allowed_kg,
+          current_stock_kg: detailEditForm.current_stock_kg,
+          hazard_symbols: detailEditForm.hazard_symbols,
+          gevi_number: detailEditForm.gevi_number.trim() || null,
+          storage_class: detailEditForm.storage_class.trim() || null,
+          wms_classification: detailEditForm.wms_classification.trim() || null,
+          un_number: detailEditForm.un_number.trim() || null,
+          risk_phrases: detailEditForm.risk_phrases.trim() || null,
+          safety_phrases: detailEditForm.safety_phrases.trim() || null,
+          storage_location: detailEditForm.storage_location.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", detailEditForm.id);
+      if (error) throw error;
+      toast.success("Gegevens opgeslagen");
+      setDetailEditOpen(false);
+      fetchSubstances();
+    } catch (err) {
+      console.error(err);
+      toast.error("Fout bij opslaan");
+    } finally {
+      setDetailEditSaving(false);
     }
   };
 
@@ -514,8 +757,9 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
       "GEVI": s.gevi_number || "",
       "WMS": s.wms_classification || "",
       "Max. Toegestaan (kg)": s.max_allowed_kg,
-      "Huidige Voorraad (kg)": s.current_stock_kg,
-      "Bezetting (%)": s.max_allowed_kg > 0 ? Math.round((s.current_stock_kg / s.max_allowed_kg) * 100) : 0,
+      "Huidige Voorraad (kg)": s.live ? (s.liveStockKg ?? 0) : s.current_stock_kg,
+      "Bezetting (%)": Math.round(getPct(s)),
+      "Bron": s.live ? "Live (Voorraad)" : "Handmatig",
       "H-zinnen": s.risk_phrases || "",
       "P-zinnen": s.safety_phrases || "",
       Locatie: s.location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg",
@@ -553,7 +797,8 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     const pictoLabel = pictogramMode === "adr" ? "ADR" : pictogramMode === "both" ? "GHS/ADR" : "GHS";
     const head = [["Gas", "PGS", "UN", "CAS", pictoLabel, "GEVI", "WMS", "Opslagkl.", "Max (kg)", "Huidig (kg)", "Bez. (%)", "H-zinnen", "P-zinnen", "Locatie"]];
     const body = processedSubstances.map(s => {
-      const pct = s.max_allowed_kg > 0 ? Math.round((s.current_stock_kg / s.max_allowed_kg) * 100) : 0;
+      const pct = Math.round(getPct(s));
+      const stockKg = s.live ? (s.liveStockKg ?? 0) : s.current_stock_kg;
       return [
         s.gas_type_name || "",
         s.pgs_guideline,
@@ -564,7 +809,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
         s.wms_classification || "—",
         s.storage_class || "—",
         formatNumber(s.max_allowed_kg, 0),
-        formatNumber(s.current_stock_kg, 0),
+        formatNumber(stockKg, 0),
         `${pct}%`,
         s.risk_phrases || "—",
         s.safety_phrases || "—",
@@ -620,11 +865,14 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
   const guidelines = useMemo(() => [...new Set(substances.map(s => s.pgs_guideline))].sort(), [substances]);
   const storageClasses = useMemo(() => [...new Set(substances.map(s => s.storage_class).filter(Boolean))].sort(), [substances]);
 
-  const getPct = (s: PGSSubstance) => s.max_allowed_kg > 0 ? (s.current_stock_kg / s.max_allowed_kg) * 100 : 0;
+  const getPct = (s: PGSSubstance) => {
+    const stockKg = s.live ? (s.liveStockKg ?? 0) : s.current_stock_kg;
+    return s.max_allowed_kg > 0 ? (stockKg / s.max_allowed_kg) * 100 : 0;
+  };
 
   const processedSubstances = useMemo(() => {
     let result = substances.filter(s => {
-      if (filterUnknown && s.gas_type_name !== "Onbekend") return false;
+      if (s.gas_type_name === "Onbekend") return false;
       if (filterGuideline !== "all" && s.pgs_guideline !== filterGuideline) return false;
       if (filterStorageClass !== "all" && s.storage_class !== filterStorageClass) return false;
       if (searchQuery) {
@@ -651,11 +899,10 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     });
 
     return result;
-  }, [substances, filterGuideline, filterStorageClass, filterUnknown, searchQuery, sortField, sortDir]);
+  }, [substances, filterGuideline, filterStorageClass, searchQuery, sortField, sortDir]);
 
   // KPI stats
-  const unknownCount = useMemo(() => substances.filter(s => s.gas_type_name === "Onbekend").length, [substances]);
-  const stats = useMemo(() => {
+const stats = useMemo(() => {
     const total = substances.length;
     const ok = substances.filter(s => getPct(s) < 80).length;
     const warning = substances.filter(s => { const p = getPct(s); return p >= 80 && p < 95; }).length;
@@ -701,6 +948,12 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button size="sm" onClick={() => setAddDialogOpen(true)} className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              Nieuwe stof
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={exportToPDF} className="gap-1.5">
             <FileText className="h-4 w-4" />
             PDF
@@ -709,12 +962,6 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
             <Download className="h-4 w-4" />
             Excel
           </Button>
-          {isAdmin && (
-            <Button variant="outline" size="sm" onClick={() => setSolImportOpen(true)} className="gap-1.5">
-              <FileSpreadsheet className="h-4 w-4" />
-              SOL Import
-            </Button>
-          )}
         </div>
       </div>
 
@@ -765,29 +1012,26 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
           <ToggleGroupItem value="both" className="text-xs px-2.5 h-9">Beide</ToggleGroupItem>
         </ToggleGroup>
 
-        {unknownCount > 0 && (
-          <Button
-            variant={filterUnknown ? "default" : "outline"}
-            size="sm"
-            className="gap-1.5 h-9 text-xs"
-            onClick={() => setFilterUnknown(!filterUnknown)}
-          >
-            <HelpCircle className="h-3.5 w-3.5" />
-            Onbekend ({unknownCount})
-          </Button>
-        )}
-
         <div className="flex-1" />
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative w-52">
+          <div className="relative flex-1 min-w-[160px] max-w-xs">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Zoek gas, UN, CAS..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="h-9 pl-8 text-sm"
+              className="h-9 pl-8 pr-8 text-sm"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Wis zoekterm"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
           <Select value={filterGuideline} onValueChange={setFilterGuideline}>
             <SelectTrigger className="h-9 w-40 text-xs">
@@ -863,7 +1107,56 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
                         <span className="inline-flex items-center gap-1">Bezetting <SortIcon field="pct" /></span>
                       </TableHead>
                       <TableHead className="text-right">Max (kg)</TableHead>
-                      <TableHead className="text-right">Huidig (kg)</TableHead>
+                      <TableHead className="text-right">
+                        <span className="inline-flex items-center justify-end gap-1">
+                          Huidig (kg)
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button className="opacity-40 hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                                <Info className="h-3.5 w-3.5" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent side="left" align="start" className="w-80 text-sm p-0 overflow-hidden">
+                              <div className="bg-muted/60 border-b px-4 py-2.5 font-semibold text-sm flex items-center gap-2">
+                                <Zap className="h-4 w-4 text-emerald-500" />
+                                Gewichtberekening — Live
+                              </div>
+                              <div className="px-4 py-3 space-y-3 text-xs text-muted-foreground">
+                                <p>Het gewicht per stof wordt automatisch berekend uit de live <strong className="text-foreground">Voorraad</strong>-tabel:</p>
+                                <div className="rounded-md bg-muted/50 border px-3 py-2 font-mono text-[11px] leading-relaxed">
+                                  <span className="text-foreground">Gewicht (kg)</span>{" = "}<br />
+                                  <span className="pl-2">Aantal × Inhoud (L) × Dichtheid (kg/L)</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="font-semibold text-foreground">Gasdichtheden (bij vuldruk)</p>
+                                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                                    {([
+                                      ["Zuurstof", "0,276 kg/L · 200 bar"],
+                                      ["Stikstof", "0,233 kg/L · 200 bar"],
+                                      ["Argon", "0,343 kg/L · 200 bar"],
+                                      ["Helium", "0,033 kg/L · 200 bar"],
+                                      ["Waterstof", "0,016 kg/L · 200 bar"],
+                                      ["CO₂", "0,75 kg/L · vloeibaar"],
+                                      ["Lachgas", "0,67 kg/L · vloeibaar"],
+                                      ["Acetyleen", "0,15 kg/L · opgelost"],
+                                      ["Propaan", "0,43 kg/L · vloeibaar"],
+                                    ] as [string, string][]).map(([gas, val]) => (
+                                      <span key={gas} className="contents">
+                                        <span className="text-foreground">{gas}</span>
+                                        <span className="tabular-nums">{val}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="border-t pt-2 space-y-1">
+                                  <p><strong className="text-foreground">Koppeling:</strong> elke Voorraad-rij wordt via sleutelwoord (gasnaam) en locatie automatisch aan een PGS-stof gekoppeld.</p>
+                                  <p><strong className="text-foreground">Grijs "handmatig":</strong> geen Voorraad-match — gewicht uit handmatig ingevoerde waarde.</p>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </span>
+                      </TableHead>
                       <TableHead className="text-xs">Opslagplaats</TableHead>
                       {isAdmin && <TableHead className="w-16" />}
                     </TableRow>
@@ -891,7 +1184,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
                           editValues={editValues}
                           colSpan={colSpan}
                           onToggle={() => toggleRow(substance.id)}
-                          onStartEdit={() => startEdit(substance)}
+                          onStartEdit={() => openDetailEdit(substance)}
                           onCancelEdit={cancelEdit}
                           onSaveEdit={() => saveEdit(substance.id)}
                           onEditChange={setEditValues}
@@ -972,7 +1265,17 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
                             />
                             <div className="flex items-center justify-between text-[11px]">
                               <span className="font-medium tabular-nums">{formatNumber(bulkEditValue, 0)} kg</span>
-                              <span className="text-muted-foreground">/ {formatNumber(bulkEditCapacity, 0)} kg</span>
+                              <div className="flex items-center gap-1">
+                                <span className="text-muted-foreground">/</span>
+                                <Input 
+                                  type="number" 
+                                  min={0}
+                                  value={bulkEditCapacity}
+                                  onChange={e => setBulkEditCapacity(Number(e.target.value) || 0)}
+                                  className="h-6 w-20 text-[11px] px-2 py-0 text-right"
+                                />
+                                <span className="text-muted-foreground">kg</span>
+                              </div>
                             </div>
                             <div className="flex gap-1 justify-end">
                               <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => saveBulkEdit(tank.id)}>
@@ -1031,15 +1334,287 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
         </p>
       )}
 
-      {isAdmin && (
-        <SOLPGSImportDialog
-          open={solImportOpen}
-          onOpenChange={setSolImportOpen}
-          substances={substances}
-          locationTab={locationTab}
-          onUpdated={fetchSubstances}
-        />
-      )}
+      {/* Detail Edit Dialog */}
+      <Dialog open={detailEditOpen} onOpenChange={setDetailEditOpen}>
+        <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-4 w-4 text-primary" />
+              {detailEditForm.gas_type_name} bewerken
+              <span className="text-muted-foreground font-normal text-sm">
+                — {detailEditForm.pgs_guideline} · {detailEditForm.location === "sol_emmen" ? "Emmen" : "Tilburg"}
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="space-y-5 pr-4 pb-2">
+
+              {/* GHS Symbol Picker */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">Gevaarssymbolen (GHS)</label>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(GHS_CONFIG).map(([code, cfg]) => {
+                    const active = detailEditForm.hazard_symbols.includes(code);
+                    return (
+                      <button
+                        key={code}
+                        type="button"
+                        onClick={() => setDetailEditForm(f => ({
+                          ...f,
+                          hazard_symbols: active
+                            ? f.hazard_symbols.filter(s => s !== code)
+                            : [...f.hazard_symbols, code],
+                        }))}
+                        className={cn(
+                          "flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all text-[10px] font-medium w-16",
+                          active
+                            ? "border-primary bg-primary/5 opacity-100"
+                            : "border-border bg-muted/30 opacity-40 hover:opacity-70"
+                        )}
+                      >
+                        <img src={cfg.src} alt={code} className="w-9 h-9" />
+                        <span>{code}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {detailEditForm.hazard_symbols.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Geselecteerd: {detailEditForm.hazard_symbols.map(s => GHS_CONFIG[s]?.label).join(", ")}
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Max kg */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Max. toegestaan (kg)</label>
+                  <Input
+                    type="number" min={0}
+                    value={detailEditForm.max_allowed_kg}
+                    onChange={e => setDetailEditForm(f => ({ ...f, max_allowed_kg: Number(e.target.value) }))}
+                  />
+                </div>
+                {/* Huidig kg — only if not live */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Huidig (kg) <span className="text-muted-foreground font-normal text-xs">handmatig</span></label>
+                  <Input
+                    type="number" min={0}
+                    value={detailEditForm.current_stock_kg}
+                    onChange={e => setDetailEditForm(f => ({ ...f, current_stock_kg: Number(e.target.value) }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* UN-nummer */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">UN-nummer</label>
+                  <Input
+                    placeholder="bijv. UN1978"
+                    value={detailEditForm.un_number}
+                    onChange={e => setDetailEditForm(f => ({ ...f, un_number: e.target.value }))}
+                  />
+                </div>
+                {/* GEVI */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">GEVI-nummer</label>
+                  <Input
+                    placeholder="bijv. 23"
+                    value={detailEditForm.gevi_number}
+                    onChange={e => setDetailEditForm(f => ({ ...f, gevi_number: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Opslagklasse */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Opslagklasse</label>
+                  <Input
+                    placeholder="bijv. 2A"
+                    value={detailEditForm.storage_class}
+                    onChange={e => setDetailEditForm(f => ({ ...f, storage_class: e.target.value }))}
+                  />
+                </div>
+                {/* WMS */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">WMS Classificatie</label>
+                  <Input
+                    placeholder="bijv. Ontvlambaar"
+                    value={detailEditForm.wms_classification}
+                    onChange={e => setDetailEditForm(f => ({ ...f, wms_classification: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              {/* Opslagplaats */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Opslagplaats <span className="font-normal text-muted-foreground text-xs">(fysieke locatie / hal)</span></label>
+                <Input
+                  placeholder="bijv. Vak A, Hal 3"
+                  value={detailEditForm.storage_location}
+                  onChange={e => setDetailEditForm(f => ({ ...f, storage_location: e.target.value }))}
+                />
+              </div>
+
+              {/* H-zinnen */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">H-zinnen <span className="font-normal text-muted-foreground text-xs">(gevaarszinnen)</span></label>
+                <Input
+                  placeholder="bijv. H220; H280"
+                  value={detailEditForm.risk_phrases}
+                  onChange={e => setDetailEditForm(f => ({ ...f, risk_phrases: e.target.value }))}
+                />
+              </div>
+
+              {/* P-zinnen */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">P-zinnen <span className="font-normal text-muted-foreground text-xs">(veiligheidsaanbevelingen)</span></label>
+                <Input
+                  placeholder="bijv. P210; P377; P381"
+                  value={detailEditForm.safety_phrases}
+                  onChange={e => setDetailEditForm(f => ({ ...f, safety_phrases: e.target.value }))}
+                />
+              </div>
+
+            </div>
+          </ScrollArea>
+
+          <div className="flex items-center justify-between pt-3 border-t shrink-0">
+            <Button 
+              variant="outline" 
+              className="text-destructive hover:text-white hover:bg-destructive hover:border-destructive h-9 gap-1.5"
+              onClick={deleteDetailEdit}
+              disabled={detailEditSaving}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Verberg uit register</span>
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setDetailEditOpen(false)} disabled={detailEditSaving}>
+                Annuleren
+              </Button>
+              <Button onClick={saveDetailEdit} disabled={detailEditSaving} className="min-w-[90px]">
+                {detailEditSaving ? "Opslaan..." : "Opslaan"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Substance Dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" />
+              Nieuwe PGS-stof toevoegen
+            </DialogTitle>
+            <DialogDescription>
+              Vul de gegevens in. Als de gasnaam nog niet bestaat wordt er automatisch een nieuw gastype aangemaakt.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Gas naam */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Gasnaam *</label>
+              <Input
+                placeholder="bijv. Propaan"
+                list="gas-type-suggestions"
+                value={addForm.gas_type_name}
+                onChange={e => setAddForm(f => ({ ...f, gas_type_name: e.target.value }))}
+              />
+              <datalist id="gas-type-suggestions">
+                {allGasTypes.map(gt => <option key={gt.id} value={gt.name} />)}
+              </datalist>
+              {addForm.gas_type_name && !allGasTypes.some(gt => gt.name.toLowerCase() === addForm.gas_type_name.toLowerCase()) && (
+                <p className="text-xs text-amber-600">Nieuw gastype — wordt aangemaakt bij opslaan.</p>
+              )}
+            </div>
+
+            {/* Locatie */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Locatie *</label>
+              <div className="flex gap-3">
+                {(["sol_emmen", "sol_tilburg"] as const).map(loc => (
+                  <label key={loc} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="add-location"
+                      value={loc}
+                      checked={addForm.location === loc}
+                      onChange={() => setAddForm(f => ({ ...f, location: loc }))}
+                      className="accent-primary"
+                    />
+                    <span className="text-sm">{loc === "sol_emmen" ? "Emmen" : "Tilburg"}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* PGS Richtlijn */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">PGS Richtlijn *</label>
+              <Select value={addForm.pgs_guideline} onValueChange={v => setAddForm(f => ({ ...f, pgs_guideline: v }))}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[...new Set(["PGS 9", "PGS 15", "PGS 16", ...guidelines])].map(g => (
+                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Max kg + Huidig kg side by side */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Max. toegestaan (kg) *</label>
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="0"
+                  value={addForm.max_allowed_kg}
+                  onChange={e => setAddForm(f => ({ ...f, max_allowed_kg: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Huidig (kg)</label>
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="0"
+                  value={addForm.current_stock_kg}
+                  onChange={e => setAddForm(f => ({ ...f, current_stock_kg: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* UN-nummer */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-muted-foreground">UN-nummer <span className="font-normal">(optioneel)</span></label>
+              <Input
+                placeholder="bijv. UN1978"
+                value={addForm.un_number}
+                onChange={e => setAddForm(f => ({ ...f, un_number: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)} disabled={addSaving}>
+              Annuleren
+            </Button>
+            <Button onClick={handleAddSubstance} disabled={addSaving || !addForm.gas_type_name.trim() || Number(addForm.max_allowed_kg) <= 0}>
+              {addSaving ? "Opslaan..." : "Toevoegen"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Link Gas Type Dialog */}
       <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
@@ -1167,14 +1742,14 @@ function SubstanceRow({
                 <TooltipContent side="top" className="max-w-xs text-xs">
                   <p className="font-medium">Geen gastype gekoppeld</p>
                   <p className="text-muted-foreground mt-0.5">
-                    Deze stof kon niet automatisch worden gematcht bij de SOL import.
+                    Deze stof is niet gekoppeld aan een gastype — live voorraadberekening is niet mogelijk.
                     {substance.notes && <span className="block mt-1"><strong>Info:</strong> {substance.notes}</span>}
                     {substance.un_number && <span className="block"><strong>UN:</strong> {substance.un_number}</span>}
                   </p>
                 </TooltipContent>
               </Tooltip>
             )}
-            {isUnknown && isAdmin && onLinkGasType && (
+            {isAdmin && onLinkGasType && (isUnknown || !substance.live) && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -1186,7 +1761,7 @@ function SubstanceRow({
                     <Link2 className="h-3 w-3" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">Koppel aan gastype</TooltipContent>
+                <TooltipContent side="top" className="text-xs">{isUnknown ? "Koppel aan gastype" : "Gastype opnieuw koppelen"}</TooltipContent>
               </Tooltip>
             )}
             {substance.location && (
@@ -1250,7 +1825,56 @@ function SubstanceRow({
                   </Badge>
                 </div>
               </div>
-              {substance.cylinder_breakdown && substance.cylinder_breakdown.length > 0 ? (
+              {substance.live && substance.liveCylinderBreakdown && substance.liveCylinderBreakdown.length > 0 ? (
+                <>
+                  <div className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/20 border-b flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                    <Zap className="h-3 w-3" />
+                    Live data uit Voorraad tabel
+                  </div>
+                  <ScrollArea className="h-auto max-h-[400px] overflow-auto">
+                    <div className="p-3">
+                      <div className="space-y-1">
+                        {substance.liveCylinderBreakdown.map((item, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-3 rounded-md px-2.5 py-1.5 hover:bg-muted/50 transition-colors text-xs"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-foreground font-medium leading-tight break-words">
+                                {item.description || "Onbekend type"}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                {item.capacity} L cilinder
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3 flex-shrink-0 tabular-nums">
+                              <div className="text-center min-w-[36px]">
+                                <span className="font-semibold text-foreground">{item.count}</span>
+                                <p className="text-[9px] text-muted-foreground leading-none mt-0.5">stuks</p>
+                              </div>
+                              <div className="text-right min-w-[52px]">
+                                <span className="font-semibold">{formatNumber(item.weightKg, 1)}</span>
+                                <p className="text-[9px] text-muted-foreground leading-none mt-0.5">kg</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </ScrollArea>
+                  <div className="px-4 py-2.5 border-t bg-muted/30 flex items-center justify-between text-xs">
+                    <span className="font-semibold text-foreground">Totaal</span>
+                    <div className="flex items-center gap-4 tabular-nums">
+                      <span className="text-muted-foreground">
+                        {substance.liveCylinderBreakdown.reduce((s, i) => s + i.count, 0)} stuks
+                      </span>
+                      <span className="font-bold">
+                        {formatNumber(substance.liveCylinderBreakdown.reduce((s, i) => s + i.weightKg, 0), 1)} kg
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : substance.cylinder_breakdown && substance.cylinder_breakdown.length > 0 ? (
                 <ScrollArea className="h-auto max-h-[400px] overflow-auto">
                   <div className="p-3">
                     <div className="space-y-1">
@@ -1268,15 +1892,11 @@ function SubstanceRow({
                             </p>
                           </div>
                           <div className="flex items-center gap-3 flex-shrink-0 tabular-nums">
-                            <div className="text-center min-w-[28px]">
-                              <span className="font-semibold text-green-600 dark:text-green-400">{item.countVol}</span>
-                              <p className="text-[9px] text-muted-foreground leading-none mt-0.5">vol</p>
+                            <div className="text-center min-w-[36px]">
+                              <span className="font-semibold text-foreground">{item.countVol + item.countLeeg}</span>
+                              <p className="text-[9px] text-muted-foreground leading-none mt-0.5">stuks</p>
                             </div>
-                            <div className="text-center min-w-[28px]">
-                              <span className="text-orange-500">{item.countLeeg}</span>
-                              <p className="text-[9px] text-muted-foreground leading-none mt-0.5">leeg</p>
-                            </div>
-                            <div className="text-right min-w-[48px]">
+                            <div className="text-right min-w-[52px]">
                               <span className="font-semibold">{formatNumber(item.weightKg, 1)}</span>
                               <p className="text-[9px] text-muted-foreground leading-none mt-0.5">kg</p>
                             </div>
@@ -1291,19 +1911,16 @@ function SubstanceRow({
                   <Container className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
                   <p className="text-xs text-muted-foreground">Geen cilinderdata beschikbaar</p>
                   <p className="text-[10px] text-muted-foreground/70 mt-1">
-                    Gebruik de SOL Import om cilinderdetails te laden
+                    Controleer of dit gastype een koppeling heeft in de Voorraad tabel
                   </p>
                 </div>
               )}
-              {substance.cylinder_breakdown && substance.cylinder_breakdown.length > 0 && (
+              {!substance.live && substance.cylinder_breakdown && substance.cylinder_breakdown.length > 0 && (
                 <div className="px-4 py-2.5 border-t bg-muted/30 flex items-center justify-between text-xs">
                   <span className="font-semibold text-foreground">Totaal</span>
                   <div className="flex items-center gap-4 tabular-nums">
-                    <span className="font-semibold text-green-600 dark:text-green-400">
-                      {substance.cylinder_breakdown.reduce((s, i) => s + i.countVol, 0)} vol
-                    </span>
-                    <span className="text-orange-500">
-                      {substance.cylinder_breakdown.reduce((s, i) => s + i.countLeeg, 0)} leeg
+                    <span className="text-muted-foreground">
+                      {substance.cylinder_breakdown.reduce((s, i) => s + i.countVol + i.countLeeg, 0)} stuks
                     </span>
                     <span className="font-bold">
                       {formatNumber(substance.cylinder_breakdown.reduce((s, i) => s + i.weightKg, 0), 1)} kg
@@ -1327,7 +1944,7 @@ function SubstanceRow({
           )}
         </TableCell>
         <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-          {isEditing ? (
+          {isEditing && !substance.live ? (
             <div className="flex items-center justify-end gap-1">
               <Input
                 type="number"
@@ -1351,10 +1968,28 @@ function SubstanceRow({
                 </Tooltip>
               )}
             </div>
+          ) : substance.live ? (
+            <div className="flex items-center justify-end gap-1.5">
+              <span className={cn("text-sm tabular-nums font-semibold", isWarning && "text-destructive")}>
+                {formatNumber(substance.liveStockKg ?? 0, 0)}
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex items-center gap-0.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium cursor-help">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    live
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">Automatisch berekend vanuit de live Voorraad tabel</TooltipContent>
+              </Tooltip>
+            </div>
           ) : (
-            <span className={cn("text-sm tabular-nums", isWarning && "font-bold text-destructive")}>
-              {formatNumber(substance.current_stock_kg, 0)}
-            </span>
+            <div className="flex items-center justify-end gap-1.5">
+              <span className={cn("text-sm tabular-nums", isWarning && "font-bold text-destructive")}>
+                {formatNumber(substance.current_stock_kg, 0)}
+              </span>
+              <span className="text-[10px] text-muted-foreground/50">handmatig</span>
+            </div>
           )}
         </TableCell>
         <TableCell className="text-xs text-muted-foreground">{substance.storage_location || "—"}</TableCell>
@@ -1506,8 +2141,8 @@ function SubstanceRow({
                       <div className="text-xs space-y-1">
                         <p className="font-semibold text-orange-600 dark:text-orange-400">Onbekende stof — niet gekoppeld aan een gastype</p>
                         <p className="text-muted-foreground">
-                          Deze stof kon niet automatisch worden gematcht tijdens de SOL import. 
-                          Gebruik de koppelknop (<Link2 className="h-3 w-3 inline" />) om deze stof aan een bestaand gastype te koppelen.
+                          Deze stof heeft geen koppeling met een gastype — daardoor kan de voorraad niet automatisch worden berekend.
+                          Gebruik de koppelknop (<Link2 className="h-3 w-3 inline" />) om dit op te lossen.
                         </p>
                         {substance.notes && (
                           <p className="text-foreground"><strong>Opmerking:</strong> {substance.notes}</p>

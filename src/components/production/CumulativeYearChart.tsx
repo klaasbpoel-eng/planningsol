@@ -119,7 +119,7 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
             for (const row of rows) {
               const raw: string = row.Datum || "";
               if (!raw) continue;
-              const iso = raw.includes("T") ? raw.substring(0, 10) : (() => { const p = raw.split("-"); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+              const iso = raw.includes("T") ? raw.substring(0, 10) : (() => { const p = raw.split("-"); return p.length === 3 ? (p[0].length === 4 ? raw : `${p[2]}-${p[1]}-${p[0]}`) : raw; })();
               const month = parseInt(iso.substring(5, 7), 10) - 1;
               if (month >= 0 && month < 12) monthly[month] += row.Aantal || 0;
             }

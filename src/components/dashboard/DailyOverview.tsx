@@ -741,21 +741,10 @@ export function DailyOverview() {
     return texts.some(t => t && t.toLowerCase().includes(q));
   }, [debouncedSearch]);
 
-  const filteredTasks = useMemo(() => {
-    const filtered = tasks.filter(t =>
-      matchesStatus(t.status) &&
-      matchesAny([t.task_types?.name, t.title, t.notes, t.assignee_name])
-    );
-    // Sort: items mét start_time eerst (oplopend), dan items zonder tijd
-    return filtered.slice().sort((a, b) => {
-      const at = a.start_time;
-      const bt = b.start_time;
-      if (at && bt) return at.localeCompare(bt);
-      if (at && !bt) return -1;
-      if (!at && bt) return 1;
-      return 0;
-    });
-  }, [tasks, matchesAny, matchesStatus]);
+  const filteredTasks = useMemo(() => tasks.filter(t =>
+    matchesStatus(t.status) &&
+    matchesAny([t.task_types?.name, t.title, t.notes, t.assignee_name])
+  ), [tasks, matchesAny, matchesStatus]);
 
   const filteredDryIce = useMemo(() => dryIceOrders.filter(o =>
     matchesStatus(o.status) && matchesAny([o.customer_name, o.notes, o.dry_ice_packaging?.name])
@@ -1057,48 +1046,45 @@ export function DailyOverview() {
           ) : (
             <>
             {/* === PROGRESS BAR + SUMMARY === */}
-            <div className="mb-4 print:hidden space-y-2">
-              {/* Voortgang */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium text-muted-foreground">Voortgang van de dag</span>
-                  <span className="font-semibold tabular-nums text-foreground">
-                    {progressStats.completed} <span className="text-muted-foreground font-normal">van</span> {progressStats.total} afgerond
-                    {progressStats.total > 0 && <span className="text-muted-foreground font-normal"> · {progressStats.percentage}%</span>}
+            <div className="mb-5 print:hidden space-y-3">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold tracking-wide text-foreground uppercase">
+                    Voortgang Vandaag
+                  </span>
+                  <span className="text-base font-bold text-foreground">
+                    {progressStats.completed} <span className="text-muted-foreground font-medium text-sm">/ {progressStats.total} afgerond</span>
                   </span>
                 </div>
-                <Progress
-                  value={progressStats.percentage}
-                  className={`h-2 ${progressStats.percentage > 75 ? "[&>div]:bg-green-500" : progressStats.percentage > 40 ? "[&>div]:bg-orange-500" : progressStats.total === 0 ? "[&>div]:bg-muted-foreground/30" : "[&>div]:bg-red-500"}`}
-                />
+                <Progress value={progressStats.percentage} className={`h-3 w-full shadow-inner ${progressStats.percentage > 75 ? "[&>div]:bg-success [&>div]:shadow-[0_0_8px_rgba(22,101,52,0.6)]" : progressStats.percentage > 40 ? "[&>div]:bg-warning [&>div]:shadow-[0_0_8px_rgba(202,138,4,0.6)]" : "[&>div]:bg-destructive [&>div]:shadow-[0_0_8px_rgba(185,28,28,0.6)]"}`} />
               </div>
-              {/* Samenvattingsstrook — één leesbare zin */}
-              {progressStats.total + progressStats.timeOffCount > 0 ? (
-                <p className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                  <span className="font-medium text-foreground">
-                    {viewMode === "day" ? (isToday(currentDate) ? "Vandaag" : "Deze dag") : "Deze week"}
+              <div className="flex flex-wrap gap-2">
+                {progressStats.ambulanceCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-red-500/10 text-red-700 dark:text-red-400">
+                    <Ambulance className="h-3 w-3" /> {progressStats.ambulanceCount}
                   </span>
-                  <span aria-hidden>·</span>
-                  <span><span className="font-medium text-foreground">{progressStats.total}</span> {progressStats.total === 1 ? "item" : "items"}</span>
-                  {progressStats.ambulanceCount > 0 && (
-                    <><span aria-hidden>·</span><span className="inline-flex items-center gap-1"><Ambulance className="h-3.5 w-3.5 text-red-600 dark:text-red-400" aria-hidden /> {progressStats.ambulanceCount} {progressStats.ambulanceCount === 1 ? "rit" : "ritten"}</span></>
-                  )}
-                  {progressStats.dryIceCount > 0 && (
-                    <><span aria-hidden>·</span><span className="inline-flex items-center gap-1"><Snowflake className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" aria-hidden /> {progressStats.totalDryIceKg} kg droogijs</span></>
-                  )}
-                  {progressStats.gasCount > 0 && (
-                    <><span aria-hidden>·</span><span className="inline-flex items-center gap-1"><Cylinder className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" aria-hidden /> {progressStats.totalCylinders} cil.</span></>
-                  )}
-                  {progressStats.taskCount > 0 && (
-                    <><span aria-hidden>·</span><span className="inline-flex items-center gap-1"><ClipboardList className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" aria-hidden /> {progressStats.taskCount} {progressStats.taskCount === 1 ? "taak" : "taken"}</span></>
-                  )}
-                  <span aria-hidden>·</span>
-                  <span className="inline-flex items-center gap-1">
-                    <Palmtree className="h-3.5 w-3.5 text-green-600 dark:text-green-400" aria-hidden />
-                    {progressStats.timeOffCount === 0 ? "iedereen aanwezig" : `${progressStats.timeOffCount} afwezig`}
+                )}
+                {progressStats.gasCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-700 dark:text-orange-400">
+                    <Cylinder className="h-3 w-3" /> {progressStats.totalCylinders} cil.
                   </span>
-                </p>
-              ) : null}
+                )}
+                {progressStats.dryIceCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-700 dark:text-cyan-400">
+                    <Snowflake className="h-3 w-3" /> {progressStats.totalDryIceKg} kg
+                  </span>
+                )}
+                {progressStats.taskCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-400">
+                    <ClipboardList className="h-3 w-3" /> {progressStats.taskCount}
+                  </span>
+                )}
+                {progressStats.timeOffCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
+                    <Palmtree className="h-3 w-3" /> {progressStats.timeOffCount}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* === SEARCH + FILTER === */}
@@ -1160,14 +1146,15 @@ export function DailyOverview() {
               </Alert>
             )}
             {progressStats.upcomingCount > 0 && viewMode === "day" && !lookaheadActive && (
-              <div className="mb-3 print:hidden flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-                <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-                <span>
-                  Er {progressStats.upcomingCount === 1 ? "staat" : "staan"} nog{" "}
-                  <span className="font-medium text-foreground">{progressStats.upcomingCount} {progressStats.upcomingCount === 1 ? "item" : "items"}</span>{" "}
-                  gepland in de komende dagen — klik ▶ of schakel naar weekweergave.
-                </span>
-              </div>
+              <Alert className="mb-4 print:hidden bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:border-indigo-900/50 shadow-sm transition-all hover:shadow-md cursor-pointer" onClick={() => setViewMode("week")}>
+                <CalendarDays className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                <AlertDescription className="text-sm text-indigo-900 dark:text-indigo-200 ml-2 flex justify-between items-center pr-2">
+                  <span>
+                    <strong>Vooruitkijken:</strong> Er {progressStats.upcomingCount === 1 ? "staat" : "staan"} nog <strong className="text-indigo-700 dark:text-indigo-300">{progressStats.upcomingCount} {progressStats.upcomingCount === 1 ? "item" : "items"}</strong> gepland na vandaag.
+                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-400 hidden sm:inline-block">Schakel naar Weekweergave →</span>
+                </AlertDescription>
+              </Alert>
             )}
             <div className="space-y-4">
               {lookaheadActive && viewMode === "day" && (
@@ -1263,16 +1250,26 @@ export function DailyOverview() {
                               <ContextMenu key={o.id}>
                                 <ContextMenuTrigger asChild>
                                   <div
-                                    className={`text-sm space-y-1.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""} ${isOverdue(o.scheduled_date, o.status) ? "overdue-item" : ""}`}
+                                    className={`relative bg-card shadow-sm border rounded-md p-3 mb-2 cursor-pointer transition-shadow hover:shadow-md ${
+                                      o.status === "in_progress" ? "border-l-4 border-l-blue-500" :
+                                      o.status === "completed" ? "border-l-4 border-l-green-500 opacity-70 bg-muted/30" :
+                                      "border-l-4 border-l-transparent"
+                                    } ${o.status === "cancelled" ? "opacity-50 grayscale" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""} ${isOverdue(o.scheduled_date, o.status) ? "border-l-4 border-l-red-500 bg-red-50/50 dark:bg-red-950/20" : ""}`}
                                     onClick={() => handleAmbulanceClick(o)}
                                   >
-                                    <div className="flex items-center justify-between">
-                                      <span className={`font-medium text-xs uppercase tracking-wide text-muted-foreground ${o.status === "cancelled" ? "line-through" : ""}`}>Cilinders</span>
-                                      <div className="flex items-center gap-1">
-                                        {isNewItem(o.id) && <Badge variant="warning" className="text-[9px] px-1.5 py-0">Nieuw</Badge>}
-                                        <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("ambulance_trips", o.id, cycleStatus(o.status), setAmbulanceTrips)} isMobile={isMobile} onStatusSelect={(s) => handleQuickStatus("ambulance_trips", o.id, s, setAmbulanceTrips)} />
-                                      </div>
-                                    </div>
+                                    <div className="flex items-start gap-3">
+                                      <button 
+                                        className={`mt-0.5 shrink-0 h-6 w-6 rounded-full border flex items-center justify-center transition-colors ${o.status === 'completed' ? 'bg-success border-success text-success-foreground' : 'border-muted-foreground/30 hover:border-primary'}`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleQuickStatus("ambulance_trips", o.id, o.status === "completed" ? "pending" : "completed", setAmbulanceTrips);
+                                        }}
+                                      >
+                                        {o.status === "completed" && <CheckCircle2 className="h-4 w-4" />}
+                                      </button>
+                                      
+                                      <div className={`flex-1 min-w-0 ${o.status === "cancelled" || o.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
+                                        <div className="font-semibold text-sm uppercase tracking-wide text-foreground">Cilinders</div>
                                     {cylinderItems.length > 0 ? (
                                       <ul className="space-y-0.5">
                                         {cylinderItems.map((c) => (
@@ -1299,11 +1296,18 @@ export function DailyOverview() {
                                       </div>
                                     )}
                                     {o.notes && (
-                                      <p className="text-xs text-muted-foreground italic mt-1 border-t border-current/5 pt-1">
+                                      <p className="text-xs text-muted-foreground italic mt-1.5 border-t border-border pt-1.5">
                                         {o.notes}
                                       </p>
                                     )}
                                   </div>
+                                  
+                                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                    {isNewItem(o.id) && <Badge variant="warning" className="text-[10px] px-1.5 py-0">Nieuw</Badge>}
+                                    <StatusBadge status={o.status} onStatusChange={() => {}} isMobile={isMobile} onStatusSelect={(s) => handleQuickStatus("ambulance_trips", o.id, s, setAmbulanceTrips)} />
+                                  </div>
+                                </div>
+                              </div>
                                 </ContextMenuTrigger>
                                 <ContextMenuContent>
                                   {renderStatusMenu(o.status, (s) => handleQuickStatus("ambulance_trips", o.id, s, setAmbulanceTrips))}
@@ -1432,31 +1436,46 @@ export function DailyOverview() {
                           {dayDryIce.map((o) => (
                             <ContextMenu key={o.id}>
                               <ContextMenuTrigger asChild>
-                                <div
-                                  className={`text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${o.status === "in_progress" ? "border-l-2 border-blue-500 pl-2" : ""} ${o.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""} ${isOverdue(o.scheduled_date, o.status) ? "overdue-item" : ""}`}
-                                  onClick={() => handleDryIceClick(o)}
-                                >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className={`min-w-0 ${o.status === "cancelled" ? "line-through" : ""}`}>
-                                      <div className="truncate font-medium text-xs">{o.customer_name}</div>
-                                      <div className="text-xs text-muted-foreground">
-                                        {o.quantity_kg} kg
-                                        {o.dry_ice_packaging?.name ? ` · ${o.dry_ice_packaging.name}` : ""}
-                                        {(() => {
-                                          const count = o.box_count || (o.dry_ice_packaging?.capacity_kg ? Math.ceil(o.quantity_kg / o.dry_ice_packaging.capacity_kg) : null);
-                                          return count ? ` · ${count}×` : "";
-                                        })()}
+                                  <div
+                                    className={`relative bg-card shadow-sm border rounded-md p-3 mb-2 cursor-pointer transition-shadow hover:shadow-md ${
+                                      o.status === "in_progress" ? "border-l-4 border-l-blue-500" :
+                                      o.status === "completed" ? "border-l-4 border-l-green-500 opacity-70 bg-muted/30" :
+                                      "border-l-4 border-l-transparent"
+                                    } ${o.status === "cancelled" ? "opacity-50 grayscale" : ""} ${isNewItem(o.id) ? "animate-new-item" : ""} ${isOverdue(o.scheduled_date, o.status) ? "border-l-4 border-l-red-500 bg-red-50/50 dark:bg-red-950/20" : ""}`}
+                                    onClick={() => handleDryIceClick(o)}
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      <button 
+                                        className={`mt-0.5 shrink-0 h-6 w-6 rounded-full border flex items-center justify-center transition-colors ${o.status === 'completed' ? 'bg-success border-success text-success-foreground' : 'border-muted-foreground/30 hover:border-primary'}`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleQuickStatus("dry_ice_orders", o.id, o.status === "completed" ? "pending" : "completed", setDryIceOrders);
+                                        }}
+                                      >
+                                        {o.status === "completed" && <CheckCircle2 className="h-4 w-4" />}
+                                      </button>
+                                      
+                                      <div className={`flex-1 min-w-0 ${o.status === "cancelled" || o.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
+                                        <div className="truncate font-semibold text-sm">{o.customer_name}</div>
+                                        <div className="text-sm text-muted-foreground mt-0.5">
+                                          {o.quantity_kg} kg
+                                          {o.dry_ice_packaging?.name ? ` · ${o.dry_ice_packaging.name}` : ""}
+                                          {(() => {
+                                            const count = o.box_count || (o.dry_ice_packaging?.capacity_kg ? Math.ceil(o.quantity_kg / o.dry_ice_packaging.capacity_kg) : null);
+                                            return count ? ` · ${count}×` : "";
+                                          })()}
+                                        </div>
+                                        {o.notes && (
+                                          <p className="text-xs text-muted-foreground italic mt-1.5">{o.notes}</p>
+                                        )}
+                                      </div>
+                                      
+                                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                        {isNewItem(o.id) && <Badge variant="warning" className="text-[10px] px-1.5 py-0">Nieuw</Badge>}
+                                        <StatusBadge status={o.status} onStatusChange={() => {}} isMobile={isMobile} onStatusSelect={(s) => handleQuickStatus("dry_ice_orders", o.id, s, setDryIceOrders)} />
                                       </div>
                                     </div>
-                                    <div className="flex items-center gap-1">
-                                      {isNewItem(o.id) && <Badge variant="warning" className="text-[9px] px-1.5 py-0">Nieuw</Badge>}
-                                      <StatusBadge status={o.status} onStatusChange={() => handleQuickStatus("dry_ice_orders", o.id, cycleStatus(o.status), setDryIceOrders)} isMobile={isMobile} onStatusSelect={(s) => handleQuickStatus("dry_ice_orders", o.id, s, setDryIceOrders)} />
-                                    </div>
                                   </div>
-                                  {o.notes && (
-                                    <p className="text-xs text-muted-foreground italic mt-0.5">{o.notes}</p>
-                                  )}
-                                </div>
                               </ContextMenuTrigger>
                               <ContextMenuContent>
                                 {renderStatusMenu(o.status, (s) => handleQuickStatus("dry_ice_orders", o.id, s, setDryIceOrders))}
@@ -1485,42 +1504,53 @@ export function DailyOverview() {
                           onToggle={() => toggleSection("tasks")}
                           onAdd={isAdmin ? () => setCreateTaskOpen(true) : undefined}
                         >
-                          {dayTasks.map((t, idx) => {
-                            // Toon tijd-as scheidslijn vóór de eerste taak zonder start_time
-                            const showNoTimeDivider =
-                              !t.start_time &&
-                              idx > 0 &&
-                              !!dayTasks[idx - 1]?.start_time;
-                            return (
-                            <div key={t.id}>
-                            {showNoTimeDivider && (
-                              <div className="flex items-center gap-2 pt-1 mt-1 mb-1 border-t border-current/10 text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                                <Clock className="h-3 w-3" />
-                                <span>Geen tijd</span>
-                              </div>
-                            )}
-                            <ContextMenu>
+                          {dayTasks.map((t) => (
+                            <ContextMenu key={t.id}>
                               <ContextMenuTrigger asChild>
                                 <div
-                                  className={`flex items-center gap-2 text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${
-                                    t.priority === "high" ? "border-l-2 border-red-500 pl-2" :
-                                    t.priority === "low" ? "border-l-2 border-muted-foreground/30 pl-2" : ""
-                                  } ${t.status === "cancelled" ? "opacity-50" : ""} ${isNewItem(t.id) ? "animate-new-item" : ""} ${isOverdue(t.due_date, t.status) ? "overdue-item" : ""}`}
+                                  className={`relative bg-card shadow-sm border rounded-md p-3 mb-2 cursor-pointer transition-shadow hover:shadow-md ${
+                                    t.status === "completed" ? "border-l-4 border-l-green-500 opacity-70 bg-muted/30" :
+                                    t.priority === "high" ? "border-l-4 border-l-red-500" :
+                                    t.priority === "low" ? "border-l-4 border-l-muted-foreground/30" :
+                                    "border-l-4 border-l-blue-500/50"
+                                  } ${t.status === "cancelled" ? "opacity-50 grayscale" : ""} ${isNewItem(t.id) ? "animate-new-item" : ""} ${isOverdue(t.due_date, t.status) ? "border-l-4 border-l-red-500 bg-red-50/50 dark:bg-red-950/20" : ""}`}
                                   onClick={() => handleTaskClick(t)}
                                 >
-                                  {t.start_time && (
-                                    <span className="text-muted-foreground font-mono text-xs w-24 shrink-0">
-                                      {t.start_time.slice(0, 5)}
-                                      {t.end_time && `–${t.end_time.slice(0, 5)}`}
-                                    </span>
-                                  )}
-                                  <span className={`min-w-0 break-words ${t.status === "cancelled" ? "line-through" : ""}`}>
-                                    {t.task_types?.name || t.title || "Taak"}
-                                    {t.title && t.task_types?.name ? ` — ${t.title}` : ""}
-                                  </span>
-                                  <div className="flex items-center gap-1 ml-auto">
-                                    {isNewItem(t.id) && <Badge variant="warning" className="text-[9px] px-1.5 py-0">Nieuw</Badge>}
-                                    <StatusBadge status={t.status} onStatusChange={() => handleQuickStatus("tasks", t.id, cycleStatus(t.status), setTasks)} isMobile={isMobile} onStatusSelect={(s) => handleQuickStatus("tasks", t.id, s, setTasks)} />
+                                  <div className="flex items-start gap-3">
+                                    <button 
+                                        className={`mt-0.5 shrink-0 h-6 w-6 rounded-full border flex items-center justify-center transition-colors ${t.status === 'completed' ? 'bg-success border-success text-success-foreground' : 'border-muted-foreground/30 hover:border-primary'}`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleQuickStatus("tasks", t.id, t.status === "completed" ? "pending" : "completed", setTasks);
+                                        }}
+                                      >
+                                      {t.status === "completed" && <CheckCircle2 className="h-4 w-4" />}
+                                    </button>
+                                    
+                                    <div className={`flex-1 min-w-0 ${t.status === "cancelled" || t.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
+                                      <div className="font-semibold text-sm">
+                                        {t.task_types?.name || t.title || "Taak"}
+                                      </div>
+                                      
+                                      {(t.title && t.task_types?.name) && (
+                                        <div className="text-sm text-muted-foreground mt-0.5">
+                                          {t.title}
+                                        </div>
+                                      )}
+
+                                      {t.start_time && (
+                                        <div className="text-sm font-mono text-muted-foreground mt-1 bg-muted px-1.5 py-0.5 rounded-md inline-block">
+                                          <Clock className="w-3 h-3 inline mr-1" />
+                                          {t.start_time.slice(0, 5)}
+                                          {t.end_time && ` – ${t.end_time.slice(0, 5)}`}
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                      {isNewItem(t.id) && <Badge variant="warning" className="text-[10px] px-1.5 py-0">Nieuw</Badge>}
+                                      <StatusBadge status={t.status} onStatusChange={() => {}} isMobile={isMobile} onStatusSelect={(s) => handleQuickStatus("tasks", t.id, s, setTasks)} />
+                                    </div>
                                   </div>
                                 </div>
                               </ContextMenuTrigger>
@@ -1528,9 +1558,7 @@ export function DailyOverview() {
                                 {renderStatusMenu(t.status, (s) => handleQuickStatus("tasks", t.id, s, setTasks))}
                               </ContextMenuContent>
                             </ContextMenu>
-                            </div>
-                            );
-                          })}
+                          ))}
                         </Section>
                       )}
 
@@ -1555,18 +1583,22 @@ export function DailyOverview() {
                               <ContextMenuTrigger asChild>
                                 <Popover>
                                   <PopoverTrigger asChild>
-                                    <div className={`flex items-center gap-2 text-sm py-0.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer rounded p-1 -m-1 transition-colors ${t.status === "pending" ? "opacity-70 border-l-2 border-warning pl-2" : ""}`}>
-                                      <span className="truncate">
-                                        {t.profiles?.full_name || "Medewerker"}
-                                      </span>
-                                      <div className="flex items-center gap-1 ml-auto shrink-0">
-                                        {t.status === "pending" && (
-                                          <Badge variant="warning" className="text-[9px] px-1.5 py-0 h-4">In afwachting</Badge>
-                                        )}
-                                        <span className="text-muted-foreground text-xs">
-                                          {t.time_off_types?.name || "Verlof"}
-                                          {t.day_part && t.day_part !== "full_day" && ` (${t.day_part === "morning" ? "ochtend" : "middag"})`}
-                                        </span>
+                                    <div className={`relative bg-card shadow-sm border rounded-md p-3 mb-2 cursor-pointer transition-shadow hover:shadow-md ${t.status === "pending" ? "border-l-4 border-l-warning" : "border-l-4 border-l-transparent"}`}>
+                                      <div className="flex items-center justify-between gap-3">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-semibold text-sm truncate">
+                                            {t.profiles?.full_name || "Medewerker"}
+                                          </div>
+                                          <div className="text-xs text-muted-foreground mt-0.5">
+                                            {t.time_off_types?.name || "Verlof"}
+                                            {t.day_part && t.day_part !== "full_day" && ` (${t.day_part === "morning" ? "ochtend" : "middag"})`}
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          {t.status === "pending" && (
+                                            <Badge variant="warning" className="text-[10px] px-1.5 py-0 h-5">In afwachting</Badge>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   </PopoverTrigger>
@@ -1763,23 +1795,16 @@ function Section({
   onAdd?: () => void;
   children: React.ReactNode;
 }) {
-  const isEmpty = count === 0;
   return (
-    <div
-      className={`rounded-lg border p-3 transition-opacity ${
-        isEmpty
-          ? "border-dashed bg-muted/20 opacity-60 hover:opacity-100"
-          : bgClass || ""
-      }`}
-    >
+    <div className={`rounded-lg border p-3 ${bgClass || ""}`}>
       <div className="flex items-center gap-2 mb-2">
         <button
           onClick={onToggle}
           className="flex items-center gap-2 flex-1 min-w-0 text-left min-h-[44px] md:min-h-0 rounded-md px-1 -mx-1 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         >
-          <span className={isEmpty ? "text-muted-foreground" : color}>{icon}</span>
-          <span className={`text-sm font-medium ${isEmpty ? "text-muted-foreground" : ""}`}>{label}</span>
-          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${isEmpty ? "bg-muted text-muted-foreground" : badgeClass}`}>
+          <span className={color}>{icon}</span>
+          <span className="text-sm font-medium">{label}</span>
+          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${badgeClass}`}>
             {count}
           </span>
           <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform print:hidden ${collapsed ? "-rotate-90" : ""}`} />
@@ -1799,13 +1824,7 @@ function Section({
         )}
       </div>
       {!collapsed && (
-        <div className="divide-y divide-current/5 space-y-2 md:space-y-1.5">
-          {isEmpty ? (
-            <p className="text-xs text-muted-foreground/70 italic py-1">Geen items</p>
-          ) : (
-            children
-          )}
-        </div>
+        <div className="divide-y divide-current/5 space-y-2 md:space-y-1.5">{children}</div>
       )}
     </div>
   );
@@ -1829,10 +1848,6 @@ function StatusBadge({ status, onStatusChange, isMobile, onStatusSelect }: {
       variant={variant}
       className={`ml-auto text-[10px] shrink-0 ${onStatusChange ? "cursor-pointer hover:ring-2 hover:ring-ring hover:ring-offset-1 transition-all" : ""} ${isMobile ? "px-2.5 py-1 min-h-[28px] text-[11px]" : ""}`}
       onClick={!isMobile && onStatusChange ? (e: React.MouseEvent) => { e.stopPropagation(); onStatusChange(); } : undefined}
-      role={onStatusChange ? "button" : undefined}
-      tabIndex={onStatusChange ? 0 : undefined}
-      aria-label={`Status: ${statusLabels[status] || status}${onStatusChange ? " — klik om te wijzigen" : ""}`}
-      title={statusLabels[status] || status}
     >
       {statusLabels[status] || status}
     </Badge>

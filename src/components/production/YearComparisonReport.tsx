@@ -106,6 +106,8 @@ interface YearComparisonReportProps {
   location?: ProductionLocation;
   hideDigital?: boolean;
   onHideDigitalChange?: (value: boolean) => void;
+  hideExternal?: boolean;
+  onHideExternalChange?: (value: boolean) => void;
 }
 
 interface MonthlyCustomerCylinderData {
@@ -115,7 +117,7 @@ interface MonthlyCustomerCylinderData {
   total_cylinders: number;
 }
 
-export const YearComparisonReport = React.memo(function YearComparisonReport({ location = "all", hideDigital: externalHideDigital, onHideDigitalChange }: YearComparisonReportProps) {
+export const YearComparisonReport = React.memo(function YearComparisonReport({ location = "all", hideDigital: externalHideDigital, onHideDigitalChange, hideExternal: externalHideExternal, onHideExternalChange }: YearComparisonReportProps) {
   const showDryIce = location !== "sol_tilburg";
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -145,13 +147,21 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   const [cylinderSizeComparison, setCylinderSizeComparison] = useState<CylinderSizeComparison[]>([]);
   const hideDigital = externalHideDigital ?? false;
   const setHideDigital = (val: boolean) => onHideDigitalChange?.(val);
+  const hideExternal = externalHideExternal ?? false;
+  const setHideExternal = (val: boolean) => onHideExternalChange?.(val);
 
   const hasDigitalTypes = useMemo(() => {
     return gasTypes.some((gt: any) => gt.is_digital);
   }, [gasTypes]);
+  const hasExternalTypes = useMemo(() => {
+    return gasTypes.some((gt: any) => gt.is_external);
+  }, [gasTypes]);
 
   const digitalGasTypeIds = useMemo(() => {
     return new Set(gasTypes.filter((gt: any) => gt.is_digital).map((gt: any) => gt.id));
+  }, [gasTypes]);
+  const externalGasTypeIds = useMemo(() => {
+    return new Set(gasTypes.filter((gt: any) => gt.is_external).map((gt: any) => gt.id));
   }, [gasTypes]);
   const isSignificantGrowth = (percent: number) => percent > 10 || percent < -10;
 
@@ -178,11 +188,14 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
     if (hideDigital) {
       data = data.filter(gt => !digitalGasTypeIds.has(gt.gas_type_id));
     }
+    if (hideExternal) {
+      data = data.filter(gt => !externalGasTypeIds.has(gt.gas_type_id));
+    }
     if (selectedGasTypes.length > 0) {
       data = data.filter(gt => selectedGasTypes.includes(gt.gas_type_id));
     }
     return data;
-  }, [gasTypeComparison, selectedGasTypes, hideDigital, digitalGasTypeIds]);
+  }, [gasTypeComparison, selectedGasTypes, hideDigital, hideExternal, digitalGasTypeIds, externalGasTypeIds]);
 
   // Herberekende cylinder totalen op basis van gastype filter
   const filteredCylinderTotals = useMemo(() => {
@@ -195,21 +208,21 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
     const change = currentTotal - previousTotal;
     const changePercent = previousTotal > 0 ? ((change / previousTotal) * 100) : (currentTotal > 0 ? 100 : 0);
     return { currentYear: currentTotal, previousYear: previousTotal, change, changePercent };
-  }, [cylinderTotals, filteredGasTypeData, selectedGasTypes, hideDigital]);
+  }, [cylinderTotals, filteredGasTypeData, selectedGasTypes, hideDigital, hideExternal]);
 
   // Gefilterde maandelijkse data voor cilinders per gastype
   const filteredMonthlyGasTypeData = useMemo(() => {
     const hasGasTypeFilter = selectedGasTypes.length > 0;
-    if (!hasGasTypeFilter && !hideDigital) return monthlyGasTypeData;
+    if (!hasGasTypeFilter && !hideDigital && !hideExternal) return monthlyGasTypeData;
 
     const activeIds = hasGasTypeFilter
-      ? selectedGasTypes.filter(id => !hideDigital || !digitalGasTypeIds.has(id))
+      ? selectedGasTypes.filter(id => (!hideDigital || !digitalGasTypeIds.has(id)) && (!hideExternal || !externalGasTypeIds.has(id)))
       : Array.from(
           new Set([
             ...monthlyGasTypeData.current.flatMap(m => Object.keys(m).filter(k => k !== 'month' && k !== 'monthName')),
             ...monthlyGasTypeData.previous.flatMap(m => Object.keys(m).filter(k => k !== 'month' && k !== 'monthName')),
           ])
-        ).filter(id => !digitalGasTypeIds.has(id));
+        ).filter(id => (!hideDigital || !digitalGasTypeIds.has(id)) && (!hideExternal || !externalGasTypeIds.has(id)));
 
     const filterMonthData = (data: MonthlyGasTypeChartData[]) => {
       return data.map(month => {
@@ -225,7 +238,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       current: filterMonthData(monthlyGasTypeData.current),
       previous: filterMonthData(monthlyGasTypeData.previous)
     };
-  }, [monthlyGasTypeData, selectedGasTypes, hideDigital, digitalGasTypeIds]);
+  }, [monthlyGasTypeData, selectedGasTypes, hideDigital, hideExternal, digitalGasTypeIds, externalGasTypeIds]);
 
   // Herberekende cylinder maanddata op basis van gastype filter
   const filteredCylinderData = useMemo(() => {
@@ -1035,16 +1048,29 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           </div>
 
           {/* Digital filter */}
-          {hasDigitalTypes && (
-            <div className="flex items-center">
-              <Button
-                variant={hideDigital ? "default" : "outline"}
-                size="sm"
-                className="h-8 text-xs gap-1"
-                onClick={() => setHideDigital(!hideDigital)}
-              >
-                ⓓ {hideDigital ? "Toon digitaal" : "Verberg digitaal"}
-              </Button>
+          {(hasDigitalTypes || hasExternalTypes) && (
+            <div className="flex items-center gap-2">
+              {hasDigitalTypes && (
+                <Button
+                  variant={hideDigital ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 text-xs gap-1"
+                  onClick={() => setHideDigital(!hideDigital)}
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {hideDigital ? "Toon digitaal" : "Verberg digitaal"}
+                </Button>
+              )}
+              {hasExternalTypes && (
+                <Button
+                  variant={hideExternal ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 text-xs gap-1"
+                  onClick={() => setHideExternal(!hideExternal)}
+                >
+                  {hideExternal ? "Toon extern" : "Verberg extern"}
+                </Button>
+              )}
             </div>
           )}
         </CardContent>

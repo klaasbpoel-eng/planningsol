@@ -32,7 +32,7 @@ const DEFAULT_CATEGORIES = ["Veiligheid", "Training", "Instructie", "Onderhoud",
 
 export function ToolboxEditorDialog({ open, onOpenChange, toolbox, onSaved, categories }: Props) {
   const isEditing = !!toolbox?.id;
-  const { sections: existingSections, loading: sectionsLoading } = useToolboxSections(toolbox?.id || null);
+  const { sections: existingSections, loading: sectionsLoading, isReady: sectionsReady } = useToolboxSections(toolbox?.id || null);
 
   const [formData, setFormData] = useState<Partial<ToolboxItem>>({
     title: "",
@@ -51,11 +51,12 @@ export function ToolboxEditorDialog({ open, onOpenChange, toolbox, onSaved, cate
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState("editor");
-  const [sectionsInitialized, setSectionsInitialized] = useState(false);
+  // Track which toolboxId we last loaded sections for — avoids the loading=false race condition
+  const loadedForId = useRef<string | null | undefined>(undefined);
 
   const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...categories])].sort();
 
-  // Load initial data
+  // Load initial form data when toolbox prop is set
   useEffect(() => {
     if (toolbox) {
       setFormData({
@@ -75,31 +76,26 @@ export function ToolboxEditorDialog({ open, onOpenChange, toolbox, onSaved, cate
         thumbnail_url: "",
         cover_image_url: "",
       });
-      setEditorSections([]);
     }
   }, [toolbox]);
 
-  // Load sections - only on initial load (when sectionsLoading transitions from true to false)
+  // Populate editorSections once fetch is confirmed complete for this specific toolboxId
   useEffect(() => {
-    if (!open) {
-      setSectionsInitialized(false);
-      return;
-    }
-    if (sectionsLoading || sectionsInitialized) return;
-    setSectionsInitialized(true);
-    
-    if (existingSections.length > 0) {
-      setEditorSections(existingSections.map(s => ({
-        id: s.id,
-        section_type: s.section_type,
-        title: s.title || "",
-        content: s.content,
-        sort_order: s.sort_order,
-      })));
-    } else {
-      setEditorSections([]);
-    }
-  }, [existingSections, sectionsLoading, open, sectionsInitialized]);
+    if (!open) return; // dialog is closing/closed — don't update state
+    // isReady = fetch completed AND result belongs to the current toolboxId
+    if (!sectionsReady && toolbox?.id) return;
+    const currentId = toolbox?.id ?? null;
+    if (loadedForId.current === currentId) return;
+    loadedForId.current = currentId;
+
+    setEditorSections(existingSections.map(s => ({
+      id: s.id,
+      section_type: s.section_type,
+      title: s.title || "",
+      content: s.content,
+      sort_order: s.sort_order,
+    })));
+  }, [open, sectionsReady, existingSections, toolbox?.id]);
 
   const saveToDb = async (publish = false, silent = false) => {
     try {
@@ -131,10 +127,14 @@ export function ToolboxEditorDialog({ open, onOpenChange, toolbox, onSaved, cate
 
       if (!silent) {
         toast.success(publish ? "Toolbox gepubliceerd!" : isEditing ? "Toolbox bijgewerkt!" : "Toolbox opgeslagen!");
-        onSaved();
+        if (publish) {
+          // Close first so TipTap editors unmount before triggering the page refetch
+          onOpenChange(false);
+          setTimeout(() => onSaved(), 100);
+        } else {
+          onSaved();
+        }
       }
-
-      if (publish) onOpenChange(false);
 
     } catch (error: any) {
       console.error("Error saving toolbox:", error);
@@ -147,12 +147,18 @@ export function ToolboxEditorDialog({ open, onOpenChange, toolbox, onSaved, cate
   const debouncedFormData = useDebounce(formData, 30000);
   const debouncedSections = useDebounce(editorSections, 30000);
 
-  // Trigger autosave on changes
+  // Keep a ref to saveToDb so the autosave effect always uses the latest version without it being a dep
+  const saveToDbRef = useRef(saveToDb);
+  useEffect(() => { saveToDbRef.current = saveToDb; });
+
+  // Trigger autosave on debounced changes — only while open and after sections are initialized
   useEffect(() => {
+    if (!open) return;
+    if (!loadedForId.current && toolbox?.id) return; // sections not yet loaded
     if (debouncedFormData.title && (debouncedFormData.id || debouncedSections.length > 0)) {
-      saveToDb(false, true);
+      saveToDbRef.current(false, true);
     }
-  }, [debouncedFormData, debouncedSections]);
+  }, [open, debouncedFormData, debouncedSections, toolbox?.id]);
 
   const handleManualSave = (publish = false) => {
     if (!formData.title) {

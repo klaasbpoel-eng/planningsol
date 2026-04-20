@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck, BookOpen, Clock, Search, ScanBarcode, FileUp, Calendar } from "lucide-react";
+import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck, BookOpen, Clock, Search, ScanBarcode, FileUp, Calendar, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +42,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { path: "/kalender", label: "Kalender", icon: <CalendarDays className="h-4 w-4" /> },
       { path: "/productie", label: "Productie", icon: <Factory className="h-4 w-4" /> },
+      { path: "/gasflow", label: "GasFlow", shortLabel: "GasFlow", icon: <Activity className="h-4 w-4" /> },
       { path: "/dagoverzicht", label: "Dagoverzicht", shortLabel: "Dag", icon: <CalendarDays className="h-4 w-4" /> },
     ],
   },

@@ -274,8 +274,17 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
         timeOffTypesData,
         ambulanceTripsData
       ] = await Promise.all([
-        safeFetch<Profile[]>(api.profiles.getAll(), "profiles"),
-        safeFetch<TimeOffRequest[]>(api.timeOffRequests.getAll(), "requests"),
+        // Use supabase directly (not api which may use external/MySQL source)
+        safeFetch<Profile[]>(
+          supabase.from("profiles").select("*").order("full_name")
+            .then(({ data, error }) => { if (error) throw error; return data ?? []; }),
+          "profiles"
+        ),
+        safeFetch<TimeOffRequest[]>(
+          supabase.from("time_off_requests").select("*").order("start_date", { ascending: false })
+            .then(({ data, error }) => { if (error) throw error; return data ?? []; }),
+          "requests"
+        ),
         safeFetch<Task[]>(api.tasks.getAll(), "tasks"),
         safeFetch<TaskType[]>(api.taskTypes.getAll(), "taskTypes"),
         safeFetch<DryIceOrder[]>(api.dryIceOrders.getPending("2025-01-01"), "dryIce"),

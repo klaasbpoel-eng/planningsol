@@ -9,6 +9,7 @@ import { FadeIn } from "@/components/ui/fade-in";
 import { CustomerListSkeleton } from "@/components/ui/skeletons";
 import { format, differenceInDays, subDays } from "date-fns";
 import { nl } from "date-fns/locale";
+import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
 
 interface CustomerData {
   customer_id: string | null;
@@ -33,13 +34,15 @@ interface TopCustomersWidgetProps {
   isRefreshing?: boolean;
   location?: ProductionLocation;
   dateRange?: DateRange;
+  hideDigital?: boolean;
 }
 
 export const TopCustomersWidget = React.memo(function TopCustomersWidget({
   refreshKey = 0,
   isRefreshing = false,
   location = "all",
-  dateRange
+  dateRange,
+  hideDigital = false,
 }: TopCustomersWidgetProps) {
   const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +50,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
 
   useEffect(() => {
     fetchTopCustomers();
-  }, [refreshKey, location, dateRange]);
+  }, [refreshKey, location, dateRange, hideDigital]);
 
   const fetchTopCustomers = useCallback(async (retryCount = 0) => {
     setLoading(true);
@@ -69,13 +72,14 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
     } finally {
       setLoading(false);
     }
-  }, [dateRange, location]);
+  }, [dateRange, location, hideDigital]);
 
   // Fetch Productie rows for a date range and group by customer
   const fetchProductieByCustomer = async (
     fromDate: string,
     toDate: string,
-    locationFilter: string | null
+    locationFilter: string | null,
+    digitalNames: Set<string> = new Set(),
   ): Promise<Map<string, number>> => {
     const fromYear = parseInt(fromDate.substring(0, 4));
     const toYear = parseInt(toDate.substring(0, 4));
@@ -87,7 +91,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
       let from = 0;
       while (true) {
         const { data } = await (supabase.from("Productie" as never) as any)
-          .select("Datum,Locatie,Aantal,Klant")
+          .select("Datum,Locatie,Product,Aantal,Klant")
           .eq("Jaar", year)
           .range(from, from + PAGE - 1);
         if (!data || data.length === 0) break;
@@ -101,12 +105,13 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
       const raw: string = row.Datum || "";
       if (!raw) return false;
       const iso = raw.includes("T") ? raw.substring(0, 10)
-        : (() => { const p = raw.split("-"); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+        : (() => { const p = raw.split("-"); return p.length === 3 ? (p[0].length === 4 ? raw : `${p[2]}-${p[1]}-${p[0]}`) : raw; })();
       if (iso < fromDate || iso > toDate) return false;
       if (locationFilter) {
         const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
         if (loc !== locationFilter) return false;
       }
+      if (digitalNames.size > 0 && digitalNames.has(row.Product)) return false;
       return true;
     });
 
@@ -121,14 +126,15 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
   // Fetch Productie rows for a full year and group by customer
   const fetchProductieByCustomerForYear = async (
     year: number,
-    locationFilter: string | null
+    locationFilter: string | null,
+    digitalNames: Set<string> = new Set(),
   ): Promise<Map<string, number>> => {
     const PAGE = 1000;
     const data: any[] = [];
     let from = 0;
     while (true) {
       const { data: page } = await (supabase.from("Productie" as never) as any)
-        .select("Locatie,Aantal,Klant")
+        .select("Locatie,Product,Aantal,Klant")
         .eq("Jaar", year)
         .range(from, from + PAGE - 1);
       if (!page || page.length === 0) break;
@@ -138,9 +144,12 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
     }
 
     const filtered = (data || []).filter((row: any) => {
-      if (!locationFilter) return true;
-      const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
-      return loc === locationFilter;
+      if (locationFilter) {
+        const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+        if (loc !== locationFilter) return false;
+      }
+      if (digitalNames.size > 0 && digitalNames.has(row.Product)) return false;
+      return true;
     });
 
     const byCustomer = new Map<string, number>();
@@ -182,10 +191,11 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
   const fetchCustomersByYear = async () => {
     const currentYear = new Date().getFullYear();
     const locationFilter = location === "all" ? null : location;
+    const digitalNames = hideDigital ? await buildDigitalProductNames() : new Set<string>();
 
     const [currentMap, previousMap] = await Promise.all([
-      fetchProductieByCustomerForYear(currentYear, locationFilter),
-      fetchProductieByCustomerForYear(currentYear - 1, locationFilter),
+      fetchProductieByCustomerForYear(currentYear, locationFilter, digitalNames),
+      fetchProductieByCustomerForYear(currentYear - 1, locationFilter, digitalNames),
     ]);
 
     setCustomers(buildCustomerList(currentMap, previousMap));
@@ -202,10 +212,11 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
     const prevToDate = format(prevTo, "yyyy-MM-dd");
 
     const locationFilter = location === "all" ? null : location;
+    const digitalNames = hideDigital ? await buildDigitalProductNames() : new Set<string>();
 
     const [currentMap, previousMap] = await Promise.all([
-      fetchProductieByCustomer(fromDate, toDate, locationFilter),
-      fetchProductieByCustomer(prevFromDate, prevToDate, locationFilter),
+      fetchProductieByCustomer(fromDate, toDate, locationFilter, digitalNames),
+      fetchProductieByCustomer(prevFromDate, prevToDate, locationFilter, digitalNames),
     ]);
 
     setCustomers(buildCustomerList(currentMap, previousMap));

@@ -24,7 +24,6 @@ interface StockSummaryWidgetProps {
   selectedLocation?: ProductionLocation;
 }
 
-
 interface StatusConfig {
   status: StockStatus;
   count: number;
@@ -34,6 +33,28 @@ interface StatusConfig {
   color: string;
   bgColor: string;
   items: StockItem[];
+}
+
+// Fetch all rows from a table with pagination (same pattern as "Productie" in ProductionReports)
+async function fetchAllRows(tableName: string): Promise<any[]> {
+  const all: any[] = [];
+  const PAGE = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await (supabase.from(tableName as never) as any)
+      .select("*")
+      .range(from, from + PAGE - 1);
+    if (error) {
+      console.error(`[fetchAllRows] Error fetching "${tableName}":`, error);
+      throw new Error(`${tableName}: ${error.message}`);
+    }
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  console.log(`[fetchAllRows] "${tableName}": ${all.length} rows`);
+  return all;
 }
 
 export function StockSummaryWidget({ refreshKey, isRefreshing, className, selectedLocation = "all" }: StockSummaryWidgetProps) {
@@ -58,84 +79,71 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
     getUser();
   }, []);
 
-  // Fetch stock data via RPC (server-side JOIN between Voorraad and Afname)
+  // Fetch live data directly from "Voorraad" and "Afname" tables (capital V/A = ERP tables)
   const fetchStockFromDB = useCallback(async () => {
     setIsLoadingDB(true);
     setDbError(null);
     try {
-      const { data: rpcData, error: rpcErr } = await (supabase as any)
-        .rpc("get_voorraad_met_afname");
+      // Actual live tables: "Voorraad" and "Afname" (capital letters)
+      // Voorraad columns: CD_CONTENT_TYPE, ContentDescription, ContainerTypeDescr, Capacity, Aantal, DS_CENTER_DESCRIPTION
+      // Afname columns: ContentDescription, ContainerTypeDescription, Capacity, Aantal, CenterDescription, Datum
+      // JOIN key: ContentDescription (product name, present in both tables)
+      const [voorraadRows, afnameRows] = await Promise.all([
+        fetchAllRows("Voorraad"),
+        fetchAllRows("Afname"),
+      ]);
 
-      if (rpcErr) {
-        setDbError(rpcErr.message);
-        return;
+      // Aggregate Voorraad by ContentDescription + locatie → sum Aantal
+      const voorraadMap = new Map<string, { subCode: string; description: string; locatie: string; aantal: number }>();
+      for (const row of voorraadRows) {
+        const description: string = row.ContentDescription || row.CD_CONTENT_TYPE || "";
+        if (!description) continue;
+        const subCode: string = row.CD_CONTENT_TYPE || description;
+        const center: string = row.DS_CENTER_DESCRIPTION || "";
+        const locatie = center.toLowerCase().includes("emmen") ? "emmen" : "tilburg";
+        const key = `${description}__${locatie}`;
+        const existing = voorraadMap.get(key);
+        if (existing) {
+          existing.aantal += Number(row.Aantal) || 0;
+        } else {
+          voorraadMap.set(key, { subCode, description, locatie, aantal: Number(row.Aantal) || 0 });
+        }
       }
 
-      const rows: Array<{
-        sub_code: string;
-        omschrijving: string;
-        locatie: string;
-        voorraad: number;
-        voorraad_leeg?: number;
-        afname: number;
-        verschil: number;
-      }> = rpcData ?? [];
+      // Aggregate Afname by ContentDescription + locatie → sum Aantal
+      const afnameMap = new Map<string, number>();
+      for (const row of afnameRows) {
+        const description: string = row.ContentDescription || "";
+        if (!description) continue;
+        const center: string = row.CenterDescription || "";
+        const locatie = center.toLowerCase().includes("emmen") ? "emmen" : "tilburg";
+        const key = `${description}__${locatie}`;
+        afnameMap.set(key, (afnameMap.get(key) || 0) + (Number(row.Aantal) || 0));
+      }
 
+      // Build StockItem list per locatie
       const emmenItems: StockItem[] = [];
       const tilburgItems: StockItem[] = [];
 
-      for (const row of rows) {
-        const voorraad = Number(row.voorraad) || 0;
-        const afname = Number(row.afname) || 0;
-        // Dekking in days = voorraad / (afname per dag). Assuming afname is monthly (P90), daily afname is afname / 30.
-        // If afname is 0, dekking is very high (let's say 999 days).
-        const dailyAfname = afname > 0 ? (afname / 90) : 0;
-        const dekking = dailyAfname > 0 ? (voorraad / dailyAfname) : (voorraad > 0 ? 999 : 0);
+      for (const [key, v] of voorraadMap.entries()) {
+        const afname = afnameMap.get(key) || 0;
+        const dailyAfname = afname > 0 ? afname / 90 : 0;
+        const dekking = dailyAfname > 0 ? v.aantal / dailyAfname : v.aantal > 0 ? 999 : 0;
 
         const item: StockItem = {
-          subCode: row.sub_code,
-          description: row.omschrijving || row.sub_code,
-          numberOnStock: voorraad,
-          numberEmpty: Number(row.voorraad_leeg) || 0,
+          subCode: v.subCode,
+          description: v.description,
+          numberOnStock: v.aantal,
+          numberEmpty: 0,
           averageConsumption: afname,
-          difference: dekking, // Now represents days of coverage
+          difference: dekking,
         };
-        if (row.locatie === "emmen") emmenItems.push(item);
+
+        if (v.locatie === "emmen") emmenItems.push(item);
         else tilburgItems.push(item);
       }
 
       setStockByLocation({ sol_emmen: emmenItems, sol_tilburg: tilburgItems });
-
-      // Sync unique products into stock_products for Vullocatie Beheer
-      // Default filled_in_emmen: true if product exists in Emmen stock, false if only in Tilburg
-      const emmenSubCodes = new Set(emmenItems.map((item) => item.subCode));
-      const tilburgSubCodes = new Set(tilburgItems.map((item) => item.subCode));
-      const uniqueMap = new Map<string, { sub_code: string; description: string; fill_location: string }>();
-      for (const item of [...emmenItems, ...tilburgItems]) {
-        if (!uniqueMap.has(item.subCode)) {
-          const fillLocation = emmenSubCodes.has(item.subCode) ? "emmen"
-            : tilburgSubCodes.has(item.subCode) ? "tilburg"
-            : "extern";
-          uniqueMap.set(item.subCode, {
-            sub_code: item.subCode,
-            description: item.description,
-            fill_location: fillLocation,
-          });
-        }
-      }
-      if (uniqueMap.size > 0) {
-        // Only insert new products; existing records (with manual overrides) are left untouched
-        const subCodes = Array.from(uniqueMap.keys());
-        const { data: existing } = await supabase
-          .from("stock_products")
-          .select("sub_code")
-          .in("sub_code", subCodes);
-        const existingSet = new Set((existing ?? []).map((r) => r.sub_code));
-        const newProducts = Array.from(uniqueMap.values()).filter((p) => !existingSet.has(p.sub_code));
-        if (newProducts.length > 0) {
-          await supabase.from("stock_products").insert(newProducts);
-        }
-      }
     } catch (err) {
       console.error("Error fetching stock from DB:", err);
       setDbError(err instanceof Error ? err.message : String(err));
@@ -151,25 +159,21 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
   // Determine which stock data to display based on selected location
   const stockData = useMemo(() => {
     if (selectedLocation === "all") {
-      // Combine both locations, avoiding duplicates by subCode
       const combined = new Map<string, StockItem>();
       for (const loc of ["sol_emmen", "sol_tilburg"]) {
         for (const item of stockByLocation[loc] || []) {
           if (combined.has(item.subCode)) {
             const existing = combined.get(item.subCode)!;
+            const combinedVoorraad = existing.numberOnStock + item.numberOnStock;
+            const combinedAfname = existing.averageConsumption + item.averageConsumption;
+            const dailyAfname = combinedAfname > 0 ? combinedAfname / 90 : 0;
+            const dekking = dailyAfname > 0 ? combinedVoorraad / dailyAfname : combinedVoorraad > 0 ? 999 : 0;
             combined.set(item.subCode, {
               ...existing,
-              averageConsumption: existing.averageConsumption + item.averageConsumption,
-              numberOnStock: existing.numberOnStock + item.numberOnStock,
-              numberEmpty: existing.numberEmpty + item.numberEmpty,
-              difference: Math.min(existing.difference, item.difference), // Keep lowest coverage when combining locations for safety, or recalculate dekking:
+              numberOnStock: combinedVoorraad,
+              averageConsumption: combinedAfname,
+              difference: dekking,
             });
-            // Recalculate dekking for combined:
-            const combinedVoorraad = combined.get(item.subCode)!.numberOnStock;
-            const combinedAfname = combined.get(item.subCode)!.averageConsumption;
-            const dailyAfname = combinedAfname > 0 ? (combinedAfname / 90) : 0;
-            const dekking = dailyAfname > 0 ? (combinedVoorraad / dailyAfname) : (combinedVoorraad > 0 ? 999 : 0);
-            combined.get(item.subCode)!.difference = dekking;
           } else {
             combined.set(item.subCode, { ...item });
           }
@@ -240,7 +244,7 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
         items: grouped.surplus,
       },
     ];
-  }, [stockData, refreshKey]);
+  }, [stockData]);
 
   // Determine overall status for the header
   const overallStatus = statusConfigs.find((s) => s.status === "critical" && s.count > 0)
@@ -411,25 +415,21 @@ export function StockSummaryWidget({ refreshKey, isRefreshing, className, select
                               </div>
                               <div className="text-right ml-3 flex-shrink-0 space-y-1">
                                 <div className="flex items-center justify-end gap-2 text-xs">
-                                  <span className="text-muted-foreground">Voorraad vol:</span>
+                                  <span className="text-muted-foreground">Voorraad:</span>
                                   <span className="font-semibold w-12 text-right text-green-600 dark:text-green-400">{formatNumber(item.numberOnStock, 0)}</span>
                                 </div>
-                                {(item.numberEmpty > 0) && (
-                                  <div className="flex items-center justify-end gap-2 text-xs">
-                                    <span className="text-muted-foreground">Voorraad leeg:</span>
-                                    <span className="font-semibold w-12 text-right text-orange-500">{formatNumber(item.numberEmpty, 0)}</span>
-                                  </div>
-                                )}
                                 <div className="flex items-center justify-end gap-2 text-xs">
                                   <span className="text-muted-foreground">P90 afname:</span>
-                                  <span className="font-semibold w-12 text-right">{formatNumber(item.averageConsumption, 2)}</span>
+                                  <span className="font-semibold w-12 text-right">{formatNumber(item.averageConsumption, 0)}</span>
                                 </div>
                                 <div className={cn(
                                   "flex items-center justify-end gap-2 text-xs font-semibold",
                                   item.difference < 3 ? "text-red-500" : item.difference < 7 ? "text-orange-500" : item.difference <= 30 ? "text-green-500" : "text-cyan-500"
                                 )}>
                                   <span>Dekking:</span>
-                                  <span className="w-12 text-right">{formatNumber(item.difference, 1)} dgn</span>
+                                  <span className="w-16 text-right">
+                                    {item.difference >= 999 ? "∞" : `${formatNumber(item.difference, 1)} dgn`}
+                                  </span>
                                 </div>
                               </div>
                             </div>

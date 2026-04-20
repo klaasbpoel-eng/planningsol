@@ -8,6 +8,7 @@ import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown
 import { formatNumber } from "@/lib/utils";
 import { getGasColor } from "@/constants/gasColors";
 import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import {
   LineChart,
   Line,
@@ -49,9 +50,11 @@ interface CumulativeGasTypeChartProps {
   location?: ProductionLocation;
   hideDigital?: boolean;
   hasDigitalTypes?: boolean;
+  hideExternal?: boolean;
+  hasExternalTypes?: boolean;
 }
 
-export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart({ location = "all", hideDigital = false, hasDigitalTypes = false }: CumulativeGasTypeChartProps) {
+export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart({ location = "all", hideDigital = false, hideExternal = false }: CumulativeGasTypeChartProps) {
   const [loading, setLoading] = useState(true);
   const [yearData, setYearData] = useState<YearData[]>([]);
   const [selectedGasTypes, setSelectedGasTypes] = useState<string[]>([]);
@@ -62,6 +65,9 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
   const [animatingTopFive, setAnimatingTopFive] = useState(false);
   const [animatingAll, setAnimatingAll] = useState(false);
   const [animatingClear, setAnimatingClear] = useState(false);
+  // YTD-modus: vergelijk alleen de maanden t/m de huidige maand voor beide jaren
+  const currentMonth = new Date().getMonth(); // 0-indexed, bijv. 2 = maart
+  const [ytdMode, setYtdMode] = useState(true);
 
 
   useEffect(() => {
@@ -122,10 +128,13 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
       return Array.from(map.values());
     };
 
-    const [rows1, rows2] = await Promise.all([
+    const [rows1, rows2, gasTypesData] = await Promise.all([
       fetchAllRowsForYear(selectedYear1),
-      fetchAllRowsForYear(selectedYear2)
+      fetchAllRowsForYear(selectedYear2),
+      api.gasTypes.getAllIncludingInactive(),
     ]);
+
+    const gasTypeMetaMap = new Map<string, any>(gasTypesData?.map((gt: any) => [gt.name, gt]) || []);
 
     const aggregated1 = computeMonthlyCylinderTotalsByGasType(rows1);
     const aggregated2 = computeMonthlyCylinderTotalsByGasType(rows2);
@@ -165,7 +174,17 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
     });
 
     const allTypes = Array.from(gasTypeMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-    setAllGasTypes(allTypes);
+    
+    // Filter completely out if the toggles are true
+    let filteredTypes = allTypes;
+    if (hideDigital) {
+      filteredTypes = filteredTypes.filter(t => !gasTypeMetaMap.get(t.name)?.is_digital);
+    }
+    if (hideExternal) {
+      filteredTypes = filteredTypes.filter(t => !gasTypeMetaMap.get(t.name)?.is_external);
+    }
+
+    setAllGasTypes(filteredTypes);
 
     setYearData([
       { year: selectedYear1, gasTypes: year1Data },
@@ -175,6 +194,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
     // Pre-select top 5 gas types by volume (year 1) for immediate useful view
     if (selectedGasTypes.length === 0) {
       const topFive = year1Data
+        .filter(gt => filteredTypes.some(ft => ft.id === gt.id))
         .map(gt => ({ id: gt.id, total: gt.months.reduce((a, b) => a + b, 0) }))
         .sort((a, b) => b.total - a.total)
         .slice(0, 5)
@@ -201,8 +221,10 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
       const gasType1 = year1DataItem?.gasTypes.find(gt => gt.id === gasTypeId);
       const gasType2 = year2DataItem?.gasTypes.find(gt => gt.id === gasTypeId);
 
-      const total1 = gasType1?.months.reduce((a, b) => a + b, 0) || 0;
-      const total2 = gasType2?.months.reduce((a, b) => a + b, 0) || 0;
+      const sliceMonths = (months: number[]) =>
+        ytdMode ? months.slice(0, currentMonth + 1) : months;
+      const total1 = sliceMonths(gasType1?.months || []).reduce((a, b) => a + b, 0);
+      const total2 = sliceMonths(gasType2?.months || []).reduce((a, b) => a + b, 0);
 
       let percentChange = 0;
       if (total2 > 0) {
@@ -221,7 +243,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
         percentChange
       };
     });
-  }, [selectedGasTypes, yearData, selectedYear1, selectedYear2, allGasTypes]);
+  }, [selectedGasTypes, yearData, selectedYear1, selectedYear2, allGasTypes, ytdMode, currentMonth]);
 
   const cumulativeChartData = useMemo(() => {
     const chartData: CumulativeChartData[] = [];
@@ -329,17 +351,23 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
               <Cylinder className="h-5 w-5 text-orange-500" />
               <LineChartIcon className="h-4 w-4" />
               Cilinders per gastype — jaarvergelijking
-              {hideDigital && hasDigitalTypes && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal">
-                  Alleen fysiek
-                </Badge>
-              )}
             </CardTitle>
             <CardDescription>
               Cumulatieve productie per maand — vergelijk twee jaren
             </CardDescription>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => setYtdMode(v => !v)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                ytdMode
+                  ? 'bg-orange-500 text-white border-orange-500'
+                  : 'bg-background border-border text-muted-foreground hover:border-orange-400'
+              }`}
+              title={ytdMode ? `Vergelijkt t/m ${MONTH_NAMES[currentMonth]} voor beide jaren` : 'Vergelijkt volledige jaren'}
+            >
+              YTD {ytdMode ? `(t/m ${MONTH_NAMES[currentMonth]})` : ''}
+            </button>
             <div className="flex items-center gap-2">
               <Label className="text-sm text-muted-foreground">Jaar 1:</Label>
               <Select value={selectedYear1.toString()} onValueChange={(v) => setSelectedYear1(parseInt(v))}>
@@ -481,8 +509,8 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="text-right text-xs text-muted-foreground">
-                    <div>{formatNumber(item.total1, 0)} ({selectedYear1})</div>
-                    <div>{formatNumber(item.total2, 0)} ({selectedYear2})</div>
+                    <div>{formatNumber(item.total1, 0)} ({selectedYear1}{ytdMode ? ` YTD` : ''})</div>
+                    <div>{formatNumber(item.total2, 0)} ({selectedYear2}{ytdMode ? ` YTD` : ''})</div>
                   </div>
                   <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${item.percentChange > 0
                     ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'

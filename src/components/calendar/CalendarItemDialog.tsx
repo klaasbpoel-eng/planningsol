@@ -104,6 +104,8 @@ export function CalendarItemDialog({
   const [timeOffStartDate, setTimeOffStartDate] = useState<Date | undefined>();
   const [timeOffEndDate, setTimeOffEndDate] = useState<Date | undefined>();
   const [timeOffTypeId, setTimeOffTypeId] = useState<string | null>(null);
+  const [timeOffDayPart, setTimeOffDayPart] = useState<string>("full_day");
+  const [timeOffProfileId, setTimeOffProfileId] = useState<string | null>(null);
 
   const resetTransientState = () => {
     setConfirmDelete(false);
@@ -136,6 +138,8 @@ export function CalendarItemDialog({
       setTimeOffStartDate(parseISO(request.start_date));
       setTimeOffEndDate(parseISO(request.end_date));
       setTimeOffTypeId(request.type_id || null);
+      setTimeOffDayPart(request.day_part || "full_day");
+      setTimeOffProfileId(request.profile_id || null);
       setApplyToSeries(false);
     }
 
@@ -215,15 +219,20 @@ export function CalendarItemDialog({
         }
       } else if (item.type === "timeoff") {
         const db = getPrimarySupabaseClient();
-        const { data, error } = await db
-          .from("time_off_requests")
-          .update({
+        const updatePayloadTimeOff: Record<string, any> = {
             status: timeOffStatus as "pending" | "approved" | "rejected",
             reason: timeOffReason || null,
             start_date: timeOffStartDate ? format(timeOffStartDate, "yyyy-MM-dd") : item.data.start_date,
             end_date: timeOffEndDate ? format(timeOffEndDate, "yyyy-MM-dd") : item.data.end_date,
             type_id: timeOffTypeId || null,
-          })
+            day_part: timeOffDayPart,
+        };
+        if (isAdmin && timeOffProfileId && timeOffProfileId !== (item.data as RequestWithProfile).profile_id) {
+          updatePayloadTimeOff.profile_id = timeOffProfileId;
+        }
+        const { data, error } = await db
+          .from("time_off_requests")
+          .update(updatePayloadTimeOff)
           .eq("id", item.data.id)
           .select()
           .single();
@@ -690,6 +699,32 @@ export function CalendarItemDialog({
           <div className="space-y-4 py-4">
             {isEditing ? (
               <>
+                {/* Medewerker */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    Medewerker
+                  </Label>
+                  {isAdmin && profiles.length > 0 ? (
+                    <Select value={timeOffProfileId || "none"} onValueChange={(val) => setTimeOffProfileId(val === "none" ? null : val)}>
+                      <SelectTrigger className="bg-background">
+                        <SelectValue placeholder="Selecteer medewerker" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border shadow-lg z-50">
+                        {profiles.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.full_name || p.email?.split("@")[0] || p.id}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="flex items-center gap-2 text-sm px-3 py-2 rounded-md border bg-muted/30">
+                      {getEmployeeName(request)}
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <Label>Status</Label>
                   <Select value={timeOffStatus} onValueChange={setTimeOffStatus}>
@@ -780,6 +815,34 @@ export function CalendarItemDialog({
                       </PopoverContent>
                     </Popover>
                   </div>
+                </div>
+
+                {/* Dagdeel */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Sun className="h-4 w-4 text-muted-foreground" />
+                    Dagdeel
+                  </Label>
+                  <Select value={timeOffDayPart} onValueChange={setTimeOffDayPart}>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border shadow-lg z-50">
+                      <SelectItem value="full_day">Hele dag</SelectItem>
+                      <SelectItem value="morning">
+                        <div className="flex items-center gap-2">
+                          <Sun className="h-4 w-4 text-amber-500" />
+                          Ochtend
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="afternoon">
+                        <div className="flex items-center gap-2">
+                          <Sunset className="h-4 w-4 text-orange-500" />
+                          Middag
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">

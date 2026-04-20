@@ -43,9 +43,31 @@ const ToolboxPage = () => {
 
   // Dialogs
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorMounted, setEditorMounted] = useState(false);
   const [editingToolbox, setEditingToolbox] = useState<Partial<ToolboxItem> | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerMounted, setViewerMounted] = useState(false);
   const [viewingToolbox, setViewingToolbox] = useState<ToolboxItem | null>(null);
+
+  // Deferred unmount — keeps TipTap editors alive until the close animation completes,
+  // preventing the synchronous ProseMirror teardown from blocking the UI thread
+  useEffect(() => {
+    if (editorOpen) {
+      setEditorMounted(true);
+    } else {
+      const t = setTimeout(() => setEditorMounted(false), 200);
+      return () => clearTimeout(t);
+    }
+  }, [editorOpen]);
+
+  useEffect(() => {
+    if (viewerOpen) {
+      setViewerMounted(true);
+    } else {
+      const t = setTimeout(() => setViewerMounted(false), 200);
+      return () => clearTimeout(t);
+    }
+  }, [viewerOpen]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
 
@@ -70,6 +92,8 @@ const ToolboxPage = () => {
   const categories = useMemo(() => {
     return ["all", ...new Set(toolboxes.map(t => t.category))].sort();
   }, [toolboxes]);
+
+  const editorCategories = useMemo(() => categories.filter(c => c !== "all"), [categories]);
 
   const filteredToolboxes = useMemo(() => {
     return toolboxes.filter(t => {
@@ -222,6 +246,8 @@ const ToolboxPage = () => {
                     <img
                       src={toolbox.cover_image_url || toolbox.thumbnail_url || ""}
                       alt={toolbox.title}
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
@@ -345,21 +371,25 @@ const ToolboxPage = () => {
         </div>
       )}
 
-      {/* Editor Dialog */}
-      <ToolboxEditorDialog
-        open={editorOpen}
-        onOpenChange={setEditorOpen}
-        toolbox={editingToolbox}
-        onSaved={refetch}
-        categories={categories.filter(c => c !== "all")}
-      />
+      {/* Editor Dialog — deferred unmount so TipTap editors don't block the UI thread on close */}
+      {editorMounted && (
+        <ToolboxEditorDialog
+          open={editorOpen}
+          onOpenChange={setEditorOpen}
+          toolbox={editingToolbox}
+          onSaved={refetch}
+          categories={editorCategories}
+        />
+      )}
 
-      {/* Viewer Dialog */}
-      <ToolboxViewer
-        open={viewerOpen}
-        onOpenChange={setViewerOpen}
-        toolbox={viewingToolbox}
-      />
+      {/* Viewer Dialog — deferred unmount */}
+      {viewerMounted && (
+        <ToolboxViewer
+          open={viewerOpen}
+          onOpenChange={setViewerOpen}
+          toolbox={viewingToolbox}
+        />
+      )}
 
       {/* Session Dialog */}
       <ToolboxSessionDialog

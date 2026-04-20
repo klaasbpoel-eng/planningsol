@@ -30,11 +30,13 @@ import { nl } from "date-fns/locale";
 import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
+import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
 import { toast } from "sonner";
 import { exportToExcel, exportToPDF } from "@/lib/export-utils";
 
 interface MonthlyReportProps {
   hideDigital?: boolean;
+  hideExternal?: boolean;
 }
 
 interface GasTypeItem {
@@ -90,7 +92,7 @@ const TOGGLE_CONFIG: { key: keyof SectionToggles; label: string; icon: React.Rea
   { key: "gasTypes", label: "Gassoorten", icon: <BarChart3 className="h-3 w-3" /> },
   { key: "sizeDistribution", label: "Grootteverdeling", icon: <Ruler className="h-3 w-3" /> },
   { key: "dryIce", label: "Droogijs", icon: <Snowflake className="h-3 w-3" /> },
-  { key: "topCustomers", label: "Top 5 klanten", icon: <Users className="h-3 w-3" /> },
+  { key: "topCustomers", label: "Top 3 klanten", icon: <Users className="h-3 w-3" /> },
 ];
 
 const TOGGLES_STORAGE_KEY = "monthly-report-section-toggles";
@@ -114,7 +116,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
   });
   const [toggles, setToggles] = useState<SectionToggles>(loadToggles);
   const [showSettings, setShowSettings] = useState(false);
-  const [trendMode, setTrendMode] = useState<"prev_month" | "prev_year">("prev_month");
+  const [trendMode, setTrendMode] = useState<"prev_month" | "prev_year" | "ytd">("prev_month");
 
   useEffect(() => {
     localStorage.setItem(TOGGLES_STORAGE_KEY, JSON.stringify(toggles));
@@ -124,19 +126,30 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
   const [tilburgData, setTilburgData] = useState<LocationKPI | null>(null);
   const [prevEmmenData, setPrevEmmenData] = useState<LocationKPI | null>(null);
   const [prevTilburgData, setPrevTilburgData] = useState<LocationKPI | null>(null);
+  const [ytdEmmenData, setYtdEmmenData] = useState<LocationKPI | null>(null);
+  const [ytdTilburgData, setYtdTilburgData] = useState<LocationKPI | null>(null);
   const [exporting, setExporting] = useState(false);
 
   const monthDate = useMemo(() => new Date(selectedMonth + "-01"), [selectedMonth]);
-  const fromDate = useMemo(() => format(startOfMonth(monthDate), "yyyy-MM-dd"), [monthDate]);
+  const fromDate = useMemo(() => {
+    if (trendMode === "ytd") return `${selectedMonth.substring(0, 4)}-01-01`;
+    return format(startOfMonth(monthDate), "yyyy-MM-dd");
+  }, [monthDate, trendMode, selectedMonth]);
   const toDate = useMemo(() => format(endOfMonth(monthDate), "yyyy-MM-dd"), [monthDate]);
   const prevMonthDate = useMemo(() => subMonths(monthDate, trendMode === "prev_year" ? 12 : 1), [monthDate, trendMode]);
-  const prevFromDate = useMemo(() => format(startOfMonth(prevMonthDate), "yyyy-MM-dd"), [prevMonthDate]);
-  const prevToDate = useMemo(() => format(endOfMonth(prevMonthDate), "yyyy-MM-dd"), [prevMonthDate]);
+  const prevFromDate = useMemo(() => {
+    if (trendMode === "ytd") return `${parseInt(selectedMonth.substring(0, 4)) - 1}-01-01`;
+    return format(startOfMonth(prevMonthDate), "yyyy-MM-dd");
+  }, [trendMode, selectedMonth, prevMonthDate]);
+  const prevToDate = useMemo(() => {
+    if (trendMode === "ytd") return format(endOfMonth(subMonths(monthDate, 12)), "yyyy-MM-dd");
+    return format(endOfMonth(prevMonthDate), "yyyy-MM-dd");
+  }, [trendMode, monthDate, prevMonthDate]);
 
   const monthOptions = useMemo(() => {
     const options = [];
     const now = new Date();
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 36; i++) {
       const d = subMonths(now, i);
       options.push({
         value: format(d, "yyyy-MM"),
@@ -170,7 +183,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
       const raw: string = row.Datum || "";
       if (!raw) return false;
       const iso = raw.includes("T") ? raw.substring(0, 10)
-        : (() => { const p = raw.split("-"); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+        : (() => { const d = raw.includes("/") ? raw.replace(/\//g, "-") : raw; const p = d.split("-"); if (p.length === 3 && p[0].length === 4) return d; return p.length === 3 ? (p[0].length === 4 ? raw : `${p[2]}-${p[1]}-${p[0]}`) : raw; })();
       if (iso < from || iso > to) return false;
       const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
       return loc === locationParam;
@@ -182,14 +195,19 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
     label: string,
     from: string,
     to: string,
+    digitalNames: Set<string> = new Set(),
   ): Promise<LocationKPI> => {
     const isTilburg = location === "sol_tilburg";
-    const [rows, dryIceEffRes] = await Promise.all([
+    const [rawRows, dryIceEffRes] = await Promise.all([
       fetchProductieForPeriod(from, to, location),
       isTilburg
         ? Promise.resolve([{ total_kg: 0, total_orders: 0 }])
         : api.reports.getDryIceEfficiency(from, to, location).catch(() => [{ total_kg: 0, total_orders: 0 }]),
     ]);
+
+    const rows = digitalNames.size > 0
+      ? rawRows.filter((r: any) => !digitalNames.has(r.Product))
+      : rawRows;
 
     const totalCyl = rows.reduce((sum, r) => sum + (r.Aantal || 0), 0);
     const cylOrders = rows.length;
@@ -202,7 +220,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
     }
     const customers = Array.from(custMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
+      .slice(0, 3)
       .map(([name, cylinders]) => ({ name, cylinders, dryIceKg: 0 }));
 
     // Gas type distribution grouped by Product
@@ -213,7 +231,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
     }
     const gasTypes = Array.from(typeMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
+      .slice(0, 3)
       .map(([name, count]) => ({ name, color: "#3b82f6", count }));
 
     // Size distribution grouped by Capaciteit
@@ -248,16 +266,23 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
     const load = async () => {
       setLoading(true);
       try {
-        const [emmen, tilburg, prevEmmen, prevTilburg] = await Promise.all([
-          fetchLocationData("sol_emmen", "SOL Emmen", fromDate, toDate),
-          fetchLocationData("sol_tilburg", "SOL Tilburg", fromDate, toDate),
-          fetchLocationData("sol_emmen", "SOL Emmen", prevFromDate, prevToDate),
-          fetchLocationData("sol_tilburg", "SOL Tilburg", prevFromDate, prevToDate),
+        const digitalNames = hideDigital ? await buildDigitalProductNames() : new Set<string>();
+        const selectedYear = parseInt(selectedMonth.substring(0, 4));
+        const ytdFrom = `${selectedYear}-01-01`;
+        const [emmen, tilburg, prevEmmen, prevTilburg, ytdEmmen, ytdTilburg] = await Promise.all([
+          fetchLocationData("sol_emmen", "SOL Emmen", fromDate, toDate, digitalNames),
+          fetchLocationData("sol_tilburg", "SOL Tilburg", fromDate, toDate, digitalNames),
+          fetchLocationData("sol_emmen", "SOL Emmen", prevFromDate, prevToDate, digitalNames),
+          fetchLocationData("sol_tilburg", "SOL Tilburg", prevFromDate, prevToDate, digitalNames),
+          trendMode !== "ytd" ? fetchLocationData("sol_emmen", "SOL Emmen", ytdFrom, toDate, digitalNames) : Promise.resolve(null as unknown as LocationKPI),
+          trendMode !== "ytd" ? fetchLocationData("sol_tilburg", "SOL Tilburg", ytdFrom, toDate, digitalNames) : Promise.resolve(null as unknown as LocationKPI),
         ]);
         setEmmenData(emmen);
         setTilburgData(tilburg);
         setPrevEmmenData(prevEmmen);
         setPrevTilburgData(prevTilburg);
+        setYtdEmmenData(trendMode !== "ytd" ? ytdEmmen : emmen);
+        setYtdTilburgData(trendMode !== "ytd" ? ytdTilburg : tilburg);
       } catch (err) {
         console.error("Error loading monthly report:", err);
       } finally {
@@ -485,12 +510,18 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
     data,
     prevData,
     color,
+    totalCylinders,
   }: {
     data: LocationKPI;
     prevData: LocationKPI | null;
     color: string;
+    totalCylinders?: number;
   }) => {
     const totalGas = data.gasTypeDistribution.reduce((sum, g) => sum + g.count, 0);
+    const sharePercent =
+      totalCylinders && totalCylinders > 0 && data.location !== "all"
+        ? Math.round((data.totalCylinders / totalCylinders) * 100)
+        : null;
 
     return (
       <div className="space-y-4">
@@ -524,21 +555,25 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
           </div>
         )}
 
-        {/* Efficiency */}
+        {/* Locatie-aandeel / Voltooiingsgraad */}
         {toggles.efficiency && (
           <div className="space-y-2">
             <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
               <Gauge className="h-3 w-3" />
-              Voltooiingsgraad
+              {sharePercent !== null ? "Aandeel van totaal" : "Voltooiingsgraad"}
             </div>
             <div className="bg-muted/30 rounded-lg p-2.5 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-lg font-bold">{data.efficiencyRate}%</span>
+                <span className="text-lg font-bold">
+                  {sharePercent !== null ? `${sharePercent}%` : `${data.efficiencyRate}%`}
+                </span>
                 <span className="text-[11px] text-muted-foreground">
-                  {formatNumber(data.completedCylinders, 0)} / {formatNumber(data.totalCylinders, 0)}
+                  {sharePercent !== null
+                    ? `${formatNumber(data.totalCylinders, 0)} / ${formatNumber(totalCylinders!, 0)}`
+                    : `${formatNumber(data.completedCylinders, 0)} / ${formatNumber(data.totalCylinders, 0)}`}
                 </span>
               </div>
-              <Progress value={data.efficiencyRate} className="h-2" />
+              <Progress value={sharePercent !== null ? sharePercent : data.efficiencyRate} className="h-2" />
             </div>
           </div>
         )}
@@ -644,17 +679,25 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
               Top 5 klanten
             </div>
             <div className="space-y-1">
-              {data.topCustomers.length > 0 ? data.topCustomers.map((c, i) => (
-                <div key={c.name} className="flex items-center justify-between text-xs py-1 px-2 rounded hover:bg-muted/30">
-                  <span className="flex items-center gap-1.5 truncate">
-                    <span className={`font-bold w-4 text-center ${i === 0 ? "text-amber-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-orange-600" : "text-muted-foreground"}`}>
-                      {i + 1}
+              {data.topCustomers.length > 0 ? data.topCustomers.map((c, i) => {
+                const isNew = prevData ? !prevData.topCustomers.some(p => p.name === c.name) : false;
+                return (
+                  <div key={c.name} className="flex items-center justify-between text-xs py-1 px-2 rounded hover:bg-muted/30">
+                    <span className="flex items-center gap-1.5 truncate">
+                      <span className={`font-bold w-4 text-center ${i === 0 ? "text-amber-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-orange-600" : "text-muted-foreground"}`}>
+                        {i + 1}
+                      </span>
+                      <span className="truncate">{c.name}</span>
+                      {isNew && (
+                        <Badge variant="outline" className="text-[10px] h-4 px-1 border-green-500/50 text-green-600 bg-green-500/10 font-normal shrink-0">
+                          Nieuw
+                        </Badge>
+                      )}
                     </span>
-                    <span className="truncate">{c.name}</span>
-                  </span>
-                  <span className="font-mono font-medium shrink-0 ml-2">{formatNumber(c.cylinders, 0)}</span>
-                </div>
-              )) : (
+                    <span className="font-mono font-medium shrink-0 ml-2">{formatNumber(c.cylinders, 0)}</span>
+                  </div>
+                );
+              }) : (
                 <p className="text-xs text-muted-foreground italic px-2">Geen data</p>
               )}
             </div>
@@ -684,7 +727,9 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
               Maandrapport
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Overzicht van KPI's per locatie — vergelijking t.o.v. {trendMode === "prev_year" ? "dezelfde maand vorig jaar" : "vorige maand"}
+              {trendMode === "ytd"
+                ? `Jan – ${format(monthDate, "MMMM yyyy", { locale: nl })} versus dezelfde periode vorig jaar`
+                : `Overzicht van KPI's per locatie — vergelijking t.o.v. ${trendMode === "prev_year" ? "dezelfde maand vorig jaar" : "vorige maand"}`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -700,13 +745,14 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={trendMode} onValueChange={(v) => setTrendMode(v as "prev_month" | "prev_year")}>
+            <Select value={trendMode} onValueChange={(v) => setTrendMode(v as "prev_month" | "prev_year" | "ytd")}>
               <SelectTrigger className="w-[190px] h-9 text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="prev_month">t.o.v. vorige maand</SelectItem>
                 <SelectItem value="prev_year">t.o.v. vorig jaar</SelectItem>
+                <SelectItem value="ytd">YTD (jan t/m maand)</SelectItem>
               </SelectContent>
             </Select>
             <Button
@@ -771,55 +817,94 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="border rounded-lg p-4 border-blue-500/20">
-                <LocationColumn data={emmenData} prevData={prevEmmenData} color="text-blue-500" />
+                <LocationColumn data={emmenData} prevData={prevEmmenData} color="text-blue-500" totalCylinders={totalData?.totalCylinders} />
               </div>
               <div className="border rounded-lg p-4 border-sky-400/20">
-                <LocationColumn data={tilburgData} prevData={prevTilburgData} color="text-sky-400" />
+                <LocationColumn data={tilburgData} prevData={prevTilburgData} color="text-sky-400" totalCylinders={totalData?.totalCylinders} />
               </div>
               <div className="border rounded-lg p-4 border-primary/20 bg-primary/[0.02]">
                 <LocationColumn data={totalData} prevData={prevTotalData} color="text-primary" />
               </div>
             </div>
 
-            {/* Maand doelstelling voortgang */}
+            {/* Doelstelling voortgang: maand + YTD */}
             {(() => {
               try {
                 const year = parseInt(selectedMonth.substring(0, 4));
+                const monthIndex = parseInt(selectedMonth.substring(5, 7));
                 const stored = localStorage.getItem(`yearly-targets-${year}`);
                 const t = stored ? JSON.parse(stored) : null;
                 if (!t || (t.emmen === 0 && t.tilburg === 0)) return null;
-                const monthlyEmmen = Math.round((t.emmen || 0) / 12);
-                const monthlyTilburg = Math.round((t.tilburg || 0) / 12);
-                const monthlyTotal = monthlyEmmen + monthlyTilburg;
-                const rows = [
-                  { label: "SOL Emmen", colorBar: "bg-blue-500", colorText: "text-blue-500", current: emmenData.totalCylinders, target: monthlyEmmen },
-                  { label: "SOL Tilburg", colorBar: "bg-sky-400", colorText: "text-sky-400", current: tilburgData.totalCylinders, target: monthlyTilburg },
-                  { label: "Totaal", colorBar: "bg-primary", colorText: "text-primary", current: totalData.totalCylinders, target: monthlyTotal },
-                ].filter(r => r.target > 0);
-                if (rows.length === 0) return null;
-                return (
-                  <div className="mt-4 pt-4 border-t space-y-2.5">
-                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                      <Target className="h-3 w-3" />
-                      Maand doelstelling (1/12 van jaartarget {year})
+
+                const isYtdMode = trendMode === "ytd";
+
+                // Monthly targets (1/12)
+                const mE = Math.round((t.emmen || 0) / 12);
+                const mT = Math.round((t.tilburg || 0) / 12);
+                const mTot = mE + mT;
+
+                // YTD targets (monthIndex/12)
+                const ytdTargE = Math.round((t.emmen || 0) * monthIndex / 12);
+                const ytdTargT = Math.round((t.tilburg || 0) * monthIndex / 12);
+                const ytdTargTot = ytdTargE + ytdTargT;
+
+                // YTD actuals
+                const ytdE = ytdEmmenData?.totalCylinders ?? 0;
+                const ytdT = ytdTilburgData?.totalCylinders ?? 0;
+                const ytdTot = ytdE + ytdT;
+
+                const ProgressBar = ({ label, colorBar, colorText, current, target }: { label: string; colorBar: string; colorText: string; current: number; target: number }) => {
+                  if (target === 0) return null;
+                  const pct = Math.min(100, Math.round((current / target) * 100));
+                  return (
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className={`font-medium ${colorText}`}>{label}</span>
+                        <span className="text-muted-foreground font-mono">
+                          {formatNumber(current, 0)} / {formatNumber(target, 0)}
+                          <span className={`ml-2 font-semibold ${pct >= 100 ? "text-green-500" : pct >= 80 ? "text-foreground" : "text-destructive"}`}>{pct}%</span>
+                        </span>
+                      </div>
+                      <div className="w-full bg-muted/50 rounded-full h-1.5">
+                        <div className={`h-1.5 rounded-full transition-all ${colorBar}`} style={{ width: `${pct}%` }} />
+                      </div>
                     </div>
-                    {rows.map(({ label, colorBar, colorText, current, target }) => {
-                      const pct = Math.min(100, Math.round((current / target) * 100));
-                      return (
-                        <div key={label}>
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className={`font-medium ${colorText}`}>{label}</span>
-                            <span className="text-muted-foreground font-mono">
-                              {formatNumber(current, 0)} / {formatNumber(target, 0)}
-                              <span className={`ml-2 font-semibold ${pct >= 100 ? "text-green-500" : pct >= 80 ? "text-foreground" : "text-destructive"}`}>{pct}%</span>
-                            </span>
-                          </div>
-                          <div className="w-full bg-muted/50 rounded-full h-1.5">
-                            <div className={`h-1.5 rounded-full transition-all ${colorBar}`} style={{ width: `${pct}%` }} />
-                          </div>
+                  );
+                };
+
+                return (
+                  <div className="mt-4 pt-4 border-t">
+                    {/* Monthly bars — only when not in YTD mode */}
+                    {!isYtdMode && mTot > 0 && (
+                      <>
+                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                          <Target className="h-3 w-3" />
+                          Maand doelstelling (1/12 van jaar {year})
                         </div>
-                      );
-                    })}
+                        <div className="space-y-2.5 mb-4">
+                          <ProgressBar label="SOL Emmen" colorBar="bg-blue-500" colorText="text-blue-500" current={emmenData.totalCylinders} target={mE} />
+                          <ProgressBar label="SOL Tilburg" colorBar="bg-sky-400" colorText="text-sky-400" current={tilburgData.totalCylinders} target={mT} />
+                          <ProgressBar label="Totaal" colorBar="bg-primary" colorText="text-primary" current={totalData.totalCylinders} target={mTot} />
+                        </div>
+                      </>
+                    )}
+
+                    {/* YTD bars — always shown */}
+                    {ytdTargTot > 0 && (
+                      <>
+                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                          <Target className="h-3 w-3" />
+                          {isYtdMode
+                            ? `YTD doelstelling (${monthIndex}/12 van jaar ${year})`
+                            : `YTD voortgang t/m ${format(monthDate, "MMMM", { locale: nl })} (${monthIndex}/12 van jaar)`}
+                        </div>
+                        <div className="space-y-2.5">
+                          <ProgressBar label="SOL Emmen" colorBar={isYtdMode ? "bg-blue-500" : "bg-blue-500/60"} colorText="text-blue-500" current={ytdE} target={ytdTargE} />
+                          <ProgressBar label="SOL Tilburg" colorBar={isYtdMode ? "bg-sky-400" : "bg-sky-400/60"} colorText="text-sky-400" current={ytdT} target={ytdTargT} />
+                          <ProgressBar label="Totaal" colorBar={isYtdMode ? "bg-primary" : "bg-primary/60"} colorText="text-primary" current={ytdTot} target={ytdTargTot} />
+                        </div>
+                      </>
+                    )}
                   </div>
                 );
               } catch { return null; }

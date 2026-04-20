@@ -1,21 +1,27 @@
-
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 
-dotenv.config({ path: ".env" });
+dotenv.config();
 
-const supabase = createClient(process.env.VITE_SUPABASE_URL || "", process.env.VITE_SUPABASE_ANON_KEY || "");
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL || "",
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY || ""
+);
 
-async function main() {
-  console.log("Fetching all time_off_requests...");
-  const { data, error } = await supabase.from("time_off_requests").select("*");
+async function checkDates() {
+  const { data, error } = await supabase
+    .from("Productie")
+    .select("Datum, Aantal, Locatie, Product, Jaar");
+
   if (error) {
-    console.error("Error:", error);
-  } else {
-    console.log("Total entries:", data.length);
-    console.log(JSON.stringify(data, null, 2));
+    console.error(error);
+    return;
   }
+  
+  console.log("Total entries:", data.length);
+  const sampleDates = data.slice(0, 10).map(d => `${d.Datum} (${d.Jaar})`);
+  console.log("Samples:", sampleDates);
+  
 }
 
-main();
-
+checkDates();

@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -26,6 +27,8 @@ interface ProductionHeatMapProps {
   dateRange?: { from: Date; to: Date };
   hideDigital?: boolean;
   hasDigitalTypes?: boolean;
+  hideExternal?: boolean;
+  hasExternalTypes?: boolean;
 }
 
 interface DailyData {
@@ -34,7 +37,7 @@ interface DailyData {
   dryIce: number;
 }
 
-export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDigital = false, hasDigitalTypes = false }: ProductionHeatMapProps) {
+export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDigital = false, hasDigitalTypes = false, hideExternal = false }: ProductionHeatMapProps) {
   const [currentDate, setCurrentDate] = useState(dateRange?.from ?? new Date());
   const [viewType, setViewType] = useState<ViewType>("cylinders");
   const [dailyData, setDailyData] = useState<Map<string, DailyData>>(new Map());
@@ -76,7 +79,7 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
       for (const row of allRows) {
         const raw: string = row.Datum || "";
         if (!raw) continue;
-        const iso = raw.includes("T") ? raw.substring(0,10) : (() => { const p = raw.split("-"); return p.length===3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+        const iso = raw.includes("T") ? raw.substring(0,10) : (() => { const p = raw.split("-"); return p.length===3 ? (p[0].length===4 ? raw : `${p[2]}-${p[1]}-${p[0]}`) : raw; })();
         if (iso < fromDate || iso > toDate) continue;
         if (locationParam) { const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg"; if (loc !== locationParam) continue; }
         const existing = dataMap.get(iso) || { date: iso, cylinders: 0, dryIce: 0 };
@@ -207,10 +210,27 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
             Vorige
           </Button>
 
-          <div className="text-center">
+          <div className="flex items-center gap-2">
             <span className="text-lg font-semibold capitalize">
-              {format(currentDate, "MMMM yyyy", { locale: nl })}
+              {format(currentDate, "MMMM", { locale: nl })}
             </span>
+            <Select
+              value={String(currentDate.getFullYear())}
+              onValueChange={(yr) => {
+                const d = new Date(currentDate);
+                d.setFullYear(parseInt(yr));
+                setCurrentDate(d);
+              }}
+            >
+              <SelectTrigger className="h-8 w-24 text-base font-semibold border-none shadow-none focus:ring-0 px-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: new Date().getFullYear() - 2019 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <Button

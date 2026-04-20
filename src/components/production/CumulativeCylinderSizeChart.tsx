@@ -70,9 +70,11 @@ interface CumulativeCylinderSizeChartProps {
   location?: ProductionLocation;
   hideDigital?: boolean;
   hasDigitalTypes?: boolean;
+  hideExternal?: boolean;
+  hasExternalTypes?: boolean;
 }
 
-export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinderSizeChart({ location = "all", hideDigital = false, hasDigitalTypes = false }: CumulativeCylinderSizeChartProps) {
+export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinderSizeChart({ location = "all", hideDigital = false, hasDigitalTypes = false, hideExternal = false }: CumulativeCylinderSizeChartProps) {
   const [loading, setLoading] = useState(true);
   const [yearData, setYearData] = useState<YearData[]>([]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);

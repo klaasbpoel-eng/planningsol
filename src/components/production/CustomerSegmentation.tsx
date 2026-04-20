@@ -35,6 +35,8 @@ interface CustomerSegmentationProps {
   dateRange?: { from: Date; to: Date };
   hideDigital?: boolean;
   hasDigitalTypes?: boolean;
+  hideExternal?: boolean;
+  hasExternalTypes?: boolean;
 }
 
 interface CustomerSegment {
@@ -48,6 +50,7 @@ interface CustomerSegment {
   avg_order_size: number;
   tier: "gold" | "silver" | "bronze";
   trend: "new" | "growing" | "stable" | "declining";
+  churnRisk: boolean;
 }
 
 export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange, hideDigital = false, hasDigitalTypes = false }: CustomerSegmentationProps) {
@@ -91,7 +94,7 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
         return all.filter((row: any) => {
           const raw: string = row.Datum || "";
           if (!raw) return false;
-          const iso = raw.includes("T") ? raw.substring(0,10) : (() => { const p = raw.split("-"); return p.length===3 ? `${p[2]}-${p[1]}-${p[0]}` : raw; })();
+          const iso = raw.includes("T") ? raw.substring(0,10) : (() => { const p = raw.split("-"); return p.length===3 ? (p[0].length===4 ? raw : `${p[2]}-${p[1]}-${p[0]}`) : raw; })();
           if (iso < from || iso > to) return false;
           if (locationParam) { const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg"; if (loc !== locationParam) return false; }
           return true;
@@ -123,15 +126,33 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
       const goldCut = Math.ceil(sorted.length * 0.2);
       const silverCut = Math.ceil(sorted.length * 0.5);
 
+      const today = new Date();
+      const todayStr = today.toISOString().substring(0, 10);
+      const isCurrentPeriod = tDate >= todayStr;
+
       const segments: CustomerSegment[] = sorted.map(([name, d], i) => {
         const tier: "gold"|"silver"|"bronze" = i < goldCut ? "gold" : i < silverCut ? "silver" : "bronze";
         const prev = prevMap.get(name) || 0;
         const trend: "new"|"growing"|"stable"|"declining" = prev === 0 ? "new"
           : d.total > prev * 1.1 ? "growing" : d.total < prev * 0.9 ? "declining" : "stable";
         const dates = [...d.dates].sort();
+        const lastOrderStr = dates[dates.length - 1] || "";
+        let churnRisk = false;
+        if (isCurrentPeriod && lastOrderStr) {
+          const daysSinceLast = Math.floor((today.getTime() - new Date(lastOrderStr).getTime()) / 86400000);
+          let threshold = 60;
+          if (dates.length >= 2) {
+            const totalSpan = Math.floor(
+              (new Date(dates[dates.length - 1]).getTime() - new Date(dates[0]).getTime()) / 86400000
+            );
+            const avgInterval = totalSpan / (dates.length - 1);
+            threshold = Math.max(60, avgInterval * 1.5);
+          }
+          churnRisk = daysSinceLast > threshold;
+        }
         return { customer_id: name, customer_name: name, total_cylinders: d.total, total_dry_ice_kg: 0,
-          order_count: d.count, first_order_date: dates[0]||"", last_order_date: dates[dates.length-1]||"",
-          avg_order_size: d.count > 0 ? Math.round((d.total/d.count)*10)/10 : 0, tier, trend };
+          order_count: d.count, first_order_date: dates[0]||"", last_order_date: lastOrderStr,
+          avg_order_size: d.count > 0 ? Math.round((d.total/d.count)*10)/10 : 0, tier, trend, churnRisk };
       });
       setCustomers(segments);
     } catch (error) {
@@ -167,6 +188,8 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
   const totalCylinders = useMemo(() => {
     return customers.reduce((sum, c) => sum + c.total_cylinders, 0);
   }, [customers]);
+
+  const churnCount = useMemo(() => customers.filter(c => c.churnRisk).length, [customers]);
 
   const getTierIcon = (tier: string) => {
     switch (tier) {
@@ -344,6 +367,16 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
                 </div>
               </div>
 
+              {/* Churn Risk Alert */}
+              {churnCount > 0 && (
+                <div className="mb-4 p-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    <span className="font-semibold">{churnCount} klant{churnCount !== 1 ? "en" : ""}</span> met churn risico — langer inactief dan verwacht o.b.v. orderfrequentie
+                  </p>
+                </div>
+              )}
+
               {/* Search */}
               <div className="relative mb-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -382,6 +415,12 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
                                     {getTrendIcon(customer.trend)}
                                     {getTrendLabel(customer.trend)}
                                   </Badge>
+                                  {customer.churnRisk && (
+                                    <Badge variant="outline" className="text-xs h-5 gap-1 border-amber-500/50 text-amber-500 bg-amber-500/10">
+                                      <AlertTriangle className="h-3 w-3" />
+                                      Churn risico
+                                    </Badge>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                   <span>{formatNumber(customer.total_cylinders, 0)} cilinders</span>
