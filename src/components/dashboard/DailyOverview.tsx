@@ -1486,6 +1486,21 @@ export function DailyOverview() {
                           onAdd={isAdmin ? () => setCreateTaskOpen(true) : undefined}
                         >
                           {dayTasks.map((t) => (
+                            (() => {
+                            // Toon tijd-as scheidslijn vóór de eerste taak zonder start_time
+                            const idx = dayTasks.indexOf(t);
+                            const showNoTimeDivider =
+                              !t.start_time &&
+                              idx > 0 &&
+                              !!dayTasks[idx - 1]?.start_time;
+                            return (
+                            <>
+                            {showNoTimeDivider && (
+                              <div className="flex items-center gap-2 pt-1 mt-1 border-t border-current/10 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                                <Clock className="h-3 w-3" />
+                                <span>Geen tijd</span>
+                              </div>
+                            )}
                             <ContextMenu key={t.id}>
                               <ContextMenuTrigger asChild>
                                 <div
@@ -1515,6 +1530,9 @@ export function DailyOverview() {
                                 {renderStatusMenu(t.status, (s) => handleQuickStatus("tasks", t.id, s, setTasks))}
                               </ContextMenuContent>
                             </ContextMenu>
+                            </>
+                            );
+                            })()
                           ))}
                         </Section>
                       )}
