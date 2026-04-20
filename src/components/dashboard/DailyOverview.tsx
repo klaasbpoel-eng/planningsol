@@ -1047,39 +1047,47 @@ export function DailyOverview() {
             <>
             {/* === PROGRESS BAR + SUMMARY === */}
             <div className="mb-4 print:hidden space-y-2">
-              <div className="flex items-center gap-3">
-                <Progress value={progressStats.percentage} className={`flex-1 h-2.5 ${progressStats.percentage > 75 ? "[&>div]:bg-green-500" : progressStats.percentage > 40 ? "[&>div]:bg-orange-500" : "[&>div]:bg-red-500"}`} />
-                <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-                  {progressStats.completed}/{progressStats.total} afgerond
-                </span>
+              {/* Voortgang */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-muted-foreground">Voortgang van de dag</span>
+                  <span className="font-semibold tabular-nums text-foreground">
+                    {progressStats.completed} <span className="text-muted-foreground font-normal">van</span> {progressStats.total} afgerond
+                    {progressStats.total > 0 && <span className="text-muted-foreground font-normal"> · {progressStats.percentage}%</span>}
+                  </span>
+                </div>
+                <Progress
+                  value={progressStats.percentage}
+                  className={`h-2 ${progressStats.percentage > 75 ? "[&>div]:bg-green-500" : progressStats.percentage > 40 ? "[&>div]:bg-orange-500" : progressStats.total === 0 ? "[&>div]:bg-muted-foreground/30" : "[&>div]:bg-red-500"}`}
+                />
               </div>
-              <div className="flex flex-wrap gap-2">
-                {progressStats.ambulanceCount > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-red-500/10 text-red-700 dark:text-red-400">
-                    <Ambulance className="h-3 w-3" /> {progressStats.ambulanceCount}
+              {/* Samenvattingsstrook — één leesbare zin */}
+              {progressStats.total + progressStats.timeOffCount > 0 ? (
+                <p className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                  <span className="font-medium text-foreground">
+                    {viewMode === "day" ? (isToday(currentDate) ? "Vandaag" : "Deze dag") : "Deze week"}
                   </span>
-                )}
-                {progressStats.gasCount > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-700 dark:text-orange-400">
-                    <Cylinder className="h-3 w-3" /> {progressStats.totalCylinders} cil.
+                  <span aria-hidden>·</span>
+                  <span><span className="font-medium text-foreground">{progressStats.total}</span> {progressStats.total === 1 ? "item" : "items"}</span>
+                  {progressStats.ambulanceCount > 0 && (
+                    <><span aria-hidden>·</span><span className="inline-flex items-center gap-1"><Ambulance className="h-3.5 w-3.5 text-red-600 dark:text-red-400" aria-hidden /> {progressStats.ambulanceCount} {progressStats.ambulanceCount === 1 ? "rit" : "ritten"}</span></>
+                  )}
+                  {progressStats.dryIceCount > 0 && (
+                    <><span aria-hidden>·</span><span className="inline-flex items-center gap-1"><Snowflake className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" aria-hidden /> {progressStats.totalDryIceKg} kg droogijs</span></>
+                  )}
+                  {progressStats.gasCount > 0 && (
+                    <><span aria-hidden>·</span><span className="inline-flex items-center gap-1"><Cylinder className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" aria-hidden /> {progressStats.totalCylinders} cil.</span></>
+                  )}
+                  {progressStats.taskCount > 0 && (
+                    <><span aria-hidden>·</span><span className="inline-flex items-center gap-1"><ClipboardList className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" aria-hidden /> {progressStats.taskCount} {progressStats.taskCount === 1 ? "taak" : "taken"}</span></>
+                  )}
+                  <span aria-hidden>·</span>
+                  <span className="inline-flex items-center gap-1">
+                    <Palmtree className="h-3.5 w-3.5 text-green-600 dark:text-green-400" aria-hidden />
+                    {progressStats.timeOffCount === 0 ? "iedereen aanwezig" : `${progressStats.timeOffCount} afwezig`}
                   </span>
-                )}
-                {progressStats.dryIceCount > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-700 dark:text-cyan-400">
-                    <Snowflake className="h-3 w-3" /> {progressStats.totalDryIceKg} kg
-                  </span>
-                )}
-                {progressStats.taskCount > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-400">
-                    <ClipboardList className="h-3 w-3" /> {progressStats.taskCount}
-                  </span>
-                )}
-                {progressStats.timeOffCount > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
-                    <Palmtree className="h-3 w-3" /> {progressStats.timeOffCount}
-                  </span>
-                )}
-              </div>
+                </p>
+              ) : null}
             </div>
 
             {/* === SEARCH + FILTER === */}
@@ -1729,16 +1737,23 @@ function Section({
   onAdd?: () => void;
   children: React.ReactNode;
 }) {
+  const isEmpty = count === 0;
   return (
-    <div className={`rounded-lg border p-3 ${bgClass || ""}`}>
+    <div
+      className={`rounded-lg border p-3 transition-opacity ${
+        isEmpty
+          ? "border-dashed bg-muted/20 opacity-60 hover:opacity-100"
+          : bgClass || ""
+      }`}
+    >
       <div className="flex items-center gap-2 mb-2">
         <button
           onClick={onToggle}
           className="flex items-center gap-2 flex-1 min-w-0 text-left min-h-[44px] md:min-h-0 rounded-md px-1 -mx-1 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         >
-          <span className={color}>{icon}</span>
-          <span className="text-sm font-medium">{label}</span>
-          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${badgeClass}`}>
+          <span className={isEmpty ? "text-muted-foreground" : color}>{icon}</span>
+          <span className={`text-sm font-medium ${isEmpty ? "text-muted-foreground" : ""}`}>{label}</span>
+          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${isEmpty ? "bg-muted text-muted-foreground" : badgeClass}`}>
             {count}
           </span>
           <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform print:hidden ${collapsed ? "-rotate-90" : ""}`} />
@@ -1758,7 +1773,13 @@ function Section({
         )}
       </div>
       {!collapsed && (
-        <div className="divide-y divide-current/5 space-y-2 md:space-y-1.5">{children}</div>
+        <div className="divide-y divide-current/5 space-y-2 md:space-y-1.5">
+          {isEmpty ? (
+            <p className="text-xs text-muted-foreground/70 italic py-1">Geen items</p>
+          ) : (
+            children
+          )}
+        </div>
       )}
     </div>
   );
