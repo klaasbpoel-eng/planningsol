@@ -10,7 +10,8 @@ interface StatCardProps {
   iconBgColor?: string;
   cardBgColor?: string;
   trend?: {
-    value: number;
+    /** Pass `null` to indicate "no comparable baseline" (avoids fake +999% / -999%). */
+    value: number | null;
     label?: string;
   };
   className?: string;
@@ -25,27 +26,33 @@ export function StatCard({
   trend,
   className,
 }: StatCardProps) {
+  const trendValue = trend?.value;
+  // A change is only visually emphasised when it's >=5% — smaller deltas are noise.
+  const isMeaningful =
+    trendValue !== null && trendValue !== undefined && Math.abs(trendValue) >= 5;
+
   const getTrendIcon = () => {
     if (!trend) return null;
-    if (trend.value > 0) {
-      return <TrendingUp className="h-3 w-3" />;
-    } else if (trend.value < 0) {
-      return <TrendingDown className="h-3 w-3" />;
-    }
-    return <Minus className="h-3 w-3" />;
+    if (trendValue === null || !isMeaningful) return <Minus className="h-3 w-3" />;
+    if (trendValue! > 0) return <TrendingUp className="h-3 w-3" />;
+    return <TrendingDown className="h-3 w-3" />;
   };
 
   const getTrendColor = () => {
     if (!trend) return "";
-    if (trend.value > 0) return "text-success";
-    if (trend.value < 0) return "text-destructive";
-    return "text-muted-foreground";
+    if (trendValue === null || !isMeaningful) return "text-muted-foreground";
+    if (trendValue! > 0) return "text-success";
+    return "text-destructive";
   };
 
   const formatTrendValue = () => {
     if (!trend) return "";
-    const prefix = trend.value > 0 ? "+" : "";
-    return `${prefix}${trend.value}%`;
+    if (trendValue === null) return "—";
+    const capped = Math.max(-500, Math.min(500, trendValue!));
+    const prefix = capped > 0 ? "+" : "";
+    if (capped >= 500) return "+500%+";
+    if (capped <= -500) return "−500%+";
+    return `${prefix}${capped}%`;
   };
 
   return (
@@ -63,6 +70,7 @@ export function StatCard({
                   "flex items-center gap-0.5 text-[11px] font-medium whitespace-nowrap",
                   getTrendColor()
                 )}
+                title={trendValue === null ? "Geen vergelijkbare basis in vorige periode" : undefined}
               >
                 {getTrendIcon()}
                 <span>{formatTrendValue()}</span>

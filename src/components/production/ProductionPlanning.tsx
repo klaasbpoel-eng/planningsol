@@ -173,10 +173,12 @@ export function ProductionPlanning({
     setRefreshKey(prev => prev + 1);
   }, []);
 
-  const calculateTrend = (current: number, previous: number): number => {
-    if (previous === 0) return current > 0 ? 999 : 0;
+  // Returns null when there is no comparable baseline so the StatCard can
+  // render "—" instead of a misleading +999%.
+  const calculateTrend = (current: number, previous: number): number | null => {
+    if (previous === 0) return null;
     const pct = Math.round(((current - previous) / previous) * 100);
-    return Math.max(-999, Math.min(999, pct));
+    return Math.max(-500, Math.min(500, pct));
   };
 
   const handleDateRangeChange = useCallback((newRange: DateRange) => {
@@ -287,17 +289,15 @@ export function ProductionPlanning({
 
   return (
     <div className="space-y-6">
-      {/* KPI Dashboard - only for non-operators */}
-      {showKPIDashboard && (
-        <KPIDashboard location={selectedLocation} refreshKey={refreshKey} dateRange={dateRange} hideDigital={hideDigital} onHideDigitalChange={setHideDigital} hideExternal={hideExternal} onHideExternalChange={setHideExternal} onNavigateToReports={() => setActiveTab("rapportage")} />
-      )}
-
-      {/* Location Filter */}
-      <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 border border-border/50">
-        <MapPin className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm text-muted-foreground mr-2">Locatie:</span>
-        <TooltipProvider>
-          <div className="flex gap-1">
+      {/* Toolbar: locatie + periode — sticky, hoger in de visuele hiërarchie */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
+        <div className="flex items-center gap-2 flex-wrap">
+          <MapPin className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mr-1">
+            Locatie
+          </span>
+          <TooltipProvider>
+            <div className="flex gap-1">
             {/* "Alle locaties" - only clickable for admins */}
             {canViewAllLocations ? (
               <Badge
@@ -385,33 +385,48 @@ export function ProductionPlanning({
                 </TooltipContent>
               </Tooltip>
             )}
-          </div>
-        </TooltipProvider>
+            </div>
+          </TooltipProvider>
 
-        {/* Show user's assigned location info if restricted */}
-        {!canViewAllLocations && userProductionLocation && (
-          <span className="text-xs text-muted-foreground ml-2 flex items-center gap-1">
-            <Lock className="h-3 w-3" />
-            Beperkt tot jouw locatie
+          {!canViewAllLocations && userProductionLocation && (
+            <span className="text-xs text-muted-foreground ml-1 flex items-center gap-1">
+              <Lock className="h-3 w-3" />
+              Beperkt tot jouw locatie
+            </span>
+          )}
+        </div>
+
+        {/* Period indicator — klikbaar naar Rapportage tab waar de picker zit */}
+        <button
+          type="button"
+          onClick={() => showAdvancedTabs && setActiveTab("rapportage")}
+          disabled={!showAdvancedTabs}
+          className={cn(
+            "flex items-center gap-2 text-sm rounded-md px-3 py-1.5 transition-colors",
+            showAdvancedTabs
+              ? "bg-background hover:bg-background/80 border border-border cursor-pointer"
+              : "bg-muted/40 cursor-default"
+          )}
+          title={showAdvancedTabs ? "Klik om periode te wijzigen in Rapportage" : undefined}
+        >
+          <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+            Periode
           </span>
-        )}
+          <span className="font-medium">{getDateRangeLabel(dateRange)}</span>
+          {showAdvancedTabs && <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+        </button>
       </div>
+
+      {/* KPI Dashboard - only for non-operators */}
+      {showKPIDashboard && (
+        <KPIDashboard location={selectedLocation} refreshKey={refreshKey} dateRange={dateRange} hideDigital={hideDigital} onHideDigitalChange={setHideDigital} hideExternal={hideExternal} onHideExternalChange={setHideExternal} onNavigateToReports={() => setActiveTab("rapportage")} />
+      )}
 
       {/* Quick stats - Only show for planning tabs, hide for reporting to give more space */}
       {activeTab !== 'rapportage' && (
         <div className="space-y-2">
-          {/* Period indicator + collapse toggle */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-xs font-medium">
-                📅 {getDateRangeLabel(dateRange)}
-              </Badge>
-              {showAdvancedTabs && (
-                <span className="text-xs text-muted-foreground">
-                  Wijzig periode in Rapportage tab
-                </span>
-              )}
-            </div>
+          {/* Collapse toggle (period now lives in the toolbar above) */}
+          <div className="flex items-center justify-end">
             <button
               onClick={() => {
                 setStatsCollapsed(prev => {

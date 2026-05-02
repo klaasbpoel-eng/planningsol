@@ -1,5 +1,6 @@
-import { AlertTriangle, TrendingUp, TrendingDown, Sparkles } from "lucide-react";
+import { AlertTriangle, TrendingUp, TrendingDown, Sparkles, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -93,9 +94,10 @@ export function AnomalyAlertBadge({ anomaly, compact = false, className }: Anoma
 interface AnomalyAlertsPanelProps {
   anomalies: { label: string; result: AnomalyResult }[];
   className?: string;
+  onInvestigate?: () => void;
 }
 
-export function AnomalyAlertsPanel({ anomalies, className }: AnomalyAlertsPanelProps) {
+export function AnomalyAlertsPanel({ anomalies, className, onInvestigate }: AnomalyAlertsPanelProps) {
   const activeAnomalies = anomalies.filter((a) => a.result.isAnomaly);
 
   if (activeAnomalies.length === 0) return null;
@@ -122,6 +124,9 @@ export function AnomalyAlertsPanel({ anomalies, className }: AnomalyAlertsPanelP
           {activeAnomalies.length} {activeAnomalies.length === 1 ? "alert" : "alerts"}
         </Badge>
       </div>
+      <p className="text-xs text-muted-foreground mb-2">
+        Statistisch ongebruikelijke {activeAnomalies.length === 1 ? "afwijking" : "afwijkingen"} t.o.v. de afgelopen weken.
+      </p>
       <div className="space-y-1.5">
         {activeAnomalies.map((anomaly, index) => (
           <div
@@ -139,6 +144,19 @@ export function AnomalyAlertsPanel({ anomalies, className }: AnomalyAlertsPanelP
           </div>
         ))}
       </div>
+      {onInvestigate && (
+        <div className="mt-3 flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onInvestigate}
+            className="h-7 text-xs gap-1"
+          >
+            Onderzoek in rapportage
+            <ArrowRight className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

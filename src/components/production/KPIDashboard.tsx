@@ -280,25 +280,33 @@ export function KPIDashboard({
     fetchKPIData();
   }, [fetchKPIData, refreshKey]);
 
-  const calculateTrend = (current: number, previous: number): number => {
-    if (previous === 0) return current > 0 ? 999 : 0;
+  // Returns null when there is no comparable baseline (previous = 0).
+  // This avoids meaningless "+999%" / "-999%" displays.
+  const calculateTrend = (current: number, previous: number): number | null => {
+    if (previous === 0) return null;
     const pct = Math.round(((current - previous) / previous) * 100);
-    return Math.max(-999, Math.min(999, pct));
+    return Math.max(-500, Math.min(500, pct));
   };
 
-  const formatTrend = (value: number): string => {
-    if (value >= 999) return ">+999%";
-    if (value <= -999) return "<-999%";
+  const formatTrend = (value: number | null): string => {
+    if (value === null) return "—";
+    if (value >= 500) return "+500%+";
+    if (value <= -500) return "−500%+";
     return `${value > 0 ? "+" : ""}${value}%`;
   };
 
-  const volumeTrend = useMemo(() => {
-    if (!currentStats || !previousStats) return 0;
+  // Only color trends red/green when the change is meaningful (> 5% delta).
+  // Tiny fluctuations stay neutral to reduce visual noise.
+  const isMeaningful = (value: number | null) =>
+    value !== null && Math.abs(value) >= 5;
+
+  const volumeTrend = useMemo<number | null>(() => {
+    if (!currentStats || !previousStats) return null;
     return calculateTrend(currentStats.total_cylinders, previousStats.total_cylinders);
   }, [currentStats, previousStats]);
 
-  const recordsTrend = useMemo(() => {
-    if (!currentStats || !previousStats) return 0;
+  const recordsTrend = useMemo<number | null>(() => {
+    if (!currentStats || !previousStats) return null;
     return calculateTrend(currentStats.total_records, previousStats.total_records);
   }, [currentStats, previousStats]);
 
@@ -307,16 +315,16 @@ export function KPIDashboard({
     return Math.round(currentStats.total_cylinders / currentStats.total_records);
   }, [currentStats]);
 
-  const getTrendIcon = (value: number) => {
+  const getTrendIcon = (value: number | null) => {
+    if (value === null || !isMeaningful(value)) return <Minus className="h-3 w-3" />;
     if (value > 0) return <TrendingUp className="h-3 w-3" />;
-    if (value < 0) return <TrendingDown className="h-3 w-3" />;
-    return <Minus className="h-3 w-3" />;
+    return <TrendingDown className="h-3 w-3" />;
   };
 
-  const getTrendColor = (value: number) => {
+  const getTrendColor = (value: number | null) => {
+    if (value === null || !isMeaningful(value)) return "text-muted-foreground";
     if (value > 0) return "text-success";
-    if (value < 0) return "text-destructive";
-    return "text-muted-foreground";
+    return "text-destructive";
   };
 
   const anomalies = useMemo(() => {
@@ -396,7 +404,10 @@ export function KPIDashboard({
                         {isCustomPeriod ? "Volume periode" : "Volume YTD"}
                       </span>
                     </div>
-                    <div className={cn("flex flex-col items-end gap-0", "")}>
+                    <div
+                      className="flex flex-col items-end gap-0"
+                      title={volumeTrend === null ? "Geen vergelijkbare basis in vorige periode" : undefined}
+                    >
                       <div className={cn("flex items-center gap-1 text-xs font-medium", getTrendColor(volumeTrend))}>
                         {getTrendIcon(volumeTrend)}
                         <span>{formatTrend(volumeTrend)}</span>
@@ -414,16 +425,19 @@ export function KPIDashboard({
 
                 {/* Records */}
                 <div
-                  className={cn("p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20", onNavigateToReports && "cursor-pointer hover:ring-1 hover:ring-primary/40 transition-all")}
+                  className={cn("p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20", onNavigateToReports && "cursor-pointer hover:ring-1 hover:ring-purple-500/40 transition-all")}
                   onClick={onNavigateToReports}
                   title={onNavigateToReports ? "Bekijk rapportage" : undefined}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <ListOrdered className="h-4 w-4 text-primary" />
+                      <ListOrdered className="h-4 w-4 text-purple-500" />
                       <span className="text-xs font-medium text-muted-foreground">Regels</span>
                     </div>
-                    <div className={cn("flex flex-col items-end gap-0", "")}>
+                    <div
+                      className="flex flex-col items-end gap-0"
+                      title={recordsTrend === null ? "Geen vergelijkbare basis in vorige periode" : undefined}
+                    >
                       <div className={cn("flex items-center gap-1 text-xs font-medium", getTrendColor(recordsTrend))}>
                         {getTrendIcon(recordsTrend)}
                         <span>{formatTrend(recordsTrend)}</span>
@@ -433,7 +447,7 @@ export function KPIDashboard({
                       )}
                     </div>
                   </div>
-                  <div className="text-3xl font-bold text-primary">
+                  <div className="text-3xl font-bold text-purple-500">
                     {formatNumber(currentStats?.total_records || 0, 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">Productieregels</p>
@@ -594,9 +608,13 @@ export function KPIDashboard({
                 } catch { return null; }
               })()}
 
-              {/* Anomaly Alerts Panel */}
+              {/* Anomaly Alerts Panel — actiegericht via knop naar Rapportage */}
               {activeAnomalies.length > 0 && (
-                <AnomalyAlertsPanel anomalies={anomalies} className="mt-4" />
+                <AnomalyAlertsPanel
+                  anomalies={anomalies}
+                  className="mt-4"
+                  onInvestigate={onNavigateToReports}
+                />
               )}
             </FadeIn>
           </CardContent>
