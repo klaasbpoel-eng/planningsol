@@ -72,6 +72,8 @@ import {
   ChevronDown,
   ChevronUp,
   EyeOff,
+  TrendingDown,
+  Minus,
 } from "lucide-react";
 import { ChartSkeleton, StatCardSkeleton } from "@/components/ui/skeletons";
 import { StatCard } from "@/components/ui/stat-card";
@@ -85,6 +87,7 @@ const CustomerSegmentation = lazy(() => import("./CustomerSegmentation").then(m 
 const LocationComparisonReport = lazy(() => import("./LocationComparisonReport").then(m => ({ default: m.LocationComparisonReport })));
 const MonthlyReport = lazy(() => import("./MonthlyReport").then(m => ({ default: m.MonthlyReport })));
 const YearlyReport = lazy(() => import("./YearlyReport").then(m => ({ default: m.YearlyReport })));
+const TopCustomersWidget = lazy(() => import("./TopCustomersWidget").then(m => ({ default: m.TopCustomersWidget })));
 
 
 
@@ -436,15 +439,18 @@ export function ProductionReports({
   };
 
   // Helper function to calculate trend percentage
-  const calculateTrend = (current: number, previous: number): number => {
-    if (previous === 0) return current > 0 ? 999 : 0;
+  const calculateTrend = (current: number, previous: number): number | null => {
+    if (previous === 0) return null;
     const pct = Math.round(((current - previous) / previous) * 100);
-    return Math.max(-999, Math.min(999, pct));
+    return Math.max(-500, Math.min(500, pct));
   };
 
   const setPresetRange = (preset: string) => {
     const now = new Date();
     switch (preset) {
+      case "mtd":
+        setDateRange({ from: startOfMonth(now), to: now });
+        break;
       case "week":
         setDateRange({ from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) });
         break;
@@ -472,6 +478,10 @@ export function ProductionReports({
     const now = new Date();
     const { from, to } = dateRange;
 
+    // MTD: month start to today (must check before "month" because of overlap on last day)
+    if (isSameDay(from, startOfMonth(now)) && isSameDay(to, new Date(now.getFullYear(), now.getMonth(), now.getDate()))) {
+      if (!isSameDay(to, endOfMonth(now))) return "mtd";
+    }
     if (isSameDay(from, startOfWeek(now, { weekStartsOn: 1 })) && isSameDay(to, endOfWeek(now, { weekStartsOn: 1 }))) return "week";
     if (isSameDay(from, startOfMonth(now)) && isSameDay(to, endOfMonth(now))) return "month";
     const lastMonth = subMonths(now, 1);
@@ -741,6 +751,7 @@ export function ProductionReports({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="week">Deze week</SelectItem>
+              <SelectItem value="mtd">Maand t/m vandaag</SelectItem>
               <SelectItem value="month">Deze maand</SelectItem>
               <SelectItem value="last-month">Vorige maand</SelectItem>
               <SelectItem value="quarter">Kwartaal</SelectItem>
@@ -750,29 +761,33 @@ export function ProductionReports({
             </SelectContent>
           </Select>
 
-          <div className="flex items-center gap-2 bg-background border rounded-md px-2 py-1 h-9">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 px-2 hover:bg-transparent">
-                  <span className="text-sm font-medium">{format(dateRange.from, "d MMM", { locale: nl })}</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateRange.from} onSelect={(d) => d && setDateRange({ ...dateRange, from: d })} locale={nl} />
-              </PopoverContent>
-            </Popover>
-            <span className="text-muted-foreground">-</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 px-2 hover:bg-transparent">
-                  <span className="text-sm font-medium">{format(dateRange.to, "d MMM", { locale: nl })}</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateRange.to} onSelect={(d) => d && setDateRange({ ...dateRange, to: d })} locale={nl} />
-              </PopoverContent>
-            </Popover>
-          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 px-3 gap-2 font-medium">
+                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-sm">
+                  {format(dateRange.from, "d MMM", { locale: nl })} – {format(dateRange.to, "d MMM yyyy", { locale: nl })}
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="range"
+                selected={{ from: dateRange.from, to: dateRange.to }}
+                onSelect={(range) => {
+                  if (range?.from && range?.to) {
+                    setDateRange({ from: range.from, to: range.to });
+                  } else if (range?.from) {
+                    setDateRange({ from: range.from, to: range.from });
+                  }
+                }}
+                locale={nl}
+                numberOfMonths={2}
+                defaultMonth={dateRange.from}
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
           {isYtdMode && (
             <Badge variant="outline" className="text-[10px] h-7 px-2 text-primary border-primary/40 font-medium">
               YTD vs. vorig jaar
@@ -835,94 +850,127 @@ export function ProductionReports({
         </div>
       )}
 
-      {/* Primary KPI Stats */}
-      <div className="flex overflow-x-auto scrollbar-none gap-3 pb-1 sm:grid sm:grid-cols-3 lg:grid-cols-6 sm:overflow-visible">
-        <StatCard
-          value={formatNumber(cylinderStats.total, 0)}
-          label="Cilinder orders"
-          icon={<Cylinder className="h-4 w-4 text-orange-500" />}
-          iconBgColor="bg-orange-500/10"
-          trend={{
-            value: calculateTrend(cylinderStats.total, previousPeriodStats.cylinderOrders),
-            label: "vs. vorige periode"
-          }}
-          className="border-orange-500/20 shadow-sm min-w-[160px] sm:min-w-0"
-        />
+      {/* Hero KPIs: Cilinders + Droogijs (large, with completion ratio bar) */}
+      {(() => {
+        const cylinderValue = hideDigital
+          ? cylinderStats.totalCylinders - digitalPhysicalSplit.digital
+          : cylinderStats.totalCylinders;
+        const cylinderTrend = calculateTrend(cylinderValue, previousPeriodStats.totalCylinders);
+        const cylinderTrendMeaningful = cylinderTrend !== null && Math.abs(cylinderTrend) >= 5;
+        const cylinderTrendColor = !cylinderTrendMeaningful
+          ? "text-muted-foreground"
+          : cylinderTrend! > 0
+            ? "text-success"
+            : "text-destructive";
+        const dryIceTrend = calculateTrend(dryIceStats.totalKg, previousPeriodStats.totalDryIce);
+        const dryIceTrendMeaningful = dryIceTrend !== null && Math.abs(dryIceTrend) >= 5;
+        const dryIceTrendColor = !dryIceTrendMeaningful
+          ? "text-muted-foreground"
+          : dryIceTrend! > 0
+            ? "text-success"
+            : "text-destructive";
+        const formatTrendDisplay = (t: number | null) => {
+          if (t === null) return "—";
+          return `${t > 0 ? "+" : ""}${t}%`;
+        };
 
-        <StatCard
-          value={formatNumber(hideDigital ? cylinderStats.totalCylinders - digitalPhysicalSplit.digital : cylinderStats.totalCylinders, 0)}
-          label={
-            <span className="flex items-center gap-1.5">
-              {hideDigital ? "Fysieke cilinders" : "Totaal cilinders"}
-              {hideDigital && hasDigitalTypes && (
-                <span className="inline-flex items-center text-[9px] px-1 py-0 rounded border border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal leading-tight">Alleen fysiek</span>
-              )}
-            </span>
-          }
-          icon={<Package className="h-4 w-4 text-orange-500" />}
-          iconBgColor="bg-orange-500/10"
-          trend={{
-            value: calculateTrend(
-              hideDigital ? cylinderStats.totalCylinders - digitalPhysicalSplit.digital : cylinderStats.totalCylinders,
-              previousPeriodStats.totalCylinders
-            ),
-            label: "vs. vorige periode"
-          }}
-          className="border-orange-500/20 shadow-sm min-w-[160px] sm:min-w-0"
-        />
+        return (
+          <div className={cn(
+            "grid gap-4",
+            showDryIce ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+          )}>
+            {/* Cilinders Hero */}
+            <Card className="border-orange-500/20 shadow-sm overflow-hidden hover-lift">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2.5 rounded-xl bg-orange-500/10">
+                      <Cylinder className="h-5 w-5 text-orange-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
+                        {hideDigital ? "Fysieke cilinders" : "Cilinders"}
+                      </p>
+                      <p className="text-3xl font-bold leading-tight">{formatNumber(cylinderValue, 0)}</p>
+                    </div>
+                  </div>
+                  <div className={cn("flex items-center gap-1 text-sm font-medium", cylinderTrendColor)}
+                       title={cylinderTrend === null ? "Geen vergelijkbare basis in vorige periode" : "vs. vorige periode"}>
+                    {!cylinderTrendMeaningful ? (
+                      <Minus className="h-3.5 w-3.5" />
+                    ) : cylinderTrend! > 0 ? (
+                      <TrendingUp className="h-3.5 w-3.5" />
+                    ) : (
+                      <TrendingDown className="h-3.5 w-3.5" />
+                    )}
+                    <span>{formatTrendDisplay(cylinderTrend)}</span>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>{formatNumber(cylinderStats.total, 0)} orders</span>
+                    <span>
+                      <span className="text-green-500 font-medium">{formatNumber(cylinderStats.completed, 0)}</span> voltooid
+                      {cylinderStats.pending > 0 && <> · <span className="text-yellow-500 font-medium">{formatNumber(cylinderStats.pending, 0)}</span> gepland</>}
+                    </span>
+                  </div>
+                  {cylinderStats.total > 0 && (
+                    <div className="flex h-1.5 rounded-full overflow-hidden bg-muted/40">
+                      <div className="bg-green-500/80 transition-all" style={{ width: `${(cylinderStats.completed / cylinderStats.total) * 100}%` }} />
+                      <div className="bg-yellow-500/70 transition-all" style={{ width: `${(cylinderStats.pending / cylinderStats.total) * 100}%` }} />
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-        {showDryIce && (
-          <>
-            <StatCard
-              value={formatNumber(dryIceStats.total, 0)}
-              label="Droogijs orders"
-              icon={<Snowflake className="h-4 w-4 text-cyan-500" />}
-              iconBgColor="bg-cyan-500/10"
-              trend={{
-                value: calculateTrend(dryIceStats.total, previousPeriodStats.dryIceOrders),
-                label: "vs. vorige periode"
-              }}
-              className="border-cyan-500/20 shadow-sm min-w-[160px] sm:min-w-0"
-            />
-
-            <StatCard
-              value={`${formatNumber(dryIceStats.totalKg, 0)} kg`}
-              label="Totaal droogijs"
-              icon={<TrendingUp className="h-4 w-4 text-cyan-500" />}
-              iconBgColor="bg-cyan-500/10"
-              trend={{
-                value: calculateTrend(dryIceStats.totalKg, previousPeriodStats.totalDryIce),
-                label: "vs. vorige periode"
-              }}
-              className="border-cyan-500/20 shadow-sm min-w-[160px] sm:min-w-0"
-            />
-          </>
-        )}
-
-        <StatCard
-          value={formatNumber(cylinderStats.completed + dryIceStats.completed, 0)}
-          label="Voltooid"
-          icon={<CheckCircle2 className="h-4 w-4 text-green-500" />}
-          iconBgColor="bg-green-500/10"
-          trend={{
-            value: calculateTrend(cylinderStats.completed + dryIceStats.completed, previousPeriodStats.completed),
-            label: "vs. vorige periode"
-          }}
-          className="border-green-500/20 shadow-sm min-w-[160px] sm:min-w-0"
-        />
-
-        <StatCard
-          value={formatNumber(cylinderStats.pending + dryIceStats.pending, 0)}
-          label="Gepland"
-          icon={<Clock className="h-4 w-4 text-yellow-500" />}
-          iconBgColor="bg-yellow-500/10"
-          trend={{
-            value: calculateTrend(cylinderStats.pending + dryIceStats.pending, previousPeriodStats.pending),
-            label: "vs. vorige periode"
-          }}
-          className="border-yellow-500/20 shadow-sm min-w-[160px] sm:min-w-0"
-        />
-      </div>
+            {/* Droogijs Hero */}
+            {showDryIce && (
+              <Card className="border-cyan-500/20 shadow-sm overflow-hidden hover-lift">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2.5 rounded-xl bg-cyan-500/10">
+                        <Snowflake className="h-5 w-5 text-cyan-500" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Droogijs</p>
+                        <p className="text-3xl font-bold leading-tight">{formatNumber(dryIceStats.totalKg, 0)} <span className="text-base text-muted-foreground font-normal">kg</span></p>
+                      </div>
+                    </div>
+                    <div className={cn("flex items-center gap-1 text-sm font-medium", dryIceTrendColor)}
+                         title={dryIceTrend === null ? "Geen vergelijkbare basis in vorige periode" : "vs. vorige periode"}>
+                      {!dryIceTrendMeaningful ? (
+                        <Minus className="h-3.5 w-3.5" />
+                      ) : dryIceTrend! > 0 ? (
+                        <TrendingUp className="h-3.5 w-3.5" />
+                      ) : (
+                        <TrendingDown className="h-3.5 w-3.5" />
+                      )}
+                      <span>{formatTrendDisplay(dryIceTrend)}</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>{formatNumber(dryIceStats.total, 0)} orders</span>
+                      <span>
+                        <span className="text-green-500 font-medium">{formatNumber(dryIceStats.completed, 0)}</span> voltooid
+                        {dryIceStats.pending > 0 && <> · <span className="text-yellow-500 font-medium">{formatNumber(dryIceStats.pending, 0)}</span> gepland</>}
+                      </span>
+                    </div>
+                    {dryIceStats.total > 0 && (
+                      <div className="flex h-1.5 rounded-full overflow-hidden bg-muted/40">
+                        <div className="bg-green-500/80 transition-all" style={{ width: `${(dryIceStats.completed / dryIceStats.total) * 100}%` }} />
+                        <div className="bg-yellow-500/70 transition-all" style={{ width: `${(dryIceStats.pending / dryIceStats.total) * 100}%` }} />
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Locatie uitsplitsing — shown when location is "all" and data loaded */}
       {location === "all" && (locationSplit.emmen > 0 || locationSplit.tilburg > 0) && (() => {
@@ -1163,7 +1211,17 @@ export function ProductionReports({
               </CardContent>
             </Card>
 
-            {/* Additional Widgets Row could go here */}
+            {/* Top 5 Customers widget */}
+            <div className="lg:col-span-3">
+              <Suspense fallback={<ChartLoadingFallback />}>
+                <TopCustomersWidget
+                  refreshKey={refreshKey}
+                  location={location}
+                  dateRange={dateRange}
+                  hideDigital={hideDigital}
+                />
+              </Suspense>
+            </div>
           </div>
         </TabsContent>
 
