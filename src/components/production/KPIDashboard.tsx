@@ -300,13 +300,13 @@ export function KPIDashboard({
   const isMeaningful = (value: number | null) =>
     value !== null && Math.abs(value) >= 5;
 
-  const volumeTrend = useMemo(() => {
-    if (!currentStats || !previousStats) return 0;
+  const volumeTrend = useMemo<number | null>(() => {
+    if (!currentStats || !previousStats) return null;
     return calculateTrend(currentStats.total_cylinders, previousStats.total_cylinders);
   }, [currentStats, previousStats]);
 
-  const recordsTrend = useMemo(() => {
-    if (!currentStats || !previousStats) return 0;
+  const recordsTrend = useMemo<number | null>(() => {
+    if (!currentStats || !previousStats) return null;
     return calculateTrend(currentStats.total_records, previousStats.total_records);
   }, [currentStats, previousStats]);
 
@@ -315,16 +315,16 @@ export function KPIDashboard({
     return Math.round(currentStats.total_cylinders / currentStats.total_records);
   }, [currentStats]);
 
-  const getTrendIcon = (value: number) => {
+  const getTrendIcon = (value: number | null) => {
+    if (value === null || !isMeaningful(value)) return <Minus className="h-3 w-3" />;
     if (value > 0) return <TrendingUp className="h-3 w-3" />;
-    if (value < 0) return <TrendingDown className="h-3 w-3" />;
-    return <Minus className="h-3 w-3" />;
+    return <TrendingDown className="h-3 w-3" />;
   };
 
-  const getTrendColor = (value: number) => {
+  const getTrendColor = (value: number | null) => {
+    if (value === null || !isMeaningful(value)) return "text-muted-foreground";
     if (value > 0) return "text-success";
-    if (value < 0) return "text-destructive";
-    return "text-muted-foreground";
+    return "text-destructive";
   };
 
   const anomalies = useMemo(() => {
