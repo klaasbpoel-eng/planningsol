@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      // IMPORTANT: more specific aliases must come BEFORE the generic "@" alias.
       // Redirect all imports of the auto-generated Lovable Cloud client
       // to the external Supabase project (sbngjpnvxwwlchenyhhy).
       "@/integrations/supabase/client": path.resolve(
@@ -26,6 +26,7 @@ export default defineConfig(({ mode }) => ({
         __dirname,
         "./src/integrations/external-supabase/types.ts"
       ),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   build: {
