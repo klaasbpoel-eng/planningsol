@@ -173,10 +173,12 @@ export function ProductionPlanning({
     setRefreshKey(prev => prev + 1);
   }, []);
 
-  const calculateTrend = (current: number, previous: number): number => {
-    if (previous === 0) return current > 0 ? 999 : 0;
+  // Returns null when there is no comparable baseline so the StatCard can
+  // render "—" instead of a misleading +999%.
+  const calculateTrend = (current: number, previous: number): number | null => {
+    if (previous === 0) return null;
     const pct = Math.round(((current - previous) / previous) * 100);
-    return Math.max(-999, Math.min(999, pct));
+    return Math.max(-500, Math.min(500, pct));
   };
 
   const handleDateRangeChange = useCallback((newRange: DateRange) => {
