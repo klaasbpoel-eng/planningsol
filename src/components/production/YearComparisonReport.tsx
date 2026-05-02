@@ -403,6 +403,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
         let query = (supabase.from("Productie" as never) as any)
           .select("Datum, Product, Capaciteit, Aantal, Klant")
           .eq("Jaar", year)
+          .order("id", { ascending: true })
           .range(from, from + PAGE - 1);
         if (locFilter) {
           query = query.eq("Locatie", locFilter);

@@ -631,6 +631,92 @@ export function ProductionReports({
     return top;
   }, [distributionView, gasTypeDistribution, gasCategoryDistribution, showAllDistribution]);
 
+  // Build tab-specific export data
+  const activeExportData = useMemo(() => {
+    const periodLabel = `${format(dateRange.from, "d MMM yyyy", { locale: nl })} – ${format(dateRange.to, "d MMM yyyy", { locale: nl })}`;
+    const locLabel = location === "all" ? "Alle locaties" : location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg";
+
+    if (activeTab === "cylinders") {
+      return {
+        title: "Cilinder maten",
+        subtitle: `${locLabel} | ${periodLabel}`,
+        columns: [
+          { header: "Maat", key: "size", width: 15 },
+          { header: "Cilinders", key: "total", width: 12 },
+          { header: "%", key: "pct", width: 8 },
+        ] as { header: string; key: string; width?: number }[],
+        rows: (() => {
+          const totalCyl = gasCategoryDistributionData.reduce((s, r) => s + r.total_cylinders, 0);
+          return gasCategoryDistributionData.map(r => ({
+            size: r.category_name,
+            total: r.total_cylinders,
+            pct: totalCyl > 0 ? `${Math.round((r.total_cylinders / totalCyl) * 100)}%` : "0%",
+          }));
+        })(),
+        dateRange: { from: dateRange.from, to: dateRange.to },
+        location: locLabel,
+      };
+    }
+
+    if (activeTab === "insights") {
+      return {
+        title: "Dagelijkse productie",
+        subtitle: `${locLabel} | ${periodLabel}`,
+        columns: [
+          { header: "Datum", key: "date", width: 14 },
+          { header: "Cilinders", key: "cylinders", width: 12 },
+        ] as { header: string; key: string; width?: number }[],
+        rows: dailyProduction.map(d => ({ date: d.production_date, cylinders: d.cylinder_count })),
+        dateRange: { from: dateRange.from, to: dateRange.to },
+        location: locLabel,
+      };
+    }
+
+    if (activeTab === "locations") {
+      return {
+        title: "Locatieverdeling",
+        subtitle: `${periodLabel}`,
+        columns: [
+          { header: "Locatie", key: "loc", width: 20 },
+          { header: "Cilinders", key: "total", width: 12 },
+          { header: "%", key: "pct", width: 8 },
+        ] as { header: string; key: string; width?: number }[],
+        rows: (() => {
+          const tot = locationSplit.emmen + locationSplit.tilburg;
+          return [
+            { loc: "SOL Emmen", total: locationSplit.emmen, pct: tot > 0 ? `${Math.round((locationSplit.emmen / tot) * 100)}%` : "0%" },
+            { loc: "SOL Tilburg", total: locationSplit.tilburg, pct: tot > 0 ? `${Math.round((locationSplit.tilburg / tot) * 100)}%` : "0%" },
+            { loc: "Totaal", total: tot, pct: "100%" },
+          ];
+        })(),
+        dateRange: { from: dateRange.from, to: dateRange.to },
+        location: locLabel,
+      };
+    }
+
+    // Default: gas type distribution (overview, productie, comparison)
+    return {
+      title: "Gastype verdeling",
+      subtitle: `${locLabel} | ${periodLabel}`,
+      columns: [
+        { header: "Gastype", key: "name", width: 25 },
+        { header: "Cilinders", key: "total", width: 12 },
+        { header: "%", key: "pct", width: 8 },
+      ] as { header: string; key: string; width?: number }[],
+      rows: (() => {
+        const filtered = gasTypeDistributionData.filter(r => (!hideDigital || !r.is_digital) && (!hideExternal || !r.is_external));
+        const totalCyl = filtered.reduce((s, r) => s + r.total_cylinders, 0);
+        return filtered.map(r => ({
+          name: r.gas_type_name,
+          total: r.total_cylinders,
+          pct: totalCyl > 0 ? `${Math.round((r.total_cylinders / totalCyl) * 100)}%` : "0%",
+        }));
+      })(),
+      dateRange: { from: dateRange.from, to: dateRange.to },
+      location: locLabel,
+    };
+  }, [activeTab, gasTypeDistributionData, gasCategoryDistributionData, dailyProduction, locationSplit, dateRange, location, hideDigital, hideExternal]);
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -718,22 +804,9 @@ export function ProductionReports({
             </Button>
           )}
           <ReportExportButtons
-            tableData={{
-              title: "Productie Rapport",
-              subtitle: `Cilinders en Droogijs overzicht`,
-              columns: [
-                { header: "Datum", key: "date", width: 12 },
-                { header: "Klant", key: "customer", width: 25 },
-                { header: "Type", key: "type", width: 12 },
-                { header: "Aantal/Kg", key: "quantity", width: 10 },
-                { header: "Status", key: "status", width: 12 },
-              ],
-              rows: [], // Export functionality might need update if row data is needed, currently simplified
-              dateRange: { from: dateRange.from, to: dateRange.to },
-              location: location === "all" ? "Alle locaties" : location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg",
-            }}
-            chartElementId="production-chart"
-            chartTitle="Productie Grafiek"
+            tableData={activeExportData}
+            chartElementId={activeTab === "overview" ? "production-chart" : undefined}
+            chartTitle={activeTab === "overview" ? "Productie Grafiek" : undefined}
             chartOptions={{
               dateRange: { from: dateRange.from, to: dateRange.to },
               location: location === "all" ? "Alle locaties" : location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg",

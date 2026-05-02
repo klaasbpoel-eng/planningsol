@@ -70,7 +70,7 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
       let from = 0;
       while (true) {
         const { data } = await (supabase.from("Productie" as never) as any)
-          .select("Datum,Locatie,Aantal").eq("Jaar", year).range(from, from + PAGE - 1);
+          .select("Datum,Locatie,Aantal").eq("Jaar", year).order("id", { ascending: true }).range(from, from + PAGE - 1);
         if (!data || data.length === 0) break;
         allRows.push(...data); if (data.length < PAGE) break; from += PAGE;
       }

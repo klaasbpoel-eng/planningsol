@@ -172,6 +172,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
         const { data } = await (supabase.from("Productie" as never) as any)
           .select("Datum,Locatie,Product,Capaciteit,Aantal,Klant")
           .eq("Jaar", year)
+          .order("id", { ascending: true })
           .range(offset, offset + PAGE - 1);
         if (!data || data.length === 0) break;
         allRows.push(...data);

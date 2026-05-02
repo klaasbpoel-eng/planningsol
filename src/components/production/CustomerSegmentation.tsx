@@ -86,7 +86,7 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
           const PAGE = 1000; let offset = 0;
           while (true) {
             const { data } = await (supabase.from("Productie" as never) as any)
-              .select("Datum,Locatie,Aantal,Klant").eq("Jaar", yr).range(offset, offset + PAGE - 1);
+              .select("Datum,Locatie,Aantal,Klant").eq("Jaar", yr).order("id", { ascending: true }).range(offset, offset + PAGE - 1);
             if (!data || data.length === 0) break;
             all.push(...data); if (data.length < PAGE) break; offset += PAGE;
           }

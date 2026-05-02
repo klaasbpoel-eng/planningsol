@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Cylinder, Calendar, Filter, CalendarIcon, X, ArrowUp, ArrowDown, ArrowUpDown, MapPin } from "lucide-react";
+import { Cylinder, Calendar, Filter, CalendarIcon, X, ArrowUp, ArrowDown, ArrowUpDown, MapPin, RefreshCw } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -141,6 +141,7 @@ export function GasCylinderPlanning({ location = "all" }: GasCylinderPlanningPro
         const { data, error } = await (supabase.from("Productie" as never) as any)
           .select("id,Jaar,Datum,Locatie,Product,Capaciteit,Aantal,Klant")
           .eq("Jaar", yearFilter)
+          .order("id", { ascending: true })
           .range(from, from + PAGE - 1);
         if (error) {
           console.error("Error fetching Productie:", error);
@@ -258,6 +259,16 @@ export function GasCylinderPlanning({ location = "all" }: GasCylinderPlanningPro
                 <CardDescription>Productiedata gascilinders</CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={fetchOrders}
+                  disabled={loading}
+                  title="Data herladen"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                </Button>
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <Popover>
                   <PopoverTrigger asChild>

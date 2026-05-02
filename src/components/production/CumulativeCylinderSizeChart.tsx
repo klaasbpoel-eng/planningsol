@@ -113,6 +113,7 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
         const { data } = await (supabase.from("Productie" as never) as any)
           .select("Datum,Locatie,Product,Capaciteit,Aantal")
           .eq("Jaar", year)
+          .order("id", { ascending: true })
           .range(from, from + PAGE - 1);
         if (!data || data.length === 0) break;
         if (locationParam) {
