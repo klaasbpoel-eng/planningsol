@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_FUNCTIONS_URL } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Database, Loader2, Download } from "lucide-react";
 
@@ -30,7 +30,7 @@ export function DatabaseExportSettings({ selectedTables }: DatabaseExportSetting
         toast.info(`Exporteren: ${table} (${i + 1}/${selectedTables.length})...`);
 
         const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-mysql-dump`,
+          `${SUPABASE_FUNCTIONS_URL}/export-mysql-dump`,
           {
             method: "POST",
             headers: {

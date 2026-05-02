@@ -17,6 +17,12 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "paths": {
+      "@/integrations/supabase/client": [
+        "./src/integrations/external-supabase/client.ts"
+      ],
+      "@/integrations/supabase/types": [
+        "./src/integrations/external-supabase/types.ts"
+      ],
       "@/*": [
         "./src/*"
       ]

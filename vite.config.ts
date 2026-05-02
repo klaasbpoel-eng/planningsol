@@ -15,6 +15,17 @@ export default defineConfig(({ mode }) => ({
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
+      // IMPORTANT: more specific aliases must come BEFORE the generic "@" alias.
+      // Redirect all imports of the auto-generated Lovable Cloud client
+      // to the external Supabase project (sbngjpnvxwwlchenyhhy).
+      "@/integrations/supabase/client": path.resolve(
+        __dirname,
+        "./src/integrations/external-supabase/client.ts"
+      ),
+      "@/integrations/supabase/types": path.resolve(
+        __dirname,
+        "./src/integrations/external-supabase/types.ts"
+      ),
       "@": path.resolve(__dirname, "./src"),
     },
   },
