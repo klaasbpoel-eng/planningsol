@@ -30,7 +30,7 @@ export function DatabaseExportSettings({ selectedTables }: DatabaseExportSetting
         toast.info(`Exporteren: ${table} (${i + 1}/${selectedTables.length})...`);
 
         const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-mysql-dump`,
+          `${SUPABASE_FUNCTIONS_URL}/export-mysql-dump`,
           {
             method: "POST",
             headers: {
