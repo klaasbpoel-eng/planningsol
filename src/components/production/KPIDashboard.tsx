@@ -404,7 +404,10 @@ export function KPIDashboard({
                         {isCustomPeriod ? "Volume periode" : "Volume YTD"}
                       </span>
                     </div>
-                    <div className={cn("flex flex-col items-end gap-0", "")}>
+                    <div
+                      className="flex flex-col items-end gap-0"
+                      title={volumeTrend === null ? "Geen vergelijkbare basis in vorige periode" : undefined}
+                    >
                       <div className={cn("flex items-center gap-1 text-xs font-medium", getTrendColor(volumeTrend))}>
                         {getTrendIcon(volumeTrend)}
                         <span>{formatTrend(volumeTrend)}</span>
@@ -431,7 +434,10 @@ export function KPIDashboard({
                       <ListOrdered className="h-4 w-4 text-primary" />
                       <span className="text-xs font-medium text-muted-foreground">Regels</span>
                     </div>
-                    <div className={cn("flex flex-col items-end gap-0", "")}>
+                    <div
+                      className="flex flex-col items-end gap-0"
+                      title={recordsTrend === null ? "Geen vergelijkbare basis in vorige periode" : undefined}
+                    >
                       <div className={cn("flex items-center gap-1 text-xs font-medium", getTrendColor(recordsTrend))}>
                         {getTrendIcon(recordsTrend)}
                         <span>{formatTrend(recordsTrend)}</span>
