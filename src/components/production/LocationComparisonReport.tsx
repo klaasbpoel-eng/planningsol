@@ -460,9 +460,15 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
         return (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card className={`shadow-sm border-orange-500/30 ${leader === "emmen" ? "ring-2 ring-orange-500/40" : ""} relative overflow-hidden`}>
-              {leader === "emmen" && (
-                <div className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded">Leider</div>
-              )}
+              {leader === "emmen" ? (
+                <div className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                  <TrendingUp className="h-2.5 w-2.5" /> Leider
+                </div>
+              ) : leader === "tie" && filteredEmmenTotal > 0 ? (
+                <div className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded flex items-center gap-1">
+                  <Minus className="h-2.5 w-2.5" /> Gelijk spel
+                </div>
+              ) : null}
               <CardContent className="pt-4 pb-3">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-xl bg-orange-500/10 shrink-0">
@@ -483,9 +489,15 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
             </Card>
 
             <Card className={`shadow-sm border-blue-500/30 ${leader === "tilburg" ? "ring-2 ring-blue-500/40" : ""} relative overflow-hidden`}>
-              {leader === "tilburg" && (
-                <div className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide text-blue-500 bg-blue-500/10 px-1.5 py-0.5 rounded">Leider</div>
-              )}
+              {leader === "tilburg" ? (
+                <div className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide text-blue-500 bg-blue-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                  <TrendingUp className="h-2.5 w-2.5" /> Leider
+                </div>
+              ) : leader === "tie" && filteredTilburgTotal > 0 ? (
+                <div className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded flex items-center gap-1">
+                  <Minus className="h-2.5 w-2.5" /> Gelijk spel
+                </div>
+              ) : null}
               <CardContent className="pt-4 pb-3">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-xl bg-blue-500/10 shrink-0">
