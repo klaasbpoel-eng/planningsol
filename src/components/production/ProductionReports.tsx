@@ -749,6 +749,7 @@ export function ProductionReports({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="week">Deze week</SelectItem>
+              <SelectItem value="mtd">Maand t/m vandaag</SelectItem>
               <SelectItem value="month">Deze maand</SelectItem>
               <SelectItem value="last-month">Vorige maand</SelectItem>
               <SelectItem value="quarter">Kwartaal</SelectItem>
@@ -758,29 +759,33 @@ export function ProductionReports({
             </SelectContent>
           </Select>
 
-          <div className="flex items-center gap-2 bg-background border rounded-md px-2 py-1 h-9">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 px-2 hover:bg-transparent">
-                  <span className="text-sm font-medium">{format(dateRange.from, "d MMM", { locale: nl })}</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateRange.from} onSelect={(d) => d && setDateRange({ ...dateRange, from: d })} locale={nl} />
-              </PopoverContent>
-            </Popover>
-            <span className="text-muted-foreground">-</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 px-2 hover:bg-transparent">
-                  <span className="text-sm font-medium">{format(dateRange.to, "d MMM", { locale: nl })}</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateRange.to} onSelect={(d) => d && setDateRange({ ...dateRange, to: d })} locale={nl} />
-              </PopoverContent>
-            </Popover>
-          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 px-3 gap-2 font-medium">
+                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-sm">
+                  {format(dateRange.from, "d MMM", { locale: nl })} – {format(dateRange.to, "d MMM yyyy", { locale: nl })}
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="range"
+                selected={{ from: dateRange.from, to: dateRange.to }}
+                onSelect={(range) => {
+                  if (range?.from && range?.to) {
+                    setDateRange({ from: range.from, to: range.to });
+                  } else if (range?.from) {
+                    setDateRange({ from: range.from, to: range.from });
+                  }
+                }}
+                locale={nl}
+                numberOfMonths={2}
+                defaultMonth={dateRange.from}
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
           {isYtdMode && (
             <Badge variant="outline" className="text-[10px] h-7 px-2 text-primary border-primary/40 font-medium">
               YTD vs. vorig jaar
