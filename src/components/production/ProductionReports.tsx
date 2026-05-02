@@ -85,6 +85,7 @@ const CustomerSegmentation = lazy(() => import("./CustomerSegmentation").then(m 
 const LocationComparisonReport = lazy(() => import("./LocationComparisonReport").then(m => ({ default: m.LocationComparisonReport })));
 const MonthlyReport = lazy(() => import("./MonthlyReport").then(m => ({ default: m.MonthlyReport })));
 const YearlyReport = lazy(() => import("./YearlyReport").then(m => ({ default: m.YearlyReport })));
+const TopCustomersWidget = lazy(() => import("./TopCustomersWidget").then(m => ({ default: m.TopCustomersWidget })));
 
 
 
