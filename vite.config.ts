@@ -16,6 +16,16 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Redirect all imports of the auto-generated Lovable Cloud client
+      // to the external Supabase project (sbngjpnvxwwlchenyhhy).
+      "@/integrations/supabase/client": path.resolve(
+        __dirname,
+        "./src/integrations/external-supabase/client.ts"
+      ),
+      "@/integrations/supabase/types": path.resolve(
+        __dirname,
+        "./src/integrations/external-supabase/types.ts"
+      ),
     },
   },
   build: {
