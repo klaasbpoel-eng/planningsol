@@ -1211,7 +1211,17 @@ export function ProductionReports({
               </CardContent>
             </Card>
 
-            {/* Additional Widgets Row could go here */}
+            {/* Top 5 Customers widget */}
+            <div className="lg:col-span-3">
+              <Suspense fallback={<ChartLoadingFallback />}>
+                <TopCustomersWidget
+                  refreshKey={refreshKey}
+                  location={location}
+                  dateRange={dateRange}
+                  hideDigital={hideDigital}
+                />
+              </Suspense>
+            </div>
           </div>
         </TabsContent>
 
