@@ -437,15 +437,18 @@ export function ProductionReports({
   };
 
   // Helper function to calculate trend percentage
-  const calculateTrend = (current: number, previous: number): number => {
-    if (previous === 0) return current > 0 ? 999 : 0;
+  const calculateTrend = (current: number, previous: number): number | null => {
+    if (previous === 0) return null;
     const pct = Math.round(((current - previous) / previous) * 100);
-    return Math.max(-999, Math.min(999, pct));
+    return Math.max(-500, Math.min(500, pct));
   };
 
   const setPresetRange = (preset: string) => {
     const now = new Date();
     switch (preset) {
+      case "mtd":
+        setDateRange({ from: startOfMonth(now), to: now });
+        break;
       case "week":
         setDateRange({ from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) });
         break;
@@ -473,6 +476,10 @@ export function ProductionReports({
     const now = new Date();
     const { from, to } = dateRange;
 
+    // MTD: month start to today (must check before "month" because of overlap on last day)
+    if (isSameDay(from, startOfMonth(now)) && isSameDay(to, new Date(now.getFullYear(), now.getMonth(), now.getDate()))) {
+      if (!isSameDay(to, endOfMonth(now))) return "mtd";
+    }
     if (isSameDay(from, startOfWeek(now, { weekStartsOn: 1 })) && isSameDay(to, endOfWeek(now, { weekStartsOn: 1 }))) return "week";
     if (isSameDay(from, startOfMonth(now)) && isSameDay(to, endOfMonth(now))) return "month";
     const lastMonth = subMonths(now, 1);
