@@ -72,6 +72,8 @@ import {
   ChevronDown,
   ChevronUp,
   EyeOff,
+  TrendingDown,
+  Minus,
 } from "lucide-react";
 import { ChartSkeleton, StatCardSkeleton } from "@/components/ui/skeletons";
 import { StatCard } from "@/components/ui/stat-card";
