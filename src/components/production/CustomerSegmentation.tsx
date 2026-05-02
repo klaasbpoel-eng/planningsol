@@ -311,6 +311,40 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
         <CollapsibleContent>
           <CardContent className="pt-0">
             <FadeIn show={true}>
+              {/* Trend Segment Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                {([
+                  { key: "growing" as const, label: "Groeiend", icon: <TrendingUp className="h-4 w-4 text-success" />, cardClass: "bg-gradient-to-br from-success/10 to-success/5 border border-success/20", textClass: "text-success", barClass: "bg-success" },
+                  { key: "stable" as const, label: "Stabiel", icon: <Minus className="h-4 w-4 text-muted-foreground" />, cardClass: "bg-gradient-to-br from-muted/40 to-muted/10 border border-border", textClass: "text-foreground", barClass: "bg-muted-foreground/60" },
+                  { key: "declining" as const, label: "Dalend", icon: <TrendingDown className="h-4 w-4 text-destructive" />, cardClass: "bg-gradient-to-br from-destructive/10 to-destructive/5 border border-destructive/20", textClass: "text-destructive", barClass: "bg-destructive" },
+                  { key: "new" as const, label: "Nieuw", icon: <Sparkles className="h-4 w-4 text-primary" />, cardClass: "bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20", textClass: "text-primary", barClass: "bg-primary" },
+                ]).map((seg) => {
+                  const count = trendStats[seg.key];
+                  const pct = customers.length > 0 ? Math.round((count / customers.length) * 100) : 0;
+                  return (
+                    <button
+                      key={seg.key}
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className={`p-3 rounded-lg text-left transition-all hover:scale-[1.02] ${seg.cardClass}`}
+                      title={`${count} klanten in segment "${seg.label}"`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          {seg.icon}
+                          <span className="text-xs font-medium">{seg.label}</span>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground">{pct}%</span>
+                      </div>
+                      <p className={`text-2xl font-bold ${seg.textClass}`}>{count}</p>
+                      <div className="mt-2 h-1.5 rounded-full bg-muted/50 overflow-hidden">
+                        <div className={`h-full rounded-full ${seg.barClass} transition-all duration-500`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
               {/* Summary Cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                 {/* Tier Distribution with proportion bars */}
