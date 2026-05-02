@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_FUNCTIONS_URL } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Download, Upload, AlertTriangle, Database } from "lucide-react";
 
