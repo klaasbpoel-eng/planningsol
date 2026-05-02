@@ -425,18 +425,8 @@ export function ProductionPlanning({
       {/* Quick stats - Only show for planning tabs, hide for reporting to give more space */}
       {activeTab !== 'rapportage' && (
         <div className="space-y-2">
-          {/* Period indicator + collapse toggle */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-xs font-medium">
-                📅 {getDateRangeLabel(dateRange)}
-              </Badge>
-              {showAdvancedTabs && (
-                <span className="text-xs text-muted-foreground">
-                  Wijzig periode in Rapportage tab
-                </span>
-              )}
-            </div>
+          {/* Collapse toggle (period now lives in the toolbar above) */}
+          <div className="flex items-center justify-end">
             <button
               onClick={() => {
                 setStatsCollapsed(prev => {
