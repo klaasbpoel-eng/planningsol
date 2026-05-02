@@ -447,8 +447,19 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
         const leader: "emmen" | "tilburg" | "tie" =
           filteredEmmenTotal > filteredTilburgTotal ? "emmen"
           : filteredTilburgTotal > filteredEmmenTotal ? "tilburg" : "tie";
+        // Trend / share tie detection
+        const trendTie = showComparison
+          && emmenDelta !== null && tilburgDelta !== null
+          && Math.abs(emmenDelta - tilburgDelta) < 0.05; // <0.05pp = effectively equal
+        const shareTie = grandTotal > 0 && emmenPercent === tilburgPercent;
+        const TieBadge = ({ label = "Gelijk spel" }: { label?: string }) => (
+          <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+            <Minus className="h-2.5 w-2.5" /> {label}
+          </span>
+        );
         const DeltaBadge = ({ delta }: { delta: number | null }) => {
           if (!showComparison || delta === null) return null;
+          if (trendTie) return <TieBadge label="Gelijke trend" />;
           const pos = delta >= 0;
           return (
             <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${pos ? "text-emerald-600" : "text-red-500"}`}>
@@ -485,6 +496,9 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                     {emmenPercent}%
                   </Badge>
                 </div>
+                {shareTie && (
+                  <div className="mt-2"><TieBadge label="Aandeel gelijk (50/50)" /></div>
+                )}
               </CardContent>
             </Card>
 
@@ -514,6 +528,9 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                     {tilburgPercent}%
                   </Badge>
                 </div>
+                {shareTie && (
+                  <div className="mt-2"><TieBadge label="Aandeel gelijk (50/50)" /></div>
+                )}
               </CardContent>
             </Card>
 
@@ -540,6 +557,9 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                   <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500" />Emmen {emmenPercent}%</span>
                   <span className="flex items-center gap-1">Tilburg {tilburgPercent}%<span className="w-2 h-2 rounded-full bg-blue-500" /></span>
                 </div>
+                {shareTie && (
+                  <div className="mt-2 flex justify-center"><TieBadge label="Gelijk verdeeld" /></div>
+                )}
               </CardContent>
             </Card>
           </div>
