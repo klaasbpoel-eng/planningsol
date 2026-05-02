@@ -608,9 +608,13 @@ export function KPIDashboard({
                 } catch { return null; }
               })()}
 
-              {/* Anomaly Alerts Panel */}
+              {/* Anomaly Alerts Panel — actiegericht via knop naar Rapportage */}
               {activeAnomalies.length > 0 && (
-                <AnomalyAlertsPanel anomalies={anomalies} className="mt-4" />
+                <AnomalyAlertsPanel
+                  anomalies={anomalies}
+                  className="mt-4"
+                  onInvestigate={onNavigateToReports}
+                />
               )}
             </FadeIn>
           </CardContent>
