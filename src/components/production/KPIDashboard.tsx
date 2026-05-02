@@ -425,13 +425,13 @@ export function KPIDashboard({
 
                 {/* Records */}
                 <div
-                  className={cn("p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20", onNavigateToReports && "cursor-pointer hover:ring-1 hover:ring-primary/40 transition-all")}
+                  className={cn("p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20", onNavigateToReports && "cursor-pointer hover:ring-1 hover:ring-purple-500/40 transition-all")}
                   onClick={onNavigateToReports}
                   title={onNavigateToReports ? "Bekijk rapportage" : undefined}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <ListOrdered className="h-4 w-4 text-primary" />
+                      <ListOrdered className="h-4 w-4 text-purple-500" />
                       <span className="text-xs font-medium text-muted-foreground">Regels</span>
                     </div>
                     <div
@@ -447,7 +447,7 @@ export function KPIDashboard({
                       )}
                     </div>
                   </div>
-                  <div className="text-3xl font-bold text-primary">
+                  <div className="text-3xl font-bold text-purple-500">
                     {formatNumber(currentStats?.total_records || 0, 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">Productieregels</p>
