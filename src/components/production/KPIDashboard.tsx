@@ -280,17 +280,25 @@ export function KPIDashboard({
     fetchKPIData();
   }, [fetchKPIData, refreshKey]);
 
-  const calculateTrend = (current: number, previous: number): number => {
-    if (previous === 0) return current > 0 ? 999 : 0;
+  // Returns null when there is no comparable baseline (previous = 0).
+  // This avoids meaningless "+999%" / "-999%" displays.
+  const calculateTrend = (current: number, previous: number): number | null => {
+    if (previous === 0) return null;
     const pct = Math.round(((current - previous) / previous) * 100);
-    return Math.max(-999, Math.min(999, pct));
+    return Math.max(-500, Math.min(500, pct));
   };
 
-  const formatTrend = (value: number): string => {
-    if (value >= 999) return ">+999%";
-    if (value <= -999) return "<-999%";
+  const formatTrend = (value: number | null): string => {
+    if (value === null) return "—";
+    if (value >= 500) return "+500%+";
+    if (value <= -500) return "−500%+";
     return `${value > 0 ? "+" : ""}${value}%`;
   };
+
+  // Only color trends red/green when the change is meaningful (> 5% delta).
+  // Tiny fluctuations stay neutral to reduce visual noise.
+  const isMeaningful = (value: number | null) =>
+    value !== null && Math.abs(value) >= 5;
 
   const volumeTrend = useMemo(() => {
     if (!currentStats || !previousStats) return 0;
