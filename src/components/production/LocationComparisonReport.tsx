@@ -444,6 +444,9 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
         const emmenDelta = prevEmmenTotal > 0 ? ((filteredEmmenTotal - prevEmmenTotal) / prevEmmenTotal) * 100 : null;
         const tilburgDelta = prevTilburgTotal > 0 ? ((filteredTilburgTotal - prevTilburgTotal) / prevTilburgTotal) * 100 : null;
         const totalDelta = prevGrandTotal > 0 ? ((grandTotal - prevGrandTotal) / prevGrandTotal) * 100 : null;
+        const leader: "emmen" | "tilburg" | "tie" =
+          filteredEmmenTotal > filteredTilburgTotal ? "emmen"
+          : filteredTilburgTotal > filteredEmmenTotal ? "tilburg" : "tie";
         const DeltaBadge = ({ delta }: { delta: number | null }) => {
           if (!showComparison || delta === null) return null;
           const pos = delta >= 0;
@@ -456,34 +459,46 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
         };
         return (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card className="shadow-sm border-blue-500/20">
+            <Card className={`shadow-sm border-orange-500/30 ${leader === "emmen" ? "ring-2 ring-orange-500/40" : ""} relative overflow-hidden`}>
+              {leader === "emmen" && (
+                <div className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded">Leider</div>
+              )}
               <CardContent className="pt-4 pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1.5">SOL Emmen{hideDigital && hasDigitalTypes && (<span className="inline-flex items-center text-[9px] px-1 py-0 rounded border border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal leading-tight">Alleen fysiek</span>)}</p>
-                    <p className="text-2xl font-bold">{formatNumber(filteredEmmenTotal, 0)}</p>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-orange-500/10 shrink-0">
+                    <Building2 className="h-5 w-5 text-orange-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide font-medium">SOL Emmen{hideDigital && hasDigitalTypes && (<span className="inline-flex items-center text-[9px] px-1 py-0 rounded border border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal leading-tight normal-case tracking-normal">Alleen fysiek</span>)}</p>
+                    <p className="text-3xl font-bold leading-tight">{formatNumber(filteredEmmenTotal, 0)}</p>
                     {showComparison && prevEmmenTotal > 0 && (
                       <p className="text-xs text-muted-foreground mt-0.5">{selectedYear - 1}: {formatNumber(prevEmmenTotal, 0)} <DeltaBadge delta={emmenDelta} /></p>
                     )}
                   </div>
-                  <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20">
+                  <Badge variant="secondary" className="bg-orange-500/10 text-orange-600 border-orange-500/20 shrink-0">
                     {emmenPercent}%
                   </Badge>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm border-sky-400/20">
+            <Card className={`shadow-sm border-blue-500/30 ${leader === "tilburg" ? "ring-2 ring-blue-500/40" : ""} relative overflow-hidden`}>
+              {leader === "tilburg" && (
+                <div className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide text-blue-500 bg-blue-500/10 px-1.5 py-0.5 rounded">Leider</div>
+              )}
               <CardContent className="pt-4 pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1.5">SOL Tilburg{hideDigital && hasDigitalTypes && (<span className="inline-flex items-center text-[9px] px-1 py-0 rounded border border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal leading-tight">Alleen fysiek</span>)}</p>
-                    <p className="text-2xl font-bold">{formatNumber(filteredTilburgTotal, 0)}</p>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-blue-500/10 shrink-0">
+                    <Building2 className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide font-medium">SOL Tilburg{hideDigital && hasDigitalTypes && (<span className="inline-flex items-center text-[9px] px-1 py-0 rounded border border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal leading-tight normal-case tracking-normal">Alleen fysiek</span>)}</p>
+                    <p className="text-3xl font-bold leading-tight">{formatNumber(filteredTilburgTotal, 0)}</p>
                     {showComparison && prevTilburgTotal > 0 && (
                       <p className="text-xs text-muted-foreground mt-0.5">{selectedYear - 1}: {formatNumber(prevTilburgTotal, 0)} <DeltaBadge delta={tilburgDelta} /></p>
                     )}
                   </div>
-                  <Badge variant="secondary" className="bg-sky-400/10 text-sky-500 border-sky-400/20">
+                  <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20 shrink-0">
                     {tilburgPercent}%
                   </Badge>
                 </div>
@@ -492,27 +507,26 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
 
             <Card className="shadow-sm">
               <CardContent className="pt-4 pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1.5">Totaal{hideDigital && hasDigitalTypes && (<span className="inline-flex items-center text-[9px] px-1 py-0 rounded border border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal leading-tight">Alleen fysiek</span>)}</p>
-                    <p className="text-2xl font-bold">{formatNumber(grandTotal, 0)}</p>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-primary/10 shrink-0">
+                    <Cylinder className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide font-medium">Totaal{hideDigital && hasDigitalTypes && (<span className="inline-flex items-center text-[9px] px-1 py-0 rounded border border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal leading-tight normal-case tracking-normal">Alleen fysiek</span>)}</p>
+                    <p className="text-3xl font-bold leading-tight">{formatNumber(grandTotal, 0)}</p>
                     {showComparison && prevGrandTotal > 0 && (
                       <p className="text-xs text-muted-foreground mt-0.5">{selectedYear - 1}: {formatNumber(prevGrandTotal, 0)} <DeltaBadge delta={totalDelta} /></p>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Cylinder className="h-4 w-4" />
-                    cilinders
-                  </div>
                 </div>
                 {/* Proportion bar */}
                 <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden flex">
-                  <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${emmenPercent}%` }} />
-                  <div className="h-full bg-sky-400 transition-all duration-500" style={{ width: `${tilburgPercent}%` }} />
+                  <div className="h-full bg-orange-500 transition-all duration-500" style={{ width: `${emmenPercent}%` }} />
+                  <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${tilburgPercent}%` }} />
                 </div>
                 <div className="flex justify-between mt-1.5 text-[10px] text-muted-foreground">
-                  <span>Emmen</span>
-                  <span>Tilburg</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500" />Emmen {emmenPercent}%</span>
+                  <span className="flex items-center gap-1">Tilburg {tilburgPercent}%<span className="w-2 h-2 rounded-full bg-blue-500" /></span>
                 </div>
               </CardContent>
             </Card>
