@@ -131,10 +131,10 @@ export function AnomalyAlertsPanel({ anomalies, className, onInvestigate }: Anom
         {activeAnomalies.map((anomaly, index) => (
           <div
             key={index}
-            className="flex items-center justify-between text-sm bg-background/50 rounded px-2 py-1.5"
+            className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-sm bg-background/50 rounded px-2 py-1.5"
           >
-            <span className="text-muted-foreground">{anomaly.label}</span>
-            <div className="flex items-center gap-2">
+            <span className="text-muted-foreground min-w-0 flex-1 break-words">{anomaly.label}</span>
+            <div className="flex items-center gap-2 shrink-0">
               <span className="text-xs">
                 {anomaly.result.percentDeviation > 0 ? "+" : ""}
                 {anomaly.result.percentDeviation}%
@@ -145,15 +145,15 @@ export function AnomalyAlertsPanel({ anomalies, className, onInvestigate }: Anom
         ))}
       </div>
       {onInvestigate && (
-        <div className="mt-3 flex justify-end">
+        <div className="mt-3 flex justify-stretch sm:justify-end">
           <Button
             variant="outline"
-            size="sm"
+            size="default"
             onClick={onInvestigate}
-            className="h-7 text-xs gap-1"
+            className="w-full sm:w-auto h-10 sm:h-8 text-sm sm:text-xs gap-1.5 min-h-[44px] sm:min-h-0"
           >
             Onderzoek in rapportage
-            <ArrowRight className="h-3 w-3" />
+            <ArrowRight className="h-4 w-4 sm:h-3 sm:w-3" />
           </Button>
         </div>
       )}
