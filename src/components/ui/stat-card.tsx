@@ -70,6 +70,7 @@ export function StatCard({
                   "flex items-center gap-0.5 text-[11px] font-medium whitespace-nowrap",
                   getTrendColor()
                 )}
+                title={trendValue === null ? "Geen vergelijkbare basis in vorige periode" : undefined}
               >
                 {getTrendIcon()}
                 <span>{formatTrendValue()}</span>
