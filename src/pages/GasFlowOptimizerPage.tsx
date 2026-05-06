@@ -1,11 +1,12 @@
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Factory, Truck, Database, Users, AlertTriangle } from "lucide-react";
+import { Factory, Truck, Database, Users, AlertTriangle, Package } from "lucide-react";
 import { useGasFlowPredictor } from "@/hooks/useGasFlowPredictor";
 import { GasFlowProductionTab } from "@/components/dashboard/GasFlowProductionTab";
 import { GasFlowLogisticsTab } from "@/components/dashboard/GasFlowLogisticsTab";
 import { GasFlowStockMonitorTab } from "@/components/dashboard/GasFlowStockMonitorTab";
 import { GasFlowDriversTab } from "@/components/dashboard/GasFlowDriversTab";
+import { GasFlowPackagesTab } from "@/components/dashboard/GasFlowPackagesTab";
 import { format } from "date-fns";
 import { nl } from "date-fns/locale";
 
@@ -64,6 +65,11 @@ export default function GasFlowOptimizerPage() {
               <span className="hidden sm:inline">Chauffeurs</span>
               <span className="sm:hidden">Chauffeurs</span>
             </TabsTrigger>
+            <TabsTrigger value="pakketten" className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              <span className="hidden sm:inline">Pakketten</span>
+              <span className="sm:hidden">Pakket</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="productie" className="space-y-4">
@@ -80,6 +86,10 @@ export default function GasFlowOptimizerPage() {
 
           <TabsContent value="chauffeurs" className="space-y-4">
             <GasFlowDriversTab data={data} isLoading={isLoading} error={error} />
+          </TabsContent>
+
+          <TabsContent value="pakketten" className="space-y-4">
+            <GasFlowPackagesTab />
           </TabsContent>
         </Tabs>
       </div>

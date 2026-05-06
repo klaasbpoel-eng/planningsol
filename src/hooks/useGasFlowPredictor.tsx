@@ -168,6 +168,27 @@ export function useGasFlowPredictor() {
         fetchAllRows('Afname')
       ]);
 
+      // ── Bundel/pakket mapping: 1 bundel rij telt als N individuele cilinders ──
+      // Bv. 800L bundel = 16 cilinders van 50L
+      const { data: pkgRows } = await (supabase as any)
+        .from('gas_packages')
+        .select('bundle_capacity_liters, cylinders_per_pack, single_cylinder_liters, is_active');
+      const packageMap = new Map<number, { mult: number; unitCap: number }>();
+      for (const p of (pkgRows || [])) {
+        if ((p as any).is_active === false) continue;
+        const bundleCap = Number((p as any).bundle_capacity_liters);
+        const mult = Math.max(1, Number((p as any).cylinders_per_pack) || 1);
+        const unitCap = Math.max(1, Number((p as any).single_cylinder_liters) || 50);
+        if (bundleCap > 0) packageMap.set(bundleCap, { mult, unitCap });
+      }
+      // Helper: converteer (cap, aantal) naar (effectiveCap, effectiveAantal)
+      // gebaseerd op de mapping. Niet-bundels blijven onveranderd.
+      const expandPackage = (cap: number, aantal: number): { cap: number; aantal: number } => {
+        const m = packageMap.get(cap);
+        if (!m) return { cap, aantal };
+        return { cap: m.unitCap, aantal: aantal * m.mult };
+      };
+
       const today = startOfDay(new Date());
       const in7Days = addDays(today, 7);
       const in10Days = addDays(today, 10);
@@ -211,8 +232,11 @@ export function useGasFlowPredictor() {
         }
         if (!parsedDate || isNaN(parsedDate.getTime())) continue;
 
-        const aantal = Number(row.Aantal) || 0;
-        const cap    = Math.max(1, Number(row.Capaciteit || row.Capacity) || 1);
+        const rawAantal = Number(row.Aantal) || 0;
+        const rawCap    = Math.max(1, Number(row.Capaciteit || row.Capacity) || 1);
+        const expanded  = expandPackage(rawCap, rawAantal);
+        const aantal    = expanded.aantal;
+        const cap       = expanded.cap;
 
         // Derive supply location from SyncID (contains "Tilburg" or "Emmen") or legacy columns
         const syncIdStr = safeStr(row.SyncID || '', '').toLowerCase();
@@ -459,10 +483,13 @@ export function useGasFlowPredictor() {
         const rawLoc = safeStr(row.DS_ENTITY_DESCRIPTION || row.CenterDescription || row.DS_CENTER_DESCRIPTION || row.Locatie, '');
         const locStr = rawLoc.toLowerCase();
         const location = locStr.includes('tilburg') ? 'Tilburg' : locStr.includes('emmen') ? 'Emmen' : 'Overig';
-        const rowCapacity = Math.max(1, Number(row.Capacity || row.Capaciteit) || 1);
+        const rawCapacity = Math.max(1, Number(row.Capacity || row.Capaciteit) || 1);
+        const rawCount = Number(row.Aantal) || 0;
+        // Bundels uitsplitsen naar individuele cilinders
+        const exp = expandPackage(rawCapacity, rawCount);
+        const rowCapacity = exp.cap;
+        const rowAantal = exp.aantal;
         const key = `${product}__${location}__${rowCapacity}`;
-
-        const rowAantal = Number(row.Aantal) || 0;
 
         if (!stockMap.has(key)) {
           stockMap.set(key, { current: 0, capacityPerUnit: rowCapacity, location });
