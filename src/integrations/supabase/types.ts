@@ -893,33 +893,33 @@ export type Database = {
       }
       gas_packages: {
         Row: {
+          bundle_capacity_liters: number
           created_at: string
-          cylinder_capacity_liters: number | null
           cylinders_per_pack: number
           description: string | null
           id: string
           is_active: boolean
-          subcode: string
+          single_cylinder_liters: number
           updated_at: string
         }
         Insert: {
+          bundle_capacity_liters: number
           created_at?: string
-          cylinder_capacity_liters?: number | null
           cylinders_per_pack?: number
           description?: string | null
           id?: string
           is_active?: boolean
-          subcode: string
+          single_cylinder_liters?: number
           updated_at?: string
         }
         Update: {
+          bundle_capacity_liters?: number
           created_at?: string
-          cylinder_capacity_liters?: number | null
           cylinders_per_pack?: number
           description?: string | null
           id?: string
           is_active?: boolean
-          subcode?: string
+          single_cylinder_liters?: number
           updated_at?: string
         }
         Relationships: []
