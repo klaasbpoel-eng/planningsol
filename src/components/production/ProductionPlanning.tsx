@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock, ShieldAlert, Truck, FlaskConical, ChevronUp, ChevronDown, Route } from "lucide-react";
+import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock, ShieldAlert, Truck, FlaskConical, ChevronUp, ChevronDown, Route, CalendarClock } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { TopCustomersWidget } from "./TopCustomersWidget";
 import { KPIDashboard } from "./KPIDashboard";
@@ -15,6 +15,7 @@ const DryIcePlanning = lazy(() => import("./DryIcePlanning").then(m => ({ defaul
 const GasMixtureRecipemaker = lazy(() => import("./GasMixtureRecipemaker"));
 const SiteMap = lazy(() => import("./SiteMap").then(m => ({ default: m.SiteMap })));
 const PGSRegistry = lazy(() => import("./PGSRegistry").then(m => ({ default: m.PGSRegistry })));
+const FillPlanning = lazy(() => import("./FillPlanning").then(m => ({ default: m.FillPlanning })));
 
 
 // ... (existing code)
@@ -563,6 +564,16 @@ export function ProductionPlanning({
             <span className="sm:hidden">Droogijs</span>
           </TabsTrigger>
           {showAdvancedTabs && (
+            <TabsTrigger
+              value="vulplanning"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+            >
+              <CalendarClock className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Vulplanning</span>
+              <span className="sm:hidden">Vullen</span>
+            </TabsTrigger>
+          )}
+          {showAdvancedTabs && (
             <>
               <TabsTrigger
                 value="rapportage"
@@ -633,6 +644,14 @@ export function ProductionPlanning({
             />
           </Suspense>
         </TabsContent>
+
+        {showAdvancedTabs && (
+          <TabsContent value="vulplanning" className="mt-6">
+            <Suspense fallback={<TabLoadingFallback />}>
+              <FillPlanning />
+            </Suspense>
+          </TabsContent>
+        )}
 
         {showAdvancedTabs && (
           <>
