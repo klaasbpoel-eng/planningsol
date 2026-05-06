@@ -32,6 +32,38 @@ export interface DeadStockItem {
   daysSinceLastDelivery: number | null; // null = geen geschiedenis afgelopen 12 maanden
 }
 
+export interface FillPlanItem {
+  product: string;
+  location: string;
+  capacityPerUnit: number;
+  startStock: number;             // huidige voorraad in stuks
+  totalExpectedDemand: number;    // som vraag over horizon
+  totalSuggestedFill: number;     // som vulsuggestie over horizon
+  perDay: {
+    date: string;                 // YYYY-MM-DD
+    expectedDemand: number;       // stuks verwacht deze dag
+    projectedStockBefore: number; // voorraad voor vraag van die dag
+    projectedStockAfter: number;  // voorraad na vraag, voor vullen
+    suggestedFill: number;        // stuks bij te vullen om voorraad >= safety te houden
+    endStock: number;             // voorraad einde dag (na vulling)
+  }[];
+}
+
+export interface FillPlanDay {
+  date: string;
+  dayLabel: string;        // bv. "ma 11 mei"
+  totalExpectedDemand: number;
+  totalSuggestedFill: number;
+  items: {
+    product: string;
+    location: string;
+    capacityPerUnit: number;
+    expectedDemand: number;
+    projectedStockBefore: number;
+    suggestedFill: number;
+  }[];
+}
+
 export interface ChurnRisk {
   customerName: string;
   city: string;
