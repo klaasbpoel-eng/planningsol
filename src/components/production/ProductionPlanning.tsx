@@ -646,6 +646,14 @@ export function ProductionPlanning({
         </TabsContent>
 
         {showAdvancedTabs && (
+          <TabsContent value="vulplanning" className="mt-6">
+            <Suspense fallback={<TabLoadingFallback />}>
+              <FillPlanning />
+            </Suspense>
+          </TabsContent>
+        )}
+
+        {showAdvancedTabs && (
           <>
             <TabsContent value="rapportage" className="mt-6">
               <Suspense fallback={<ReportLoadingFallback />}>
