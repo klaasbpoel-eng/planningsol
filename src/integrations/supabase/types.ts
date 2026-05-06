@@ -891,6 +891,39 @@ export type Database = {
         }
         Relationships: []
       }
+      gas_packages: {
+        Row: {
+          created_at: string
+          cylinder_capacity_liters: number | null
+          cylinders_per_pack: number
+          description: string | null
+          id: string
+          is_active: boolean
+          subcode: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cylinder_capacity_liters?: number | null
+          cylinders_per_pack?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          subcode: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cylinder_capacity_liters?: number | null
+          cylinders_per_pack?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          subcode?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       gas_type_categories: {
         Row: {
           created_at: string
