@@ -170,7 +170,7 @@ export function useGasFlowPredictor() {
 
       // ── Bundel/pakket mapping: 1 bundel rij telt als N individuele cilinders ──
       // Bv. 800L bundel = 16 cilinders van 50L
-      const { data: pkgRows } = await supabase
+      const { data: pkgRows } = await (supabase as any)
         .from('gas_packages')
         .select('bundle_capacity_liters, cylinders_per_pack, single_cylinder_liters, is_active');
       const packageMap = new Map<number, { mult: number; unitCap: number }>();
