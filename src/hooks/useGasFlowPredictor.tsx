@@ -271,6 +271,41 @@ export function useGasFlowPredictor() {
       const productDemand7Days = new Map<string, number>();
       const productDemand10Days = new Map<string, number>();
 
+      // ── Vulplanning: vraag per (pKey, dagIndex 0..N-1) over komende werkdagen ──
+      const FILL_PLAN_DAYS = 5; // werkdagen
+      // Bouw lijst van komende werkdagen (ma-vr), startend bij vandaag (of eerstvolgende werkdag)
+      const planDays: { date: Date; key: string }[] = [];
+      {
+        const cursor = new Date(today);
+        while (planDays.length < FILL_PLAN_DAYS) {
+          const dow = cursor.getDay(); // 0 zo, 6 za
+          if (dow !== 0 && dow !== 6) {
+            const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+            planDays.push({ date: new Date(cursor), key });
+          }
+          cursor.setDate(cursor.getDate() + 1);
+        }
+      }
+      const planLastDate = planDays[planDays.length - 1].date;
+      // demandPerDay[pKey] = number[FILL_PLAN_DAYS]
+      const demandPerDay = new Map<string, number[]>();
+      const ensureDemandRow = (pKey: string) => {
+        let row = demandPerDay.get(pKey);
+        if (!row) { row = new Array(FILL_PLAN_DAYS).fill(0); demandPerDay.set(pKey, row); }
+        return row;
+      };
+      const dayIndexFor = (d: Date): number => {
+        // Map elke datum naar eerstvolgende werkdag-slot binnen het venster
+        if (d < today) {
+          // Achterstallig → eerste werkdag (vandaag/eerstvolgende werkdag)
+          return 0;
+        }
+        for (let i = 0; i < planDays.length; i++) {
+          if (d <= planDays[i].date) return i;
+        }
+        return -1; // buiten venster
+      };
+
       for (const [key, deliveries] of customerHistory.entries()) {
         // Sort by date ascending
         deliveries.sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -371,6 +406,26 @@ export function useGasFlowPredictor() {
               urgency: 'Actie',
               driver: lastDelivery.driver,
             });
+          }
+        }
+
+        // ── Vulplanning: voeg verwachte leveringen binnen het werkdag-venster toe ──
+        {
+          const product = lastDelivery.product;
+          const supplyLocStr = lastDelivery.supplyLocation.toLowerCase();
+          const location = supplyLocStr.includes('tilburg') ? 'Tilburg' : supplyLocStr.includes('emmen') ? 'Emmen' : 'Overig';
+          const pKey = `${product}__${location}__${capPerUnit}`;
+          // Stap door volgende verwachte leveringen
+          let cursorDate = new Date(nextDate);
+          let safety = 0;
+          while (cursorDate <= planLastDate && safety < 20) {
+            const idx = dayIndexFor(cursorDate);
+            if (idx >= 0) {
+              const row = ensureDemandRow(pKey);
+              row[idx] += avgAmount;
+            }
+            cursorDate = addDays(cursorDate, avgInterval);
+            safety++;
           }
         }
       }
