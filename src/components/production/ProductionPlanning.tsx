@@ -564,6 +564,16 @@ export function ProductionPlanning({
             <span className="sm:hidden">Droogijs</span>
           </TabsTrigger>
           {showAdvancedTabs && (
+            <TabsTrigger
+              value="vulplanning"
+              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+            >
+              <CalendarClock className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Vulplanning</span>
+              <span className="sm:hidden">Vullen</span>
+            </TabsTrigger>
+          )}
+          {showAdvancedTabs && (
             <>
               <TabsTrigger
                 value="rapportage"
