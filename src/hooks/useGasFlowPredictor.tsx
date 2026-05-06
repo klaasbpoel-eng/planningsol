@@ -168,6 +168,27 @@ export function useGasFlowPredictor() {
         fetchAllRows('Afname')
       ]);
 
+      // ── Bundel/pakket mapping: 1 bundel rij telt als N individuele cilinders ──
+      // Bv. 800L bundel = 16 cilinders van 50L
+      const { data: pkgRows } = await supabase
+        .from('gas_packages')
+        .select('bundle_capacity_liters, cylinders_per_pack, single_cylinder_liters, is_active');
+      const packageMap = new Map<number, { mult: number; unitCap: number }>();
+      for (const p of (pkgRows || [])) {
+        if ((p as any).is_active === false) continue;
+        const bundleCap = Number((p as any).bundle_capacity_liters);
+        const mult = Math.max(1, Number((p as any).cylinders_per_pack) || 1);
+        const unitCap = Math.max(1, Number((p as any).single_cylinder_liters) || 50);
+        if (bundleCap > 0) packageMap.set(bundleCap, { mult, unitCap });
+      }
+      // Helper: converteer (cap, aantal) naar (effectiveCap, effectiveAantal)
+      // gebaseerd op de mapping. Niet-bundels blijven onveranderd.
+      const expandPackage = (cap: number, aantal: number): { cap: number; aantal: number } => {
+        const m = packageMap.get(cap);
+        if (!m) return { cap, aantal };
+        return { cap: m.unitCap, aantal: aantal * m.mult };
+      };
+
       const today = startOfDay(new Date());
       const in7Days = addDays(today, 7);
       const in10Days = addDays(today, 10);
