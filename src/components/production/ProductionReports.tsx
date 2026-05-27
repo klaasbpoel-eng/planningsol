@@ -84,6 +84,7 @@ const CumulativeGasTypeChart = lazy(() => import("./CumulativeGasTypeChart").the
 const CumulativeCylinderSizeChart = lazy(() => import("./CumulativeCylinderSizeChart").then(m => ({ default: m.CumulativeCylinderSizeChart })));
 const ProductionHeatMap = lazy(() => import("./ProductionHeatMap").then(m => ({ default: m.ProductionHeatMap })));
 const CustomerSegmentation = lazy(() => import("./CustomerSegmentation").then(m => ({ default: m.CustomerSegmentation })));
+const YoYInsights = lazy(() => import("./YoYInsights").then(m => ({ default: m.YoYInsights })));
 const LocationComparisonReport = lazy(() => import("./LocationComparisonReport").then(m => ({ default: m.LocationComparisonReport })));
 const MonthlyReport = lazy(() => import("./MonthlyReport").then(m => ({ default: m.MonthlyReport })));
 const YearlyReport = lazy(() => import("./YearlyReport").then(m => ({ default: m.YearlyReport })));
@@ -1258,6 +1259,16 @@ export function ProductionReports({
 
         {/* Other tabs content placeholders (using existing components) */}
         <TabsContent value="insights" className="mt-0">
+          <Suspense fallback={<ChartLoadingFallback />}>
+            <YoYInsights
+              location={location}
+              refreshKey={refreshKey}
+              dateRange={dateRange}
+              hideDigital={hideDigital}
+              hasDigitalTypes={hasDigitalTypes}
+            />
+          </Suspense>
+          <div className="h-4" />
           <Suspense fallback={<ChartLoadingFallback />}>
             <CustomerSegmentation
               location={location}
