@@ -88,10 +88,31 @@ export function YoYInsights({
   const [search, setSearch] = useState("");
   const [minVol, setMinVol] = useState<number>(MIN_VOLUME_DEFAULT);
   const [showAll, setShowAll] = useState(false);
+  const [periodMode, setPeriodMode] = useState<"ytd" | "selection" | "full">(
+    dateRange ? "selection" : "ytd",
+  );
 
-  // Determine current period (from selected dateRange or year, default this year)
-  const currentFrom = dateRange?.from ?? new Date(year ?? new Date().getFullYear(), 0, 1);
-  const currentTo = dateRange?.to ?? new Date(year ?? new Date().getFullYear(), 11, 31);
+  // Switch to "selection" automatically when the page-level dateRange changes
+  useEffect(() => {
+    if (dateRange) setPeriodMode("selection");
+  }, [dateRange?.from?.getTime(), dateRange?.to?.getTime()]);
+
+  // Determine current period based on mode
+  const today = new Date();
+  const baseYear = year ?? today.getFullYear();
+  let currentFrom: Date;
+  let currentTo: Date;
+  if (periodMode === "selection" && dateRange) {
+    currentFrom = dateRange.from;
+    currentTo = dateRange.to;
+  } else if (periodMode === "full") {
+    currentFrom = new Date(baseYear, 0, 1);
+    currentTo = new Date(baseYear, 11, 31);
+  } else {
+    // YTD: 1 jan t/m vandaag
+    currentFrom = new Date(baseYear, 0, 1);
+    currentTo = today;
+  }
   const prevFrom = subYears(currentFrom, 1);
   const prevTo = subYears(currentTo, 1);
 
