@@ -55,6 +55,36 @@ function bucketCapacity(cap: number | string | null | undefined): string {
   return `${n}L (bundel)`;
 }
 
+function normalizeKlant(raw: string | null | undefined): string {
+  if (!raw) return "onbekend";
+  let s = String(raw).toLowerCase();
+  // strip diacritics
+  s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  // & / + -> en
+  s = s.replace(/[&+]/g, " en ");
+  // remove punctuation
+  s = s.replace(/[.,'`"()\/\\]/g, " ");
+  // strip common legal suffixes (as separate tokens)
+  s = ` ${s} `;
+  const suffixes = [
+    " b v ", " bv ", " bvba ", " n v ", " nv ", " gmbh ", " ltd ", " sa ",
+    " sl ", " srl ", " s a ", " s l ", " s r l ",
+  ];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const suf of suffixes) {
+      if (s.endsWith(suf)) {
+        s = s.slice(0, -suf.length) + " ";
+        changed = true;
+      }
+    }
+  }
+  // collapse whitespace
+  s = s.replace(/\s+/g, " ").trim();
+  return s || "onbekend";
+}
+
 function buildDelta(
   curr: Map<string, number>,
   prev: Map<string, number>,
