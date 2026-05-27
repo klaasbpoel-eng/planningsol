@@ -88,10 +88,31 @@ export function YoYInsights({
   const [search, setSearch] = useState("");
   const [minVol, setMinVol] = useState<number>(MIN_VOLUME_DEFAULT);
   const [showAll, setShowAll] = useState(false);
+  const [periodMode, setPeriodMode] = useState<"ytd" | "selection" | "full">(
+    dateRange ? "selection" : "ytd",
+  );
 
-  // Determine current period (from selected dateRange or year, default this year)
-  const currentFrom = dateRange?.from ?? new Date(year ?? new Date().getFullYear(), 0, 1);
-  const currentTo = dateRange?.to ?? new Date(year ?? new Date().getFullYear(), 11, 31);
+  // Switch to "selection" automatically when the page-level dateRange changes
+  useEffect(() => {
+    if (dateRange) setPeriodMode("selection");
+  }, [dateRange?.from?.getTime(), dateRange?.to?.getTime()]);
+
+  // Determine current period based on mode
+  const today = new Date();
+  const baseYear = year ?? today.getFullYear();
+  let currentFrom: Date;
+  let currentTo: Date;
+  if (periodMode === "selection" && dateRange) {
+    currentFrom = dateRange.from;
+    currentTo = dateRange.to;
+  } else if (periodMode === "full") {
+    currentFrom = new Date(baseYear, 0, 1);
+    currentTo = new Date(baseYear, 11, 31);
+  } else {
+    // YTD: 1 jan t/m vandaag
+    currentFrom = new Date(baseYear, 0, 1);
+    currentTo = today;
+  }
   const prevFrom = subYears(currentFrom, 1);
   const prevTo = subYears(currentTo, 1);
 
@@ -247,12 +268,20 @@ export function YoYInsights({
   }, [deltas, sortMode]);
 
   const periodDays = Math.max(1, differenceInCalendarDays(currentTo, currentFrom) + 1);
-  const periodLabel = dateRange
-    ? `${format(currentFrom, "d MMM yyyy", { locale: nl })} - ${format(currentTo, "d MMM yyyy", { locale: nl })}`
-    : `${currentFrom.getFullYear()}`;
-  const prevPeriodLabel = dateRange
-    ? `${format(prevFrom, "d MMM yyyy", { locale: nl })} - ${format(prevTo, "d MMM yyyy", { locale: nl })}`
-    : `${prevFrom.getFullYear()}`;
+  const fmtRange = (a: Date, b: Date) =>
+    `${format(a, "d MMM yyyy", { locale: nl })} - ${format(b, "d MMM yyyy", { locale: nl })}`;
+  const periodLabel =
+    periodMode === "full"
+      ? `${currentFrom.getFullYear()}`
+      : periodMode === "ytd"
+      ? `YTD ${currentFrom.getFullYear()} (t/m ${format(currentTo, "d MMM", { locale: nl })})`
+      : fmtRange(currentFrom, currentTo);
+  const prevPeriodLabel =
+    periodMode === "full"
+      ? `${prevFrom.getFullYear()}`
+      : periodMode === "ytd"
+      ? `YTD ${prevFrom.getFullYear()} (t/m ${format(prevTo, "d MMM", { locale: nl })})`
+      : fmtRange(prevFrom, prevTo);
 
   const formatPct = (p: number) => {
     if (!isFinite(p)) return "—";
@@ -419,6 +448,33 @@ export function YoYInsights({
                       </div>
                     </>
                   )}
+                  <div className="flex rounded-md border bg-muted/30 text-xs">
+                    {([
+                      { k: "ytd" as const, label: "YTD", disabled: false },
+                      { k: "full" as const, label: "Heel jaar", disabled: false },
+                      { k: "selection" as const, label: "Selectie", disabled: !dateRange },
+                    ]).map((opt, i, arr) => (
+                      <button
+                        key={opt.k}
+                        type="button"
+                        disabled={opt.disabled}
+                        onClick={() => setPeriodMode(opt.k)}
+                        className={cn(
+                          "px-2 py-1 transition-colors",
+                          i === 0 && "rounded-l-md",
+                          i === arr.length - 1 && "rounded-r-md",
+                          periodMode === opt.k
+                            ? "bg-primary text-primary-foreground"
+                            : opt.disabled
+                            ? "opacity-40 cursor-not-allowed"
+                            : "hover:bg-muted",
+                        )}
+                        title={opt.disabled ? "Kies eerst een datumbereik bovenaan de pagina" : undefined}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                   <div className="flex rounded-md border bg-muted/30 text-xs">
                     <button
                       type="button"
