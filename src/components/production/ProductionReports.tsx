@@ -1260,6 +1260,16 @@ export function ProductionReports({
         {/* Other tabs content placeholders (using existing components) */}
         <TabsContent value="insights" className="mt-0">
           <Suspense fallback={<ChartLoadingFallback />}>
+            <YoYInsights
+              location={location}
+              refreshKey={refreshKey}
+              dateRange={dateRange}
+              hideDigital={hideDigital}
+              hasDigitalTypes={hasDigitalTypes}
+            />
+          </Suspense>
+          <div className="h-4" />
+          <Suspense fallback={<ChartLoadingFallback />}>
             <CustomerSegmentation
               location={location}
               refreshKey={refreshKey}
