@@ -449,6 +449,33 @@ export function YoYInsights({
                     </>
                   )}
                   <div className="flex rounded-md border bg-muted/30 text-xs">
+                    {([
+                      { k: "ytd", label: "YTD" },
+                      { k: "full", label: "Heel jaar" },
+                      { k: "selection", label: "Selectie", disabled: !dateRange },
+                    ] as const).map((opt, i, arr) => (
+                      <button
+                        key={opt.k}
+                        type="button"
+                        disabled={opt.disabled}
+                        onClick={() => setPeriodMode(opt.k)}
+                        className={cn(
+                          "px-2 py-1 transition-colors",
+                          i === 0 && "rounded-l-md",
+                          i === arr.length - 1 && "rounded-r-md",
+                          periodMode === opt.k
+                            ? "bg-primary text-primary-foreground"
+                            : opt.disabled
+                            ? "opacity-40 cursor-not-allowed"
+                            : "hover:bg-muted",
+                        )}
+                        title={opt.disabled ? "Kies eerst een datumbereik bovenaan de pagina" : undefined}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex rounded-md border bg-muted/30 text-xs">
                     <button
                       type="button"
                       onClick={() => setSortMode("abs")}
