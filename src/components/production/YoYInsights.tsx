@@ -55,6 +55,36 @@ function bucketCapacity(cap: number | string | null | undefined): string {
   return `${n}L (bundel)`;
 }
 
+function normalizeKlant(raw: string | null | undefined): string {
+  if (!raw) return "onbekend";
+  let s = String(raw).toLowerCase();
+  // strip diacritics
+  s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  // & / + -> en
+  s = s.replace(/[&+]/g, " en ");
+  // remove punctuation
+  s = s.replace(/[.,'`"()\/\\]/g, " ");
+  // strip common legal suffixes (as separate tokens)
+  s = ` ${s} `;
+  const suffixes = [
+    " b v ", " bv ", " bvba ", " n v ", " nv ", " gmbh ", " ltd ", " sa ",
+    " sl ", " srl ", " s a ", " s l ", " s r l ",
+  ];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const suf of suffixes) {
+      if (s.endsWith(suf)) {
+        s = s.slice(0, -suf.length) + " ";
+        changed = true;
+      }
+    }
+  }
+  // collapse whitespace
+  s = s.replace(/\s+/g, " ").trim();
+  return s || "onbekend";
+}
+
 function buildDelta(
   curr: Map<string, number>,
   prev: Map<string, number>,
@@ -217,18 +247,62 @@ export function YoYInsights({
       }
       return m;
     };
+    // Klanten: group by normalized name, but keep the most-frequent original spelling as display label
+    const groupKlanten = (rows: Row[]) => {
+      const m = new Map<string, number>();
+      const labelVotes = new Map<string, Map<string, number>>();
+      for (const r of rows) {
+        const original = (r.Klant || "Onbekend").trim() || "Onbekend";
+        const key = normalizeKlant(original);
+        const aantal = Number(r.Aantal) || 0;
+        m.set(key, (m.get(key) || 0) + aantal);
+        let votes = labelVotes.get(key);
+        if (!votes) {
+          votes = new Map();
+          labelVotes.set(key, votes);
+        }
+        votes.set(original, (votes.get(original) || 0) + aantal);
+      }
+      return { totals: m, labelVotes };
+    };
+    const kc = groupKlanten(rowsCurrent);
+    const kp = groupKlanten(rowsPrevious);
+    // Build display label per normalized key: highest combined volume wins
+    const klantenLabel = new Map<string, string>();
+    const allKeys = new Set<string>([...kc.totals.keys(), ...kp.totals.keys()]);
+    for (const key of allKeys) {
+      const combined = new Map<string, number>();
+      for (const [lbl, v] of kc.labelVotes.get(key) || []) {
+        combined.set(lbl, (combined.get(lbl) || 0) + v);
+      }
+      for (const [lbl, v] of kp.labelVotes.get(key) || []) {
+        combined.set(lbl, (combined.get(lbl) || 0) + v);
+      }
+      let bestLabel = key;
+      let bestVol = -1;
+      for (const [lbl, v] of combined) {
+        if (v > bestVol) {
+          bestVol = v;
+          bestLabel = lbl;
+        }
+      }
+      klantenLabel.set(key, bestLabel);
+    }
     return {
       klanten: {
-        curr: groupBy(rowsCurrent, (r) => r.Klant),
-        prev: groupBy(rowsPrevious, (r) => r.Klant),
+        curr: kc.totals,
+        prev: kp.totals,
+        labels: klantenLabel,
       },
       gas: {
         curr: groupBy(rowsCurrent, (r) => r.Product),
         prev: groupBy(rowsPrevious, (r) => r.Product),
+        labels: null as Map<string, string> | null,
       },
       capaciteit: {
         curr: groupBy(rowsCurrent, (r) => bucketCapacity(r.Capaciteit)),
         prev: groupBy(rowsPrevious, (r) => bucketCapacity(r.Capaciteit)),
+        labels: null as Map<string, string> | null,
       },
     };
   }, [rowsCurrent, rowsPrevious]);
@@ -243,10 +317,14 @@ export function YoYInsights({
   const active = agg[tab];
   const deltas = useMemo(() => {
     const d = buildDelta(active.curr, active.prev);
+    // Apply display labels (e.g. canonical klant name)
+    const labeled = active.labels
+      ? d.map((r) => ({ ...r, label: active.labels!.get(r.key) ?? r.label }))
+      : d;
     // For capacity tab keep all buckets; for others apply min volume filter
     const filtered = tab === "capaciteit"
-      ? d
-      : d.filter((row) => Math.max(row.current, row.previous) >= minVol);
+      ? labeled
+      : labeled.filter((row) => Math.max(row.current, row.previous) >= minVol);
     const searched = search
       ? filtered.filter((r) => r.label.toLowerCase().includes(search.toLowerCase()))
       : filtered;
