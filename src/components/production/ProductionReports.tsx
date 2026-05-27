@@ -84,6 +84,7 @@ const CumulativeGasTypeChart = lazy(() => import("./CumulativeGasTypeChart").the
 const CumulativeCylinderSizeChart = lazy(() => import("./CumulativeCylinderSizeChart").then(m => ({ default: m.CumulativeCylinderSizeChart })));
 const ProductionHeatMap = lazy(() => import("./ProductionHeatMap").then(m => ({ default: m.ProductionHeatMap })));
 const CustomerSegmentation = lazy(() => import("./CustomerSegmentation").then(m => ({ default: m.CustomerSegmentation })));
+const YoYInsights = lazy(() => import("./YoYInsights").then(m => ({ default: m.YoYInsights })));
 const LocationComparisonReport = lazy(() => import("./LocationComparisonReport").then(m => ({ default: m.LocationComparisonReport })));
 const MonthlyReport = lazy(() => import("./MonthlyReport").then(m => ({ default: m.MonthlyReport })));
 const YearlyReport = lazy(() => import("./YearlyReport").then(m => ({ default: m.YearlyReport })));
