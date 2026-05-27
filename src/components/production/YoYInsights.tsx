@@ -247,18 +247,62 @@ export function YoYInsights({
       }
       return m;
     };
+    // Klanten: group by normalized name, but keep the most-frequent original spelling as display label
+    const groupKlanten = (rows: Row[]) => {
+      const m = new Map<string, number>();
+      const labelVotes = new Map<string, Map<string, number>>();
+      for (const r of rows) {
+        const original = (r.Klant || "Onbekend").trim() || "Onbekend";
+        const key = normalizeKlant(original);
+        const aantal = Number(r.Aantal) || 0;
+        m.set(key, (m.get(key) || 0) + aantal);
+        let votes = labelVotes.get(key);
+        if (!votes) {
+          votes = new Map();
+          labelVotes.set(key, votes);
+        }
+        votes.set(original, (votes.get(original) || 0) + aantal);
+      }
+      return { totals: m, labelVotes };
+    };
+    const kc = groupKlanten(rowsCurrent);
+    const kp = groupKlanten(rowsPrevious);
+    // Build display label per normalized key: highest combined volume wins
+    const klantenLabel = new Map<string, string>();
+    const allKeys = new Set<string>([...kc.totals.keys(), ...kp.totals.keys()]);
+    for (const key of allKeys) {
+      const combined = new Map<string, number>();
+      for (const [lbl, v] of kc.labelVotes.get(key) || []) {
+        combined.set(lbl, (combined.get(lbl) || 0) + v);
+      }
+      for (const [lbl, v] of kp.labelVotes.get(key) || []) {
+        combined.set(lbl, (combined.get(lbl) || 0) + v);
+      }
+      let bestLabel = key;
+      let bestVol = -1;
+      for (const [lbl, v] of combined) {
+        if (v > bestVol) {
+          bestVol = v;
+          bestLabel = lbl;
+        }
+      }
+      klantenLabel.set(key, bestLabel);
+    }
     return {
       klanten: {
-        curr: groupBy(rowsCurrent, (r) => r.Klant),
-        prev: groupBy(rowsPrevious, (r) => r.Klant),
+        curr: kc.totals,
+        prev: kp.totals,
+        labels: klantenLabel,
       },
       gas: {
         curr: groupBy(rowsCurrent, (r) => r.Product),
         prev: groupBy(rowsPrevious, (r) => r.Product),
+        labels: null as Map<string, string> | null,
       },
       capaciteit: {
         curr: groupBy(rowsCurrent, (r) => bucketCapacity(r.Capaciteit)),
         prev: groupBy(rowsPrevious, (r) => bucketCapacity(r.Capaciteit)),
+        labels: null as Map<string, string> | null,
       },
     };
   }, [rowsCurrent, rowsPrevious]);
