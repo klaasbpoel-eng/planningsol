@@ -268,12 +268,20 @@ export function YoYInsights({
   }, [deltas, sortMode]);
 
   const periodDays = Math.max(1, differenceInCalendarDays(currentTo, currentFrom) + 1);
-  const periodLabel = dateRange
-    ? `${format(currentFrom, "d MMM yyyy", { locale: nl })} - ${format(currentTo, "d MMM yyyy", { locale: nl })}`
-    : `${currentFrom.getFullYear()}`;
-  const prevPeriodLabel = dateRange
-    ? `${format(prevFrom, "d MMM yyyy", { locale: nl })} - ${format(prevTo, "d MMM yyyy", { locale: nl })}`
-    : `${prevFrom.getFullYear()}`;
+  const fmtRange = (a: Date, b: Date) =>
+    `${format(a, "d MMM yyyy", { locale: nl })} - ${format(b, "d MMM yyyy", { locale: nl })}`;
+  const periodLabel =
+    periodMode === "full"
+      ? `${currentFrom.getFullYear()}`
+      : periodMode === "ytd"
+      ? `YTD ${currentFrom.getFullYear()} (t/m ${format(currentTo, "d MMM", { locale: nl })})`
+      : fmtRange(currentFrom, currentTo);
+  const prevPeriodLabel =
+    periodMode === "full"
+      ? `${prevFrom.getFullYear()}`
+      : periodMode === "ytd"
+      ? `YTD ${prevFrom.getFullYear()} (t/m ${format(prevTo, "d MMM", { locale: nl })})`
+      : fmtRange(prevFrom, prevTo);
 
   const formatPct = (p: number) => {
     if (!isFinite(p)) return "—";
