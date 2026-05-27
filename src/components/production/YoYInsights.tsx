@@ -450,10 +450,10 @@ export function YoYInsights({
                   )}
                   <div className="flex rounded-md border bg-muted/30 text-xs">
                     {([
-                      { k: "ytd", label: "YTD" },
-                      { k: "full", label: "Heel jaar" },
-                      { k: "selection", label: "Selectie", disabled: !dateRange },
-                    ] as const).map((opt, i, arr) => (
+                      { k: "ytd" as const, label: "YTD", disabled: false },
+                      { k: "full" as const, label: "Heel jaar", disabled: false },
+                      { k: "selection" as const, label: "Selectie", disabled: !dateRange },
+                    ]).map((opt, i, arr) => (
                       <button
                         key={opt.k}
                         type="button"
