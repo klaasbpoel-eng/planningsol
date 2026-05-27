@@ -317,10 +317,14 @@ export function YoYInsights({
   const active = agg[tab];
   const deltas = useMemo(() => {
     const d = buildDelta(active.curr, active.prev);
+    // Apply display labels (e.g. canonical klant name)
+    const labeled = active.labels
+      ? d.map((r) => ({ ...r, label: active.labels!.get(r.key) ?? r.label }))
+      : d;
     // For capacity tab keep all buckets; for others apply min volume filter
     const filtered = tab === "capaciteit"
-      ? d
-      : d.filter((row) => Math.max(row.current, row.previous) >= minVol);
+      ? labeled
+      : labeled.filter((row) => Math.max(row.current, row.previous) >= minVol);
     const searched = search
       ? filtered.filter((r) => r.label.toLowerCase().includes(search.toLowerCase()))
       : filtered;
