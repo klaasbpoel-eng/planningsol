@@ -496,11 +496,11 @@ export function ProductionReports({
     const lastYear = subYears(now, 1);
     if (isSameDay(from, startOfYear(lastYear)) && isSameDay(to, endOfYear(lastYear))) return "last-year";
 
-    // This year (YTD: Jan 1 to any date this year)
-    if (isSameDay(from, startOfYear(now)) && from.getFullYear() === to.getFullYear() && to.getFullYear() === now.getFullYear()) return "this-year";
-
-    // Full calendar year of current year (Jan 1 — Dec 31)
+    // Full calendar year of current year (Jan 1 — Dec 31) — check before YTD because YTD also starts on Jan 1
     if (isSameDay(from, startOfYear(now)) && isSameDay(to, endOfYear(now))) return "full-year";
+
+    // This year (YTD: Jan 1 to any date this year except Dec 31 which is full-year)
+    if (isSameDay(from, startOfYear(now)) && from.getFullYear() === to.getFullYear() && to.getFullYear() === now.getFullYear()) return "this-year";
 
     return "";
   };
