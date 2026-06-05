@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   Cylinder,
   Users,
-  ListOrdered,
+  CalendarClock,
+  Gauge,
   MapPin,
   Target,
 } from "lucide-react";
