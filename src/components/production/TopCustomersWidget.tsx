@@ -290,7 +290,8 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex flex-col items-end gap-0.5">
+                  <div className="flex items-center gap-1">
                   {getTrendIcon(customer.changePercent)}
                   <Badge
                     variant={customer.changePercent >= 0 ? "default" : "destructive"}
@@ -298,6 +299,17 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
                   >
                     {customer.changePercent >= 999 ? ">+999%" : customer.changePercent <= -999 ? "<-999%" : `${customer.changePercent >= 0 ? "+" : ""}${customer.changePercent.toFixed(0)}%`}
                   </Badge>
+                  </div>
+                  {customer.previousCylinders > 0 && (
+                    <span
+                      className={cn(
+                        "text-[10px] tabular-nums",
+                        customer.deltaAbs >= 0 ? "text-green-600" : "text-red-600",
+                      )}
+                    >
+                      {customer.deltaAbs >= 0 ? "+" : ""}{formatNumber(customer.deltaAbs, 0)} cil.
+                    </span>
+                  )}
                 </div>
               </div>
             ))
