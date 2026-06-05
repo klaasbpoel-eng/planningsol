@@ -9,6 +9,7 @@ import { TrendingUp, TrendingDown, Users, Flame, Container, ChevronDown, Chevron
 import { supabase } from "@/integrations/supabase/client";
 import { cn, formatNumber, normalizeDatum } from "@/lib/utils";
 import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
+import { normalizeKlant } from "@/lib/customerNormalize";
 import { format, subYears, differenceInCalendarDays } from "date-fns";
 import { nl } from "date-fns/locale";
 
@@ -39,6 +40,8 @@ interface DeltaRow {
   previous: number;
   delta: number;
   pct: number;
+  /** Share of current period total volume (0–1) */
+  share: number;
 }
 
 type SortMode = "pct" | "abs";
@@ -55,48 +58,20 @@ function bucketCapacity(cap: number | string | null | undefined): string {
   return `${n}L (bundel)`;
 }
 
-function normalizeKlant(raw: string | null | undefined): string {
-  if (!raw) return "onbekend";
-  let s = String(raw).toLowerCase();
-  // strip diacritics
-  s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  // & / + -> en
-  s = s.replace(/[&+]/g, " en ");
-  // remove punctuation
-  s = s.replace(/[.,'`"()\/\\]/g, " ");
-  // strip common legal suffixes (as separate tokens)
-  s = ` ${s} `;
-  const suffixes = [
-    " b v ", " bv ", " bvba ", " n v ", " nv ", " gmbh ", " ltd ", " sa ",
-    " sl ", " srl ", " s a ", " s l ", " s r l ",
-  ];
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const suf of suffixes) {
-      if (s.endsWith(suf)) {
-        s = s.slice(0, -suf.length) + " ";
-        changed = true;
-      }
-    }
-  }
-  // collapse whitespace
-  s = s.replace(/\s+/g, " ").trim();
-  return s || "onbekend";
-}
-
 function buildDelta(
   curr: Map<string, number>,
   prev: Map<string, number>,
 ): DeltaRow[] {
   const keys = new Set<string>([...curr.keys(), ...prev.keys()]);
+  const currTotal = Array.from(curr.values()).reduce((a, b) => a + b, 0);
   const out: DeltaRow[] = [];
   for (const k of keys) {
     const c = curr.get(k) || 0;
     const p = prev.get(k) || 0;
     const d = c - p;
     const pct = p > 0 ? (d / p) * 100 : c > 0 ? 100 : 0;
-    out.push({ key: k, label: k, current: c, previous: p, delta: d, pct });
+    const share = currTotal > 0 ? c / currTotal : 0;
+    out.push({ key: k, label: k, current: c, previous: p, delta: d, pct, share });
   }
   return out;
 }
