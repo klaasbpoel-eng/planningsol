@@ -626,6 +626,43 @@ export function YoYInsights({
                   </div>
                 )}
 
+                {!loading && deltas.length > 0 && (() => {
+                  const top5Up = risers.slice(0, 5).reduce((a, b) => a + b.delta, 0);
+                  const top5Down = fallers.slice(0, 5).reduce((a, b) => a + b.delta, 0);
+                  const netto = totals.delta;
+                  const rest = netto - top5Up - top5Down;
+                  return (
+                    <div className="mt-3 p-3 rounded-lg bg-muted/20 border border-border/40 text-xs space-y-1.5">
+                      <p className="font-medium text-foreground">Bijdrage-samenvatting</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-muted-foreground">
+                        <span>
+                          Top 5 stijgers:{" "}
+                          <span className="text-success font-medium">
+                            {top5Up >= 0 ? "+" : ""}{formatNumber(top5Up, 0)}
+                          </span>
+                        </span>
+                        <span>
+                          Top 5 dalers:{" "}
+                          <span className="text-destructive font-medium">
+                            {formatNumber(top5Down, 0)}
+                          </span>
+                        </span>
+                        <span>
+                          Overige beweging:{" "}
+                          <span className={cn("font-medium", rest >= 0 ? "text-success" : "text-destructive")}>
+                            {rest >= 0 ? "+" : ""}{formatNumber(rest, 0)}
+                          </span>
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground/80">
+                        Totaal verschil: <span className={cn("font-semibold", netto >= 0 ? "text-success" : "text-destructive")}>
+                          {netto >= 0 ? "+" : ""}{formatNumber(netto, 0)}
+                        </span> cilinders ({formatPct(totals.pct)})
+                      </p>
+                    </div>
+                  );
+                })()}
+
                 <p className="text-[11px] text-muted-foreground mt-3 italic">
                   Periode: {periodDays} dagen. Bundels worden uitgesplitst naar individuele
                   cilinders (bv. 800L = 16×50L).
