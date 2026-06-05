@@ -77,8 +77,10 @@ export function ProductionPlanning({
 
   // Date range state for dashboard sync with reports
   const [dateRange, setDateRange] = useState<DateRange>({
+    // Default to YTD (Jan 1 — today) so trends compare like-for-like with last year.
+    // Use "Heel jaar" preset in Rapportage for full calendar year.
     from: startOfYear(new Date()),
-    to: endOfYear(new Date())
+    to: new Date()
   });
 
   // Helper function to format date range as human-readable label
@@ -87,9 +89,14 @@ export function ProductionPlanning({
     const { from, to } = range;
 
     // Check for common presets
-    // This year
-    if (isSameDay(from, startOfYear(now)) && isSameDay(to, endOfYear(now))) {
+    // YTD (Jan 1 — today) is what we now call "Dit jaar"
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (isSameDay(from, startOfYear(now)) && isSameDay(to, todayMidnight)) {
       return "Dit jaar";
+    }
+    // Full calendar year (Jan 1 — Dec 31)
+    if (isSameDay(from, startOfYear(now)) && isSameDay(to, endOfYear(now))) {
+      return "Heel jaar";
     }
 
     // Last year

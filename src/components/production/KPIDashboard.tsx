@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   Cylinder,
   Users,
-  ListOrdered,
+  CalendarClock,
+  Gauge,
   MapPin,
   Target,
 } from "lucide-react";
@@ -168,6 +169,7 @@ export function KPIDashboard({
   const [weeklyData, setWeeklyData] = useState<SparklineData[]>([]);
   const [historicalWeeklyData, setHistoricalWeeklyData] = useState<number[]>([]);
   const [newCustomersYtd, setNewCustomersYtd] = useState(0);
+  const [pacePrevAtSameDay, setPacePrevAtSameDay] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   const currentYear = new Date().getFullYear();
@@ -220,23 +222,49 @@ export function KPIDashboard({
 
         setCurrentStats(calculateStats(allCurrentRows, fromStr, toStr, locationParam));
 
-        // Previous period (same duration, immediately before)
-        const periodDays = Math.ceil(
-          (dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)
-        );
-        const prevTo = new Date(dateRange.from);
-        prevTo.setDate(prevTo.getDate() - 1);
-        const prevFrom = new Date(prevTo);
-        prevFrom.setDate(prevFrom.getDate() - periodDays);
+        // Previous period = same calendar window one year earlier (e.g. YTD 2026 vs YTD 2025
+        // same dates). This gives like-for-like seasonal comparison.
+        const prevFrom = new Date(dateRange.from);
+        prevFrom.setFullYear(prevFrom.getFullYear() - 1);
+        const prevTo = new Date(dateRange.to);
+        prevTo.setFullYear(prevTo.getFullYear() - 1);
         const prevFromStr = toLocalDateString(prevFrom);
         const prevToStr = toLocalDateString(prevTo);
 
-        const prevYear = prevFrom.getFullYear();
-        const rawPrevRows = prevYear >= fromYear
-          ? allCurrentRows
-          : await fetchProductieForYear(prevYear);
+        const prevYears = Array.from(
+          { length: prevTo.getFullYear() - prevFrom.getFullYear() + 1 },
+          (_, i) => prevFrom.getFullYear() + i,
+        );
+        const rawPrevRows = (
+          await Promise.all(prevYears.map(fetchProductieForYear))
+        ).flat();
         const prevRows = filterDigital(rawPrevRows);
         setPreviousStats(calculateStats(prevRows, prevFromStr, prevToStr, locationParam));
+
+        // Pace: where did we stand on this same day last year (start-of-year through same calendar day)?
+        // Only meaningful when the current period starts on Jan 1.
+        const isYtdLike = dateRange.from.getMonth() === 0 && dateRange.from.getDate() === 1;
+        if (isYtdLike) {
+          const paceStart = new Date(prevFrom.getFullYear(), 0, 1);
+          const paceStartStr = toLocalDateString(paceStart);
+          const pace = calculateStats(prevRows, paceStartStr, prevToStr, locationParam);
+          setPacePrevAtSameDay(pace.total_cylinders);
+        } else {
+          setPacePrevAtSameDay(0);
+        }
+
+        // New customers in current period that did not appear in same period last year
+        const currKlanten = new Set<string>();
+        for (const r of allCurrentRows) {
+          const d = normalizeDatum(r.Datum);
+          if (d >= fromStr && d <= toStr && r.Klant) currKlanten.add(r.Klant);
+        }
+        const prevKlanten = new Set<string>();
+        for (const r of prevRows) {
+          const d = normalizeDatum(r.Datum);
+          if (d >= prevFromStr && d <= prevToStr && r.Klant) prevKlanten.add(r.Klant);
+        }
+        setNewCustomersYtd([...currKlanten].filter((c) => !prevKlanten.has(c)).length);
 
         const sparklineEnd = new Date(Math.min(dateRange.to.getTime(), Date.now()));
         const sparkline = computeWeeklySparkline(allCurrentRows, sparklineEnd, locationParam);
@@ -253,6 +281,7 @@ export function KPIDashboard({
 
         setCurrentStats(calculateStats(currentRows, undefined, undefined, locationParam));
         setPreviousStats(calculateStats(previousRows, undefined, undefined, locationParam));
+        setPacePrevAtSameDay(0);
 
         // New customers YTD: in current year but not in previous year
         const currentCustomerSet = new Set(currentRows.map(r => r.Klant).filter(Boolean));
@@ -314,6 +343,45 @@ export function KPIDashboard({
     if (!currentStats || currentStats.total_records === 0) return 0;
     return Math.round(currentStats.total_cylinders / currentStats.total_records);
   }, [currentStats]);
+
+  // Count working days (Mon-Fri) between two dates inclusive.
+  const workdaysBetween = (start: Date, end: Date): number => {
+    let count = 0;
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    while (d.getTime() <= last.getTime()) {
+      const day = d.getDay();
+      if (day !== 0 && day !== 6) count++;
+      d.setDate(d.getDate() + 1);
+    }
+    return count;
+  };
+
+  const avgPerWorkday = useMemo(() => {
+    if (!currentStats || !dateRange) return { current: 0, previous: 0 };
+    const today = new Date();
+    const effectiveTo = dateRange.to.getTime() > today.getTime() ? today : dateRange.to;
+    const wd = Math.max(1, workdaysBetween(dateRange.from, effectiveTo));
+    const prevFrom = new Date(dateRange.from); prevFrom.setFullYear(prevFrom.getFullYear() - 1);
+    const prevTo = new Date(effectiveTo); prevTo.setFullYear(prevTo.getFullYear() - 1);
+    const wdPrev = Math.max(1, workdaysBetween(prevFrom, prevTo));
+    return {
+      current: Math.round((currentStats.total_cylinders || 0) / wd),
+      previous: Math.round((previousStats?.total_cylinders || 0) / wdPrev),
+    };
+  }, [currentStats, previousStats, dateRange]);
+
+  const workdayTrend = useMemo<number | null>(() => {
+    if (!avgPerWorkday.previous) return null;
+    return calculateTrend(avgPerWorkday.current, avgPerWorkday.previous);
+  }, [avgPerWorkday]);
+
+  const paceProgress = useMemo(() => {
+    // Pace = where prior year stood on the same calendar day.
+    if (!pacePrevAtSameDay || !currentStats) return null;
+    const pct = Math.round((currentStats.total_cylinders / pacePrevAtSameDay) * 100);
+    return { pct: Math.max(0, Math.min(200, pct)), pacePrev: pacePrevAtSameDay };
+  }, [pacePrevAtSameDay, currentStats]);
 
   const getTrendIcon = (value: number | null) => {
     if (value === null || !isMeaningful(value)) return <Minus className="h-3 w-3" />;
@@ -423,7 +491,7 @@ export function KPIDashboard({
                   <p className="text-xs text-muted-foreground mt-1">Gevulde cilinders</p>
                 </div>
 
-                {/* Records */}
+                {/* Gemiddeld per werkdag */}
                 <div
                   className={cn("p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20", onNavigateToReports && "cursor-pointer hover:ring-1 hover:ring-purple-500/40 transition-all")}
                   onClick={onNavigateToReports}
@@ -431,26 +499,26 @@ export function KPIDashboard({
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <ListOrdered className="h-4 w-4 text-purple-500" />
-                      <span className="text-xs font-medium text-muted-foreground">Regels</span>
+                      <CalendarClock className="h-4 w-4 text-purple-500" />
+                      <span className="text-xs font-medium text-muted-foreground">Gem. per werkdag</span>
                     </div>
                     <div
                       className="flex flex-col items-end gap-0"
-                      title={recordsTrend === null ? "Geen vergelijkbare basis in vorige periode" : undefined}
+                      title={workdayTrend === null ? "Geen vergelijkbare basis in vorige periode" : "vs. zelfde periode vorig jaar"}
                     >
-                      <div className={cn("flex items-center gap-1 text-xs font-medium", getTrendColor(recordsTrend))}>
-                        {getTrendIcon(recordsTrend)}
-                        <span>{formatTrend(recordsTrend)}</span>
+                      <div className={cn("flex items-center gap-1 text-xs font-medium", getTrendColor(workdayTrend))}>
+                        {getTrendIcon(workdayTrend)}
+                        <span>{formatTrend(workdayTrend)}</span>
                       </div>
-                      {!isCustomPeriod && (
-                        <span className="text-[10px] text-muted-foreground">vs. {currentYear - 1}</span>
-                      )}
+                      <span className="text-[10px] text-muted-foreground">vs. {currentYear - 1}</span>
                     </div>
                   </div>
                   <div className="text-3xl font-bold text-purple-500">
-                    {formatNumber(currentStats?.total_records || 0, 0)}
+                    {formatNumber(avgPerWorkday.current, 0)}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Productieregels</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    cilinders/werkdag · vorig jaar {formatNumber(avgPerWorkday.previous, 0)}
+                  </p>
                 </div>
 
                 {/* Klanten */}
@@ -474,7 +542,7 @@ export function KPIDashboard({
                   )}
                 </div>
 
-                {/* Weekly Trend Sparkline */}
+                {/* Pace vs vorig-jaar */}
                 <div
                   className={cn(
                     "p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border relative",
@@ -492,40 +560,41 @@ export function KPIDashboard({
                   )}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-blue-500" />
+                      <Gauge className="h-4 w-4 text-blue-500" />
                       <span className="text-xs font-medium text-muted-foreground">
-                        Wekelijkse trend
+                        Pace vs vorig jaar
                       </span>
                     </div>
                   </div>
-                  <div className="h-12">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={weeklyData}>
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              return (
-                                <div className="bg-popover border rounded-lg px-2 py-1 text-xs shadow-md">
-                                  <span className="font-medium">
-                                    {formatNumber(payload[0].value as number, 0)} cilinders
-                                  </span>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
+                  {paceProgress ? (
+                    <>
+                      <div className={cn(
+                        "text-3xl font-bold",
+                        paceProgress.pct >= 100 ? "text-success" : paceProgress.pct >= 90 ? "text-blue-500" : "text-destructive",
+                      )}>
+                        {paceProgress.pct}%
+                      </div>
+                      <div className="w-full bg-muted/40 rounded-full h-1.5 mt-2 overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-1.5 rounded-full transition-all",
+                            paceProgress.pct >= 100 ? "bg-success" : paceProgress.pct >= 90 ? "bg-blue-500" : "bg-destructive",
+                          )}
+                          style={{ width: `${Math.min(100, paceProgress.pct)}%` }}
                         />
-                        <Line
-                          type="monotone"
-                          dataKey="value"
-                          stroke="hsl(var(--primary))"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Laatste 8 weken</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        {formatNumber(currentStats?.total_cylinders || 0, 0)} t.o.v. {formatNumber(paceProgress.pacePrev, 0)} vorig jaar
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-3xl font-bold text-muted-foreground">—</div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Kies een YTD-periode voor pace-vergelijking
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
 

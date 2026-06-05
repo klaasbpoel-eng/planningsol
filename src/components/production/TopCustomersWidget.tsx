@@ -10,6 +10,7 @@ import { CustomerListSkeleton } from "@/components/ui/skeletons";
 import { format, differenceInDays, subDays } from "date-fns";
 import { nl } from "date-fns/locale";
 import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
+import { normalizeKlant } from "@/lib/customerNormalize";
 
 interface CustomerData {
   customer_id: string | null;
@@ -20,6 +21,7 @@ interface CustomerData {
   previousDryIce: number;
   totalVolume: number;
   changePercent: number;
+  deltaAbs: number;
 }
 
 type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
@@ -80,7 +82,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
     toDate: string,
     locationFilter: string | null,
     digitalNames: Set<string> = new Set(),
-  ): Promise<Map<string, number>> => {
+  ): Promise<{ totals: Map<string, number>; labels: Map<string, string> }> => {
     const fromYear = parseInt(fromDate.substring(0, 4));
     const toYear = parseInt(toDate.substring(0, 4));
     const yearsNeeded = Array.from({ length: toYear - fromYear + 1 }, (_, i) => fromYear + i);
@@ -115,58 +117,37 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
       return true;
     });
 
-    const byCustomer = new Map<string, number>();
+    const totals = new Map<string, number>();
+    const votes = new Map<string, Map<string, number>>();
     for (const row of filtered) {
-      const name = row.Klant || "Onbekend";
-      byCustomer.set(name, (byCustomer.get(name) || 0) + (row.Aantal || 0));
+      const original = (row.Klant || "Onbekend").toString().trim() || "Onbekend";
+      const key = normalizeKlant(original);
+      const aantal = row.Aantal || 0;
+      totals.set(key, (totals.get(key) || 0) + aantal);
+      let m = votes.get(key);
+      if (!m) { m = new Map(); votes.set(key, m); }
+      m.set(original, (m.get(original) || 0) + aantal);
     }
-    return byCustomer;
-  };
-
-  // Fetch Productie rows for a full year and group by customer
-  const fetchProductieByCustomerForYear = async (
-    year: number,
-    locationFilter: string | null,
-    digitalNames: Set<string> = new Set(),
-  ): Promise<Map<string, number>> => {
-    const PAGE = 1000;
-    const data: any[] = [];
-    let from = 0;
-    while (true) {
-      const { data: page } = await (supabase.from("Productie" as never) as any)
-        .select("Locatie,Product,Aantal,Klant")
-        .eq("Jaar", year)
-        .range(from, from + PAGE - 1);
-      if (!page || page.length === 0) break;
-      data.push(...page);
-      if (page.length < PAGE) break;
-      from += PAGE;
+    const labels = new Map<string, string>();
+    for (const [key, m] of votes) {
+      let best = key; let bestVol = -1;
+      for (const [lbl, v] of m) if (v > bestVol) { bestVol = v; best = lbl; }
+      labels.set(key, best);
     }
-
-    const filtered = (data || []).filter((row: any) => {
-      if (locationFilter) {
-        const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
-        if (loc !== locationFilter) return false;
-      }
-      if (digitalNames.size > 0 && digitalNames.has(row.Product)) return false;
-      return true;
-    });
-
-    const byCustomer = new Map<string, number>();
-    for (const row of filtered) {
-      const name = row.Klant || "Onbekend";
-      byCustomer.set(name, (byCustomer.get(name) || 0) + (row.Aantal || 0));
-    }
-    return byCustomer;
+    return { totals, labels };
   };
 
   const buildCustomerList = (
-    currentMap: Map<string, number>,
-    previousMap: Map<string, number>
+    current: { totals: Map<string, number>; labels: Map<string, string> },
+    previous: { totals: Map<string, number>; labels: Map<string, string> }
   ): CustomerData[] => {
-    return Array.from(currentMap.entries())
-      .map(([name, cylinders]) => {
-        const prevCylinders = previousMap.get(name) || 0;
+    // Combined labels: prefer current period spelling, fall back to previous
+    const labels = new Map<string, string>();
+    for (const [k, v] of previous.labels) labels.set(k, v);
+    for (const [k, v] of current.labels) labels.set(k, v);
+    return Array.from(current.totals.entries())
+      .map(([key, cylinders]) => {
+        const prevCylinders = previous.totals.get(key) || 0;
         const changePercent =
           prevCylinders > 0
             ? ((cylinders - prevCylinders) / prevCylinders) * 100
@@ -175,13 +156,14 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
             : 0;
         return {
           customer_id: null,
-          customer_name: name,
+          customer_name: labels.get(key) || key,
           total_cylinders: cylinders,
           total_dry_ice_kg: 0,
           previousCylinders: prevCylinders,
           previousDryIce: 0,
           totalVolume: cylinders,
           changePercent,
+          deltaAbs: cylinders - prevCylinders,
         };
       })
       .sort((a, b) => b.total_cylinders - a.total_cylinders)
@@ -189,16 +171,22 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
   };
 
   const fetchCustomersByYear = async () => {
-    const currentYear = new Date().getFullYear();
+    // YTD vs same YTD-period last year (was: full year vs full year — caused everyone to look like a decliner mid-year)
+    const now = new Date();
+    const currYearStart = new Date(now.getFullYear(), 0, 1);
+    const prevYearStart = new Date(now.getFullYear() - 1, 0, 1);
+    const prevYearSameDay = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+
+    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const locationFilter = location === "all" ? null : location;
     const digitalNames = hideDigital ? await buildDigitalProductNames() : new Set<string>();
 
-    const [currentMap, previousMap] = await Promise.all([
-      fetchProductieByCustomerForYear(currentYear, locationFilter, digitalNames),
-      fetchProductieByCustomerForYear(currentYear - 1, locationFilter, digitalNames),
+    const [current, previous] = await Promise.all([
+      fetchProductieByCustomer(fmt(currYearStart), fmt(now), locationFilter, digitalNames),
+      fetchProductieByCustomer(fmt(prevYearStart), fmt(prevYearSameDay), locationFilter, digitalNames),
     ]);
 
-    setCustomers(buildCustomerList(currentMap, previousMap));
+    setCustomers(buildCustomerList(current, previous));
   };
 
   const fetchCustomersByDateRange = async (range: DateRange) => {
@@ -214,12 +202,12 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
     const locationFilter = location === "all" ? null : location;
     const digitalNames = hideDigital ? await buildDigitalProductNames() : new Set<string>();
 
-    const [currentMap, previousMap] = await Promise.all([
+    const [current, previous] = await Promise.all([
       fetchProductieByCustomer(fromDate, toDate, locationFilter, digitalNames),
       fetchProductieByCustomer(prevFromDate, prevToDate, locationFilter, digitalNames),
     ]);
 
-    setCustomers(buildCustomerList(currentMap, previousMap));
+    setCustomers(buildCustomerList(current, previous));
   };
 
   const getTrendIcon = useCallback((change: number) => {
@@ -252,7 +240,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
             <Trophy className="h-4 w-4 text-yellow-500" />
             <span>Top 5 Klanten {dateRange
               ? `${format(dateRange.from, "d MMM", { locale: nl })} - ${format(dateRange.to, "d MMM yyyy", { locale: nl })}`
-              : new Date().getFullYear()
+              : `YTD ${new Date().getFullYear()}`
             }</span>
             {location !== "all" && (
               <Badge variant="outline" className="text-[10px] py-0">
@@ -302,7 +290,8 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex flex-col items-end gap-0.5">
+                  <div className="flex items-center gap-1">
                   {getTrendIcon(customer.changePercent)}
                   <Badge
                     variant={customer.changePercent >= 0 ? "default" : "destructive"}
@@ -310,6 +299,17 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
                   >
                     {customer.changePercent >= 999 ? ">+999%" : customer.changePercent <= -999 ? "<-999%" : `${customer.changePercent >= 0 ? "+" : ""}${customer.changePercent.toFixed(0)}%`}
                   </Badge>
+                  </div>
+                  {customer.previousCylinders > 0 && (
+                    <span
+                      className={cn(
+                        "text-[10px] tabular-nums",
+                        customer.deltaAbs >= 0 ? "text-green-600" : "text-red-600",
+                      )}
+                    >
+                      {customer.deltaAbs >= 0 ? "+" : ""}{formatNumber(customer.deltaAbs, 0)} cil.
+                    </span>
+                  )}
                 </div>
               </div>
             ))

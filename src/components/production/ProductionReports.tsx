@@ -472,6 +472,9 @@ export function ProductionReports({
       case "this-year":
         setDateRange({ from: startOfYear(now), to: now });
         break;
+      case "full-year":
+        setDateRange({ from: startOfYear(now), to: endOfYear(now) });
+        break;
     }
   };
 
@@ -493,7 +496,10 @@ export function ProductionReports({
     const lastYear = subYears(now, 1);
     if (isSameDay(from, startOfYear(lastYear)) && isSameDay(to, endOfYear(lastYear))) return "last-year";
 
-    // This year (YTD: Jan 1 to any date this year)
+    // Full calendar year of current year (Jan 1 — Dec 31) — check before YTD because YTD also starts on Jan 1
+    if (isSameDay(from, startOfYear(now)) && isSameDay(to, endOfYear(now))) return "full-year";
+
+    // This year (YTD: Jan 1 to any date this year except Dec 31 which is full-year)
     if (isSameDay(from, startOfYear(now)) && from.getFullYear() === to.getFullYear() && to.getFullYear() === now.getFullYear()) return "this-year";
 
     return "";
@@ -758,6 +764,7 @@ export function ProductionReports({
               <SelectItem value="quarter">Kwartaal</SelectItem>
               <SelectItem value="last-year">Vorig jaar</SelectItem>
               <SelectItem value="this-year">Dit jaar</SelectItem>
+              <SelectItem value="full-year">Heel jaar</SelectItem>
               {getActivePreset() === "" && <SelectItem value="custom">Aangepast</SelectItem>}
             </SelectContent>
           </Select>

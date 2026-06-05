@@ -9,6 +9,7 @@ import { TrendingUp, TrendingDown, Users, Flame, Container, ChevronDown, Chevron
 import { supabase } from "@/integrations/supabase/client";
 import { cn, formatNumber, normalizeDatum } from "@/lib/utils";
 import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
+import { normalizeKlant } from "@/lib/customerNormalize";
 import { format, subYears, differenceInCalendarDays } from "date-fns";
 import { nl } from "date-fns/locale";
 
@@ -39,6 +40,8 @@ interface DeltaRow {
   previous: number;
   delta: number;
   pct: number;
+  /** Share of current period total volume (0–1) */
+  share: number;
 }
 
 type SortMode = "pct" | "abs";
@@ -55,48 +58,20 @@ function bucketCapacity(cap: number | string | null | undefined): string {
   return `${n}L (bundel)`;
 }
 
-function normalizeKlant(raw: string | null | undefined): string {
-  if (!raw) return "onbekend";
-  let s = String(raw).toLowerCase();
-  // strip diacritics
-  s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  // & / + -> en
-  s = s.replace(/[&+]/g, " en ");
-  // remove punctuation
-  s = s.replace(/[.,'`"()\/\\]/g, " ");
-  // strip common legal suffixes (as separate tokens)
-  s = ` ${s} `;
-  const suffixes = [
-    " b v ", " bv ", " bvba ", " n v ", " nv ", " gmbh ", " ltd ", " sa ",
-    " sl ", " srl ", " s a ", " s l ", " s r l ",
-  ];
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const suf of suffixes) {
-      if (s.endsWith(suf)) {
-        s = s.slice(0, -suf.length) + " ";
-        changed = true;
-      }
-    }
-  }
-  // collapse whitespace
-  s = s.replace(/\s+/g, " ").trim();
-  return s || "onbekend";
-}
-
 function buildDelta(
   curr: Map<string, number>,
   prev: Map<string, number>,
 ): DeltaRow[] {
   const keys = new Set<string>([...curr.keys(), ...prev.keys()]);
+  const currTotal = Array.from(curr.values()).reduce((a, b) => a + b, 0);
   const out: DeltaRow[] = [];
   for (const k of keys) {
     const c = curr.get(k) || 0;
     const p = prev.get(k) || 0;
     const d = c - p;
     const pct = p > 0 ? (d / p) * 100 : c > 0 ? 100 : 0;
-    out.push({ key: k, label: k, current: c, previous: p, delta: d, pct });
+    const share = currTotal > 0 ? c / currTotal : 0;
+    out.push({ key: k, label: k, current: c, previous: p, delta: d, pct, share });
   }
   return out;
 }
@@ -371,13 +346,22 @@ export function YoYInsights({
   const renderRow = (r: DeltaRow, kind: "up" | "down") => {
     const positive = kind === "up";
     const maxBar = Math.max(r.current, r.previous, 1);
+    const sharePct = (r.share * 100).toFixed(r.share >= 0.1 ? 0 : 1);
     return (
       <div
         key={r.key}
         className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
       >
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-sm truncate">{r.label}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="font-medium text-sm truncate flex-1">{r.label}</p>
+            <span
+              className="text-[10px] text-muted-foreground shrink-0 tabular-nums"
+              title="Aandeel in totaal volume huidige periode"
+            >
+              {sharePct}%
+            </span>
+          </div>
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
             <span>{formatNumber(r.previous, 0)}</span>
             <span>→</span>
@@ -641,6 +625,43 @@ export function YoYInsights({
                     </Button>
                   </div>
                 )}
+
+                {!loading && deltas.length > 0 && (() => {
+                  const top5Up = risers.slice(0, 5).reduce((a, b) => a + b.delta, 0);
+                  const top5Down = fallers.slice(0, 5).reduce((a, b) => a + b.delta, 0);
+                  const netto = totals.delta;
+                  const rest = netto - top5Up - top5Down;
+                  return (
+                    <div className="mt-3 p-3 rounded-lg bg-muted/20 border border-border/40 text-xs space-y-1.5">
+                      <p className="font-medium text-foreground">Bijdrage-samenvatting</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-muted-foreground">
+                        <span>
+                          Top 5 stijgers:{" "}
+                          <span className="text-success font-medium">
+                            {top5Up >= 0 ? "+" : ""}{formatNumber(top5Up, 0)}
+                          </span>
+                        </span>
+                        <span>
+                          Top 5 dalers:{" "}
+                          <span className="text-destructive font-medium">
+                            {formatNumber(top5Down, 0)}
+                          </span>
+                        </span>
+                        <span>
+                          Overige beweging:{" "}
+                          <span className={cn("font-medium", rest >= 0 ? "text-success" : "text-destructive")}>
+                            {rest >= 0 ? "+" : ""}{formatNumber(rest, 0)}
+                          </span>
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground/80">
+                        Totaal verschil: <span className={cn("font-semibold", netto >= 0 ? "text-success" : "text-destructive")}>
+                          {netto >= 0 ? "+" : ""}{formatNumber(netto, 0)}
+                        </span> cilinders ({formatPct(totals.pct)})
+                      </p>
+                    </div>
+                  );
+                })()}
 
                 <p className="text-[11px] text-muted-foreground mt-3 italic">
                   Periode: {periodDays} dagen. Bundels worden uitgesplitst naar individuele
