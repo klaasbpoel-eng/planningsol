@@ -169,6 +169,7 @@ export function KPIDashboard({
   const [weeklyData, setWeeklyData] = useState<SparklineData[]>([]);
   const [historicalWeeklyData, setHistoricalWeeklyData] = useState<number[]>([]);
   const [newCustomersYtd, setNewCustomersYtd] = useState(0);
+  const [pacePrevAtSameDay, setPacePrevAtSameDay] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   const currentYear = new Date().getFullYear();
@@ -221,23 +222,49 @@ export function KPIDashboard({
 
         setCurrentStats(calculateStats(allCurrentRows, fromStr, toStr, locationParam));
 
-        // Previous period (same duration, immediately before)
-        const periodDays = Math.ceil(
-          (dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)
-        );
-        const prevTo = new Date(dateRange.from);
-        prevTo.setDate(prevTo.getDate() - 1);
-        const prevFrom = new Date(prevTo);
-        prevFrom.setDate(prevFrom.getDate() - periodDays);
+        // Previous period = same calendar window one year earlier (e.g. YTD 2026 vs YTD 2025
+        // same dates). This gives like-for-like seasonal comparison.
+        const prevFrom = new Date(dateRange.from);
+        prevFrom.setFullYear(prevFrom.getFullYear() - 1);
+        const prevTo = new Date(dateRange.to);
+        prevTo.setFullYear(prevTo.getFullYear() - 1);
         const prevFromStr = toLocalDateString(prevFrom);
         const prevToStr = toLocalDateString(prevTo);
 
-        const prevYear = prevFrom.getFullYear();
-        const rawPrevRows = prevYear >= fromYear
-          ? allCurrentRows
-          : await fetchProductieForYear(prevYear);
+        const prevYears = Array.from(
+          { length: prevTo.getFullYear() - prevFrom.getFullYear() + 1 },
+          (_, i) => prevFrom.getFullYear() + i,
+        );
+        const rawPrevRows = (
+          await Promise.all(prevYears.map(fetchProductieForYear))
+        ).flat();
         const prevRows = filterDigital(rawPrevRows);
         setPreviousStats(calculateStats(prevRows, prevFromStr, prevToStr, locationParam));
+
+        // Pace: where did we stand on this same day last year (start-of-year through same calendar day)?
+        // Only meaningful when the current period starts on Jan 1.
+        const isYtdLike = dateRange.from.getMonth() === 0 && dateRange.from.getDate() === 1;
+        if (isYtdLike) {
+          const paceStart = new Date(prevFrom.getFullYear(), 0, 1);
+          const paceStartStr = toLocalDateString(paceStart);
+          const pace = calculateStats(prevRows, paceStartStr, prevToStr, locationParam);
+          setPacePrevAtSameDay(pace.total_cylinders);
+        } else {
+          setPacePrevAtSameDay(0);
+        }
+
+        // New customers in current period that did not appear in same period last year
+        const currKlanten = new Set<string>();
+        for (const r of allCurrentRows) {
+          const d = normalizeDatum(r.Datum);
+          if (d >= fromStr && d <= toStr && r.Klant) currKlanten.add(r.Klant);
+        }
+        const prevKlanten = new Set<string>();
+        for (const r of prevRows) {
+          const d = normalizeDatum(r.Datum);
+          if (d >= prevFromStr && d <= prevToStr && r.Klant) prevKlanten.add(r.Klant);
+        }
+        setNewCustomersYtd([...currKlanten].filter((c) => !prevKlanten.has(c)).length);
 
         const sparklineEnd = new Date(Math.min(dateRange.to.getTime(), Date.now()));
         const sparkline = computeWeeklySparkline(allCurrentRows, sparklineEnd, locationParam);
@@ -254,6 +281,7 @@ export function KPIDashboard({
 
         setCurrentStats(calculateStats(currentRows, undefined, undefined, locationParam));
         setPreviousStats(calculateStats(previousRows, undefined, undefined, locationParam));
+        setPacePrevAtSameDay(0);
 
         // New customers YTD: in current year but not in previous year
         const currentCustomerSet = new Set(currentRows.map(r => r.Klant).filter(Boolean));
