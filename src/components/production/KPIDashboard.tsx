@@ -491,7 +491,7 @@ export function KPIDashboard({
                   <p className="text-xs text-muted-foreground mt-1">Gevulde cilinders</p>
                 </div>
 
-                {/* Records */}
+                {/* Gemiddeld per werkdag */}
                 <div
                   className={cn("p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20", onNavigateToReports && "cursor-pointer hover:ring-1 hover:ring-purple-500/40 transition-all")}
                   onClick={onNavigateToReports}
@@ -499,26 +499,26 @@ export function KPIDashboard({
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <ListOrdered className="h-4 w-4 text-purple-500" />
-                      <span className="text-xs font-medium text-muted-foreground">Regels</span>
+                      <CalendarClock className="h-4 w-4 text-purple-500" />
+                      <span className="text-xs font-medium text-muted-foreground">Gem. per werkdag</span>
                     </div>
                     <div
                       className="flex flex-col items-end gap-0"
-                      title={recordsTrend === null ? "Geen vergelijkbare basis in vorige periode" : undefined}
+                      title={workdayTrend === null ? "Geen vergelijkbare basis in vorige periode" : "vs. zelfde periode vorig jaar"}
                     >
-                      <div className={cn("flex items-center gap-1 text-xs font-medium", getTrendColor(recordsTrend))}>
-                        {getTrendIcon(recordsTrend)}
-                        <span>{formatTrend(recordsTrend)}</span>
+                      <div className={cn("flex items-center gap-1 text-xs font-medium", getTrendColor(workdayTrend))}>
+                        {getTrendIcon(workdayTrend)}
+                        <span>{formatTrend(workdayTrend)}</span>
                       </div>
-                      {!isCustomPeriod && (
-                        <span className="text-[10px] text-muted-foreground">vs. {currentYear - 1}</span>
-                      )}
+                      <span className="text-[10px] text-muted-foreground">vs. {currentYear - 1}</span>
                     </div>
                   </div>
                   <div className="text-3xl font-bold text-purple-500">
-                    {formatNumber(currentStats?.total_records || 0, 0)}
+                    {formatNumber(avgPerWorkday.current, 0)}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Productieregels</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    cilinders/werkdag · vorig jaar {formatNumber(avgPerWorkday.previous, 0)}
+                  </p>
                 </div>
 
                 {/* Klanten */}
@@ -542,7 +542,7 @@ export function KPIDashboard({
                   )}
                 </div>
 
-                {/* Weekly Trend Sparkline */}
+                {/* Pace vs vorig-jaar */}
                 <div
                   className={cn(
                     "p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border relative",
@@ -560,40 +560,41 @@ export function KPIDashboard({
                   )}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-blue-500" />
+                      <Gauge className="h-4 w-4 text-blue-500" />
                       <span className="text-xs font-medium text-muted-foreground">
-                        Wekelijkse trend
+                        Pace vs vorig jaar
                       </span>
                     </div>
                   </div>
-                  <div className="h-12">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={weeklyData}>
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              return (
-                                <div className="bg-popover border rounded-lg px-2 py-1 text-xs shadow-md">
-                                  <span className="font-medium">
-                                    {formatNumber(payload[0].value as number, 0)} cilinders
-                                  </span>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
+                  {paceProgress ? (
+                    <>
+                      <div className={cn(
+                        "text-3xl font-bold",
+                        paceProgress.pct >= 100 ? "text-success" : paceProgress.pct >= 90 ? "text-blue-500" : "text-destructive",
+                      )}>
+                        {paceProgress.pct}%
+                      </div>
+                      <div className="w-full bg-muted/40 rounded-full h-1.5 mt-2 overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-1.5 rounded-full transition-all",
+                            paceProgress.pct >= 100 ? "bg-success" : paceProgress.pct >= 90 ? "bg-blue-500" : "bg-destructive",
+                          )}
+                          style={{ width: `${Math.min(100, paceProgress.pct)}%` }}
                         />
-                        <Line
-                          type="monotone"
-                          dataKey="value"
-                          stroke="hsl(var(--primary))"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Laatste 8 weken</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        {formatNumber(currentStats?.total_cylinders || 0, 0)} t.o.v. {formatNumber(paceProgress.pacePrev, 0)} vorig jaar
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-3xl font-bold text-muted-foreground">—</div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Kies een YTD-periode voor pace-vergelijking
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
 
