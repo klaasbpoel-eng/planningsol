@@ -346,13 +346,22 @@ export function YoYInsights({
   const renderRow = (r: DeltaRow, kind: "up" | "down") => {
     const positive = kind === "up";
     const maxBar = Math.max(r.current, r.previous, 1);
+    const sharePct = (r.share * 100).toFixed(r.share >= 0.1 ? 0 : 1);
     return (
       <div
         key={r.key}
         className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
       >
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-sm truncate">{r.label}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="font-medium text-sm truncate flex-1">{r.label}</p>
+            <span
+              className="text-[10px] text-muted-foreground shrink-0 tabular-nums"
+              title="Aandeel in totaal volume huidige periode"
+            >
+              {sharePct}%
+            </span>
+          </div>
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
             <span>{formatNumber(r.previous, 0)}</span>
             <span>→</span>
