@@ -240,7 +240,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
             <Trophy className="h-4 w-4 text-yellow-500" />
             <span>Top 5 Klanten {dateRange
               ? `${format(dateRange.from, "d MMM", { locale: nl })} - ${format(dateRange.to, "d MMM yyyy", { locale: nl })}`
-              : new Date().getFullYear()
+              : `YTD ${new Date().getFullYear()}`
             }</span>
             {location !== "all" && (
               <Badge variant="outline" className="text-[10px] py-0">
