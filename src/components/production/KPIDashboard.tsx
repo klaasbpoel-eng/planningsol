@@ -344,6 +344,45 @@ export function KPIDashboard({
     return Math.round(currentStats.total_cylinders / currentStats.total_records);
   }, [currentStats]);
 
+  // Count working days (Mon-Fri) between two dates inclusive.
+  const workdaysBetween = (start: Date, end: Date): number => {
+    let count = 0;
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    while (d.getTime() <= last.getTime()) {
+      const day = d.getDay();
+      if (day !== 0 && day !== 6) count++;
+      d.setDate(d.getDate() + 1);
+    }
+    return count;
+  };
+
+  const avgPerWorkday = useMemo(() => {
+    if (!currentStats || !dateRange) return { current: 0, previous: 0 };
+    const today = new Date();
+    const effectiveTo = dateRange.to.getTime() > today.getTime() ? today : dateRange.to;
+    const wd = Math.max(1, workdaysBetween(dateRange.from, effectiveTo));
+    const prevFrom = new Date(dateRange.from); prevFrom.setFullYear(prevFrom.getFullYear() - 1);
+    const prevTo = new Date(effectiveTo); prevTo.setFullYear(prevTo.getFullYear() - 1);
+    const wdPrev = Math.max(1, workdaysBetween(prevFrom, prevTo));
+    return {
+      current: Math.round((currentStats.total_cylinders || 0) / wd),
+      previous: Math.round((previousStats?.total_cylinders || 0) / wdPrev),
+    };
+  }, [currentStats, previousStats, dateRange]);
+
+  const workdayTrend = useMemo<number | null>(() => {
+    if (!avgPerWorkday.previous) return null;
+    return calculateTrend(avgPerWorkday.current, avgPerWorkday.previous);
+  }, [avgPerWorkday]);
+
+  const paceProgress = useMemo(() => {
+    // Pace = where prior year stood on the same calendar day.
+    if (!pacePrevAtSameDay || !currentStats) return null;
+    const pct = Math.round((currentStats.total_cylinders / pacePrevAtSameDay) * 100);
+    return { pct: Math.max(0, Math.min(200, pct)), pacePrev: pacePrevAtSameDay };
+  }, [pacePrevAtSameDay, currentStats]);
+
   const getTrendIcon = (value: number | null) => {
     if (value === null || !isMeaningful(value)) return <Minus className="h-3 w-3" />;
     if (value > 0) return <TrendingUp className="h-3 w-3" />;
