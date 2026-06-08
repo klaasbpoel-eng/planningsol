@@ -20,7 +20,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays, Clock, Palmtree, Plus } from "lucide-react";
-import { format, differenceInDays } from "date-fns";
+import { format, differenceInDays, addWeeks, addDays, getDay } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -31,6 +31,11 @@ import type { Database } from "@/integrations/supabase/types";
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type TimeOffTypeRecord = Database["public"]["Tables"]["time_off_types"]["Row"];
 type DayPart = "full_day" | "morning" | "afternoon" | "hours";
+type RepeatMode = "none" | "weekly" | "biweekly";
+
+const WEEKDAY_LABELS = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
+const toMonIndex = (d: Date) => (getDay(d) + 6) % 7;
+const MAX_OCCURRENCES = 60;
 
 interface CreateLeaveRequestDialogProps {
   open: boolean;
@@ -63,6 +68,9 @@ export function CreateLeaveRequestDialog({
   const [dayPart, setDayPart] = useState<DayPart>("full_day");
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("17:00");
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>("none");
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
+  const [seriesEndDate, setSeriesEndDate] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
     if (open) {
@@ -76,6 +84,15 @@ export function CreateLeaveRequestDialog({
       setEndDate(initialDate);
     }
   }, [initialDate]);
+
+  useEffect(() => {
+    if (repeatMode !== "none" && startDate) {
+      if (repeatDays.length === 0) setRepeatDays([toMonIndex(startDate)]);
+      if (!seriesEndDate) setSeriesEndDate(addWeeks(startDate, 4));
+      setEndDate(startDate);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repeatMode]);
 
   useEffect(() => {
     if (currentProfileId && !selectedProfileId) {
@@ -118,12 +135,37 @@ export function CreateLeaveRequestDialog({
     setDayPart("full_day");
     setStartTime("09:00");
     setEndTime("17:00");
+    setRepeatMode("none");
+    setRepeatDays([]);
+    setSeriesEndDate(undefined);
   };
 
   const handleClose = () => {
     resetForm();
     onOpenChange(false);
   };
+
+  const computeOccurrences = (): Date[] => {
+    if (!startDate) return [];
+    if (repeatMode === "none") return [startDate];
+    if (!seriesEndDate || seriesEndDate < startDate || repeatDays.length === 0) return [];
+    const step = repeatMode === "weekly" ? 1 : 2;
+    const occ: Date[] = [];
+    const startMon = addDays(startDate, -toMonIndex(startDate));
+    let weekStart = startMon;
+    while (weekStart <= seriesEndDate && occ.length <= MAX_OCCURRENCES) {
+      for (const d of [...repeatDays].sort((a, b) => a - b)) {
+        const candidate = addDays(weekStart, d);
+        if (candidate >= startDate && candidate <= seriesEndDate) {
+          occ.push(candidate);
+        }
+      }
+      weekStart = addWeeks(weekStart, step);
+    }
+    return occ;
+  };
+
+  const occurrences = computeOccurrences();
 
   const handleCreate = async () => {
     if (!startDate || !endDate) {
@@ -142,6 +184,25 @@ export function CreateLeaveRequestDialog({
       return;
     }
 
+    if (repeatMode !== "none") {
+      if (repeatDays.length === 0) {
+        toast.error("Selecteer minstens één weekdag voor de herhaling");
+        return;
+      }
+      if (!seriesEndDate) {
+        toast.error("Kies een einddatum voor de reeks");
+        return;
+      }
+      if (occurrences.length === 0) {
+        toast.error("Geen geldige datums in deze reeks");
+        return;
+      }
+      if (occurrences.length > MAX_OCCURRENCES) {
+        toast.error(`Reeks te groot (max ${MAX_OCCURRENCES} aanvragen)`);
+        return;
+      }
+    }
+
     setSaving(true);
 
     try {
@@ -157,27 +218,56 @@ export function CreateLeaveRequestDialog({
         ? `[${startTime}-${endTime}]${reason.trim() ? ` ${reason.trim()}` : ""}`
         : reason.trim() || null;
 
-      const createdRequest = await api.timeOffRequests.create({
-        profile_id: profileId,
-        type_id: typeId,
-        start_date: format(startDate, "yyyy-MM-dd"),
-        end_date: format(endDate, "yyyy-MM-dd"),
-        reason: reasonValue,
-        status: isAdmin ? 'approved' : 'pending',
-        day_part: dayPartValue,
-      });
-
       const employeeName = isAdmin
         ? profiles.find(p => p.id === profileId)?.full_name || "Medewerker"
         : "Je";
 
-      toast.success("Verlofaanvraag ingediend", {
-        description: `${employeeName} verlof van ${format(startDate, "d MMM", { locale: nl })} t/m ${format(endDate, "d MMM", { locale: nl })}`,
-      });
+      if (repeatMode === "none") {
+        const createdRequest = await api.timeOffRequests.create({
+          profile_id: profileId,
+          type_id: typeId,
+          start_date: format(startDate, "yyyy-MM-dd"),
+          end_date: format(endDate, "yyyy-MM-dd"),
+          reason: reasonValue,
+          status: isAdmin ? 'approved' : 'pending',
+          day_part: dayPartValue,
+        });
 
-      resetForm();
-      onCreate([createdRequest]);
-      onOpenChange(false);
+        toast.success("Verlofaanvraag ingediend", {
+          description: `${employeeName} verlof van ${format(startDate, "d MMM", { locale: nl })} t/m ${format(endDate, "d MMM", { locale: nl })}`,
+        });
+
+        resetForm();
+        onCreate([createdRequest]);
+        onOpenChange(false);
+      } else {
+        const seriesId = crypto.randomUUID();
+        const rows = occurrences.map((d) => ({
+          profile_id: profileId,
+          type_id: typeId,
+          start_date: format(d, "yyyy-MM-dd"),
+          end_date: format(d, "yyyy-MM-dd"),
+          reason: reasonValue,
+          status: (isAdmin ? "approved" : "pending") as "approved" | "pending",
+          day_part: dayPartValue,
+          series_id: seriesId,
+        }));
+
+        const { data, error } = await supabase
+          .from("time_off_requests")
+          .insert(rows)
+          .select();
+
+        if (error) throw error;
+
+        toast.success(`${rows.length} verlofaanvragen ingediend (reeks)`, {
+          description: `${employeeName} — ${repeatMode === "weekly" ? "wekelijks" : "2-wekelijks"} t/m ${format(seriesEndDate!, "d MMM yyyy", { locale: nl })}`,
+        });
+
+        resetForm();
+        onCreate(data || []);
+        onOpenChange(false);
+      }
     } catch (error) {
       console.error("Error creating leave request:", error);
       toast.error("Fout bij indienen aanvraag", {
@@ -368,7 +458,113 @@ export function CreateLeaveRequestDialog({
             </div>
           </div>
 
-          {/* Day part selector - only for single day */}
+          {/* Recurrence selector */}
+          <div className="space-y-2">
+            <Label>Herhaling</Label>
+            <div className="flex rounded-lg border overflow-hidden divide-x text-sm">
+              {(
+                [
+                  { value: "none", label: "Geen" },
+                  { value: "weekly", label: "Wekelijks" },
+                  { value: "biweekly", label: "2-wekelijks" },
+                ] as { value: RepeatMode; label: string }[]
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setRepeatMode(opt.value)}
+                  className={cn(
+                    "flex-1 py-2 font-medium transition-colors",
+                    repeatMode === opt.value
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-muted-foreground"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {repeatMode !== "none" && (
+              <div className="space-y-3 pt-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Dagen van de week</Label>
+                  <div className="flex gap-1 mt-1">
+                    {WEEKDAY_LABELS.map((lbl, idx) => {
+                      const active = repeatDays.includes(idx);
+                      return (
+                        <button
+                          key={lbl}
+                          type="button"
+                          onClick={() => {
+                            setRepeatDays((prev) =>
+                              prev.includes(idx)
+                                ? prev.filter((d) => d !== idx)
+                                : [...prev, idx]
+                            );
+                          }}
+                          className={cn(
+                            "flex-1 py-1.5 rounded-md border text-xs font-medium transition-colors",
+                            active
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "border-border hover:bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {lbl}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-muted-foreground">Herhalen t/m</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full mt-1 justify-start text-left font-normal",
+                          !seriesEndDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarDays className="mr-2 h-4 w-4" />
+                        {seriesEndDate
+                          ? format(seriesEndDate, "d MMM yyyy", { locale: nl })
+                          : "Selecteer einddatum reeks"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={seriesEndDate}
+                        onSelect={setSeriesEndDate}
+                        disabled={(date) => (startDate ? date < startDate : false)}
+                        locale={nl}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {occurrences.length > 0 && (
+                  <div className="text-xs p-2 rounded-md bg-muted/50 text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      Genereert {occurrences.length} {occurrences.length === 1 ? "aanvraag" : "aanvragen"}:
+                    </span>{" "}
+                    {occurrences.slice(0, 3).map((d) => format(d, "EEE d MMM", { locale: nl })).join(", ")}
+                    {occurrences.length > 3 && ` … +${occurrences.length - 3} meer`}
+                  </div>
+                )}
+                {occurrences.length > MAX_OCCURRENCES && (
+                  <p className="text-xs text-destructive">Reeks te groot (max {MAX_OCCURRENCES})</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Day part selector - only for single day, not when repeating multi-day */}
           {isSingleDay && (
             <div className="space-y-2">
               <Label>Dagdeel</Label>
@@ -494,7 +690,15 @@ export function CreateLeaveRequestDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={saving || !startDate || !endDate || !typeId || (isAdmin && !selectedProfileId) || isTimeInvalid}
+            disabled={
+              saving ||
+              !startDate ||
+              !endDate ||
+              !typeId ||
+              (isAdmin && !selectedProfileId) ||
+              isTimeInvalid ||
+              (repeatMode !== "none" && (occurrences.length === 0 || occurrences.length > MAX_OCCURRENCES))
+            }
           >
             <Plus className="h-4 w-4 mr-2" />
             {saving ? "Indienen..." : "Aanvraag indienen"}
