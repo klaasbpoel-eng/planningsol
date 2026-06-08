@@ -690,7 +690,15 @@ export function CreateLeaveRequestDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={saving || !startDate || !endDate || !typeId || (isAdmin && !selectedProfileId) || isTimeInvalid}
+            disabled={
+              saving ||
+              !startDate ||
+              !endDate ||
+              !typeId ||
+              (isAdmin && !selectedProfileId) ||
+              isTimeInvalid ||
+              (repeatMode !== "none" && (occurrences.length === 0 || occurrences.length > MAX_OCCURRENCES))
+            }
           >
             <Plus className="h-4 w-4 mr-2" />
             {saving ? "Indienen..." : "Aanvraag indienen"}
