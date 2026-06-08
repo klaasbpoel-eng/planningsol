@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 import { EmptyState } from "@/components/ui/empty-state";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,13 +32,22 @@ interface TimeOffRequestListProps {
 }
 
 export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListProps) {
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [requestToDelete, setRequestToDelete] = useState<TimeOffRequest | null>(null);
+  const [deleteScope, setDeleteScope] = useState<"single" | "series">("single");
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async () => {
+    if (!requestToDelete) return;
     try {
-      await api.timeOffRequests.delete(id);
-
-      toast.success("Aanvraag verwijderd");
+      const seriesId = (requestToDelete as any).series_id as string | null;
+      if (deleteScope === "series" && seriesId) {
+        const table = supabase.from("time_off_requests") as any;
+        const { error } = await table.delete().eq("series_id", seriesId);
+        if (error) throw error;
+        toast.success("Hele reeks verwijderd");
+      } else {
+        await api.timeOffRequests.delete(requestToDelete.id);
+        toast.success("Aanvraag verwijderd");
+      }
       onDelete();
     } catch (error: any) {
       toast.error("Fout bij verwijderen: " + error.message);
@@ -146,7 +157,10 @@ export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListPro
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => setDeleteId(request.id)}
+                    onClick={() => {
+                      setRequestToDelete(request);
+                      setDeleteScope("single");
+                    }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -157,7 +171,7 @@ export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListPro
         })}
       </CardContent>
 
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+      <AlertDialog open={!!requestToDelete} onOpenChange={(open) => !open && setRequestToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Aanvraag verwijderen?</AlertDialogTitle>
@@ -165,13 +179,36 @@ export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListPro
               Weet u zeker dat u deze verlofaanvraag wilt verwijderen? Dit kan niet ongedaan worden gemaakt.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {(requestToDelete as any)?.series_id && (
+            <div className="py-2">
+              <Label className="text-sm font-medium">Wat wil je verwijderen?</Label>
+              <RadioGroup
+                value={deleteScope}
+                onValueChange={(v) => setDeleteScope(v as "single" | "series")}
+                className="mt-2 space-y-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="single" id="user-del-single" />
+                  <Label htmlFor="user-del-single" className="font-normal cursor-pointer">
+                    Alleen dit event
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="series" id="user-del-series" />
+                  <Label htmlFor="user-del-series" className="font-normal cursor-pointer">
+                    Hele reeks
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Annuleren</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
-                if (deleteId) handleDelete(deleteId);
-                setDeleteId(null);
+                handleDelete();
+                setRequestToDelete(null);
               }}
             >
               Verwijderen
