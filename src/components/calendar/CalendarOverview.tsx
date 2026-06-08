@@ -1624,6 +1624,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                 locale: nl
               })}</div>
             </div>
+            <Badge variant="outline" className="text-[10px] font-semibold uppercase tracking-wider ml-2">
+              Wk {getWeek(date, { weekStartsOn: 1 })}
+            </Badge>
             {isToday(date) && <Badge variant="secondary" className="ml-auto text-xs">Vandaag</Badge>}
           </div>
 
