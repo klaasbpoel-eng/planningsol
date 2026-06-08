@@ -20,7 +20,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays, Clock, Palmtree, Plus } from "lucide-react";
-import { format, differenceInDays } from "date-fns";
+import { format, differenceInDays, addWeeks, addDays, getDay } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -31,6 +31,11 @@ import type { Database } from "@/integrations/supabase/types";
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type TimeOffTypeRecord = Database["public"]["Tables"]["time_off_types"]["Row"];
 type DayPart = "full_day" | "morning" | "afternoon" | "hours";
+type RepeatMode = "none" | "weekly" | "biweekly";
+
+const WEEKDAY_LABELS = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
+const toMonIndex = (d: Date) => (getDay(d) + 6) % 7;
+const MAX_OCCURRENCES = 60;
 
 interface CreateLeaveRequestDialogProps {
   open: boolean;
