@@ -1624,6 +1624,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
                 locale: nl
               })}</div>
             </div>
+            <Badge variant="outline" className="text-[10px] font-semibold uppercase tracking-wider ml-2">
+              Wk {getWeek(date, { weekStartsOn: 1 })}
+            </Badge>
             {isToday(date) && <Badge variant="secondary" className="ml-auto text-xs">Vandaag</Badge>}
           </div>
 
@@ -1835,6 +1838,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
               locale: nl
             })}
           </div>
+          <div className="text-xs text-muted-foreground/70 mt-1 uppercase tracking-wider">
+            Week {getWeek(currentDate, { weekStartsOn: 1 })}
+          </div>
         </div>
 
         {!hasItems ? <div className="text-center text-muted-foreground py-12 bg-muted/30 rounded-xl">
@@ -2009,8 +2015,10 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
       start: weekStart,
       end: weekEnd
     });
+    const weekNumber = getWeek(weekStart, { weekStartsOn: 1 });
     return <div className="flex flex-col gap-2 animate-fade-in flex-1 min-h-0">
-      <div className="grid grid-cols-7 gap-2 flex-shrink-0">
+      <div className="grid grid-cols-[2.25rem_repeat(7,1fr)] gap-2 flex-shrink-0">
+        <div className="text-center text-[10px] font-semibold py-2 uppercase tracking-wider text-muted-foreground/60">Wk</div>
         {weekDays.map((day, index) => {
           const isWeekendDay = index >= 5;
           return <div key={day} className={cn("text-center text-xs font-semibold py-2 uppercase tracking-wider", isWeekendDay ? "text-primary/70 bg-primary/5 rounded-lg" : "text-muted-foreground")}>
@@ -2018,7 +2026,10 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
           </div>;
         })}
       </div>
-      <div className="grid grid-cols-7 gap-2 flex-1 min-h-0">
+      <div className="grid grid-cols-[2.25rem_repeat(7,1fr)] gap-2 flex-1 min-h-0">
+        <div className="flex items-start justify-center pt-2 text-xs font-bold text-muted-foreground/60">
+          {weekNumber}
+        </div>
         {days.map((day, index) => {
           const dayRequests = getRequestsForDay(day);
           const dayTasks = getTasksForDay(day);
