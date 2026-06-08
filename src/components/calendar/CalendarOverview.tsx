@@ -2062,7 +2062,7 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
           const isCurrentDay = isToday(day);
           const isDragOver = dragOverDate && isSameDay(dragOverDate, day);
           const isWeekendDay = isWeekend(day);
-          return <div key={day.toISOString()} onClick={e => handleDayClick(day, e)} className={cn("p-3 rounded-xl border transition-all duration-300 hover:shadow-md flex flex-col flex-1", isWeekendDay ? "bg-primary/5 backdrop-blur-sm border-primary/20 hover:bg-primary/10" : "bg-card/80 backdrop-blur-sm border-border/50", isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/10 to-transparent shadow-lg shadow-primary/5", isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]", isAdmin && "cursor-pointer")} style={{
+          return <div key={day.toISOString()} onClick={e => handleDayClick(day, e)} className={cn("p-3 rounded-xl border transition-all duration-300 hover:shadow-md flex flex-col flex-1 min-w-0 overflow-hidden", isWeekendDay ? "bg-primary/5 backdrop-blur-sm border-primary/20 hover:bg-primary/10" : "bg-card/80 backdrop-blur-sm border-border/50", isCurrentDay && "ring-2 ring-primary/50 bg-gradient-to-br from-primary/10 to-transparent shadow-lg shadow-primary/5", isDragOver && "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/30 scale-[1.02]", isAdmin && "cursor-pointer")} style={{
             animationDelay: `${index * 30}ms`
           }} onDragOver={e => handleDragOver(e, day)} onDragLeave={handleDragLeave} onDrop={e => handleDrop(e, day)}>
              <div className={cn("text-sm font-bold mb-1 flex items-center justify-center w-7 h-7 rounded-full", isCurrentDay ? "bg-primary text-primary-foreground" : "text-foreground")}>
