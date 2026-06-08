@@ -59,6 +59,7 @@ import {
   endOfWeek,
   isToday,
   eachDayOfInterval,
+  getISOWeek,
 } from "date-fns";
 import { nl } from "date-fns/locale";
 import { DryIceOrderDialog } from "@/components/calendar/DryIceOrderDialog";
@@ -703,11 +704,15 @@ export function DailyOverview() {
 
   const headerLabel = useMemo(() => {
     if (viewMode === "day") {
+      const wk = getISOWeek(currentDate);
       return isToday(currentDate)
-        ? `Vandaag, ${format(currentDate, "d MMMM yyyy", { locale: nl })}`
-        : format(currentDate, "EEEE d MMMM yyyy", { locale: nl });
+        ? `Vandaag, ${format(currentDate, "d MMMM yyyy", { locale: nl })} · Wk ${wk}`
+        : `${format(currentDate, "EEEE d MMMM yyyy", { locale: nl })} · Wk ${wk}`;
     }
-    return `${format(dateRange.from, "d MMM", { locale: nl })} – ${format(dateRange.to, "d MMM yyyy", { locale: nl })}`;
+    const wkFrom = getISOWeek(dateRange.from);
+    const wkTo = getISOWeek(dateRange.to);
+    const wkLabel = wkFrom === wkTo ? `Wk ${wkFrom}` : `Wk ${wkFrom}–${wkTo}`;
+    return `${format(dateRange.from, "d MMM", { locale: nl })} – ${format(dateRange.to, "d MMM yyyy", { locale: nl })} · ${wkLabel}`;
   }, [viewMode, currentDate, dateRange]);
 
   const days = useMemo(() => {
