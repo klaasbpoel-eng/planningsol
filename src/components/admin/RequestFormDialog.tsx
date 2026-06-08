@@ -10,6 +10,8 @@ import { CalendarIcon, Loader2, Plus, Edit } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -51,8 +53,11 @@ export function RequestFormDialog({
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(initialFormData);
   const [leaveTypes, setLeaveTypes] = useState<TimeOffTypeRecord[]>([]);
+  const [editScope, setEditScope] = useState<"single" | "series">("single");
 
   const isCreateMode = mode === "create";
+  const seriesId = (request as any)?.series_id as string | null | undefined;
+  const isSeries = !!seriesId && !isCreateMode;
 
   useEffect(() => {
     if (open) {
@@ -92,6 +97,7 @@ export function RequestFormDialog({
           reason: request.reason || "",
           status: request.status,
         });
+        setEditScope("single");
       }
     }
   }, [request, open, isCreateMode, employees, leaveTypes]);
@@ -133,15 +139,30 @@ export function RequestFormDialog({
       } else {
         if (!request) return;
 
-        await api.timeOffRequests.update(request.id, {
-          type_id: formData.type_id,
-          start_date: format(formData.start_date, "yyyy-MM-dd"),
-          end_date: format(formData.end_date, "yyyy-MM-dd"),
-          reason: formData.reason || null,
-          status: formData.status,
-        });
-
-        toast.success("Aanvraag succesvol bijgewerkt");
+        if (editScope === "series" && seriesId) {
+          // Update type/reason/status for the entire series; skip dates
+          const table = supabase.from("time_off_requests") as any;
+          const { error } = await table
+            .update({
+              type_id: formData.type_id,
+              reason: formData.reason || null,
+              status: formData.status,
+            })
+            .eq("series_id", seriesId);
+          if (error) throw error;
+          toast.success("Hele reeks bijgewerkt", {
+            description: "Datums per event blijven ongewijzigd",
+          });
+        } else {
+          await api.timeOffRequests.update(request.id, {
+            type_id: formData.type_id,
+            start_date: format(formData.start_date, "yyyy-MM-dd"),
+            end_date: format(formData.end_date, "yyyy-MM-dd"),
+            reason: formData.reason || null,
+            status: formData.status,
+          });
+          toast.success("Aanvraag succesvol bijgewerkt");
+        }
       }
 
       onUpdate();
