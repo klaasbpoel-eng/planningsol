@@ -1639,6 +1639,7 @@ export type Database = {
           id: string
           profile_id: string
           reason: string | null
+          series_id: string | null
           start_date: string
           status: Database["public"]["Enums"]["request_status"]
           type: Database["public"]["Enums"]["time_off_type"]
@@ -1653,6 +1654,7 @@ export type Database = {
           id?: string
           profile_id: string
           reason?: string | null
+          series_id?: string | null
           start_date: string
           status?: Database["public"]["Enums"]["request_status"]
           type?: Database["public"]["Enums"]["time_off_type"]
@@ -1667,6 +1669,7 @@ export type Database = {
           id?: string
           profile_id?: string
           reason?: string | null
+          series_id?: string | null
           start_date?: string
           status?: Database["public"]["Enums"]["request_status"]
           type?: Database["public"]["Enums"]["time_off_type"]
