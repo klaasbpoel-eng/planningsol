@@ -1835,6 +1835,9 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
               locale: nl
             })}
           </div>
+          <div className="text-xs text-muted-foreground/70 mt-1 uppercase tracking-wider">
+            Week {getWeek(currentDate, { weekStartsOn: 1 })}
+          </div>
         </div>
 
         {!hasItems ? <div className="text-center text-muted-foreground py-12 bg-muted/30 rounded-xl">
