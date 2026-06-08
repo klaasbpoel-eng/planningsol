@@ -25,6 +25,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { RequestFormDialog } from "./RequestFormDialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import type { Database } from "@/integrations/supabase/types";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
@@ -48,6 +50,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [requestToDelete, setRequestToDelete] = useState<RequestWithProfile | null>(null);
+  const [deleteScope, setDeleteScope] = useState<"single" | "series">("single");
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -93,6 +96,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
 
   const handleDeleteClick = (request: RequestWithProfile) => {
     setRequestToDelete(request);
+    setDeleteScope("single");
     setDeleteDialogOpen(true);
   };
 
@@ -101,13 +105,20 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
 
     setDeleting(true);
     try {
-      const { error } = await supabase
-        .from("time_off_requests")
-        .delete()
-        .eq("id", requestToDelete.id);
-
+      const seriesId = (requestToDelete as any).series_id as string | null;
+      let query = supabase.from("time_off_requests").delete();
+      if (deleteScope === "series" && seriesId) {
+        query = query.eq("series_id", seriesId);
+      } else {
+        query = query.eq("id", requestToDelete.id);
+      }
+      const { error } = await query;
       if (error) throw error;
-      toast.success("Aanvraag verwijderd");
+      toast.success(
+        deleteScope === "series" && seriesId
+          ? "Hele reeks verwijderd"
+          : "Aanvraag verwijderd"
+      );
       onUpdate();
     } catch (error: any) {
       toast.error(error.message);
