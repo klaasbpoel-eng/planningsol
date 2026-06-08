@@ -2019,10 +2019,16 @@ export function CalendarOverview({ currentUser }: CalendarOverviewProps) {
     return <div className="flex flex-col gap-2 animate-fade-in flex-1 min-h-0">
       <div className="grid grid-cols-[2.25rem_repeat(7,1fr)] gap-2 flex-shrink-0">
         <div className="text-center text-[10px] font-semibold py-2 uppercase tracking-wider text-muted-foreground/60">Wk</div>
-        {weekDays.map((day, index) => {
+        {days.map((day, index) => {
           const isWeekendDay = index >= 5;
-          return <div key={day} className={cn("text-center text-xs font-semibold py-2 uppercase tracking-wider", isWeekendDay ? "text-primary/70 bg-primary/5 rounded-lg" : "text-muted-foreground")}>
-            {day}
+          const isCurrentDay = isToday(day);
+          return <div key={day.toISOString()} className={cn("text-center py-2 rounded-lg", isWeekendDay ? "bg-primary/5" : "")}>
+            <div className={cn("text-[10px] font-semibold uppercase tracking-wider", isWeekendDay ? "text-primary/70" : "text-muted-foreground")}>
+              {weekDays[index]}
+            </div>
+            <div className={cn("text-sm font-bold mt-0.5", isCurrentDay ? "text-primary" : "text-foreground")}>
+              {format(day, "d MMM", { locale: nl })}
+            </div>
           </div>;
         })}
       </div>
