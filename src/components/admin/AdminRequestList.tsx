@@ -384,6 +384,29 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
               Weet u zeker dat u deze verlofaanvraag wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {(requestToDelete as any)?.series_id && (
+            <div className="py-2">
+              <Label className="text-sm font-medium">Wat wil je verwijderen?</Label>
+              <RadioGroup
+                value={deleteScope}
+                onValueChange={(v) => setDeleteScope(v as "single" | "series")}
+                className="mt-2 space-y-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="single" id="del-single" />
+                  <Label htmlFor="del-single" className="font-normal cursor-pointer">
+                    Alleen dit event
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="series" id="del-series" />
+                  <Label htmlFor="del-series" className="font-normal cursor-pointer">
+                    Hele reeks
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Annuleren</AlertDialogCancel>
             <AlertDialogAction
