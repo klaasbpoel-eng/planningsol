@@ -135,6 +135,9 @@ export function CreateLeaveRequestDialog({
     setDayPart("full_day");
     setStartTime("09:00");
     setEndTime("17:00");
+    setRepeatMode("none");
+    setRepeatDays([]);
+    setSeriesEndDate(undefined);
   };
 
   const handleClose = () => {
