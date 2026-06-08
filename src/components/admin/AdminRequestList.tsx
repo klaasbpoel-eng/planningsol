@@ -25,6 +25,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { RequestFormDialog } from "./RequestFormDialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import type { Database } from "@/integrations/supabase/types";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
@@ -48,6 +50,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [requestToDelete, setRequestToDelete] = useState<RequestWithProfile | null>(null);
+  const [deleteScope, setDeleteScope] = useState<"single" | "series">("single");
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -93,6 +96,7 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
 
   const handleDeleteClick = (request: RequestWithProfile) => {
     setRequestToDelete(request);
+    setDeleteScope("single");
     setDeleteDialogOpen(true);
   };
 
@@ -101,13 +105,18 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
 
     setDeleting(true);
     try {
-      const { error } = await supabase
-        .from("time_off_requests")
-        .delete()
-        .eq("id", requestToDelete.id);
-
+      const seriesId = (requestToDelete as any).series_id as string | null;
+      const table = supabase.from("time_off_requests") as any;
+      const { error } =
+        deleteScope === "series" && seriesId
+          ? await table.delete().eq("series_id", seriesId)
+          : await table.delete().eq("id", requestToDelete.id);
       if (error) throw error;
-      toast.success("Aanvraag verwijderd");
+      toast.success(
+        deleteScope === "series" && seriesId
+          ? "Hele reeks verwijderd"
+          : "Aanvraag verwijderd"
+      );
       onUpdate();
     } catch (error: any) {
       toast.error(error.message);
@@ -375,6 +384,29 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
               Weet u zeker dat u deze verlofaanvraag wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {(requestToDelete as any)?.series_id && (
+            <div className="py-2">
+              <Label className="text-sm font-medium">Wat wil je verwijderen?</Label>
+              <RadioGroup
+                value={deleteScope}
+                onValueChange={(v) => setDeleteScope(v as "single" | "series")}
+                className="mt-2 space-y-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="single" id="del-single" />
+                  <Label htmlFor="del-single" className="font-normal cursor-pointer">
+                    Alleen dit event
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="series" id="del-series" />
+                  <Label htmlFor="del-series" className="font-normal cursor-pointer">
+                    Hele reeks
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Annuleren</AlertDialogCancel>
             <AlertDialogAction
