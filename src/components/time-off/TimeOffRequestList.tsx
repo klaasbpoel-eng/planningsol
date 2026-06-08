@@ -129,6 +129,11 @@ export function TimeOffRequestList({ requests, onDelete }: TimeOffRequestListPro
                     <Badge variant="outline" className={cn("capitalize", getStatusStyles(request.status))}>
                       {request.status}
                     </Badge>
+                    {(request as any).series_id && (
+                      <Badge variant="outline" className="bg-accent/10 text-accent border-accent/20">
+                        Reeks
+                      </Badge>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 text-sm text-foreground">
