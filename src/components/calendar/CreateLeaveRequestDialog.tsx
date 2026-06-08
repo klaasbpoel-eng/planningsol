@@ -458,7 +458,113 @@ export function CreateLeaveRequestDialog({
             </div>
           </div>
 
-          {/* Day part selector - only for single day */}
+          {/* Recurrence selector */}
+          <div className="space-y-2">
+            <Label>Herhaling</Label>
+            <div className="flex rounded-lg border overflow-hidden divide-x text-sm">
+              {(
+                [
+                  { value: "none", label: "Geen" },
+                  { value: "weekly", label: "Wekelijks" },
+                  { value: "biweekly", label: "2-wekelijks" },
+                ] as { value: RepeatMode; label: string }[]
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setRepeatMode(opt.value)}
+                  className={cn(
+                    "flex-1 py-2 font-medium transition-colors",
+                    repeatMode === opt.value
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-muted-foreground"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {repeatMode !== "none" && (
+              <div className="space-y-3 pt-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Dagen van de week</Label>
+                  <div className="flex gap-1 mt-1">
+                    {WEEKDAY_LABELS.map((lbl, idx) => {
+                      const active = repeatDays.includes(idx);
+                      return (
+                        <button
+                          key={lbl}
+                          type="button"
+                          onClick={() => {
+                            setRepeatDays((prev) =>
+                              prev.includes(idx)
+                                ? prev.filter((d) => d !== idx)
+                                : [...prev, idx]
+                            );
+                          }}
+                          className={cn(
+                            "flex-1 py-1.5 rounded-md border text-xs font-medium transition-colors",
+                            active
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "border-border hover:bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {lbl}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-muted-foreground">Herhalen t/m</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full mt-1 justify-start text-left font-normal",
+                          !seriesEndDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarDays className="mr-2 h-4 w-4" />
+                        {seriesEndDate
+                          ? format(seriesEndDate, "d MMM yyyy", { locale: nl })
+                          : "Selecteer einddatum reeks"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={seriesEndDate}
+                        onSelect={setSeriesEndDate}
+                        disabled={(date) => (startDate ? date < startDate : false)}
+                        locale={nl}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {occurrences.length > 0 && (
+                  <div className="text-xs p-2 rounded-md bg-muted/50 text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      Genereert {occurrences.length} {occurrences.length === 1 ? "aanvraag" : "aanvragen"}:
+                    </span>{" "}
+                    {occurrences.slice(0, 3).map((d) => format(d, "EEE d MMM", { locale: nl })).join(", ")}
+                    {occurrences.length > 3 && ` … +${occurrences.length - 3} meer`}
+                  </div>
+                )}
+                {occurrences.length > MAX_OCCURRENCES && (
+                  <p className="text-xs text-destructive">Reeks te groot (max {MAX_OCCURRENCES})</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Day part selector - only for single day, not when repeating multi-day */}
           {isSingleDay && (
             <div className="space-y-2">
               <Label>Dagdeel</Label>
