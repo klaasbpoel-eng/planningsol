@@ -145,6 +145,28 @@ export function CreateLeaveRequestDialog({
     onOpenChange(false);
   };
 
+  const computeOccurrences = (): Date[] => {
+    if (!startDate) return [];
+    if (repeatMode === "none") return [startDate];
+    if (!seriesEndDate || seriesEndDate < startDate || repeatDays.length === 0) return [];
+    const step = repeatMode === "weekly" ? 1 : 2;
+    const occ: Date[] = [];
+    const startMon = addDays(startDate, -toMonIndex(startDate));
+    let weekStart = startMon;
+    while (weekStart <= seriesEndDate && occ.length <= MAX_OCCURRENCES) {
+      for (const d of [...repeatDays].sort((a, b) => a - b)) {
+        const candidate = addDays(weekStart, d);
+        if (candidate >= startDate && candidate <= seriesEndDate) {
+          occ.push(candidate);
+        }
+      }
+      weekStart = addWeeks(weekStart, step);
+    }
+    return occ;
+  };
+
+  const occurrences = computeOccurrences();
+
   const handleCreate = async () => {
     if (!startDate || !endDate) {
       toast.error("Selecteer zowel begin- als einddatum");
@@ -162,6 +184,25 @@ export function CreateLeaveRequestDialog({
       return;
     }
 
+    if (repeatMode !== "none") {
+      if (repeatDays.length === 0) {
+        toast.error("Selecteer minstens één weekdag voor de herhaling");
+        return;
+      }
+      if (!seriesEndDate) {
+        toast.error("Kies een einddatum voor de reeks");
+        return;
+      }
+      if (occurrences.length === 0) {
+        toast.error("Geen geldige datums in deze reeks");
+        return;
+      }
+      if (occurrences.length > MAX_OCCURRENCES) {
+        toast.error(`Reeks te groot (max ${MAX_OCCURRENCES} aanvragen)`);
+        return;
+      }
+    }
+
     setSaving(true);
 
     try {
@@ -177,27 +218,56 @@ export function CreateLeaveRequestDialog({
         ? `[${startTime}-${endTime}]${reason.trim() ? ` ${reason.trim()}` : ""}`
         : reason.trim() || null;
 
-      const createdRequest = await api.timeOffRequests.create({
-        profile_id: profileId,
-        type_id: typeId,
-        start_date: format(startDate, "yyyy-MM-dd"),
-        end_date: format(endDate, "yyyy-MM-dd"),
-        reason: reasonValue,
-        status: isAdmin ? 'approved' : 'pending',
-        day_part: dayPartValue,
-      });
-
       const employeeName = isAdmin
         ? profiles.find(p => p.id === profileId)?.full_name || "Medewerker"
         : "Je";
 
-      toast.success("Verlofaanvraag ingediend", {
-        description: `${employeeName} verlof van ${format(startDate, "d MMM", { locale: nl })} t/m ${format(endDate, "d MMM", { locale: nl })}`,
-      });
+      if (repeatMode === "none") {
+        const createdRequest = await api.timeOffRequests.create({
+          profile_id: profileId,
+          type_id: typeId,
+          start_date: format(startDate, "yyyy-MM-dd"),
+          end_date: format(endDate, "yyyy-MM-dd"),
+          reason: reasonValue,
+          status: isAdmin ? 'approved' : 'pending',
+          day_part: dayPartValue,
+        });
 
-      resetForm();
-      onCreate([createdRequest]);
-      onOpenChange(false);
+        toast.success("Verlofaanvraag ingediend", {
+          description: `${employeeName} verlof van ${format(startDate, "d MMM", { locale: nl })} t/m ${format(endDate, "d MMM", { locale: nl })}`,
+        });
+
+        resetForm();
+        onCreate([createdRequest]);
+        onOpenChange(false);
+      } else {
+        const seriesId = crypto.randomUUID();
+        const rows = occurrences.map((d) => ({
+          profile_id: profileId,
+          type_id: typeId,
+          start_date: format(d, "yyyy-MM-dd"),
+          end_date: format(d, "yyyy-MM-dd"),
+          reason: reasonValue,
+          status: (isAdmin ? "approved" : "pending") as "approved" | "pending",
+          day_part: dayPartValue,
+          series_id: seriesId,
+        }));
+
+        const { data, error } = await supabase
+          .from("time_off_requests")
+          .insert(rows)
+          .select();
+
+        if (error) throw error;
+
+        toast.success(`${rows.length} verlofaanvragen ingediend (reeks)`, {
+          description: `${employeeName} — ${repeatMode === "weekly" ? "wekelijks" : "2-wekelijks"} t/m ${format(seriesEndDate!, "d MMM yyyy", { locale: nl })}`,
+        });
+
+        resetForm();
+        onCreate(data || []);
+        onOpenChange(false);
+      }
     } catch (error) {
       console.error("Error creating leave request:", error);
       toast.error("Fout bij indienen aanvraag", {
