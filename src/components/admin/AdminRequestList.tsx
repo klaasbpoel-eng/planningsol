@@ -106,10 +106,11 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
     setDeleting(true);
     try {
       const seriesId = (requestToDelete as any).series_id as string | null;
+      const table = supabase.from("time_off_requests") as any;
       const { error } =
         deleteScope === "series" && seriesId
-          ? await supabase.from("time_off_requests").delete().eq("series_id", seriesId)
-          : await supabase.from("time_off_requests").delete().eq("id", requestToDelete.id);
+          ? await table.delete().eq("series_id", seriesId)
+          : await table.delete().eq("id", requestToDelete.id);
       if (error) throw error;
       toast.success(
         deleteScope === "series" && seriesId
