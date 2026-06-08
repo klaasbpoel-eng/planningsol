@@ -199,6 +199,29 @@ export function RequestFormDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {isSeries && (
+            <div className="space-y-2 p-3 rounded-md bg-muted/40 border">
+              <Label className="text-sm font-medium">Deze aanvraag is onderdeel van een reeks</Label>
+              <RadioGroup
+                value={editScope}
+                onValueChange={(v) => setEditScope(v as "single" | "series")}
+                className="space-y-1.5"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="single" id="edit-single" />
+                  <Label htmlFor="edit-single" className="font-normal cursor-pointer">
+                    Alleen dit event bewerken
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="series" id="edit-series" />
+                  <Label htmlFor="edit-series" className="font-normal cursor-pointer">
+                    Hele reeks bewerken <span className="text-xs text-muted-foreground">(datums per event blijven)</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
           {/* Employee selector (only for create mode) */}
           {isCreateMode && (
             <div className="space-y-2">
