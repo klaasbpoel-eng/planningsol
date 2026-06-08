@@ -68,6 +68,9 @@ export function CreateLeaveRequestDialog({
   const [dayPart, setDayPart] = useState<DayPart>("full_day");
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("17:00");
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>("none");
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
+  const [seriesEndDate, setSeriesEndDate] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
     if (open) {
@@ -81,6 +84,15 @@ export function CreateLeaveRequestDialog({
       setEndDate(initialDate);
     }
   }, [initialDate]);
+
+  useEffect(() => {
+    if (repeatMode !== "none" && startDate) {
+      if (repeatDays.length === 0) setRepeatDays([toMonIndex(startDate)]);
+      if (!seriesEndDate) setSeriesEndDate(addWeeks(startDate, 4));
+      setEndDate(startDate);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repeatMode]);
 
   useEffect(() => {
     if (currentProfileId && !selectedProfileId) {
