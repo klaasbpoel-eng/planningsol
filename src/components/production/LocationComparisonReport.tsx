@@ -47,6 +47,10 @@ interface GasTypeLocationData {
   emmen_prev?: number;
   tilburg_prev?: number;
   total_prev?: number;
+  emmen_months?: number[];
+  tilburg_months?: number[];
+  emmen_months_prev?: number[];
+  tilburg_months_prev?: number[];
 }
 
 interface LocationComparisonReportProps {
