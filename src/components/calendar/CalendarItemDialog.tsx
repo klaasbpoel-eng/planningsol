@@ -1010,6 +1010,63 @@ export function CalendarItemDialog({
                     )}
                   </div>
 
+                  {isAdmin && (() => {
+                    const start = parseISO(request.start_date);
+                    const end = parseISO(request.end_date);
+                    const totalDays = differenceInCalendarDays(end, start) + 1;
+                    return (
+                      <div className="pt-3 border-t space-y-2">
+                        <Label className="flex items-center gap-2 text-sm">
+                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          Losse dag verwijderen
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          {totalDays > 1
+                            ? "Selecteer een dag binnen deze periode om alleen die dag uit het verlof te halen. Bij een dag in het midden wordt het verlof automatisch gesplitst."
+                            : "Dit verlof bestaat uit één dag. Verwijderen haalt de hele aanvraag weg."}
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "flex-1 justify-start text-left font-normal",
+                                  !removeDayDate && "text-muted-foreground"
+                                )}
+                                disabled={removingDay || deleting || saving}
+                              >
+                                <CalendarDays className="mr-2 h-4 w-4" />
+                                {removeDayDate
+                                  ? format(removeDayDate, "d MMM yyyy", { locale: nl })
+                                  : "Kies dag"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={removeDayDate}
+                                onSelect={setRemoveDayDate}
+                                defaultMonth={start}
+                                disabled={(d) => d < start || d > end}
+                                locale={nl}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <Button
+                            variant="destructive"
+                            onClick={() => void handleRemoveSingleDay()}
+                            disabled={!removeDayDate || removingDay || deleting || saving}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            {removingDay ? "Verwijderen..." : "Verwijder dag"}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <div className="pt-2 border-t">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />
