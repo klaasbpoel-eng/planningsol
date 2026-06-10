@@ -1043,7 +1043,7 @@ export function CalendarItemDialog({
                                   : "Kies dag"}
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
+                            <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-[100]" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
                               <Calendar
                                 mode="single"
                                 selected={removeDayDate}
