@@ -895,7 +895,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">Gastype verdeling per locatie</CardTitle>
           <CardDescription>
-            Cilinders per gastype — Emmen vs Tilburg ({selectedYear})
+            Cilinders per gastype — Emmen vs Tilburg ({ytdMode ? `YTD t/m ${MONTH_NAMES[todayMonth - 1]} ${selectedYear}` : `${selectedYear} jaartotaal`})
             {showComparison && ` — vergeleken met ${selectedYear - 1}`}
           </CardDescription>
         </CardHeader>
