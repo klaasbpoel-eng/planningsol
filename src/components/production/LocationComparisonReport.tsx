@@ -951,6 +951,10 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                       const pctEmmen = gt.total > 0 ? Math.round((gt.emmen / gt.total) * 100) : 0;
                       const prevTotal = gt.total_prev || 0;
                       const delta = prevTotal > 0 ? ((gt.total - prevTotal) / prevTotal) * 100 : null;
+                      const prevEmmen = gt.emmen_prev || 0;
+                      const prevTilburg = gt.tilburg_prev || 0;
+                      const deltaEmmen = prevEmmen > 0 ? ((gt.emmen - prevEmmen) / prevEmmen) * 100 : null;
+                      const deltaTilburg = prevTilburg > 0 ? ((gt.tilburg - prevTilburg) / prevTilburg) * 100 : null;
                       return (
                         <tr key={gt.gas_type_name} className="border-b last:border-0">
                           <td className="py-2 pr-4 font-medium flex items-center gap-1.5">
@@ -960,8 +964,22 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                               <Badge variant="outline" className="text-[9px] px-1 py-0 border-sky-400/40 text-sky-500 bg-sky-400/10">ⓓ</Badge>
                             )}
                           </td>
-                          <td className="text-right py-2 px-3 tabular-nums">{formatNumber(gt.emmen, 0)}</td>
-                          <td className="text-right py-2 px-3 tabular-nums">{formatNumber(gt.tilburg, 0)}</td>
+                          <td className="text-right py-2 px-3 tabular-nums">
+                            <div>{formatNumber(gt.emmen, 0)}</div>
+                            {showComparison && (
+                              <div className={`text-[10px] ${deltaEmmen === null ? "text-muted-foreground" : deltaEmmen >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                {deltaEmmen === null ? "—" : `${deltaEmmen >= 0 ? "+" : ""}${deltaEmmen.toFixed(0)}%`}
+                              </div>
+                            )}
+                          </td>
+                          <td className="text-right py-2 px-3 tabular-nums">
+                            <div>{formatNumber(gt.tilburg, 0)}</div>
+                            {showComparison && (
+                              <div className={`text-[10px] ${deltaTilburg === null ? "text-muted-foreground" : deltaTilburg >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                {deltaTilburg === null ? "—" : `${deltaTilburg >= 0 ? "+" : ""}${deltaTilburg.toFixed(0)}%`}
+                              </div>
+                            )}
+                          </td>
                           <td className="text-right py-2 px-3 font-semibold tabular-nums">{formatNumber(gt.total, 0)}</td>
                           {showComparison && (
                             <td className="text-right py-2 px-3 tabular-nums text-muted-foreground">{prevTotal > 0 ? formatNumber(prevTotal, 0) : "—"}</td>
@@ -995,12 +1013,30 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                     const totalCurrent = filteredGasTypeData.reduce((s, gt) => s + (gt.total || 0), 0);
                     const totalPrev = filteredGasTypeData.reduce((s, gt) => s + (gt.total_prev || 0), 0);
                     const totalDelta = totalPrev > 0 ? ((totalCurrent - totalPrev) / totalPrev) * 100 : null;
+                    const totalPrevEmmen = filteredGasTypeData.reduce((s, gt) => s + (gt.emmen_prev || 0), 0);
+                    const totalPrevTilburg = filteredGasTypeData.reduce((s, gt) => s + (gt.tilburg_prev || 0), 0);
+                    const totalDeltaEmmen = totalPrevEmmen > 0 ? ((totalEmmen - totalPrevEmmen) / totalPrevEmmen) * 100 : null;
+                    const totalDeltaTilburg = totalPrevTilburg > 0 ? ((totalTilburg - totalPrevTilburg) / totalPrevTilburg) * 100 : null;
                     return (
                       <tfoot>
                         <tr className="border-t-2 font-semibold bg-muted/20">
                           <td className="py-2 pr-4">{totalsRowLabel(selectedYear, ytdMode, todayMonth, MONTH_NAMES)}</td>
-                          <td className="text-right py-2 px-3 tabular-nums">{formatNumber(totalEmmen, 0)}</td>
-                          <td className="text-right py-2 px-3 tabular-nums">{formatNumber(totalTilburg, 0)}</td>
+                          <td className="text-right py-2 px-3 tabular-nums">
+                            <div>{formatNumber(totalEmmen, 0)}</div>
+                            {showComparison && (
+                              <div className={`text-[10px] font-medium ${totalDeltaEmmen === null ? "text-muted-foreground" : totalDeltaEmmen >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                {totalDeltaEmmen === null ? "—" : `${totalDeltaEmmen >= 0 ? "+" : ""}${totalDeltaEmmen.toFixed(0)}%`}
+                              </div>
+                            )}
+                          </td>
+                          <td className="text-right py-2 px-3 tabular-nums">
+                            <div>{formatNumber(totalTilburg, 0)}</div>
+                            {showComparison && (
+                              <div className={`text-[10px] font-medium ${totalDeltaTilburg === null ? "text-muted-foreground" : totalDeltaTilburg >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                {totalDeltaTilburg === null ? "—" : `${totalDeltaTilburg >= 0 ? "+" : ""}${totalDeltaTilburg.toFixed(0)}%`}
+                              </div>
+                            )}
+                          </td>
                           <td className="text-right py-2 px-3 font-bold tabular-nums">{formatNumber(totalCurrent, 0)}</td>
                           {showComparison && (
                             <td className="text-right py-2 px-3 tabular-nums text-muted-foreground">
