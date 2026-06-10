@@ -388,7 +388,7 @@ export function CalendarItemDialog({
         type_id: req.type_id,
         reason: req.reason,
         day_part: req.day_part,
-        series_id: req.series_id,
+        series_id: (req as any).series_id ?? null,
         user_id: req.user_id,
       });
       if (insErr) throw insErr;
