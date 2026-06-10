@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatTimeRange, getDayPartLabel, hasTimeInfo } from "@/lib/calendar-utils";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, addDays, isWithinInterval, isSameDay, differenceInCalendarDays } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { getPrimarySupabaseClient } from "@/lib/api";
@@ -107,10 +107,15 @@ export function CalendarItemDialog({
   const [timeOffDayPart, setTimeOffDayPart] = useState<string>("full_day");
   const [timeOffProfileId, setTimeOffProfileId] = useState<string | null>(null);
 
+  // Remove single day from a multi-day leave
+  const [removeDayDate, setRemoveDayDate] = useState<Date | undefined>();
+  const [removingDay, setRemovingDay] = useState(false);
+
   const resetTransientState = () => {
     setConfirmDelete(false);
     setIsEditing(false);
     setApplyToSeries(false);
+    setRemoveDayDate(undefined);
   };
 
   useEffect(() => {
@@ -307,6 +312,98 @@ export function CalendarItemDialog({
 
   const handleClose = () => {
     closeDialog();
+  };
+
+  const handleRemoveSingleDay = async () => {
+    if (!item || item.type !== "timeoff" || !removeDayDate || removingDay || deleting || saving) return;
+    const req = item.data as RequestWithProfile;
+    const start = parseISO(req.start_date);
+    const end = parseISO(req.end_date);
+    const target = removeDayDate;
+
+    if (!isWithinInterval(target, { start, end })) {
+      toast.error("Datum valt buiten de verlofperiode");
+      return;
+    }
+
+    setRemovingDay(true);
+    try {
+      const db = getPrimarySupabaseClient();
+      // Whole leave is just this day -> delete
+      if (isSameDay(start, end)) {
+        const { error } = await db.from("time_off_requests").delete().eq("id", req.id);
+        if (error) throw error;
+        toast.success("Verlofdag verwijderd");
+        setRemoveDayDate(undefined);
+        onOpenChange(false);
+        onUpdate(req.id, "timeoff");
+        return;
+      }
+      // First day -> bump start
+      if (isSameDay(target, start)) {
+        const newStart = format(addDays(start, 1), "yyyy-MM-dd");
+        const { data, error } = await db
+          .from("time_off_requests")
+          .update({ start_date: newStart })
+          .eq("id", req.id)
+          .select()
+          .single();
+        if (error) throw error;
+        toast.success(`Dag ${format(target, "d MMM yyyy", { locale: nl })} verwijderd`);
+        setRemoveDayDate(undefined);
+        onUpdate(undefined, "timeoff", data);
+        return;
+      }
+      // Last day -> bump end
+      if (isSameDay(target, end)) {
+        const newEnd = format(addDays(end, -1), "yyyy-MM-dd");
+        const { data, error } = await db
+          .from("time_off_requests")
+          .update({ end_date: newEnd })
+          .eq("id", req.id)
+          .select()
+          .single();
+        if (error) throw error;
+        toast.success(`Dag ${format(target, "d MMM yyyy", { locale: nl })} verwijderd`);
+        setRemoveDayDate(undefined);
+        onUpdate(undefined, "timeoff", data);
+        return;
+      }
+      // Middle day -> split into two records
+      const beforeEnd = format(addDays(target, -1), "yyyy-MM-dd");
+      const afterStart = format(addDays(target, 1), "yyyy-MM-dd");
+      const originalEnd = req.end_date;
+
+      const { error: updErr } = await db
+        .from("time_off_requests")
+        .update({ end_date: beforeEnd })
+        .eq("id", req.id);
+      if (updErr) throw updErr;
+
+      const { error: insErr } = await db.from("time_off_requests").insert({
+        profile_id: req.profile_id,
+        start_date: afterStart,
+        end_date: originalEnd,
+        status: req.status,
+        type: req.type,
+        type_id: req.type_id,
+        reason: req.reason,
+        day_part: req.day_part,
+        series_id: (req as any).series_id ?? null,
+        user_id: req.user_id,
+      });
+      if (insErr) throw insErr;
+
+      toast.success(`Dag ${format(target, "d MMM yyyy", { locale: nl })} verwijderd`);
+      setRemoveDayDate(undefined);
+      onOpenChange(false);
+      onUpdate();
+    } catch (error) {
+      console.error("Error removing single day:", error);
+      toast.error("Fout bij verwijderen van dag", { description: "Probeer het opnieuw" });
+    } finally {
+      setRemovingDay(false);
+    }
   };
 
   const handleDialogOpenChange = (nextOpen: boolean) => {
@@ -913,6 +1010,63 @@ export function CalendarItemDialog({
                       </div>
                     )}
                   </div>
+
+                  {isAdmin && (() => {
+                    const start = parseISO(request.start_date);
+                    const end = parseISO(request.end_date);
+                    const totalDays = differenceInCalendarDays(end, start) + 1;
+                    return (
+                      <div className="pt-3 border-t space-y-2">
+                        <Label className="flex items-center gap-2 text-sm">
+                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          Losse dag verwijderen
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          {totalDays > 1
+                            ? "Selecteer een dag binnen deze periode om alleen die dag uit het verlof te halen. Bij een dag in het midden wordt het verlof automatisch gesplitst."
+                            : "Dit verlof bestaat uit één dag. Verwijderen haalt de hele aanvraag weg."}
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "flex-1 justify-start text-left font-normal",
+                                  !removeDayDate && "text-muted-foreground"
+                                )}
+                                disabled={removingDay || deleting || saving}
+                              >
+                                <CalendarDays className="mr-2 h-4 w-4" />
+                                {removeDayDate
+                                  ? format(removeDayDate, "d MMM yyyy", { locale: nl })
+                                  : "Kies dag"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={removeDayDate}
+                                onSelect={setRemoveDayDate}
+                                defaultMonth={start}
+                                disabled={(d) => d < start || d > end}
+                                locale={nl}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <Button
+                            variant="destructive"
+                            onClick={() => void handleRemoveSingleDay()}
+                            disabled={!removeDayDate || removingDay || deleting || saving}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            {removingDay ? "Verwijderen..." : "Verwijder dag"}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="pt-2 border-t">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
