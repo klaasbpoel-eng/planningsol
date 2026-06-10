@@ -308,11 +308,30 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
     }
   };
 
-  // Filtered gas type data (hide digital)
+  // Filtered gas type data (hide digital + YTD trim, sorted by current total)
   const filteredGasTypeData = useMemo(() => {
-    if (!hideDigital) return gasTypeData;
-    return gasTypeData.filter(gt => !gt.is_digital);
-  }, [gasTypeData, hideDigital]);
+    const base = hideDigital ? gasTypeData.filter(gt => !gt.is_digital) : gasTypeData;
+    if (!ytdMode) return base;
+    const maxIdx = todayMonth; // months 1..todayMonth → indices 0..todayMonth-1
+    const sumUpTo = (arr?: number[]) => (arr || []).slice(0, maxIdx).reduce((s, v) => s + v, 0);
+    return base
+      .map(gt => {
+        const emmen = sumUpTo(gt.emmen_months);
+        const tilburg = sumUpTo(gt.tilburg_months);
+        const emmen_prev = sumUpTo(gt.emmen_months_prev);
+        const tilburg_prev = sumUpTo(gt.tilburg_months_prev);
+        return {
+          ...gt,
+          emmen,
+          tilburg,
+          total: emmen + tilburg,
+          emmen_prev,
+          tilburg_prev,
+          total_prev: emmen_prev + tilburg_prev,
+        };
+      })
+      .sort((a, b) => b.total - a.total);
+  }, [gasTypeData, hideDigital, ytdMode, todayMonth]);
 
   const digitalPhysicalSplit = useMemo(() => {
     const digital = gasTypeData.filter(gt => gt.is_digital).reduce((s, gt) => s + gt.total, 0);
