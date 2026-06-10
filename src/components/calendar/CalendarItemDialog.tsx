@@ -1052,6 +1052,7 @@ export function CalendarItemDialog({
                                 disabled={(d) => d < start || d > end}
                                 locale={nl}
                                 initialFocus
+                                className="pointer-events-auto"
                               />
                             </PopoverContent>
                           </Popover>
