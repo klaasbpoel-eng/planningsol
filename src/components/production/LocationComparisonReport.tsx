@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getGasColor } from "@/constants/gasColors";
 import { supabase } from "@/integrations/supabase/client";
+import { periodLabel, yearWithYtdSuffix, totalsRowLabel } from "@/lib/periodLabels";
 import {
   BarChart,
   Bar,
@@ -863,7 +864,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">Gastype verdeling per locatie</CardTitle>
           <CardDescription>
-            Cilinders per gastype — Emmen vs Tilburg ({ytdMode ? `${selectedYear} YTD t/m ${MONTH_NAMES[todayMonth - 1]}` : `${selectedYear} jaartotaal`})
+            Cilinders per gastype — Emmen vs Tilburg ({periodLabel(selectedYear, ytdMode, todayMonth, MONTH_NAMES)})
             {showComparison && ` — vergeleken met ${selectedYear - 1}`}
           </CardDescription>
         </CardHeader>
@@ -902,10 +903,10 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                   />
                   <Legend
                     formatter={(value: string) =>
-                      value === "emmen" ? `Emmen ${selectedYear}${ytdMode ? " YTD" : ""}` :
-                      value === "tilburg" ? `Tilburg ${selectedYear}${ytdMode ? " YTD" : ""}` :
-                      value === "emmen_prev" ? `Emmen ${selectedYear - 1}${ytdMode ? " YTD" : ""}` :
-                      `Tilburg ${selectedYear - 1}${ytdMode ? " YTD" : ""}`
+                      value === "emmen" ? `Emmen ${yearWithYtdSuffix(selectedYear, ytdMode)}` :
+                      value === "tilburg" ? `Tilburg ${yearWithYtdSuffix(selectedYear, ytdMode)}` :
+                      value === "emmen_prev" ? `Emmen ${yearWithYtdSuffix(selectedYear - 1, ytdMode)}` :
+                      `Tilburg ${yearWithYtdSuffix(selectedYear - 1, ytdMode)}`
                     }
                   />
                   <Bar dataKey="emmen" fill="#3b82f6" radius={[0, 2, 2, 0]} barSize={showComparison ? 9 : 14} stackId="cur" />
@@ -939,8 +940,8 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                       <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Gastype</th>
                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Emmen</th>
                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Tilburg</th>
-                      <th className="text-right py-2 px-3 font-semibold">{selectedYear}{ytdMode ? " YTD" : ""}</th>
-                      {showComparison && <th className="text-right py-2 px-3 font-medium text-muted-foreground">{selectedYear - 1}{ytdMode ? " YTD" : ""}</th>}
+                      <th className="text-right py-2 px-3 font-semibold">{yearWithYtdSuffix(selectedYear, ytdMode)}</th>
+                      {showComparison && <th className="text-right py-2 px-3 font-medium text-muted-foreground">{yearWithYtdSuffix(selectedYear - 1, ytdMode)}</th>}
                       {showComparison && <th className="text-right py-2 pl-3 font-medium text-muted-foreground">Δ</th>}
                       {!showComparison && <th className="text-right py-2 pl-3 font-medium text-muted-foreground">Verdeling</th>}
                     </tr>
@@ -997,7 +998,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                     return (
                       <tfoot>
                         <tr className="border-t-2 font-semibold bg-muted/20">
-                          <td className="py-2 pr-4">{ytdMode ? `Totaal YTD t/m ${MONTH_NAMES[todayMonth - 1]}` : `Totaal ${selectedYear} jaartotaal`}</td>
+                          <td className="py-2 pr-4">{totalsRowLabel(selectedYear, ytdMode, todayMonth, MONTH_NAMES)}</td>
                           <td className="text-right py-2 px-3 tabular-nums">{formatNumber(totalEmmen, 0)}</td>
                           <td className="text-right py-2 px-3 tabular-nums">{formatNumber(totalTilburg, 0)}</td>
                           <td className="text-right py-2 px-3 font-bold tabular-nums">{formatNumber(totalCurrent, 0)}</td>
@@ -1025,7 +1026,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
             </>
           ) : (
             <div className="flex items-center justify-center h-[200px] text-muted-foreground text-sm">
-              Geen gastype data beschikbaar voor {ytdMode ? `${selectedYear} YTD t/m ${MONTH_NAMES[todayMonth - 1]}` : `${selectedYear} jaartotaal`}
+              Geen gastype data beschikbaar voor {periodLabel(selectedYear, ytdMode, todayMonth, MONTH_NAMES)}
             </div>
           )}
         </CardContent>
