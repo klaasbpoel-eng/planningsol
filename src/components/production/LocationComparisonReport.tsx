@@ -807,7 +807,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                       return (
                         <tfoot>
                           <tr className="border-t-2 font-semibold bg-muted/20">
-                            <td className="py-2 pr-4">{ytdMode ? `Totaal YTD t/m ${MONTH_NAMES[todayMonth - 1]}` : "Totaal jaartotaal"}</td>
+                            <td className="py-2 pr-4">{ytdMode ? `Totaal YTD t/m ${MONTH_NAMES[todayMonth - 1]}` : "Jaartotaal"}</td>
                             <td className="text-right py-2 px-3 tabular-nums">{formatNumber(totalEmmen, 0)}</td>
                             <td className="text-right py-2 px-3 tabular-nums">{formatNumber(totalTilburg, 0)}</td>
                             <td className="text-right py-2 px-3 font-bold tabular-nums">{formatNumber(totalCurrent, 0)}</td>
