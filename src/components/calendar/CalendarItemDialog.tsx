@@ -115,6 +115,7 @@ export function CalendarItemDialog({
     setConfirmDelete(false);
     setIsEditing(false);
     setApplyToSeries(false);
+    setRemoveDayDate(undefined);
   };
 
   useEffect(() => {
