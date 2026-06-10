@@ -220,13 +220,19 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
       setHasDigitalTypes(false);
       setDigitalGasTypeIds(new Set());
 
-      // Aggregate gas type totals per location
-      const buildGasMap = (rows: any[], loc: "emmen" | "tilburg"): Map<string, { emmen: number; tilburg: number }> => {
-        const gasMap = new Map<string, { emmen: number; tilburg: number }>();
+      // Aggregate gas type totals per location, per month
+      const buildGasMap = (rows: any[], loc: "emmen" | "tilburg"): Map<string, { emmen: number; tilburg: number; emmenMonths: number[]; tilburgMonths: number[] }> => {
+        const gasMap = new Map<string, { emmen: number; tilburg: number; emmenMonths: number[]; tilburgMonths: number[] }>();
         for (const row of rows) {
           const name = row.Product || "Onbekend";
-          const existing = gasMap.get(name) || { emmen: 0, tilburg: 0 };
-          existing[loc] += Number(row.Aantal) || 0;
+          const existing = gasMap.get(name) || { emmen: 0, tilburg: 0, emmenMonths: new Array(12).fill(0), tilburgMonths: new Array(12).fill(0) };
+          const amount = Number(row.Aantal) || 0;
+          existing[loc] += amount;
+          const month = getRowMonth(row);
+          if (month) {
+            if (loc === "emmen") existing.emmenMonths[month - 1] += amount;
+            else existing.tilburgMonths[month - 1] += amount;
+          }
           gasMap.set(name, existing);
         }
         return gasMap;
@@ -238,31 +244,45 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
       const tilburgGasMapPrev = buildGasMap(tilburgRowsPrev, "tilburg");
 
       // Merge current year maps
-      const combinedGasMap = new Map<string, { emmen: number; tilburg: number }>();
-      emmenGasMap.forEach((val, name) => { combinedGasMap.set(name, { emmen: val.emmen, tilburg: 0 }); });
+      type CombinedGas = { emmen: number; tilburg: number; emmenMonths: number[]; tilburgMonths: number[] };
+      const emptyCombined = (): CombinedGas => ({ emmen: 0, tilburg: 0, emmenMonths: new Array(12).fill(0), tilburgMonths: new Array(12).fill(0) });
+      const combinedGasMap = new Map<string, CombinedGas>();
+      emmenGasMap.forEach((val, name) => {
+        const c = emptyCombined();
+        c.emmen = val.emmen;
+        c.emmenMonths = val.emmenMonths.slice();
+        combinedGasMap.set(name, c);
+      });
       tilburgGasMap.forEach((val, name) => {
-        const existing = combinedGasMap.get(name) || { emmen: 0, tilburg: 0 };
+        const existing = combinedGasMap.get(name) || emptyCombined();
         existing.tilburg += val.tilburg;
+        existing.tilburgMonths = existing.tilburgMonths.map((v, i) => v + val.tilburgMonths[i]);
         combinedGasMap.set(name, existing);
       });
 
       // Merge prev year maps
-      const combinedGasMapPrev = new Map<string, { emmen: number; tilburg: number }>();
-      emmenGasMapPrev.forEach((val, name) => { combinedGasMapPrev.set(name, { emmen: val.emmen, tilburg: 0 }); });
+      const combinedGasMapPrev = new Map<string, CombinedGas>();
+      emmenGasMapPrev.forEach((val, name) => {
+        const c = emptyCombined();
+        c.emmen = val.emmen;
+        c.emmenMonths = val.emmenMonths.slice();
+        combinedGasMapPrev.set(name, c);
+      });
       tilburgGasMapPrev.forEach((val, name) => {
-        const existing = combinedGasMapPrev.get(name) || { emmen: 0, tilburg: 0 };
+        const existing = combinedGasMapPrev.get(name) || emptyCombined();
         existing.tilburg += val.tilburg;
+        existing.tilburgMonths = existing.tilburgMonths.map((v, i) => v + val.tilburgMonths[i]);
         combinedGasMapPrev.set(name, existing);
       });
 
       // Also ensure prev-year-only products appear in combined map
       combinedGasMapPrev.forEach((_, name) => {
-        if (!combinedGasMap.has(name)) combinedGasMap.set(name, { emmen: 0, tilburg: 0 });
+        if (!combinedGasMap.has(name)) combinedGasMap.set(name, emptyCombined());
       });
 
       const gasData: GasTypeLocationData[] = Array.from(combinedGasMap.entries())
         .map(([name, vals]) => {
-          const prev = combinedGasMapPrev.get(name) || { emmen: 0, tilburg: 0 };
+          const prev = combinedGasMapPrev.get(name) || emptyCombined();
           return {
             gas_type_name: name,
             gas_type_color: getGasColor(name, "#3b82f6"),
@@ -273,6 +293,10 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
             emmen_prev: prev.emmen,
             tilburg_prev: prev.tilburg,
             total_prev: prev.emmen + prev.tilburg,
+            emmen_months: vals.emmenMonths,
+            tilburg_months: vals.tilburgMonths,
+            emmen_months_prev: prev.emmenMonths,
+            tilburg_months_prev: prev.tilburgMonths,
           };
         })
         .sort((a, b) => b.total - a.total);
