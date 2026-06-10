@@ -313,6 +313,98 @@ export function CalendarItemDialog({
     closeDialog();
   };
 
+  const handleRemoveSingleDay = async () => {
+    if (!item || item.type !== "timeoff" || !removeDayDate || removingDay || deleting || saving) return;
+    const req = item.data as RequestWithProfile;
+    const start = parseISO(req.start_date);
+    const end = parseISO(req.end_date);
+    const target = removeDayDate;
+
+    if (!isWithinInterval(target, { start, end })) {
+      toast.error("Datum valt buiten de verlofperiode");
+      return;
+    }
+
+    setRemovingDay(true);
+    try {
+      const db = getPrimarySupabaseClient();
+      // Whole leave is just this day -> delete
+      if (isSameDay(start, end)) {
+        const { error } = await db.from("time_off_requests").delete().eq("id", req.id);
+        if (error) throw error;
+        toast.success("Verlofdag verwijderd");
+        setRemoveDayDate(undefined);
+        onOpenChange(false);
+        onUpdate(req.id, "timeoff");
+        return;
+      }
+      // First day -> bump start
+      if (isSameDay(target, start)) {
+        const newStart = format(addDays(start, 1), "yyyy-MM-dd");
+        const { data, error } = await db
+          .from("time_off_requests")
+          .update({ start_date: newStart })
+          .eq("id", req.id)
+          .select()
+          .single();
+        if (error) throw error;
+        toast.success(`Dag ${format(target, "d MMM yyyy", { locale: nl })} verwijderd`);
+        setRemoveDayDate(undefined);
+        onUpdate(undefined, "timeoff", data);
+        return;
+      }
+      // Last day -> bump end
+      if (isSameDay(target, end)) {
+        const newEnd = format(addDays(end, -1), "yyyy-MM-dd");
+        const { data, error } = await db
+          .from("time_off_requests")
+          .update({ end_date: newEnd })
+          .eq("id", req.id)
+          .select()
+          .single();
+        if (error) throw error;
+        toast.success(`Dag ${format(target, "d MMM yyyy", { locale: nl })} verwijderd`);
+        setRemoveDayDate(undefined);
+        onUpdate(undefined, "timeoff", data);
+        return;
+      }
+      // Middle day -> split into two records
+      const beforeEnd = format(addDays(target, -1), "yyyy-MM-dd");
+      const afterStart = format(addDays(target, 1), "yyyy-MM-dd");
+      const originalEnd = req.end_date;
+
+      const { error: updErr } = await db
+        .from("time_off_requests")
+        .update({ end_date: beforeEnd })
+        .eq("id", req.id);
+      if (updErr) throw updErr;
+
+      const { error: insErr } = await db.from("time_off_requests").insert({
+        profile_id: req.profile_id,
+        start_date: afterStart,
+        end_date: originalEnd,
+        status: req.status,
+        type: req.type,
+        type_id: req.type_id,
+        reason: req.reason,
+        day_part: req.day_part,
+        series_id: req.series_id,
+        user_id: req.user_id,
+      });
+      if (insErr) throw insErr;
+
+      toast.success(`Dag ${format(target, "d MMM yyyy", { locale: nl })} verwijderd`);
+      setRemoveDayDate(undefined);
+      onOpenChange(false);
+      onUpdate();
+    } catch (error) {
+      console.error("Error removing single day:", error);
+      toast.error("Fout bij verwijderen van dag", { description: "Probeer het opnieuw" });
+    } finally {
+      setRemovingDay(false);
+    }
+  };
+
   const handleDialogOpenChange = (nextOpen: boolean) => {
     if (nextOpen) {
       onOpenChange(true);
