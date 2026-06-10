@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatTimeRange, getDayPartLabel, hasTimeInfo } from "@/lib/calendar-utils";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, addDays, isWithinInterval, isSameDay, differenceInCalendarDays } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { getPrimarySupabaseClient } from "@/lib/api";
@@ -106,6 +106,10 @@ export function CalendarItemDialog({
   const [timeOffTypeId, setTimeOffTypeId] = useState<string | null>(null);
   const [timeOffDayPart, setTimeOffDayPart] = useState<string>("full_day");
   const [timeOffProfileId, setTimeOffProfileId] = useState<string | null>(null);
+
+  // Remove single day from a multi-day leave
+  const [removeDayDate, setRemoveDayDate] = useState<Date | undefined>();
+  const [removingDay, setRemovingDay] = useState(false);
 
   const resetTransientState = () => {
     setConfirmDelete(false);
