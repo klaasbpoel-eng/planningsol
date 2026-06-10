@@ -1027,35 +1027,30 @@ export function CalendarItemDialog({
                             : "Dit verlof bestaat uit één dag. Verwijderen haalt de hele aanvraag weg."}
                         </p>
                         <div className="flex flex-col sm:flex-row gap-2">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "flex-1 justify-start text-left font-normal",
-                                  !removeDayDate && "text-muted-foreground"
-                                )}
-                                disabled={removingDay || deleting || saving}
-                              >
-                                <CalendarDays className="mr-2 h-4 w-4" />
-                                {removeDayDate
-                                  ? format(removeDayDate, "d MMM yyyy", { locale: nl })
-                                  : "Kies dag"}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-[100]" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
-                              <Calendar
-                                mode="single"
-                                selected={removeDayDate}
-                                onSelect={setRemoveDayDate}
-                                defaultMonth={start}
-                                disabled={(d) => d < start || d > end}
-                                locale={nl}
-                                initialFocus
-                                className="pointer-events-auto"
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <Select
+                            value={removeDayDate ? format(removeDayDate, "yyyy-MM-dd") : undefined}
+                            onValueChange={(v) => setRemoveDayDate(parseISO(v))}
+                            disabled={removingDay || deleting || saving}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                <SelectValue placeholder="Kies dag" />
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent className="z-[100] max-h-72">
+                              {Array.from({ length: totalDays }).map((_, i) => {
+                                const d = new Date(start);
+                                d.setDate(start.getDate() + i);
+                                const iso = format(d, "yyyy-MM-dd");
+                                return (
+                                  <SelectItem key={iso} value={iso}>
+                                    {format(d, "EEEE d MMM yyyy", { locale: nl })}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
                           <Button
                             variant="destructive"
                             onClick={() => void handleRemoveSingleDay()}
