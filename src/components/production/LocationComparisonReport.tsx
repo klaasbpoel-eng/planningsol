@@ -751,6 +751,38 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                   </tr>
                 )}
               </tbody>
+                    {filteredGasTypeData.length > 0 && (() => {
+                      const totalEmmen = filteredGasTypeData.reduce((s, gt) => s + (gt.emmen || 0), 0);
+                      const totalTilburg = filteredGasTypeData.reduce((s, gt) => s + (gt.tilburg || 0), 0);
+                      const totalCurrent = filteredGasTypeData.reduce((s, gt) => s + (gt.total || 0), 0);
+                      const totalPrev = filteredGasTypeData.reduce((s, gt) => s + (gt.total_prev || 0), 0);
+                      const totalDelta = totalPrev > 0 ? ((totalCurrent - totalPrev) / totalPrev) * 100 : null;
+                      return (
+                        <tfoot>
+                          <tr className="border-t-2 font-semibold bg-muted/20">
+                            <td className="py-2 pr-4">Totaal</td>
+                            <td className="text-right py-2 px-3 tabular-nums">{formatNumber(totalEmmen, 0)}</td>
+                            <td className="text-right py-2 px-3 tabular-nums">{formatNumber(totalTilburg, 0)}</td>
+                            <td className="text-right py-2 px-3 font-bold tabular-nums">{formatNumber(totalCurrent, 0)}</td>
+                            {showComparison && (
+                              <td className="text-right py-2 px-3 tabular-nums text-muted-foreground">
+                                {totalPrev > 0 ? formatNumber(totalPrev, 0) : "—"}
+                              </td>
+                            )}
+                            {showComparison && (
+                              <td className="text-right py-2 pl-3 tabular-nums">
+                                {totalDelta !== null ? (
+                                  <span className={`font-medium ${totalDelta >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                    {totalDelta >= 0 ? "+" : ""}{totalDelta.toFixed(0)}%
+                                  </span>
+                                ) : "—"}
+                              </td>
+                            )}
+                            {!showComparison && <td className="py-2 pl-3" />}
+                          </tr>
+                        </tfoot>
+                      );
+                    })()}
             </table>
           </div>
         </CardContent>
