@@ -798,38 +798,6 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                   </tr>
                 )}
               </tbody>
-                    {filteredGasTypeData.length > 0 && (() => {
-                      const totalEmmen = filteredGasTypeData.reduce((s, gt) => s + (gt.emmen || 0), 0);
-                      const totalTilburg = filteredGasTypeData.reduce((s, gt) => s + (gt.tilburg || 0), 0);
-                      const totalCurrent = filteredGasTypeData.reduce((s, gt) => s + (gt.total || 0), 0);
-                      const totalPrev = filteredGasTypeData.reduce((s, gt) => s + (gt.total_prev || 0), 0);
-                      const totalDelta = totalPrev > 0 ? ((totalCurrent - totalPrev) / totalPrev) * 100 : null;
-                      return (
-                        <tfoot>
-                          <tr className="border-t-2 font-semibold bg-muted/20">
-                            <td className="py-2 pr-4">{ytdMode ? `Totaal YTD t/m ${MONTH_NAMES[todayMonth - 1]}` : "Jaartotaal"}</td>
-                            <td className="text-right py-2 px-3 tabular-nums">{formatNumber(totalEmmen, 0)}</td>
-                            <td className="text-right py-2 px-3 tabular-nums">{formatNumber(totalTilburg, 0)}</td>
-                            <td className="text-right py-2 px-3 font-bold tabular-nums">{formatNumber(totalCurrent, 0)}</td>
-                            {showComparison && (
-                              <td className="text-right py-2 px-3 tabular-nums text-muted-foreground">
-                                {totalPrev > 0 ? formatNumber(totalPrev, 0) : "—"}
-                              </td>
-                            )}
-                            {showComparison && (
-                              <td className="text-right py-2 pl-3 tabular-nums">
-                                {totalDelta !== null ? (
-                                  <span className={`font-medium ${totalDelta >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                                    {totalDelta >= 0 ? "+" : ""}{totalDelta.toFixed(0)}%
-                                  </span>
-                                ) : "—"}
-                              </td>
-                            )}
-                            {!showComparison && <td className="py-2 pl-3" />}
-                          </tr>
-                        </tfoot>
-                      );
-                    })()}
             </table>
           </div>
         </CardContent>
@@ -895,7 +863,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">Gastype verdeling per locatie</CardTitle>
           <CardDescription>
-            Cilinders per gastype — Emmen vs Tilburg ({ytdMode ? `YTD t/m ${MONTH_NAMES[todayMonth - 1]} ${selectedYear}` : `${selectedYear} jaartotaal`})
+            Cilinders per gastype — Emmen vs Tilburg ({ytdMode ? `${selectedYear} YTD t/m ${MONTH_NAMES[todayMonth - 1]}` : `${selectedYear} jaartotaal`})
             {showComparison && ` — vergeleken met ${selectedYear - 1}`}
           </CardDescription>
         </CardHeader>
@@ -934,10 +902,10 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                   />
                   <Legend
                     formatter={(value: string) =>
-                      value === "emmen" ? `Emmen ${selectedYear}` :
-                      value === "tilburg" ? `Tilburg ${selectedYear}` :
-                      value === "emmen_prev" ? `Emmen ${selectedYear - 1}` :
-                      `Tilburg ${selectedYear - 1}`
+                      value === "emmen" ? `Emmen ${selectedYear}${ytdMode ? " YTD" : ""}` :
+                      value === "tilburg" ? `Tilburg ${selectedYear}${ytdMode ? " YTD" : ""}` :
+                      value === "emmen_prev" ? `Emmen ${selectedYear - 1}${ytdMode ? " YTD" : ""}` :
+                      `Tilburg ${selectedYear - 1}${ytdMode ? " YTD" : ""}`
                     }
                   />
                   <Bar dataKey="emmen" fill="#3b82f6" radius={[0, 2, 2, 0]} barSize={showComparison ? 9 : 14} stackId="cur" />
@@ -971,8 +939,8 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                       <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Gastype</th>
                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Emmen</th>
                       <th className="text-right py-2 px-3 font-medium text-muted-foreground">Tilburg</th>
-                      <th className="text-right py-2 px-3 font-semibold">{selectedYear}</th>
-                      {showComparison && <th className="text-right py-2 px-3 font-medium text-muted-foreground">{selectedYear - 1}</th>}
+                      <th className="text-right py-2 px-3 font-semibold">{selectedYear}{ytdMode ? " YTD" : ""}</th>
+                      {showComparison && <th className="text-right py-2 px-3 font-medium text-muted-foreground">{selectedYear - 1}{ytdMode ? " YTD" : ""}</th>}
                       {showComparison && <th className="text-right py-2 pl-3 font-medium text-muted-foreground">Δ</th>}
                       {!showComparison && <th className="text-right py-2 pl-3 font-medium text-muted-foreground">Verdeling</th>}
                     </tr>
@@ -1020,12 +988,44 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                       );
                     })}
                   </tbody>
+                  {filteredGasTypeData.length > 0 && (() => {
+                    const totalEmmen = filteredGasTypeData.reduce((s, gt) => s + (gt.emmen || 0), 0);
+                    const totalTilburg = filteredGasTypeData.reduce((s, gt) => s + (gt.tilburg || 0), 0);
+                    const totalCurrent = filteredGasTypeData.reduce((s, gt) => s + (gt.total || 0), 0);
+                    const totalPrev = filteredGasTypeData.reduce((s, gt) => s + (gt.total_prev || 0), 0);
+                    const totalDelta = totalPrev > 0 ? ((totalCurrent - totalPrev) / totalPrev) * 100 : null;
+                    return (
+                      <tfoot>
+                        <tr className="border-t-2 font-semibold bg-muted/20">
+                          <td className="py-2 pr-4">{ytdMode ? `Totaal YTD t/m ${MONTH_NAMES[todayMonth - 1]}` : `Totaal ${selectedYear} jaartotaal`}</td>
+                          <td className="text-right py-2 px-3 tabular-nums">{formatNumber(totalEmmen, 0)}</td>
+                          <td className="text-right py-2 px-3 tabular-nums">{formatNumber(totalTilburg, 0)}</td>
+                          <td className="text-right py-2 px-3 font-bold tabular-nums">{formatNumber(totalCurrent, 0)}</td>
+                          {showComparison && (
+                            <td className="text-right py-2 px-3 tabular-nums text-muted-foreground">
+                              {totalPrev > 0 ? formatNumber(totalPrev, 0) : "—"}
+                            </td>
+                          )}
+                          {showComparison && (
+                            <td className="text-right py-2 pl-3 tabular-nums">
+                              {totalDelta !== null ? (
+                                <span className={`font-medium ${totalDelta >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                  {totalDelta >= 0 ? "+" : ""}{totalDelta.toFixed(0)}%
+                                </span>
+                              ) : "—"}
+                            </td>
+                          )}
+                          {!showComparison && <td className="py-2 pl-3" />}
+                        </tr>
+                      </tfoot>
+                    );
+                  })()}
                 </table>
               </div>
             </>
           ) : (
             <div className="flex items-center justify-center h-[200px] text-muted-foreground text-sm">
-              Geen gastype data beschikbaar voor {selectedYear}
+              Geen gastype data beschikbaar voor {ytdMode ? `${selectedYear} YTD t/m ${MONTH_NAMES[todayMonth - 1]}` : `${selectedYear} jaartotaal`}
             </div>
           )}
         </CardContent>
