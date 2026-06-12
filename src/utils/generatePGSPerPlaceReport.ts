@@ -91,7 +91,11 @@ export async function generatePGSPerPlacePDF(filterLocation?: string) {
   for (const place of allPlaces) {
     const subs = substances.filter(s => (s.storage_place_id || "__none__") === place.id && (!filterLocation || s.location === filterLocation));
     const placeTanks = tanks.filter(t => (t.storage_place_id || "__none__") === place.id && (!filterLocation || t.location === filterLocation));
-    if (subs.length === 0 && placeTanks.length === 0) continue;
+    const isIncidental = place.place_type === "temporary" || place.place_type === "crossdock";
+    // Always include temporary/crossdock places (also when empty) — vereist voor PGS 15:2021 registratie.
+    // Sla alleen "(Niet toegewezen)" en lege vaste plekken over.
+    if (subs.length === 0 && placeTanks.length === 0 && !isIncidental) continue;
+    if ((place as any).__virtual && subs.length === 0 && placeTanks.length === 0) continue;
 
     if (!isFirst) {
       doc.addPage();
@@ -165,10 +169,21 @@ export async function generatePGSPerPlacePDF(filterLocation?: string) {
       cursorY = (doc as any).lastAutoTable.finalY + 6;
     }
 
-    if (place.place_type === "crossdock") {
+    if (subs.length === 0 && placeTanks.length === 0 && isIncidental) {
+      doc.setFontSize(9);
+      doc.setTextColor(120);
+      doc.text("Geen actuele voorraad geregistreerd. Deze locatie wordt uitsluitend incidenteel gebruikt.", 14, cursorY);
+      doc.setTextColor(0);
+      cursorY += 6;
+    }
+
+    if (place.place_type === "crossdock" || place.place_type === "temporary") {
       doc.setFontSize(8);
       doc.setTextColor(120);
-      doc.text("Crossdock: deze tabel toont wat hier maximaal aanwezig kán zijn, niet de actuele voorraad.", 14, cursorY);
+      const note = place.place_type === "crossdock"
+        ? "Crossdock: deze tabel toont wat hier maximaal aanwezig kán zijn, niet de actuele voorraad."
+        : `Tijdelijke/incidentele opslag${place.max_residence_hours != null ? ` — maximale verblijftijd ${place.max_residence_hours} uur` : ""}.`;
+      doc.text(note, 14, cursorY);
       doc.setTextColor(0);
       cursorY += 6;
     }
@@ -217,7 +232,8 @@ export async function generatePGSPerPlaceExcel(filterLocation?: string) {
   for (const place of filteredPlaces) {
     const subs = substances.filter(s => s.storage_place_id === place.id);
     const placeTanks = tanks.filter(t => t.storage_place_id === place.id);
-    if (subs.length === 0 && placeTanks.length === 0) continue;
+    const isIncidental = place.place_type === "temporary" || place.place_type === "crossdock";
+    if (subs.length === 0 && placeTanks.length === 0 && !isIncidental) continue;
 
     const rows: any[] = subs.map(s => ({
       Soort: "Stof",
@@ -245,6 +261,21 @@ export async function generatePGSPerPlaceExcel(filterLocation?: string) {
         "Huidig (kg)": Number(t.current_level_kg),
         "% bezetting": t.capacity_kg > 0 ? Math.round((t.current_level_kg / t.capacity_kg) * 100) : 0,
         Opmerking: place.place_type === "crossdock" ? `Max. verblijftijd: ${place.max_residence_hours ?? "—"} u` : "",
+      });
+    }
+    if (rows.length === 0 && isIncidental) {
+      rows.push({
+        Soort: "—",
+        Naam: "(Geen actuele voorraad — incidenteel gebruik)",
+        "UN-nr": "",
+        GEVI: "",
+        PGS: place.pgs_guideline,
+        GHS: "",
+        Klasse: "",
+        "Max. (kg)": "",
+        "Huidig (kg)": "",
+        "% bezetting": "",
+        Opmerking: place.max_residence_hours != null ? `Max. verblijftijd: ${place.max_residence_hours} u` : "Tijdelijke/incidentele opslag",
       });
     }
     const ws = XLSX.utils.json_to_sheet(rows);
