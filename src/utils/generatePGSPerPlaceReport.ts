@@ -204,15 +204,15 @@ export async function generatePGSPerPlacePDF(filterLocation?: string, filterType
   doc.save(`pgs-register-per-opslagplaats-${new Date().toISOString().split("T")[0]}.pdf`);
 }
 
-export async function generatePGSPerPlaceExcel(filterLocation?: string, filterType?: "all" | "permanent" | "temporary" | "crossdock") {
+export async function generatePGSPerPlaceExcel(filterLocation?: string, filterTypes?: PlaceType[]) {
   const { places, substances, tanks } = await loadData();
   const wb = XLSX.utils.book_new();
 
   // Overview sheet
   const overviewRows: any[] = [];
   let filteredPlaces = places.filter(p => !filterLocation || p.location === filterLocation);
-  if (filterType && filterType !== "all") {
-    filteredPlaces = filteredPlaces.filter(p => p.place_type === filterType);
+  if (filterTypes && filterTypes.length > 0) {
+    filteredPlaces = filteredPlaces.filter(p => filterTypes.includes(p.place_type));
   }
   for (const place of filteredPlaces) {
     const subs = substances.filter(s => s.storage_place_id === place.id);
