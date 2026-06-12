@@ -204,7 +204,7 @@ export async function generatePGSPerPlacePDF(filterLocation?: string, filterType
   doc.save(`pgs-register-per-opslagplaats-${new Date().toISOString().split("T")[0]}.pdf`);
 }
 
-export async function generatePGSPerPlaceExcel(filterLocation?: string) {
+export async function generatePGSPerPlaceExcel(filterLocation?: string, filterType?: "all" | "incidental") {
   const { places, substances, tanks } = await loadData();
   const wb = XLSX.utils.book_new();
 
