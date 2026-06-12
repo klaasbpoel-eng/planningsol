@@ -72,7 +72,7 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
 
   async function fetchPlaces() {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("storage_places")
       .select("*")
       .order("location")
@@ -119,9 +119,9 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
 
     let error;
     if (editingId && editingId !== "__new__") {
-      ({ error } = await supabase.from("storage_places").update(payload).eq("id", editingId));
+      ({ error } = await (supabase as any).from("storage_places").update(payload).eq("id", editingId));
     } else {
-      ({ error } = await supabase.from("storage_places").insert(payload));
+      ({ error } = await (supabase as any).from("storage_places").insert(payload));
     }
     setSaving(false);
     if (error) {
@@ -136,7 +136,7 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
 
   async function remove(p: StoragePlace) {
     if (!confirm(`Verwijder opslagplaats "${p.name}"?`)) return;
-    const { error } = await supabase.from("storage_places").delete().eq("id", p.id);
+    const { error } = await (supabase as any).from("storage_places").delete().eq("id", p.id);
     if (error) toast.error("Verwijderen mislukt: " + error.message);
     else {
       toast.success("Verwijderd");
