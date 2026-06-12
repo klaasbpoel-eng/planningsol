@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -55,6 +57,8 @@ import { StoragePlacesManager } from "./StoragePlacesManager";
 import { PGSAssignStoragePlaceDialog } from "./PGSAssignStoragePlaceDialog";
 import { PGSExpansionRequestsDialog } from "./PGSExpansionRequestsDialog";
 import { generatePGSPerPlacePDF, generatePGSPerPlaceExcel } from "@/utils/generatePGSPerPlaceReport";
+
+type PlaceType = "permanent" | "temporary" | "crossdock";
 
 // GHS pictogram config with diamond styling
 const GHS_CONFIG: Record<string, { label: string; src: string }> = {
@@ -390,7 +394,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
   const [placesManagerOpen, setPlacesManagerOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [expansionDialogOpen, setExpansionDialogOpen] = useState(false);
-  const [filterPlaceType, setFilterPlaceType] = useState<"all" | "permanent" | "temporary" | "crossdock">("all");
+  const [filterPlaceTypes, setFilterPlaceTypes] = useState<PlaceType[]>(["permanent", "temporary", "crossdock"]);
 
   const handlePictogramModeChange = (value: string) => {
     if (value) {
@@ -983,21 +987,39 @@ const stats = useMemo(() => {
             <Download className="h-4 w-4" />
             Excel
           </Button>
-          <Select value={filterPlaceType} onValueChange={(v) => setFilterPlaceType(v as any)}>
-            <SelectTrigger className="w-[200px] h-9 text-xs">
-              <SelectValue placeholder="Filter opslagplaats..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle plaatsen</SelectItem>
-              <SelectItem value="permanent">Vast (permanent)</SelectItem>
-              <SelectItem value="temporary">Tijdelijk / incidenteel</SelectItem>
-              <SelectItem value="crossdock">Crossdock</SelectItem>
-            </SelectContent>
-          </Select>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs">
+                <MapPin className="h-3.5 w-3.5" />
+                {filterPlaceTypes.length === 3 ? "Alle typen" : `${filterPlaceTypes.length} type${filterPlaceTypes.length !== 1 ? "s" : ""} geselecteerd`}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-3" align="end">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground">Opslagplaatstypes</p>
+                {(["permanent", "temporary", "crossdock"] as PlaceType[]).map(type => (
+                  <div key={type} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`place-type-${type}`}
+                      checked={filterPlaceTypes.includes(type)}
+                      onCheckedChange={(checked) => {
+                        setFilterPlaceTypes(prev =>
+                          checked ? [...prev, type] : prev.filter(t => t !== type)
+                        );
+                      }}
+                    />
+                    <Label htmlFor={`place-type-${type}`} className="text-xs cursor-pointer">
+                      {type === "permanent" ? "Vast (permanent)" : type === "temporary" ? "Tijdelijk / incidenteel" : "Crossdock"}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => generatePGSPerPlacePDF(locationTab !== "both" ? locationTab : undefined, filterPlaceType).catch(() => toast.error("PDF mislukt"))}
+            onClick={() => generatePGSPerPlacePDF(locationTab !== "both" ? locationTab : undefined, filterPlaceTypes).catch(() => toast.error("PDF mislukt"))}
             className="gap-1.5"
             title="PDF gegroepeerd per opslagplaats (PGS 15:2021)"
           >
@@ -1007,7 +1029,7 @@ const stats = useMemo(() => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => generatePGSPerPlaceExcel(locationTab !== "both" ? locationTab : undefined, filterPlaceType).catch(() => toast.error("Excel mislukt"))}
+            onClick={() => generatePGSPerPlaceExcel(locationTab !== "both" ? locationTab : undefined, filterPlaceTypes).catch(() => toast.error("Excel mislukt"))}
             className="gap-1.5"
             title="Excel gegroepeerd per opslagplaats"
           >
