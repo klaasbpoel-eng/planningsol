@@ -174,8 +174,14 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
           </TabsList>
 
           <TabsContent value={tab} className="space-y-3 mt-3">
-            <div className="flex justify-between items-center">
-              <div className="text-sm text-muted-foreground">{filtered.length} opslagplaats(en)</div>
+            <div className="flex justify-between items-center flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <ToggleGroup type="single" value={typeFilter} onValueChange={(v) => v && setTypeFilter(v as "all" | "incidental")} variant="outline" size="sm">
+                  <ToggleGroupItem value="all" className="text-xs h-8">Alle</ToggleGroupItem>
+                  <ToggleGroupItem value="incidental" className="text-xs h-8">Alleen tijdelijk / incidenteel</ToggleGroupItem>
+                </ToggleGroup>
+                <div className="text-sm text-muted-foreground">{filtered.length} opslagplaats(en)</div>
+              </div>
               {isAdmin && (
                 <Button size="sm" onClick={() => startEdit()} className="gap-1.5">
                   <Plus className="h-4 w-4" /> Nieuwe opslagplaats
