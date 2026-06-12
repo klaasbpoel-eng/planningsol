@@ -210,7 +210,10 @@ export async function generatePGSPerPlaceExcel(filterLocation?: string, filterTy
 
   // Overview sheet
   const overviewRows: any[] = [];
-  const filteredPlaces = places.filter(p => !filterLocation || p.location === filterLocation);
+  let filteredPlaces = places.filter(p => !filterLocation || p.location === filterLocation);
+  if (filterType === "incidental") {
+    filteredPlaces = filteredPlaces.filter(p => p.place_type === "temporary" || p.place_type === "crossdock");
+  }
   for (const place of filteredPlaces) {
     const subs = substances.filter(s => s.storage_place_id === place.id);
     const placeTanks = tanks.filter(t => t.storage_place_id === place.id);
