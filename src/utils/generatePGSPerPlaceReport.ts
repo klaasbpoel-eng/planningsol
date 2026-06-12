@@ -67,7 +67,7 @@ async function loadData() {
   return { places, substances, tanks };
 }
 
-export async function generatePGSPerPlacePDF(filterLocation?: string, filterType?: "all" | "incidental") {
+export async function generatePGSPerPlacePDF(filterLocation?: string, filterType?: "all" | "permanent" | "temporary" | "crossdock") {
   const { places, substances, tanks } = await loadData();
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
@@ -81,8 +81,8 @@ export async function generatePGSPerPlacePDF(filterLocation?: string, filterType
 
   let cursorY = 30;
   let filteredPlaces = places.filter(p => !filterLocation || p.location === filterLocation);
-  if (filterType === "incidental") {
-    filteredPlaces = filteredPlaces.filter(p => p.place_type === "temporary" || p.place_type === "crossdock");
+  if (filterType && filterType !== "all") {
+    filteredPlaces = filteredPlaces.filter(p => p.place_type === filterType);
   }
   // Add "unassigned" pseudo-place at the end for substances/tanks zonder koppeling
   const allPlaces: (Place & { __virtual?: boolean })[] = [
