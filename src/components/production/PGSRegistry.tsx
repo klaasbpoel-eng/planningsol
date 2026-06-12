@@ -1019,7 +1019,7 @@ const stats = useMemo(() => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => generatePGSPerPlacePDF(locationTab !== "both" ? locationTab : undefined, filterPlaceType).catch(() => toast.error("PDF mislukt"))}
+            onClick={() => generatePGSPerPlacePDF(locationTab !== "both" ? locationTab : undefined, filterPlaceTypes).catch(() => toast.error("PDF mislukt"))}
             className="gap-1.5"
             title="PDF gegroepeerd per opslagplaats (PGS 15:2021)"
           >
@@ -1029,7 +1029,7 @@ const stats = useMemo(() => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => generatePGSPerPlaceExcel(locationTab !== "both" ? locationTab : undefined, filterPlaceType).catch(() => toast.error("Excel mislukt"))}
+            onClick={() => generatePGSPerPlaceExcel(locationTab !== "both" ? locationTab : undefined, filterPlaceTypes).catch(() => toast.error("Excel mislukt"))}
             className="gap-1.5"
             title="Excel gegroepeerd per opslagplaats"
           >
