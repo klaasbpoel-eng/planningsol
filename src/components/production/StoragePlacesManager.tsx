@@ -174,17 +174,35 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
           <TabsContent value={tab} className="space-y-3 mt-3">
             <div className="flex justify-between items-center flex-wrap gap-2">
               <div className="flex items-center gap-2">
-              <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
-                  <SelectTrigger className="w-[180px] h-8 text-xs">
-                    <SelectValue placeholder="Filter type..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Alle typen</SelectItem>
-                    <SelectItem value="permanent">Vast (permanent)</SelectItem>
-                    <SelectItem value="temporary">Tijdelijk / incidenteel</SelectItem>
-                    <SelectItem value="crossdock">Crossdock</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                      <Filter className="h-3.5 w-3.5" />
+                      {typeFilters.length === 3 ? "Alle typen" : `${typeFilters.length} type${typeFilters.length !== 1 ? "s" : ""}`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-3" align="start">
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground">Opslagplaatstypes</p>
+                      {(["permanent", "temporary", "crossdock"] as PlaceType[]).map(type => (
+                        <div key={type} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`mgr-place-type-${type}`}
+                            checked={typeFilters.includes(type)}
+                            onCheckedChange={(checked) => {
+                              setTypeFilters(prev =>
+                                checked ? [...prev, type] : prev.filter(t => t !== type)
+                              );
+                            }}
+                          />
+                          <Label htmlFor={`mgr-place-type-${type}`} className="text-xs cursor-pointer">
+                            {type === "permanent" ? "Vast (permanent)" : type === "temporary" ? "Tijdelijk / incidenteel" : "Crossdock"}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 <div className="text-sm text-muted-foreground">{filtered.length} opslagplaats(en)</div>
               </div>
               {isAdmin && (
