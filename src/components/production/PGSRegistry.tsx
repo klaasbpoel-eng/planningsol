@@ -51,6 +51,10 @@ import { getGasColor } from "@/constants/gasColors";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { StoragePlacesManager } from "./StoragePlacesManager";
+import { PGSAssignStoragePlaceDialog } from "./PGSAssignStoragePlaceDialog";
+import { PGSExpansionRequestsDialog } from "./PGSExpansionRequestsDialog";
+import { generatePGSPerPlacePDF, generatePGSPerPlaceExcel } from "@/utils/generatePGSPerPlaceReport";
 
 // GHS pictogram config with diamond styling
 const GHS_CONFIG: Record<string, { label: string; src: string }> = {
@@ -382,6 +386,10 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
     un_number: "",
   });
   const [cylinderSizes, setCylinderSizes] = useState<Array<{ id: string; name: string; capacity_liters: number | null }>>([]);
+  // PGS 15:2021 per-opslagplaats add-ons
+  const [placesManagerOpen, setPlacesManagerOpen] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [expansionDialogOpen, setExpansionDialogOpen] = useState(false);
 
   const handlePictogramModeChange = (value: string) => {
     if (value) {
@@ -954,6 +962,18 @@ const stats = useMemo(() => {
               Nieuwe stof
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={() => setPlacesManagerOpen(true)} className="gap-1.5">
+            <MapPin className="h-4 w-4" />
+            Opslagplaatsen
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setAssignDialogOpen(true)} className="gap-1.5">
+            <Link2 className="h-4 w-4" />
+            Toewijzen
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setExpansionDialogOpen(true)} className="gap-1.5">
+            <Activity className="h-4 w-4" />
+            Uitbreiding
+          </Button>
           <Button variant="outline" size="sm" onClick={exportToPDF} className="gap-1.5">
             <FileText className="h-4 w-4" />
             PDF
@@ -961,6 +981,26 @@ const stats = useMemo(() => {
           <Button variant="outline" size="sm" onClick={exportToExcel} className="gap-1.5">
             <Download className="h-4 w-4" />
             Excel
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => generatePGSPerPlacePDF(locationTab !== "both" ? locationTab : undefined).catch(() => toast.error("PDF mislukt"))}
+            className="gap-1.5"
+            title="PDF gegroepeerd per opslagplaats (PGS 15:2021)"
+          >
+            <FileText className="h-4 w-4" />
+            PDF / plaats
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => generatePGSPerPlaceExcel(locationTab !== "both" ? locationTab : undefined).catch(() => toast.error("Excel mislukt"))}
+            className="gap-1.5"
+            title="Excel gegroepeerd per opslagplaats"
+          >
+            <Download className="h-4 w-4" />
+            Excel / plaats
           </Button>
         </div>
       </div>
@@ -1652,6 +1692,25 @@ const stats = useMemo(() => {
           </div>
         </DialogContent>
       </Dialog>
+      <StoragePlacesManager
+        open={placesManagerOpen}
+        onOpenChange={setPlacesManagerOpen}
+        isAdmin={isAdmin}
+        initialLocation={locationTab !== "both" ? (locationTab as any) : "sol_emmen"}
+      />
+      <PGSAssignStoragePlaceDialog
+        open={assignDialogOpen}
+        onOpenChange={setAssignDialogOpen}
+        isAdmin={isAdmin}
+        defaultLocation={locationTab !== "both" ? (locationTab as any) : "sol_emmen"}
+        onChanged={() => { /* substances kept in local state — refresh via tab switch */ }}
+      />
+      <PGSExpansionRequestsDialog
+        open={expansionDialogOpen}
+        onOpenChange={setExpansionDialogOpen}
+        isAdmin={isAdmin}
+        defaultLocation={locationTab !== "both" ? (locationTab as any) : "sol_emmen"}
+      />
     </div>
   );
 }

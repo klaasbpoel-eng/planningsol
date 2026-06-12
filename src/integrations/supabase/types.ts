@@ -233,6 +233,7 @@ export type Database = {
           notes: string | null
           pgs_guideline: string
           storage_class: string | null
+          storage_place_id: string | null
           tank_name: string
           tank_number: string | null
           un_number: string | null
@@ -255,6 +256,7 @@ export type Database = {
           notes?: string | null
           pgs_guideline?: string
           storage_class?: string | null
+          storage_place_id?: string | null
           tank_name: string
           tank_number?: string | null
           un_number?: string | null
@@ -277,6 +279,7 @@ export type Database = {
           notes?: string | null
           pgs_guideline?: string
           storage_class?: string | null
+          storage_place_id?: string | null
           tank_name?: string
           tank_number?: string | null
           un_number?: string | null
@@ -290,6 +293,13 @@ export type Database = {
             columns: ["gas_type_id"]
             isOneToOne: false
             referencedRelation: "gas_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulk_storage_tanks_storage_place_id_fkey"
+            columns: ["storage_place_id"]
+            isOneToOne: false
+            referencedRelation: "storage_places"
             referencedColumns: ["id"]
           },
         ]
@@ -1233,6 +1243,75 @@ export type Database = {
           },
         ]
       }
+      pgs_expansion_requests: {
+        Row: {
+          created_at: string
+          current_permitted_kg: number
+          decided_at: string | null
+          decision_notes: string | null
+          gas_type_id: string | null
+          id: string
+          location: Database["public"]["Enums"]["production_location"]
+          motivation: string | null
+          requested_at: string | null
+          requested_by: string | null
+          requested_permitted_kg: number
+          status: Database["public"]["Enums"]["pgs_expansion_status"]
+          substance_name: string
+          target_storage_place_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_permitted_kg?: number
+          decided_at?: string | null
+          decision_notes?: string | null
+          gas_type_id?: string | null
+          id?: string
+          location: Database["public"]["Enums"]["production_location"]
+          motivation?: string | null
+          requested_at?: string | null
+          requested_by?: string | null
+          requested_permitted_kg?: number
+          status?: Database["public"]["Enums"]["pgs_expansion_status"]
+          substance_name: string
+          target_storage_place_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_permitted_kg?: number
+          decided_at?: string | null
+          decision_notes?: string | null
+          gas_type_id?: string | null
+          id?: string
+          location?: Database["public"]["Enums"]["production_location"]
+          motivation?: string | null
+          requested_at?: string | null
+          requested_by?: string | null
+          requested_permitted_kg?: number
+          status?: Database["public"]["Enums"]["pgs_expansion_status"]
+          substance_name?: string
+          target_storage_place_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pgs_expansion_requests_gas_type_id_fkey"
+            columns: ["gas_type_id"]
+            isOneToOne: false
+            referencedRelation: "gas_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pgs_expansion_requests_target_storage_place_id_fkey"
+            columns: ["target_storage_place_id"]
+            isOneToOne: false
+            referencedRelation: "storage_places"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pgs_substances: {
         Row: {
           cas_number: string | null
@@ -1252,6 +1331,7 @@ export type Database = {
           safety_phrases: string | null
           storage_class: string | null
           storage_location: string | null
+          storage_place_id: string | null
           un_number: string | null
           updated_at: string
           updated_by: string | null
@@ -1275,6 +1355,7 @@ export type Database = {
           safety_phrases?: string | null
           storage_class?: string | null
           storage_location?: string | null
+          storage_place_id?: string | null
           un_number?: string | null
           updated_at?: string
           updated_by?: string | null
@@ -1298,6 +1379,7 @@ export type Database = {
           safety_phrases?: string | null
           storage_class?: string | null
           storage_location?: string | null
+          storage_place_id?: string | null
           un_number?: string | null
           updated_at?: string
           updated_by?: string | null
@@ -1309,6 +1391,13 @@ export type Database = {
             columns: ["gas_type_id"]
             isOneToOne: false
             referencedRelation: "gas_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pgs_substances_storage_place_id_fkey"
+            columns: ["storage_place_id"]
+            isOneToOne: false
+            referencedRelation: "storage_places"
             referencedColumns: ["id"]
           },
         ]
@@ -1525,6 +1614,54 @@ export type Database = {
           id?: string
           sub_code?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      storage_places: {
+        Row: {
+          code: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          location: Database["public"]["Enums"]["production_location"]
+          max_residence_hours: number | null
+          name: string
+          notes: string | null
+          pgs_guideline: string
+          place_type: Database["public"]["Enums"]["storage_place_type"]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          location?: Database["public"]["Enums"]["production_location"]
+          max_residence_hours?: number | null
+          name: string
+          notes?: string | null
+          pgs_guideline?: string
+          place_type?: Database["public"]["Enums"]["storage_place_type"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          location?: Database["public"]["Enums"]["production_location"]
+          max_residence_hours?: number | null
+          name?: string
+          notes?: string | null
+          pgs_guideline?: string
+          place_type?: Database["public"]["Enums"]["storage_place_type"]
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -2373,6 +2510,7 @@ export type Database = {
         | "oxygen"
         | "helium"
         | "other"
+      pgs_expansion_status: "draft" | "submitted" | "approved" | "rejected"
       production_location: "sol_emmen" | "sol_tilburg"
       production_order_status:
         | "pending"
@@ -2380,6 +2518,7 @@ export type Database = {
         | "completed"
         | "cancelled"
       request_status: "pending" | "approved" | "rejected"
+      storage_place_type: "permanent" | "temporary" | "crossdock"
       time_off_type: "vacation" | "sick" | "personal" | "other"
       toolbox_section_type:
         | "text"
@@ -2528,6 +2667,7 @@ export const Constants = {
         "helium",
         "other",
       ],
+      pgs_expansion_status: ["draft", "submitted", "approved", "rejected"],
       production_location: ["sol_emmen", "sol_tilburg"],
       production_order_status: [
         "pending",
@@ -2536,6 +2676,7 @@ export const Constants = {
         "cancelled",
       ],
       request_status: ["pending", "approved", "rejected"],
+      storage_place_type: ["permanent", "temporary", "crossdock"],
       time_off_type: ["vacation", "sick", "personal", "other"],
       toolbox_section_type: [
         "text",
