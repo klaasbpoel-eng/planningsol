@@ -65,7 +65,7 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<"all" | "incidental">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "permanent" | "temporary" | "crossdock">("all");
 
   useEffect(() => {
     if (open) fetchPlaces();
@@ -149,8 +149,8 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
 
   const filtered = places.filter(p => {
     if (p.location !== tab) return false;
-    if (typeFilter === "incidental") {
-      return p.place_type === "temporary" || p.place_type === "crossdock";
+    if (typeFilter !== "all") {
+      return p.place_type === typeFilter;
     }
     return true;
   });
@@ -176,10 +176,17 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
           <TabsContent value={tab} className="space-y-3 mt-3">
             <div className="flex justify-between items-center flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <ToggleGroup type="single" value={typeFilter} onValueChange={(v) => v && setTypeFilter(v as "all" | "incidental")} variant="outline" size="sm">
-                  <ToggleGroupItem value="all" className="text-xs h-8">Alle</ToggleGroupItem>
-                  <ToggleGroupItem value="incidental" className="text-xs h-8">Alleen tijdelijk / incidenteel</ToggleGroupItem>
-                </ToggleGroup>
+              <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
+                  <SelectTrigger className="w-[180px] h-8 text-xs">
+                    <SelectValue placeholder="Filter type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle typen</SelectItem>
+                    <SelectItem value="permanent">Vast (permanent)</SelectItem>
+                    <SelectItem value="temporary">Tijdelijk / incidenteel</SelectItem>
+                    <SelectItem value="crossdock">Crossdock</SelectItem>
+                  </SelectContent>
+                </Select>
                 <div className="text-sm text-muted-foreground">{filtered.length} opslagplaats(en)</div>
               </div>
               {isAdmin && (

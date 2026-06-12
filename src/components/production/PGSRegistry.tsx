@@ -390,7 +390,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
   const [placesManagerOpen, setPlacesManagerOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [expansionDialogOpen, setExpansionDialogOpen] = useState(false);
-  const [filterPlaceType, setFilterPlaceType] = useState<"all" | "incidental">("all");
+  const [filterPlaceType, setFilterPlaceType] = useState<"all" | "permanent" | "temporary" | "crossdock">("all");
 
   const handlePictogramModeChange = (value: string) => {
     if (value) {
@@ -983,10 +983,17 @@ const stats = useMemo(() => {
             <Download className="h-4 w-4" />
             Excel
           </Button>
-          <ToggleGroup type="single" value={filterPlaceType} onValueChange={(v) => v && setFilterPlaceType(v as "all" | "incidental")} variant="outline" size="sm">
-            <ToggleGroupItem value="all" className="text-xs px-2.5 h-9">Alle plaatsen</ToggleGroupItem>
-            <ToggleGroupItem value="incidental" className="text-xs px-2.5 h-9">Alleen tijdelijk / incidenteel</ToggleGroupItem>
-          </ToggleGroup>
+          <Select value={filterPlaceType} onValueChange={(v) => setFilterPlaceType(v as any)}>
+            <SelectTrigger className="w-[200px] h-9 text-xs">
+              <SelectValue placeholder="Filter opslagplaats..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle plaatsen</SelectItem>
+              <SelectItem value="permanent">Vast (permanent)</SelectItem>
+              <SelectItem value="temporary">Tijdelijk / incidenteel</SelectItem>
+              <SelectItem value="crossdock">Crossdock</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             variant="outline"
             size="sm"
