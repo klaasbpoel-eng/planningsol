@@ -64,6 +64,7 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<"all" | "incidental">("all");
 
   useEffect(() => {
     if (open) fetchPlaces();
