@@ -150,10 +150,7 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
 
   const filtered = places.filter(p => {
     if (p.location !== tab) return false;
-    if (typeFilter !== "all") {
-      return p.place_type === typeFilter;
-    }
-    return true;
+    return typeFilters.includes(p.place_type);
   });
 
   return (
