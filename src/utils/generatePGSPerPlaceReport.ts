@@ -67,7 +67,7 @@ async function loadData() {
   return { places, substances, tanks };
 }
 
-export async function generatePGSPerPlacePDF(filterLocation?: string) {
+export async function generatePGSPerPlacePDF(filterLocation?: string, filterType?: "all" | "incidental") {
   const { places, substances, tanks } = await loadData();
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
