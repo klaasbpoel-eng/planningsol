@@ -983,10 +983,14 @@ const stats = useMemo(() => {
             <Download className="h-4 w-4" />
             Excel
           </Button>
+          <ToggleGroup type="single" value={filterPlaceType} onValueChange={(v) => v && setFilterPlaceType(v as "all" | "incidental")} variant="outline" size="sm">
+            <ToggleGroupItem value="all" className="text-xs px-2.5 h-9">Alle plaatsen</ToggleGroupItem>
+            <ToggleGroupItem value="incidental" className="text-xs px-2.5 h-9">Alleen tijdelijk / incidenteel</ToggleGroupItem>
+          </ToggleGroup>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => generatePGSPerPlacePDF(locationTab !== "both" ? locationTab : undefined).catch(() => toast.error("PDF mislukt"))}
+            onClick={() => generatePGSPerPlacePDF(locationTab !== "both" ? locationTab : undefined, filterPlaceType).catch(() => toast.error("PDF mislukt"))}
             className="gap-1.5"
             title="PDF gegroepeerd per opslagplaats (PGS 15:2021)"
           >
@@ -996,7 +1000,7 @@ const stats = useMemo(() => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => generatePGSPerPlaceExcel(locationTab !== "both" ? locationTab : undefined).catch(() => toast.error("Excel mislukt"))}
+            onClick={() => generatePGSPerPlaceExcel(locationTab !== "both" ? locationTab : undefined, filterPlaceType).catch(() => toast.error("Excel mislukt"))}
             className="gap-1.5"
             title="Excel gegroepeerd per opslagplaats"
           >
