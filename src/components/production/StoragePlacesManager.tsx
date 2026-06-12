@@ -66,7 +66,7 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<"all" | "permanent" | "temporary" | "crossdock">("all");
+  const [typeFilters, setTypeFilters] = useState<PlaceType[]>(["permanent", "temporary", "crossdock"]);
 
   useEffect(() => {
     if (open) fetchPlaces();
