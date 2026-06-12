@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Pencil, Plus, Trash2, MapPin, Clock } from "lucide-react";
 import { toast } from "sonner";
 
@@ -64,6 +65,7 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<"all" | "incidental">("all");
 
   useEffect(() => {
     if (open) fetchPlaces();
@@ -145,7 +147,13 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
     }
   }
 
-  const filtered = places.filter(p => p.location === tab);
+  const filtered = places.filter(p => {
+    if (p.location !== tab) return false;
+    if (typeFilter === "incidental") {
+      return p.place_type === "temporary" || p.place_type === "crossdock";
+    }
+    return true;
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -166,8 +174,14 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
           </TabsList>
 
           <TabsContent value={tab} className="space-y-3 mt-3">
-            <div className="flex justify-between items-center">
-              <div className="text-sm text-muted-foreground">{filtered.length} opslagplaats(en)</div>
+            <div className="flex justify-between items-center flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <ToggleGroup type="single" value={typeFilter} onValueChange={(v) => v && setTypeFilter(v as "all" | "incidental")} variant="outline" size="sm">
+                  <ToggleGroupItem value="all" className="text-xs h-8">Alle</ToggleGroupItem>
+                  <ToggleGroupItem value="incidental" className="text-xs h-8">Alleen tijdelijk / incidenteel</ToggleGroupItem>
+                </ToggleGroup>
+                <div className="text-sm text-muted-foreground">{filtered.length} opslagplaats(en)</div>
+              </div>
               {isAdmin && (
                 <Button size="sm" onClick={() => startEdit()} className="gap-1.5">
                   <Plus className="h-4 w-4" /> Nieuwe opslagplaats

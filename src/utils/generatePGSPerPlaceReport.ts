@@ -67,7 +67,7 @@ async function loadData() {
   return { places, substances, tanks };
 }
 
-export async function generatePGSPerPlacePDF(filterLocation?: string) {
+export async function generatePGSPerPlacePDF(filterLocation?: string, filterType?: "all" | "incidental") {
   const { places, substances, tanks } = await loadData();
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
@@ -80,7 +80,10 @@ export async function generatePGSPerPlacePDF(filterLocation?: string) {
   doc.setTextColor(0);
 
   let cursorY = 30;
-  const filteredPlaces = places.filter(p => !filterLocation || p.location === filterLocation);
+  let filteredPlaces = places.filter(p => !filterLocation || p.location === filterLocation);
+  if (filterType === "incidental") {
+    filteredPlaces = filteredPlaces.filter(p => p.place_type === "temporary" || p.place_type === "crossdock");
+  }
   // Add "unassigned" pseudo-place at the end for substances/tanks zonder koppeling
   const allPlaces: (Place & { __virtual?: boolean })[] = [
     ...filteredPlaces,
@@ -201,13 +204,16 @@ export async function generatePGSPerPlacePDF(filterLocation?: string) {
   doc.save(`pgs-register-per-opslagplaats-${new Date().toISOString().split("T")[0]}.pdf`);
 }
 
-export async function generatePGSPerPlaceExcel(filterLocation?: string) {
+export async function generatePGSPerPlaceExcel(filterLocation?: string, filterType?: "all" | "incidental") {
   const { places, substances, tanks } = await loadData();
   const wb = XLSX.utils.book_new();
 
   // Overview sheet
   const overviewRows: any[] = [];
-  const filteredPlaces = places.filter(p => !filterLocation || p.location === filterLocation);
+  let filteredPlaces = places.filter(p => !filterLocation || p.location === filterLocation);
+  if (filterType === "incidental") {
+    filteredPlaces = filteredPlaces.filter(p => p.place_type === "temporary" || p.place_type === "crossdock");
+  }
   for (const place of filteredPlaces) {
     const subs = substances.filter(s => s.storage_place_id === place.id);
     const placeTanks = tanks.filter(t => t.storage_place_id === place.id);
