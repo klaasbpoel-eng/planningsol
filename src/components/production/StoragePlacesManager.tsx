@@ -176,10 +176,17 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
           <TabsContent value={tab} className="space-y-3 mt-3">
             <div className="flex justify-between items-center flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <ToggleGroup type="single" value={typeFilter} onValueChange={(v) => v && setTypeFilter(v as "all" | "incidental")} variant="outline" size="sm">
-                  <ToggleGroupItem value="all" className="text-xs h-8">Alle</ToggleGroupItem>
-                  <ToggleGroupItem value="incidental" className="text-xs h-8">Alleen tijdelijk / incidenteel</ToggleGroupItem>
-                </ToggleGroup>
+              <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
+                  <SelectTrigger className="w-[180px] h-8 text-xs">
+                    <SelectValue placeholder="Filter type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle typen</SelectItem>
+                    <SelectItem value="permanent">Vast (permanent)</SelectItem>
+                    <SelectItem value="temporary">Tijdelijk / incidenteel</SelectItem>
+                    <SelectItem value="crossdock">Crossdock</SelectItem>
+                  </SelectContent>
+                </Select>
                 <div className="text-sm text-muted-foreground">{filtered.length} opslagplaats(en)</div>
               </div>
               {isAdmin && (
