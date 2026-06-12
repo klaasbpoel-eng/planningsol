@@ -146,7 +146,13 @@ export function StoragePlacesManager({ open, onOpenChange, isAdmin, initialLocat
     }
   }
 
-  const filtered = places.filter(p => p.location === tab);
+  const filtered = places.filter(p => {
+    if (p.location !== tab) return false;
+    if (typeFilter === "incidental") {
+      return p.place_type === "temporary" || p.place_type === "crossdock";
+    }
+    return true;
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
