@@ -58,6 +58,8 @@ import { PGSAssignStoragePlaceDialog } from "./PGSAssignStoragePlaceDialog";
 import { PGSExpansionRequestsDialog } from "./PGSExpansionRequestsDialog";
 import { generatePGSPerPlacePDF, generatePGSPerPlaceExcel } from "@/utils/generatePGSPerPlaceReport";
 
+type PlaceType = "permanent" | "temporary" | "crossdock";
+
 // GHS pictogram config with diamond styling
 const GHS_CONFIG: Record<string, { label: string; src: string }> = {
   GHS01: { label: "Explosief", src: "/ghs/GHS01.svg" },
