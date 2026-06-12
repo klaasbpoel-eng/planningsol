@@ -80,7 +80,10 @@ export async function generatePGSPerPlacePDF(filterLocation?: string, filterType
   doc.setTextColor(0);
 
   let cursorY = 30;
-  const filteredPlaces = places.filter(p => !filterLocation || p.location === filterLocation);
+  let filteredPlaces = places.filter(p => !filterLocation || p.location === filterLocation);
+  if (filterType === "incidental") {
+    filteredPlaces = filteredPlaces.filter(p => p.place_type === "temporary" || p.place_type === "crossdock");
+  }
   // Add "unassigned" pseudo-place at the end for substances/tanks zonder koppeling
   const allPlaces: (Place & { __virtual?: boolean })[] = [
     ...filteredPlaces,
