@@ -1692,6 +1692,25 @@ const stats = useMemo(() => {
           </div>
         </DialogContent>
       </Dialog>
+      <StoragePlacesManager
+        open={placesManagerOpen}
+        onOpenChange={setPlacesManagerOpen}
+        isAdmin={isAdmin}
+        initialLocation={locationTab !== "both" ? (locationTab as any) : "sol_emmen"}
+      />
+      <PGSAssignStoragePlaceDialog
+        open={assignDialogOpen}
+        onOpenChange={setAssignDialogOpen}
+        isAdmin={isAdmin}
+        defaultLocation={locationTab !== "both" ? (locationTab as any) : "sol_emmen"}
+        onChanged={() => { /* substances kept in local state — refresh via tab switch */ }}
+      />
+      <PGSExpansionRequestsDialog
+        open={expansionDialogOpen}
+        onOpenChange={setExpansionDialogOpen}
+        isAdmin={isAdmin}
+        defaultLocation={locationTab !== "both" ? (locationTab as any) : "sol_emmen"}
+      />
     </div>
   );
 }
