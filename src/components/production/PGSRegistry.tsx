@@ -392,7 +392,7 @@ export function PGSRegistry({ location: initialLocation, isAdmin = false }: PGSR
   const [placesManagerOpen, setPlacesManagerOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [expansionDialogOpen, setExpansionDialogOpen] = useState(false);
-  const [filterPlaceType, setFilterPlaceType] = useState<"all" | "permanent" | "temporary" | "crossdock">("all");
+  const [filterPlaceTypes, setFilterPlaceTypes] = useState<PlaceType[]>(["permanent", "temporary", "crossdock"]);
 
   const handlePictogramModeChange = (value: string) => {
     if (value) {
