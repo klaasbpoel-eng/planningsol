@@ -42,7 +42,6 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { path: "/kalender", label: "Kalender", icon: <CalendarDays className="h-4 w-4" /> },
       { path: "/productie", label: "Productie", icon: <Factory className="h-4 w-4" /> },
-      { path: "/gasflow", label: "GasFlow", shortLabel: "GasFlow", icon: <Activity className="h-4 w-4" /> },
       { path: "/dagoverzicht", label: "Dagoverzicht", shortLabel: "Dag", icon: <CalendarDays className="h-4 w-4" /> },
     ],
   },
