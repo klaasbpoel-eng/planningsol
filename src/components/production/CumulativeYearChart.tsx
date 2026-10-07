@@ -7,6 +7,7 @@ import { Cylinder, Snowflake, LineChart as LineChartIcon, Trophy, Sparkles } fro
 import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
+import { mapProductionLocation } from "@/lib/productionMetrics";
 import { ChartSkeleton } from "@/components/ui/skeletons/chart-skeleton";
 import {
   LineChart,
@@ -106,7 +107,7 @@ export const CumulativeYearChart = React.memo(function CumulativeYearChart({ typ
               }
               const filtered = locationParam
                 ? allRows.filter(row => {
-                    const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+                    const loc = mapProductionLocation(row.Locatie);
                     return loc === locationParam;
                   })
                 : allRows;

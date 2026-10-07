@@ -31,6 +31,7 @@ import { formatNumber } from "@/lib/utils";
 
 import { DryIceOrderDialog } from "@/components/calendar/DryIceOrderDialog";
 import { DryIceExcelImportDialog } from "./DryIceExcelImportDialog";
+import { CreateDryIceOrderDialog } from "./CreateDryIceOrderDialog";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileOrderCard, OrderDetail } from "./MobileOrderCard";
@@ -103,6 +104,7 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
   const [orderToDelete, setOrderToDelete] = useState<DryIceOrder | null>(null);
   const [dailyCapacity, setDailyCapacity] = useState<number>(500);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   // Filter states
   const [yearFilter, setYearFilter] = useState<number>(new Date().getFullYear());
@@ -355,6 +357,12 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
           </p>
         </div>
         <div className="flex gap-2">
+          {permissions.canCreateOrders && (
+            <Button onClick={() => setCreateDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nieuwe order
+            </Button>
+          )}
           {isAdmin && (
             <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
               <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -660,6 +668,15 @@ export function DryIcePlanning({ onDataChanged, location = "all" }: DryIcePlanni
         canEdit={isAdmin}
         productTypes={productTypes.map(pt => ({ ...pt, description: null, is_active: true, sort_order: 0, created_at: "", updated_at: "" }))}
         packagingOptions={packagingOptions.map(pkg => ({ ...pkg, description: null, is_active: true, sort_order: 0, created_at: "", updated_at: "", capacity_kg: null }))}
+      />
+
+      <CreateDryIceOrderDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onCreated={() => {
+          fetchOrders();
+          onDataChanged?.();
+        }}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

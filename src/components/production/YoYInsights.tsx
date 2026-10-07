@@ -9,6 +9,7 @@ import { TrendingUp, TrendingDown, Users, Flame, Container, ChevronDown, Chevron
 import { supabase } from "@/integrations/supabase/client";
 import { cn, formatNumber, normalizeDatum } from "@/lib/utils";
 import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
+import { mapProductionLocation } from "@/lib/productionMetrics";
 import { normalizeKlant } from "@/lib/customerNormalize";
 import { format, subYears, differenceInCalendarDays } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -175,7 +176,7 @@ export function YoYInsights({
             const iso = normalizeDatum(row.Datum);
             if (!iso || iso < f || iso > t) return false;
             if (locationParam) {
-              const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+              const loc = mapProductionLocation(row.Locatie);
               if (loc !== locationParam) return false;
             }
             if (digitalNames.size > 0 && digitalNames.has(row.Product)) return false;

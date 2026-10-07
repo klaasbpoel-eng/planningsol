@@ -29,6 +29,7 @@ import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber, normalizeDatum } from "@/lib/utils";
 import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
+import { mapProductionLocation } from "@/lib/productionMetrics";
 import { toast } from "sonner";
 import { exportToExcel, exportToPDF } from "@/lib/export-utils";
 
@@ -245,7 +246,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
       if (!raw) return false;
       const iso = normalizeDatum(raw);
       if (!iso || iso < from || iso > to) return false;
-      const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+      const loc = mapProductionLocation(row.Locatie);
       return loc === locationParam;
     });
   };
@@ -260,7 +261,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
   ): Promise<YearLocationKPI> => {
     const isTilburg = location === "sol_tilburg";
     const locFilter = (rows: any[]) => rows.filter((row: any) => {
-      const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+      const loc = mapProductionLocation(row.Locatie);
       return loc === location;
     });
     const [rawRows, dryIceEffRes] = await Promise.all([

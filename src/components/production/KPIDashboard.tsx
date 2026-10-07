@@ -31,6 +31,7 @@ import {
 import { analyzeAnomalies } from "@/hooks/useAnomalyDetection";
 import { AnomalyAlertBadge, AnomalyAlertsPanel } from "./AnomalyAlertBadge";
 import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
+import { mapProductionLocation } from "@/lib/productionMetrics";
 
 type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 
@@ -77,10 +78,6 @@ interface SparklineData {
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-function mapLocatie(locatie: string): "sol_emmen" | "sol_tilburg" {
-  return locatie.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
-}
-
 // (Removed mapDatum in favor of normalizeDatum from utils)
 const toLocalDateString = (date: Date) => {
   const y = date.getFullYear();
@@ -107,11 +104,11 @@ function calculateStats(
   }
 
   if (locationParam) {
-    filtered = filtered.filter((row) => mapLocatie(row.Locatie) === locationParam);
+    filtered = filtered.filter((row) => mapProductionLocation(row.Locatie) === locationParam);
   }
 
-  const emmenRows = filtered.filter((r) => mapLocatie(r.Locatie) === "sol_emmen");
-  const tilburgRows = filtered.filter((r) => mapLocatie(r.Locatie) === "sol_tilburg");
+  const emmenRows = filtered.filter((r) => mapProductionLocation(r.Locatie) === "sol_emmen");
+  const tilburgRows = filtered.filter((r) => mapProductionLocation(r.Locatie) === "sol_tilburg");
 
   return {
     total_cylinders: filtered.reduce((sum, r) => sum + (r.Aantal || 0), 0),
@@ -144,7 +141,7 @@ function computeWeeklySparkline(
     });
 
     if (locationParam) {
-      weekRows = weekRows.filter((r) => mapLocatie(r.Locatie) === locationParam);
+      weekRows = weekRows.filter((r) => mapProductionLocation(r.Locatie) === locationParam);
     }
 
     return {

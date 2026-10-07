@@ -7,6 +7,7 @@ import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger }
 import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown, Minus, Trophy, Ruler } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { mapProductionLocation } from "@/lib/productionMetrics";
 import {
   LineChart,
   Line,
@@ -98,7 +99,7 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
 
   useEffect(() => {
     fetchBothYearsData();
-  }, [selectedYear1, selectedYear2, location, hideDigital]);
+  }, [selectedYear1, selectedYear2, location, hideDigital, hideExternal]);
 
   const fetchBothYearsData = async () => {
     setLoading(true);
@@ -118,7 +119,7 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
         if (!data || data.length === 0) break;
         if (locationParam) {
           allRows.push(...data.filter((r: any) =>
-            (r.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg") === locationParam
+            mapProductionLocation(r.Locatie) === locationParam
           ));
         } else {
           allRows.push(...data);
@@ -143,7 +144,8 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
         if (!map.has(key)) {
           map.set(key, { month, cylinder_size, capacityLiters, total_cylinders: 0 });
         }
-        map.get(key)!.total_cylinders += Number(r.Aantal) || 0;
+        const current = map.get(key);
+        if (current) current.total_cylinders += Number(r.Aantal) || 0;
       });
       return Array.from(map.values());
     };

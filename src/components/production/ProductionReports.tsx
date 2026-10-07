@@ -96,7 +96,7 @@ const TopCustomersWidget = lazy(() => import("./TopCustomersWidget").then(m => (
 const ChartLoadingFallback = () => (
   <ChartSkeleton height={300} showLegend={false} />
 );
-import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, differenceInDays, subDays, startOfYear, endOfYear, subYears, isSameDay, isSameMonth, isSameYear } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, differenceInDays, startOfYear, endOfYear, subYears, isSameDay, isSameMonth, isSameYear } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn, formatNumber, normalizeDatum } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -162,6 +162,7 @@ interface ProductionReportsProps {
 }
 
 import { getGasColor } from "@/constants/gasColors";
+import { getComparisonRange, isYearToDateRange, mapProductionLocation } from "@/lib/productionMetrics";
 
 export function ProductionReports({
   refreshKey = 0,
@@ -179,6 +180,7 @@ export function ProductionReports({
   // Server-side aggregated data
   const [dailyProduction, setDailyProduction] = useState<DailyProductionData[]>([]);
   const [gasTypeDistributionData, setGasTypeDistributionData] = useState<GasTypeDistributionData[]>([]);
+  const [previousGasTypeDistributionData, setPreviousGasTypeDistributionData] = useState<GasTypeDistributionData[]>([]);
   const [gasCategoryDistributionData, setGasCategoryDistributionData] = useState<GasCategoryDistributionData[]>([]);
   const hideDigital = externalHideDigital ?? false;
   const setHideDigital = (val: boolean) => onHideDigitalChange?.(val);
@@ -238,23 +240,9 @@ export function ProductionReports({
       const fromDate = format(dateRange.from, "yyyy-MM-dd");
       const toDate = format(dateRange.to, "yyyy-MM-dd");
 
-      // YTD mode: Jan 1 to today → compare same period last year
-      const nowCheck = new Date();
-      const ytd = dateRange.from.getMonth() === 0 && dateRange.from.getDate() === 1
-        && dateRange.to.getFullYear() === dateRange.from.getFullYear()
-        && dateRange.to <= nowCheck;
-
-      let prevFromDate: string, prevToDate: string;
-      if (ytd) {
-        const prevYr = dateRange.from.getFullYear() - 1;
-        const prevEnd = new Date(dateRange.to);
-        prevEnd.setFullYear(prevYr);
-        prevFromDate = `${prevYr}-01-01`;
-        prevToDate = format(prevEnd, "yyyy-MM-dd");
-      } else {
-        prevFromDate = format(subYears(dateRange.from, 1), "yyyy-MM-dd");
-        prevToDate = format(subYears(dateRange.to, 1), "yyyy-MM-dd");
-      }
+      const comparison = getComparisonRange(dateRange.from, dateRange.to);
+      const prevFromDate = format(comparison.from, "yyyy-MM-dd");
+      const prevToDate = format(comparison.to, "yyyy-MM-dd");
       const locationParam = location === "all" ? null : location;
       const isTilburg = location === "sol_tilburg";
 
@@ -292,7 +280,7 @@ export function ProductionReports({
           const iso = normalizeDatum(raw);
           if (iso < fDate || iso > tDate) return false;
           if (locationParam) {
-            const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+            const loc = mapProductionLocation(row.Locatie);
             if (loc !== locationParam) return false;
           }
           return true;
@@ -369,40 +357,42 @@ export function ProductionReports({
 
       // Location split (for KPI cards when location === "all")
       const emmenCyl = currentRows
-        .filter(r => r.Locatie?.toLowerCase().includes("emmen"))
+        .filter(r => mapProductionLocation(r.Locatie) === "sol_emmen")
         .reduce((s: number, r: any) => s + (r.Aantal || 0), 0);
       const tilburgCyl = currentRows
-        .filter(r => !r.Locatie?.toLowerCase().includes("emmen"))
+        .filter(r => mapProductionLocation(r.Locatie) === "sol_tilburg")
         .reduce((s: number, r: any) => s + (r.Aantal || 0), 0);
       setLocationSplit({ emmen: emmenCyl, tilburg: tilburgCyl });
 
       // Gas type distribution grouped by Product
-      const typeMap = new Map<string, number>();
-      for (const row of currentRows) {
-        const name = row.Product || "Onbekend";
-        typeMap.set(name, (typeMap.get(name) || 0) + (row.Aantal || 0));
-      }
+      const buildTypeDistribution = (rows: any[]): GasTypeDistributionData[] => {
+        const typeMap = new Map<string, number>();
+        for (const row of rows) {
+          const name = row.Product || "Onbekend";
+          typeMap.set(name, (typeMap.get(name) || 0) + (row.Aantal || 0));
+        }
+        return Array.from(typeMap.entries()).map(([name, total]) => {
+          const gt = gasTypeMap.get(name);
+          return {
+            gas_type_id: gt?.id || null,
+            gas_type_name: name,
+            gas_type_color: gt?.color || "",
+            total_cylinders: total,
+            is_digital: gt?.is_digital || false,
+            is_external: gt?.is_external || false,
+          };
+        }).sort((a, b) => b.total_cylinders - a.total_cylinders);
+      };
+      const currentDistribution = buildTypeDistribution(currentRows);
+      const previousDistribution = buildTypeDistribution(prevRows);
       let hasDigital = false;
       let hasExternal = false;
-      setGasTypeDistributionData(
-        Array.from(typeMap.entries())
-          .map(([name, total]) => {
-            const gt = gasTypeMap.get(name);
-            const isDig = gt?.is_digital || false;
-            const isExt = gt?.is_external || false;
-            if (isDig) hasDigital = true;
-            if (isExt) hasExternal = true;
-            return {
-              gas_type_id: gt?.id || null,
-              gas_type_name: name,
-              gas_type_color: gt?.color || "",
-              total_cylinders: total,
-              is_digital: isDig,
-              is_external: isExt,
-            };
-          })
-          .sort((a, b) => b.total_cylinders - a.total_cylinders)
-      );
+      currentDistribution.forEach(item => {
+        if (item.is_digital) hasDigital = true;
+        if (item.is_external) hasExternal = true;
+      });
+      setGasTypeDistributionData(currentDistribution);
+      setPreviousGasTypeDistributionData(previousDistribution);
       setHasDigitalTypes(hasDigital);
       setHasExternalTypes(hasExternal);
 
@@ -533,23 +523,21 @@ export function ProductionReports({
   const [cumulativeChart, setCumulativeChart] = useState(false);
 
   // Detect YTD mode: period starts on Jan 1 of current year and ends today or earlier
-  const isYtdMode = useMemo(() => {
-    const now = new Date();
-    return dateRange.from.getMonth() === 0 && dateRange.from.getDate() === 1
-      && dateRange.to.getFullYear() === dateRange.from.getFullYear()
-      && dateRange.to <= now;
-  }, [dateRange]);
+  const isYtdMode = useMemo(() => isYearToDateRange(dateRange.from, dateRange.to), [dateRange]);
 
   // Prepare chart data from RPC response
   const ordersPerDay = useMemo(() => {
-    return dailyProduction.map((item, idx) => ({
+    return dailyProduction.map((item) => {
+      const offset = differenceInDays(new Date(item.production_date), dateRange.from);
+      return {
       date: item.production_date,
       cylinders: Number(item.cylinder_count) || 0,
       dryIce: Number(item.dry_ice_kg) || 0,
       displayDate: format(new Date(item.production_date), "d MMM", { locale: nl }),
-      prevCylinders: prevDailyByOffset[idx] || 0,
-    }));
-  }, [dailyProduction, prevDailyByOffset]);
+      prevCylinders: offset >= 0 ? (prevDailyByOffset[offset] || 0) : 0,
+    };
+    });
+  }, [dailyProduction, prevDailyByOffset, dateRange.from]);
 
   // Chart data: cumulative running totals when cumulativeChart is on
   const chartData = useMemo(() => {
@@ -604,7 +592,7 @@ export function ProductionReports({
         is_digital: item.is_digital,
       };
     });
-  }, [gasTypeDistributionData, hideDigital]);
+  }, [gasTypeDistributionData, hideDigital, hideExternal]);
 
   // Digital vs physical cylinder totals
   const digitalPhysicalSplit = useMemo(() => {
@@ -860,10 +848,17 @@ export function ProductionReports({
 
       {/* Hero KPIs: Cilinders + Droogijs (large, with completion ratio bar) */}
       {(() => {
-        const cylinderValue = hideDigital
-          ? cylinderStats.totalCylinders - digitalPhysicalSplit.digital
-          : cylinderStats.totalCylinders;
-        const cylinderTrend = calculateTrend(cylinderValue, previousPeriodStats.totalCylinders);
+        const includeType = (item: GasTypeDistributionData) => (!hideDigital || !item.is_digital) && (!hideExternal || !item.is_external);
+        const cylinderValue = gasTypeDistributionData.filter(includeType).reduce((sum, item) => sum + Number(item.total_cylinders || 0), 0);
+        const previousCylinderValue = previousGasTypeDistributionData.filter(includeType).reduce((sum, item) => sum + Number(item.total_cylinders || 0), 0);
+        const cylinderTrend = calculateTrend(cylinderValue, previousCylinderValue);
+        const cylinderLabel = hideDigital && hideExternal
+          ? "Fysieke interne cilinders"
+          : hideDigital
+            ? "Fysieke cilinders"
+            : hideExternal
+              ? "Interne cilinders"
+              : "Cilinders";
         const cylinderTrendMeaningful = cylinderTrend !== null && Math.abs(cylinderTrend) >= 5;
         const cylinderTrendColor = !cylinderTrendMeaningful
           ? "text-muted-foreground"
@@ -897,7 +892,7 @@ export function ProductionReports({
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
-                        {hideDigital ? "Fysieke cilinders" : "Cilinders"}
+                        {cylinderLabel}
                       </p>
                       <p className="text-3xl font-bold leading-tight">{formatNumber(cylinderValue, 0)}</p>
                     </div>
