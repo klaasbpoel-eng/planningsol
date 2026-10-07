@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { LogOut, User, ArrowLeftRight, CalendarDays, Factory, Menu, X, Truck, BookOpen, Clock, Search, ScanBarcode, FileUp, Calendar, Activity } from "lucide-react";
+import { LogOut, User, ArrowLeftRight, Menu, Search, Calendar, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { NAVIGATION_GROUPS } from "@/config/navigation";
+import { openCommandPalette } from "@/lib/command-palette";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
@@ -23,44 +25,11 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  admin: "bg-red-500/10 text-red-600 border-red-200",
-  supervisor: "bg-purple-500/10 text-purple-600 border-purple-200",
-  operator: "bg-blue-500/10 text-blue-600 border-blue-200",
-  user: "bg-gray-500/10 text-gray-600 border-gray-200",
+  admin: "bg-destructive/10 text-destructive border-destructive/30",
+  supervisor: "bg-accent/10 text-accent border-accent/30",
+  operator: "bg-primary/10 text-primary border-primary/30",
+  user: "bg-muted text-muted-foreground border-border",
 };
-
-interface NavItem {
-  path: string;
-  label: string;
-  shortLabel?: string;
-  icon: React.ReactNode;
-}
-
-const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
-  {
-    label: "Planning",
-    items: [
-      { path: "/kalender", label: "Kalender", icon: <CalendarDays className="h-4 w-4" /> },
-      { path: "/productie", label: "Productie", icon: <Factory className="h-4 w-4" /> },
-      { path: "/dagoverzicht", label: "Dagoverzicht", shortLabel: "Dag", icon: <CalendarDays className="h-4 w-4" /> },
-    ],
-  },
-  {
-    label: "Beheer",
-    items: [
-      { path: "/interne-bestellingen", label: "Bestellingen", shortLabel: "Best.", icon: <Truck className="h-4 w-4" /> },
-      { path: "/verlof", label: "Verlof", icon: <Clock className="h-4 w-4" /> },
-      { path: "/vrijgaves", label: "Vrijgaves", icon: <FileUp className="h-4 w-4" /> },
-    ],
-  },
-  {
-    label: "Tools",
-    items: [
-      { path: "/toolbox", label: "Toolbox", icon: <BookOpen className="h-4 w-4" /> },
-      { path: "/barcode", label: "Barcode", icon: <ScanBarcode className="h-4 w-4" /> },
-    ],
-  },
-];
 
 interface HeaderProps {
   userEmail?: string;
@@ -110,11 +79,21 @@ export function Header({
       )}
 
       <nav className="flex flex-col gap-1">
-        {NAV_GROUPS.map((group) => (
+        <div className="grid grid-cols-2 gap-2 px-2 pb-3">
+          <Link to="/dagoverzicht" onClick={closeMobileMenu}>
+            <Button variant="outline" className="w-full gap-2">
+              <Calendar className="h-4 w-4" /> Vandaag
+            </Button>
+          </Link>
+          <Button variant="outline" className="w-full gap-2" onClick={() => { openCommandPalette(); closeMobileMenu(); }}>
+            <Search className="h-4 w-4" /> Zoeken
+          </Button>
+        </div>
+        {NAVIGATION_GROUPS.map((group) => (
           <div key={group.label}>
             <p className="text-xs font-medium text-muted-foreground px-3 py-2 uppercase tracking-wider">{group.label}</p>
             {group.items.map((item) => (
-              <Link key={item.path} to={item.path} onClick={closeMobileMenu}>
+              <Link key={item.path} to={item.path} onClick={closeMobileMenu} aria-current={isActive(item.path) ? "page" : undefined}>
                 <Button
                   variant="ghost"
                   size="lg"
@@ -125,7 +104,7 @@ export function Header({
                       : "text-foreground border-l-4 border-transparent"
                   )}
                 >
-                  {item.icon}
+                  <item.icon className="h-4 w-4" />
                   {item.label}
                 </Button>
               </Link>
@@ -133,18 +112,20 @@ export function Header({
           </div>
         ))}
 
-        {isAdmin && onSwitchView && (
+        {isAdmin && (
           <div>
             <p className="text-xs font-medium text-muted-foreground px-3 py-2 uppercase tracking-wider">Admin</p>
-            <Button
-              variant="ghost"
-              size="lg"
-              onClick={() => { onSwitchView(); closeMobileMenu(); }}
-              className="w-full justify-start text-base h-12 gap-3 text-foreground"
-            >
-              <ArrowLeftRight className="h-4 w-4" />
-              Medewerkersweergave
-            </Button>
+            {location.pathname.startsWith("/admin") ? (
+              <Button variant="ghost" size="lg" onClick={() => { onSwitchView?.(); closeMobileMenu(); }} className="w-full justify-start text-base h-12 gap-3 text-foreground">
+                <ArrowLeftRight className="h-4 w-4" /> Medewerkersweergave
+              </Button>
+            ) : (
+              <Link to="/admin" onClick={closeMobileMenu}>
+                <Button variant="ghost" size="lg" className="w-full justify-start text-base h-12 gap-3 text-foreground">
+                  <Shield className="h-4 w-4" /> Beheerpaneel
+                </Button>
+              </Link>
+            )}
           </div>
         )}
       </nav>
@@ -193,11 +174,11 @@ export function Header({
         {/* Desktop navigation */}
         {!isMobile && (
           <nav className="hidden md:flex items-center gap-0.5">
-            {NAV_GROUPS.map((group, gi) => (
+            {NAVIGATION_GROUPS.map((group, gi) => (
               <div key={group.label} className="flex items-center">
                 {gi > 0 && <span className="w-px h-4 bg-border/50 mx-1" />}
                 {group.items.map((item) => (
-                  <Link key={item.path} to={item.path}>
+                  <Link key={item.path} to={item.path} aria-current={isActive(item.path) ? "page" : undefined}>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -208,7 +189,7 @@ export function Header({
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      {item.icon}
+                      <item.icon className="h-4 w-4" />
                       <span>{item.shortLabel || item.label}</span>
                     </Button>
                   </Link>
@@ -240,7 +221,7 @@ export function Header({
               variant="outline"
               size="sm"
               className="hidden md:flex items-center gap-2 text-muted-foreground hover:text-foreground h-8 px-3 border-border/50"
-              onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+                onClick={openCommandPalette}
             >
               <Search className="h-3.5 w-3.5" />
               <span className="text-xs">Zoeken</span>
@@ -252,6 +233,15 @@ export function Header({
 
           <ThemeToggle variant="header" />
           <NotificationBell />
+
+          {!isMobile && isAdmin && !location.pathname.startsWith("/admin") && (
+            <Link to="/admin">
+              <Button variant="outline" size="sm" className="h-8 gap-1.5" aria-label="Open beheerpaneel">
+                <Shield className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">Beheer</span>
+              </Button>
+            </Link>
+          )}
 
           {/* Desktop user & logout */}
           {!isMobile && (
@@ -266,6 +256,7 @@ export function Header({
                 variant="ghost"
                 size="sm"
                 onClick={handleLogout}
+                aria-label="Uitloggen"
                 className="text-primary hover:bg-primary/10 hover:text-primary shrink-0"
               >
                 <LogOut className="h-4 w-4 mr-2" />
@@ -278,7 +269,7 @@ export function Header({
           {isMobile && (
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-primary hover:bg-primary/10 p-2">
+                <Button variant="ghost" size="sm" className="text-primary hover:bg-primary/10 p-2" aria-label="Open navigatiemenu">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>

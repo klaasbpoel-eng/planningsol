@@ -85,7 +85,7 @@ export function PageLayout({
         )}
 
         <main id="main-content" className={`flex-1 w-full container mx-auto px-4 py-8 ${className}`}>
-          {autoBreadcrumbs.length > 0 && (
+          {autoBreadcrumbs.length > 2 && (
             <Breadcrumb className="mb-4">
               <BreadcrumbList>
                 {autoBreadcrumbs.map((crumb, i) => (

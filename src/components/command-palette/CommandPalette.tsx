@@ -10,21 +10,14 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import {
-  CalendarDays,
-  Factory,
   Home,
   LogOut,
   Moon,
   Sun,
   Settings,
-  Clock,
   Snowflake,
   Cylinder,
   BarChart3,
-  Truck,
-  BookOpen,
-  ScanBarcode,
-  FileUp,
   Plus,
   History,
 } from "lucide-react";
@@ -32,6 +25,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { useUserRole } from "@/hooks/useUserRole";
+import { NAVIGATION_ITEMS } from "@/config/navigation";
+import { OPEN_COMMAND_PALETTE_EVENT } from "@/lib/command-palette";
 
 const RECENT_KEY = "command-palette-recent";
 const MAX_RECENT = 5;
@@ -57,15 +52,8 @@ function addRecentAction(action: RecentAction) {
 
 // All navigable items with keywords for fuzzy search
 const NAV_ITEMS = [
-  { id: "dashboard", label: "Dashboard", path: "/", icon: Home, keywords: ["home", "start", "begin", "overzicht"] },
-  { id: "kalender", label: "Kalender", path: "/kalender", icon: CalendarDays, keywords: ["agenda", "planning", "datum", "calendar"] },
-  { id: "productie", label: "Productieplanning", path: "/productie", icon: Factory, keywords: ["prod", "planning", "fabriek", "production"] },
-  { id: "dagoverzicht", label: "Dagelijks Overzicht", path: "/dagoverzicht", icon: CalendarDays, keywords: ["dag", "daily", "vandaag", "overzicht"] },
-  { id: "bestellingen", label: "Interne Bestellingen", path: "/interne-bestellingen", icon: Truck, keywords: ["order", "bestelling", "intern", "levering"] },
-  { id: "verlof", label: "Verlof & Aanvragen", path: "/verlof", icon: Clock, keywords: ["vrij", "vakantie", "leave", "afwezig", "aanvraag"] },
-  { id: "toolbox", label: "Toolbox", path: "/toolbox", icon: BookOpen, keywords: ["veiligheid", "instructie", "safety", "training"] },
-  { id: "barcode", label: "Barcode Generator", path: "/barcode", icon: ScanBarcode, keywords: ["scan", "label", "sticker", "print"] },
-  { id: "vrijgaves", label: "Vrijgaves", path: "/vrijgaves", icon: FileUp, keywords: ["release", "goedkeuring", "approval"] },
+  { id: "dashboard", label: "Start", path: "/", icon: Home, keywords: ["home", "start", "overzicht"] },
+  ...NAVIGATION_ITEMS,
 ];
 
 const QUICK_ACTIONS = [
@@ -106,7 +94,12 @@ export function CommandPalette() {
       }
     };
     document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
+    const openFromButton = () => setOpen(true);
+    document.addEventListener(OPEN_COMMAND_PALETTE_EVENT, openFromButton);
+    return () => {
+      document.removeEventListener("keydown", down);
+      document.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, openFromButton);
+    };
   }, []);
 
   useEffect(() => {
@@ -190,7 +183,7 @@ export function CommandPalette() {
           {isAdmin && (
             <CommandItem
               key="admin-settings"
-              onSelect={() => runCommand(() => navigate("/?view=admin"), { id: "admin-settings", label: "Instellingen" })}
+              onSelect={() => runCommand(() => navigate("/admin?tab=settings"), { id: "admin-settings", label: "Instellingen" })}
               className="gap-2"
               keywords={["settings", "instellingen", "beheer", "admin", "configuratie"]}
             >

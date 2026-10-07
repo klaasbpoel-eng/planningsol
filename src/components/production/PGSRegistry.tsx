@@ -15,6 +15,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Separator } from "@/components/ui/separator";
@@ -45,6 +53,8 @@ import {
   Plus,
   HelpCircle,
   Trash2,
+  MoreHorizontal,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatNumber } from "@/lib/utils";
@@ -151,9 +161,9 @@ function getGasKgPerLiter(gasName: string): number | null {
 }
 
 const PGS_COLORS: Record<string, string> = {
-  "PGS 9": "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
-  "PGS 16": "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30",
-  "PGS 15": "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+  "PGS 9": "bg-primary/15 text-primary border-primary/30",
+  "PGS 16": "bg-destructive/15 text-destructive border-destructive/30",
+  "PGS 15": "bg-warning/15 text-warning border-warning/30",
 };
 
 /** Renders a single pictogram (GHS or ADR) with tooltip */
@@ -929,6 +939,16 @@ const stats = useMemo(() => {
   };
 
   const colSpan = isAdmin ? 12 : 11;
+  const hasActiveFilters = searchQuery.length > 0 || filterGuideline !== "all" || filterStorageClass !== "all" || filterPlaceTypes.length !== 3;
+
+  const resetFilters = () => {
+    setSearchQuery("");
+    setFilterGuideline("all");
+    setFilterStorageClass("all");
+    setFilterPlaceTypes(["permanent", "temporary", "crossdock"]);
+  };
+
+  const exportSelectionLabel = `${locationTab === "all" ? "alle locaties" : locationTab === "sol_emmen" ? "Emmen" : "Tilburg"} · ${filterPlaceTypes.length === 3 ? "alle opslagplaatstypes" : `${filterPlaceTypes.length} opslagplaatstype${filterPlaceTypes.length === 1 ? "" : "s"}`}`;
 
   if (loading) {
     return (
@@ -960,82 +980,47 @@ const stats = useMemo(() => {
             <p className="text-xs text-muted-foreground">Gevaarlijke stoffen conform PGS-richtlijnen</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           {isAdmin && (
             <Button size="sm" onClick={() => setAddDialogOpen(true)} className="gap-1.5">
               <Plus className="h-4 w-4" />
               Nieuwe stof
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => setPlacesManagerOpen(true)} className="gap-1.5">
-            <MapPin className="h-4 w-4" />
-            Opslagplaatsen
-          </Button>
           <Button variant="outline" size="sm" onClick={() => setAssignDialogOpen(true)} className="gap-1.5">
             <Link2 className="h-4 w-4" />
             Toewijzen
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setExpansionDialogOpen(true)} className="gap-1.5">
-            <Activity className="h-4 w-4" />
-            Uitbreiding
-          </Button>
-          <Button variant="outline" size="sm" onClick={exportToPDF} className="gap-1.5">
-            <FileText className="h-4 w-4" />
-            PDF
-          </Button>
-          <Button variant="outline" size="sm" onClick={exportToExcel} className="gap-1.5">
-            <Download className="h-4 w-4" />
-            Excel
-          </Button>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs">
-                <MapPin className="h-3.5 w-3.5" />
-                {filterPlaceTypes.length === 3 ? "Alle typen" : `${filterPlaceTypes.length} type${filterPlaceTypes.length !== 1 ? "s" : ""} geselecteerd`}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-3" align="end">
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground">Opslagplaatstypes</p>
-                {(["permanent", "temporary", "crossdock"] as PlaceType[]).map(type => (
-                  <div key={type} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`place-type-${type}`}
-                      checked={filterPlaceTypes.includes(type)}
-                      onCheckedChange={(checked) => {
-                        setFilterPlaceTypes(prev =>
-                          checked ? [...prev, type] : prev.filter(t => t !== type)
-                        );
-                      }}
-                    />
-                    <Label htmlFor={`place-type-${type}`} className="text-xs cursor-pointer">
-                      {type === "permanent" ? "Vast (permanent)" : type === "temporary" ? "Tijdelijk / incidenteel" : "Crossdock"}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => generatePGSPerPlacePDF(locationTab !== "both" ? locationTab : undefined, filterPlaceTypes).catch(() => toast.error("PDF mislukt"))}
-            className="gap-1.5"
-            title="PDF gegroepeerd per opslagplaats (PGS 15:2021)"
-          >
-            <FileText className="h-4 w-4" />
-            PDF / plaats
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => generatePGSPerPlaceExcel(locationTab !== "both" ? locationTab : undefined, filterPlaceTypes).catch(() => toast.error("Excel mislukt"))}
-            className="gap-1.5"
-            title="Excel gegroepeerd per opslagplaats"
-          >
-            <Download className="h-4 w-4" />
-            Excel / plaats
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5"><MoreHorizontal className="h-4 w-4" /> Beheren</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onSelect={() => setPlacesManagerOpen(true)}><MapPin className="mr-2 h-4 w-4" /> Opslagplaatsen</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setExpansionDialogOpen(true)}><Activity className="mr-2 h-4 w-4" /> Uitbreidingen</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5"><Download className="h-4 w-4" /> Exporteren <ChevronDown className="h-3.5 w-3.5" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuLabel>
+                <span className="block">Actieve selectie</span>
+                <span className="block text-xs font-normal text-muted-foreground">{exportSelectionLabel}</span>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={exportToPDF}><FileText className="mr-2 h-4 w-4" /> Standaard PDF</DropdownMenuItem>
+              <DropdownMenuItem onSelect={exportToExcel}><Download className="mr-2 h-4 w-4" /> Standaard Excel</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => generatePGSPerPlacePDF(locationTab !== "all" ? locationTab : undefined, filterPlaceTypes).catch(() => toast.error("PDF mislukt"))} disabled={filterPlaceTypes.length === 0}>
+                <FileText className="mr-2 h-4 w-4" /> PDF per opslagplaats
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => generatePGSPerPlaceExcel(locationTab !== "all" ? locationTab : undefined, filterPlaceTypes).catch(() => toast.error("Excel mislukt"))} disabled={filterPlaceTypes.length === 0}>
+                <Download className="mr-2 h-4 w-4" /> Excel per opslagplaats
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -1131,6 +1116,33 @@ const stats = useMemo(() => {
               </SelectContent>
             </Select>
           )}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs">
+                <MapPin className="h-3.5 w-3.5" />
+                {filterPlaceTypes.length === 3 ? "Alle opslagtypes" : filterPlaceTypes.length === 0 ? "Geen opslagtypes" : `${filterPlaceTypes.length} opslagtype${filterPlaceTypes.length === 1 ? "" : "s"}`}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-60 p-3" align="end">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground">Opslagplaatstypes</p>
+                {(["permanent", "temporary", "crossdock"] as PlaceType[]).map(type => (
+                  <div key={type} className="flex items-center space-x-2">
+                    <Checkbox id={`place-type-${type}`} checked={filterPlaceTypes.includes(type)} onCheckedChange={(checked) => setFilterPlaceTypes(prev => checked ? [...prev, type] : prev.filter(t => t !== type))} />
+                    <Label htmlFor={`place-type-${type}`} className="text-xs cursor-pointer">
+                      {type === "permanent" ? "Vast (permanent)" : type === "temporary" ? "Tijdelijk / incidenteel" : "Crossdock"}
+                    </Label>
+                  </div>
+                ))}
+                {filterPlaceTypes.length === 0 && <p className="text-xs text-destructive">Kies minimaal één type om per opslagplaats te exporteren.</p>}
+              </div>
+            </PopoverContent>
+          </Popover>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={resetFilters} className="h-9 gap-1.5 text-xs text-muted-foreground">
+              <RotateCcw className="h-3.5 w-3.5" /> Filters wissen
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1156,18 +1168,21 @@ const stats = useMemo(() => {
                       <TableHead
                         className="cursor-pointer select-none group"
                         onClick={() => handleSort("name")}
+                        aria-sort={sortField === "name" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                       >
                         <span className="inline-flex items-center gap-1">Gas <SortIcon field="name" /></span>
                       </TableHead>
                       <TableHead
                         className="cursor-pointer select-none group"
                         onClick={() => handleSort("pgs")}
+                        aria-sort={sortField === "pgs" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                       >
                         <span className="inline-flex items-center gap-1">PGS <SortIcon field="pgs" /></span>
                       </TableHead>
                       <TableHead
                         className="cursor-pointer select-none group"
                         onClick={() => handleSort("un")}
+                        aria-sort={sortField === "un" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                       >
                         <span className="inline-flex items-center gap-1">UN <SortIcon field="un" /></span>
                       </TableHead>
@@ -1177,6 +1192,7 @@ const stats = useMemo(() => {
                       <TableHead
                         className="cursor-pointer select-none group"
                         onClick={() => handleSort("pct")}
+                        aria-sort={sortField === "pct" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                       >
                         <span className="inline-flex items-center gap-1">Bezetting <SortIcon field="pct" /></span>
                       </TableHead>
