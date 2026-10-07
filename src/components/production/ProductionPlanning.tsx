@@ -40,6 +40,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import type { Database } from "@/integrations/supabase/types";
 import type { RolePermissions } from "@/hooks/useUserPermissions";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 type UserProductionLocation = Database["public"]["Enums"]["production_location"] | null;
@@ -294,6 +295,17 @@ export function ProductionPlanning({
   const showKPIDashboard = permissions?.canViewKPIDashboard ?? true;
   const showAdvancedWidgets = permissions?.canViewAdvancedWidgets ?? true;
   const showRecipemaker = permissions?.canManageUsers ?? false; // Admin only
+
+  const productionSections = [
+    { value: "gascilinders", label: "Gascilinders", visible: true },
+    { value: "droogijs", label: "Droogijs", visible: true },
+    { value: "vulplanning", label: "Vulplanning", visible: showAdvancedTabs },
+    { value: "rapportage", label: "Rapportage", visible: showAdvancedTabs },
+    { value: "recepten", label: "Recepten", visible: showRecipemaker },
+    { value: "plattegrond", label: "Plattegrond", visible: true },
+    { value: "pgs-register", label: "PGS Register", visible: showAdvancedTabs },
+    { value: "routeplanning", label: "Routeplanning", visible: showAdvancedTabs },
+  ].filter(section => section.visible);
 
   return (
     <div className="space-y-6">
@@ -550,8 +562,23 @@ export function ProductionPlanning({
 
       {/* Main content tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="md:hidden">
+          <label className="mb-1.5 block text-xs font-semibold uppercase text-muted-foreground" htmlFor="production-section">
+            Onderdeel
+          </label>
+          <Select value={activeTab} onValueChange={setActiveTab}>
+            <SelectTrigger id="production-section" className="w-full bg-card" aria-label="Kies productieonderdeel">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {productionSections.map(section => (
+                <SelectItem key={section.value} value={section.value}>{section.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <TabsList className={cn(
-          "w-full max-w-5xl flex overflow-x-auto scrollbar-hide bg-muted/50 backdrop-blur-sm h-11 p-1 gap-0.5",
+          "hidden md:flex w-full max-w-5xl overflow-x-auto bg-muted/50 backdrop-blur-sm h-11 p-1 gap-0.5",
         )}>
 
           <TabsTrigger

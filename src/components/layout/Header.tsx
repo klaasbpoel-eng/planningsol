@@ -115,15 +115,17 @@ export function Header({
         {isAdmin && (
           <div>
             <p className="text-xs font-medium text-muted-foreground px-3 py-2 uppercase tracking-wider">Admin</p>
-            <Button
-              variant="ghost"
-              size="lg"
-              onClick={() => { onSwitchView?.(); closeMobileMenu(); }}
-              className="w-full justify-start text-base h-12 gap-3 text-foreground"
-            >
-              {location.pathname.startsWith("/admin") ? <ArrowLeftRight className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
-              {location.pathname.startsWith("/admin") ? "Medewerkersweergave" : "Beheerpaneel"}
-            </Button>
+            {location.pathname.startsWith("/admin") ? (
+              <Button variant="ghost" size="lg" onClick={() => { onSwitchView?.(); closeMobileMenu(); }} className="w-full justify-start text-base h-12 gap-3 text-foreground">
+                <ArrowLeftRight className="h-4 w-4" /> Medewerkersweergave
+              </Button>
+            ) : (
+              <Link to="/admin" onClick={closeMobileMenu}>
+                <Button variant="ghost" size="lg" className="w-full justify-start text-base h-12 gap-3 text-foreground">
+                  <Shield className="h-4 w-4" /> Beheerpaneel
+                </Button>
+              </Link>
+            )}
           </div>
         )}
       </nav>
