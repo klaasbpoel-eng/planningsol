@@ -81,7 +81,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
 
   useEffect(() => {
     fetchBothYearsData();
-  }, [selectedYear1, selectedYear2, location]);
+  }, [selectedYear1, selectedYear2, location, hideDigital, hideExternal]);
 
   const fetchBothYearsData = async () => {
     setLoading(true);
@@ -124,7 +124,8 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
         if (!map.has(key)) {
           map.set(key, { month, gas_type_name, gas_type_color: "", total_cylinders: 0 });
         }
-        map.get(key)!.total_cylinders += Number(r.Aantal) || 0;
+        const current = map.get(key);
+        if (current) current.total_cylinders += Number(r.Aantal) || 0;
       });
       return Array.from(map.values());
     };

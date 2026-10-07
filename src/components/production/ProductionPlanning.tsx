@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock, ShieldAlert, Truck, FlaskConical, ChevronUp, ChevronDown, Route, CalendarClock } from "lucide-react";
+import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock, ShieldAlert, Truck, FlaskConical, ChevronUp, ChevronDown, CalendarClock } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { TopCustomersWidget } from "./TopCustomersWidget";
 import { KPIDashboard } from "./KPIDashboard";
@@ -32,7 +32,7 @@ const ReportLoadingFallback = () => (
 );
 import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
-import { format, subWeeks, startOfMonth, endOfMonth, differenceInDays, subDays, startOfYear, endOfYear, startOfWeek, endOfWeek, isSameDay, isSameMonth, isSameYear, subMonths, subYears } from "date-fns";
+import { format, subWeeks, startOfMonth, endOfMonth, startOfYear, endOfYear, startOfWeek, endOfWeek, isSameDay, isSameMonth, isSameYear, subMonths, subYears } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn, formatNumber, normalizeDatum } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,7 @@ import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/
 import type { Database } from "@/integrations/supabase/types";
 import type { RolePermissions } from "@/hooks/useUserPermissions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { calculatePercentageTrend, getComparisonRange, mapProductionLocation } from "@/lib/productionMetrics";
 
 type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 type UserProductionLocation = Database["public"]["Enums"]["production_location"] | null;
@@ -184,11 +185,7 @@ export function ProductionPlanning({
 
   // Returns null when there is no comparable baseline so the StatCard can
   // render "—" instead of a misleading +999%.
-  const calculateTrend = (current: number, previous: number): number | null => {
-    if (previous === 0) return null;
-    const pct = Math.round(((current - previous) / previous) * 100);
-    return Math.max(-500, Math.min(500, pct));
-  };
+  const calculateTrend = calculatePercentageTrend;
 
   const handleDateRangeChange = useCallback((newRange: DateRange) => {
     setDateRange(newRange);
@@ -227,7 +224,7 @@ export function ProductionPlanning({
       const iso = normalizeDatum(raw);
       if (iso < fromDate || iso > toDate) return false;
       if (locationParam) {
-        const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+        const loc = mapProductionLocation(row.Locatie);
         if (loc !== locationParam) return false;
       }
       return true;
@@ -243,10 +240,9 @@ export function ProductionPlanning({
     const fromDate = format(dateRange.from, "yyyy-MM-dd");
     const toDate = format(dateRange.to, "yyyy-MM-dd");
 
-    // Calculate previous period (same length, immediately before)
-    const periodLength = differenceInDays(dateRange.to, dateRange.from);
-    const prevTo = subDays(dateRange.from, 1);
-    const prevFrom = subDays(prevTo, periodLength);
+    const comparison = getComparisonRange(dateRange.from, dateRange.to);
+    const prevFrom = comparison.from;
+    const prevTo = comparison.to;
     const prevFromDate = format(prevFrom, "yyyy-MM-dd");
     const prevToDate = format(prevTo, "yyyy-MM-dd");
 
@@ -304,7 +300,6 @@ export function ProductionPlanning({
     { value: "recepten", label: "Recepten", visible: showRecipemaker },
     { value: "plattegrond", label: "Plattegrond", visible: true },
     { value: "pgs-register", label: "PGS Register", visible: showAdvancedTabs },
-    { value: "routeplanning", label: "Routeplanning", visible: showAdvancedTabs },
   ].filter(section => section.visible);
 
   return (
@@ -645,16 +640,6 @@ export function ProductionPlanning({
               <ShieldAlert className="h-4 w-4 flex-shrink-0" />
               <span className="hidden sm:inline">PGS Register</span>
               <span className="sm:hidden">PGS</span>
-            </TabsTrigger>
-          )}
-          {showAdvancedTabs && (
-            <TabsTrigger
-              value="routeplanning"
-              className="data-[state=active]:bg-teal-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
-            >
-              <Route className="h-4 w-4 flex-shrink-0" />
-              <span className="hidden sm:inline">Routeplanning</span>
-              <span className="sm:hidden">Routes</span>
             </TabsTrigger>
           )}
         </TabsList>

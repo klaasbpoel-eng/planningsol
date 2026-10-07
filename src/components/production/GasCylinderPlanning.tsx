@@ -20,6 +20,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn, formatNumber } from "@/lib/utils";
+import { mapProductionLocation } from "@/lib/productionMetrics";
 import {
   Table,
   TableBody,
@@ -52,7 +53,7 @@ interface CylinderFilling {
   cylinder_count: number;
   cylinder_size: number;
   scheduled_date: string; // YYYY-MM-DD
-  location: "sol_emmen" | "sol_tilburg";
+  location: "sol_emmen" | "sol_tilburg" | "unknown";
 }
 
 type LocationTab = "sol_emmen" | "sol_tilburg";
@@ -63,10 +64,6 @@ type ProductionLocation = "sol_emmen" | "sol_tilburg" | "all";
 interface GasCylinderPlanningProps {
   onDataChanged?: () => void;
   location?: ProductionLocation;
-}
-
-function mapLocatie(locatie: string): "sol_emmen" | "sol_tilburg" {
-  return locatie.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
 }
 
 // Convert datum to "YYYY-MM-DD"
@@ -166,7 +163,7 @@ export function GasCylinderPlanning({ location = "all" }: GasCylinderPlanningPro
         cylinder_count: row.Aantal || 0,
         cylinder_size: row.Capaciteit || 0,
         scheduled_date: mapDatum(row.Datum),
-        location: mapLocatie(row.Locatie || ""),
+        location: mapProductionLocation(row.Locatie),
       })));
     } catch (err) {
       console.error("Fetch error:", err);
@@ -235,14 +232,14 @@ export function GasCylinderPlanning({ location = "all" }: GasCylinderPlanningPro
     customerFilter !== "all" ||
     productFilter !== "" ||
     yearFilter !== new Date().getFullYear() ||
-    monthFilter !== new Date().getMonth() + 1;
+    monthFilter !== 0;
 
   const clearFilters = () => {
     setDateFilter(undefined);
     setCustomerFilter("all");
     setProductFilter("");
     setYearFilter(new Date().getFullYear());
-    setMonthFilter(new Date().getMonth() + 1);
+    setMonthFilter(0);
   };
 
   const renderOrderContent = () => (
@@ -256,7 +253,7 @@ export function GasCylinderPlanning({ location = "all" }: GasCylinderPlanningPro
                   <Calendar className="h-5 w-5" />
                   Vulwachtrij – {locationTab === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg"}
                 </CardTitle>
-                <CardDescription>Productiedata gascilinders</CardDescription>
+                <CardDescription>Productiedata uit de externe bron · alleen-lezen</CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Button

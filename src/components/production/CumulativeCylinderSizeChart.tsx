@@ -98,7 +98,7 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
 
   useEffect(() => {
     fetchBothYearsData();
-  }, [selectedYear1, selectedYear2, location, hideDigital]);
+  }, [selectedYear1, selectedYear2, location, hideDigital, hideExternal]);
 
   const fetchBothYearsData = async () => {
     setLoading(true);
@@ -143,7 +143,8 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
         if (!map.has(key)) {
           map.set(key, { month, cylinder_size, capacityLiters, total_cylinders: 0 });
         }
-        map.get(key)!.total_cylinders += Number(r.Aantal) || 0;
+        const current = map.get(key);
+        if (current) current.total_cylinders += Number(r.Aantal) || 0;
       });
       return Array.from(map.values());
     };
