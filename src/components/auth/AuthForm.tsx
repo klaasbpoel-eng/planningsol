@@ -63,8 +63,8 @@ export function AuthForm() {
 
   const getDescription = () => {
     switch (mode) {
-      case "login": return "Log in om uw verlofaanvragen te beheren";
-      case "signup": return "Meld u aan om verlof te plannen";
+      case "login": return "Log in voor planning, productie en veiligheid";
+      case "signup": return "Meld u aan voor toegang tot SOL Planner";
       case "forgot-password": return "Voer uw e-mailadres in om een resetlink te ontvangen";
     }
   };
@@ -135,34 +135,37 @@ export function AuthForm() {
             </Button>
 
             {mode === "forgot-password" ? (
-              <button
+              <Button
                 type="button"
+                variant="link"
                 onClick={() => setMode("login")}
-                className="text-sm text-white/60 hover:text-white flex items-center gap-1 transition-colors"
+                className="h-auto p-0 text-sm text-muted-foreground"
               >
                 <ArrowLeft className="h-3 w-3" />
                 Terug naar inloggen
-              </button>
+              </Button>
             ) : (
               <div className="flex flex-col items-center gap-2 pt-1">
                 {mode === "login" && (
-                  <button
+                  <Button
                     type="button"
+                    variant="link"
                     onClick={() => setMode("forgot-password")}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="h-auto p-0 text-sm text-muted-foreground"
                   >
                     Wachtwoord vergeten?
-                  </button>
+                  </Button>
                 )}
                 <p className="text-sm text-muted-foreground text-center">
                   {mode === "login" ? "Nog geen account?" : "Heeft u al een account?"}{" "}
-                  <button
+                  <Button
                     type="button"
+                    variant="link"
                     onClick={() => setMode(mode === "login" ? "signup" : "login")}
-                    className="text-primary font-semibold hover:underline transition-colors"
+                    className="h-auto p-0 font-semibold"
                   >
                     {mode === "login" ? "Registreren" : "Inloggen"}
-                  </button>
+                  </Button>
                 </p>
               </div>
             )}

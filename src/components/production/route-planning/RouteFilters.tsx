@@ -2,6 +2,7 @@ import { Search, X, Truck, Heart, PowerOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Depot, VehicleType } from "./types";
 
 interface RouteFiltersProps {
@@ -39,45 +40,48 @@ export function RouteFilters({
           className="pl-9 pr-8 h-10 text-sm"
         />
         {search && (
-          <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+          <Button variant="ghost" size="icon" aria-label="Wis zoekterm" onClick={() => setSearch("")} className="absolute right-0 top-1/2 -translate-y-1/2 h-9 w-9 text-muted-foreground">
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         )}
       </div>
 
       <div className="flex rounded-lg border bg-muted/40 p-0.5 gap-0.5">
         {(["all", "emmen", "tilburg"] as const).map(d => (
-          <button key={d} onClick={() => setDepotFilter(d)}
+          <Button key={d} variant="ghost" onClick={() => setDepotFilter(d)}
             className={cn("px-3 py-1.5 rounded-md text-xs font-semibold transition-all h-9",
               depotFilter === d ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
             {d === "all" ? "Beide" : d === "emmen" ? "Emmen" : "Tilburg"}
-          </button>
+          </Button>
         ))}
       </div>
 
       <div className="flex rounded-lg border bg-muted/40 p-0.5 gap-0.5">
         {(["all", "truck", "courier"] as const).map(v => (
-          <button key={v} onClick={() => setVehicleFilter(v)}
+          <Button key={v} variant="ghost" onClick={() => setVehicleFilter(v)}
             className={cn("px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 h-9",
               vehicleFilter === v ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
             {v === "truck" ? <Truck className="h-3.5 w-3.5" /> : v === "courier" ? <Heart className="h-3.5 w-3.5" /> : null}
             {v === "all" ? "Alle types" : v === "truck" ? "Vrachtwagen" : "Koerier"}
-          </button>
+          </Button>
         ))}
       </div>
 
-      <select value={zoneFilter} onChange={e => setZoneFilter(e.target.value)}
-        className="h-10 rounded-lg border bg-background px-3 py-2 text-sm font-medium focus-visible:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-      >
-        <option value="all">Alle zones</option>
+      <Select value={zoneFilter} onValueChange={setZoneFilter}>
+        <SelectTrigger className="h-10 w-full sm:w-[180px] font-medium" aria-label="Filter op zone">
+          <SelectValue placeholder="Alle zones" />
+        </SelectTrigger>
+        <SelectContent>
+        <SelectItem value="all">Alle zones</SelectItem>
         {zones.map(z => (
-          <option key={z.short} value={z.short}>{z.full}</option>
+          <SelectItem key={z.short} value={z.short}>{z.full}</SelectItem>
         ))}
-      </select>
+        </SelectContent>
+      </Select>
 
       {/* Inactief toggle */}
       <Button

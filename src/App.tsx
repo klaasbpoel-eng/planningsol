@@ -16,6 +16,7 @@ import VrijgavesPage from "./pages/VrijgavesPage";
 import DailyOverviewPage from "./pages/DailyOverviewPage";
 import { CommandPalette } from "@/components/command-palette";
 import SqlSyncTasksPage from "./pages/SqlSyncTasksPage";
+import AdminPage from "./pages/AdminPage";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/vrijgaves" element={<VrijgavesPage />} />
               <Route path="/dagoverzicht" element={<DailyOverviewPage />} />
               <Route path="/sync-instellingen" element={<SqlSyncTasksPage />} />
+              <Route path="/admin" element={<AdminPage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

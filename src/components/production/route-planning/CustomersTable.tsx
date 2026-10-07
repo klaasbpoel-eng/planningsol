@@ -50,7 +50,7 @@ export function CustomersTable({
   if (customers.length === 0) return null;
 
   return (
-    <div className="border bg-white rounded-b-xl shadow-sm border-t-0" ref={parentRef} style={{ maxHeight: '650px', overflowY: 'auto' }}>
+    <div className="border bg-card rounded-b-lg shadow-sm border-t-0" ref={parentRef} style={{ maxHeight: '650px', overflowY: 'auto' }}>
       <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
         <colgroup>
           <col className="w-10" /> {/* Checkbox */}
@@ -63,12 +63,13 @@ export function CustomersTable({
           {WEEKDAYS.map(d => <col key={d} className="w-[36px] hidden sm:table-column" />)} {/* MA-VR */}
           <col className="w-10" /> {/* Actions */}
         </colgroup>
-        <thead className="bg-slate-50/80 backdrop-blur-md border-b text-[11px] font-bold uppercase tracking-wider text-slate-500 sticky top-0 z-10 transition-colors">
+        <thead className="bg-muted/80 backdrop-blur-md border-b text-[11px] font-bold uppercase tracking-wider text-muted-foreground sticky top-0 z-10 transition-colors">
           <tr>
             <th className="px-2 py-3 text-center">
               <input
                 type="checkbox"
-                className="rounded border-slate-300 text-primary focus:ring-primary/20 transition-all cursor-pointer h-3.5 w-3.5"
+                className="rounded border-input text-primary focus:ring-primary/20 transition-all cursor-pointer h-3.5 w-3.5"
+                aria-label="Selecteer alle klanten"
                 checked={customers.length > 0 && customers.every(c => bulkSelected.has(c.key))}
                 onChange={e => setBulkSelected(prev => {
                   const next = new Set(prev);
@@ -83,7 +84,7 @@ export function CustomersTable({
             <th className="px-1 py-3 text-center">Type</th>
             <th className="px-2 py-3 text-right">
               <Tooltip>
-                <TooltipTrigger className="cursor-help border-b border-dashed border-slate-400">/week</TooltipTrigger>
+                <TooltipTrigger className="cursor-help border-b border-dashed border-muted-foreground">/week</TooltipTrigger>
                 <TooltipContent className="text-xs">Gemiddeld aantal leveringen per week</TooltipContent>
               </Tooltip>
             </th>
@@ -94,7 +95,7 @@ export function CustomersTable({
             <th className="px-2 py-3"></th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-border">
           {rowVirtualizer.getVirtualItems().length > 0 && (
             <>
               {rowVirtualizer.getVirtualItems()[0].start > 0 && (

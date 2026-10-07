@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthForm } from "@/components/auth/AuthForm";
-import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { PendingApproval } from "@/components/auth/PendingApproval";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
@@ -12,13 +11,13 @@ import { CalendarDays } from "lucide-react";
 import { DailyOverview } from "@/components/dashboard/DailyOverview";
 import type { User } from "@supabase/supabase-js";
 
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const Index = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showAdminView, setShowAdminView] = useState(searchParams.get("view") === "admin");
   const { role, permissions, loading: permissionsLoading, isAdmin } = useUserPermissions(user?.id);
   const { isApproved, loading: approvalLoading } = useApprovalStatus(user?.id);
 
@@ -39,8 +38,8 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    setShowAdminView(searchParams.get("view") === "admin");
-  }, [searchParams]);
+    if (searchParams.get("view") === "admin") navigate("/admin", { replace: true });
+  }, [navigate, searchParams]);
 
   if (loading || permissionsLoading || approvalLoading) {
     return <BrandedLoader />;
@@ -63,20 +62,6 @@ const Index = () => {
     );
   }
 
-  // Show admin dashboard for admins who want to see it
-  if (isAdmin && showAdminView) {
-    return (
-      <PageTransition>
-        <AdminDashboard
-          userEmail={user.email}
-          onSwitchView={() => setShowAdminView(false)}
-          permissions={permissions}
-          role={role}
-        />
-      </PageTransition>
-    );
-  }
-
   // Show Daily Overview as the home page
   return (
     <PageTransition>
@@ -84,6 +69,7 @@ const Index = () => {
         userEmail={user.email}
         role={role}
         isAdmin={isAdmin}
+        onSwitchView={() => navigate("/admin")}
         title="Dagelijks Overzicht"
         description="Bekijk alle taken, orders en verlof per dag of week."
         titleIcon={<CalendarDays className="h-8 w-8" />}

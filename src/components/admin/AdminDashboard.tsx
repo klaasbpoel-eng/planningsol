@@ -160,16 +160,11 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
       <Header userEmail={userEmail} isAdmin onSwitchView={onSwitchView} role={role} />
 
       <div className="flex-1 flex max-w-screen-2xl mx-auto w-full">
-        {/* Sidebar Navigation */}
+        {/* Navigation adapts internally for desktop and mobile. */}
         <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Main Content Area */}
         <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full">
-          {/* Mobile: show sidebar trigger prominently */}
-          <div className="md:hidden mb-4">
-            <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
-          </div>
-
           <div className="max-w-6xl mx-auto w-full space-y-6">
             {activeTab === 'requests' && <DailyOverview />}
 
