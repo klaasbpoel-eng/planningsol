@@ -10,21 +10,14 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import {
-  CalendarDays,
-  Factory,
   Home,
   LogOut,
   Moon,
   Sun,
   Settings,
-  Clock,
   Snowflake,
   Cylinder,
   BarChart3,
-  Truck,
-  BookOpen,
-  ScanBarcode,
-  FileUp,
   Plus,
   History,
 } from "lucide-react";
