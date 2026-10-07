@@ -234,6 +234,15 @@ export function Header({
           <ThemeToggle variant="header" />
           <NotificationBell />
 
+          {!isMobile && isAdmin && !location.pathname.startsWith("/admin") && (
+            <Link to="/admin">
+              <Button variant="outline" size="sm" className="h-8 gap-1.5" aria-label="Open beheerpaneel">
+                <Shield className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">Beheer</span>
+              </Button>
+            </Link>
+          )}
+
           {/* Desktop user & logout */}
           {!isMobile && (
             <>
@@ -247,6 +256,7 @@ export function Header({
                 variant="ghost"
                 size="sm"
                 onClick={handleLogout}
+                aria-label="Uitloggen"
                 className="text-primary hover:bg-primary/10 hover:text-primary shrink-0"
               >
                 <LogOut className="h-4 w-4 mr-2" />
