@@ -19,7 +19,7 @@ export function AdminSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Instellingen (Vernieuwd)</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Instellingen</h2>
         <p className="text-muted-foreground">
           Beheer hier alle systeeminstellingen en configuraties.
         </p>
@@ -49,19 +49,17 @@ export function AdminSettings() {
           </TabsTrigger>
           <TabsTrigger value="deployment" className="gap-2 data-[state=active]:bg-background">
             <Server className="h-4 w-4" />
-            Deploy Server
+            Server & herstel
           </TabsTrigger>
           <TabsTrigger value="migration" className="gap-2 data-[state=active]:bg-background">
             <Download className="h-4 w-4" />
-            Database Export
+            Data-uitwisseling
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-4 animate-fade-in-up">
           <div className="grid gap-4">
             <DefaultCustomerSetting />
-            <DeploymentControl />
-            <DatabaseBackupRestore />
           </div>
         </TabsContent>
 
@@ -98,6 +96,12 @@ export function AdminSettings() {
         </TabsContent>
 
         <TabsContent value="deployment" className="space-y-4 animate-fade-in-up">
+          <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
+            <h3 className="font-semibold text-foreground">Geavanceerd beheer</h3>
+            <p className="mt-1 text-sm text-muted-foreground">Wijzigingen hier kunnen beschikbaarheid en gegevens beïnvloeden.</p>
+          </div>
+          <DeploymentControl />
+          <DatabaseBackupRestore />
           <DeploymentManual />
         </TabsContent>
 

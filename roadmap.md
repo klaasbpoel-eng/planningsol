@@ -1,8 +1,8 @@
 # Roadmap
 
 - [x] Analyseer navigatie, kernschermen, mobiel gebruik, toegankelijkheid en visuele samenhang.
-- [ ] Fase 1: centraliseer navigatie, voeg mobiele snelacties en een directe beheerroute toe.
-- [ ] Fase 2: vereenvoudig mobiele productiebediening en schermhiërarchie.
-- [ ] Fase 3: groepeer PGS-acties en verbeter filter-/exportduidelijkheid.
-- [ ] Fase 4: standaardiseer beheer, statussen, toestanden en semantische kleuren.
+- [x] Fase 1: centraliseer navigatie, voeg mobiele snelacties en een directe beheerroute toe.
+- [x] Fase 2: vereenvoudig mobiele productiebediening en schermhiërarchie.
+- [x] Fase 3: groepeer PGS-acties en verbeter filter-/exportduidelijkheid.
+- [x] Fase 4: scheid geavanceerd beheer en herstel de belangrijkste semantische kleur- en tabelproblemen.
 - [ ] Valideer tests, build en kernschermen.

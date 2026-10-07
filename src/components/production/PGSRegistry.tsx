@@ -1168,18 +1168,21 @@ const stats = useMemo(() => {
                       <TableHead
                         className="cursor-pointer select-none group"
                         onClick={() => handleSort("name")}
+                        aria-sort={sortField === "name" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                       >
                         <span className="inline-flex items-center gap-1">Gas <SortIcon field="name" /></span>
                       </TableHead>
                       <TableHead
                         className="cursor-pointer select-none group"
                         onClick={() => handleSort("pgs")}
+                        aria-sort={sortField === "pgs" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                       >
                         <span className="inline-flex items-center gap-1">PGS <SortIcon field="pgs" /></span>
                       </TableHead>
                       <TableHead
                         className="cursor-pointer select-none group"
                         onClick={() => handleSort("un")}
+                        aria-sort={sortField === "un" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                       >
                         <span className="inline-flex items-center gap-1">UN <SortIcon field="un" /></span>
                       </TableHead>
@@ -1189,6 +1192,7 @@ const stats = useMemo(() => {
                       <TableHead
                         className="cursor-pointer select-none group"
                         onClick={() => handleSort("pct")}
+                        aria-sort={sortField === "pct" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                       >
                         <span className="inline-flex items-center gap-1">Bezetting <SortIcon field="pct" /></span>
                       </TableHead>

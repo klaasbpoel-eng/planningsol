@@ -93,7 +93,7 @@ export function Header({
           <div key={group.label}>
             <p className="text-xs font-medium text-muted-foreground px-3 py-2 uppercase tracking-wider">{group.label}</p>
             {group.items.map((item) => (
-              <Link key={item.path} to={item.path} onClick={closeMobileMenu}>
+              <Link key={item.path} to={item.path} onClick={closeMobileMenu} aria-current={isActive(item.path) ? "page" : undefined}>
                 <Button
                   variant="ghost"
                   size="lg"
@@ -259,7 +259,7 @@ export function Header({
           {isMobile && (
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-primary hover:bg-primary/10 p-2">
+                <Button variant="ghost" size="sm" className="text-primary hover:bg-primary/10 p-2" aria-label="Open navigatiemenu">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
