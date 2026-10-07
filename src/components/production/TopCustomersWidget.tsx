@@ -11,6 +11,7 @@ import { format, differenceInDays, subDays } from "date-fns";
 import { nl } from "date-fns/locale";
 import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
 import { normalizeKlant } from "@/lib/customerNormalize";
+import { mapProductionLocation } from "@/lib/productionMetrics";
 
 interface CustomerData {
   customer_id: string | null;
@@ -110,7 +111,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
         : (() => { const p = raw.split("-"); return p.length === 3 ? (p[0].length === 4 ? raw : `${p[2]}-${p[1]}-${p[0]}`) : raw; })();
       if (iso < fromDate || iso > toDate) return false;
       if (locationFilter) {
-        const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+        const loc = mapProductionLocation(row.Locatie);
         if (loc !== locationFilter) return false;
       }
       if (digitalNames.size > 0 && digitalNames.has(row.Product)) return false;

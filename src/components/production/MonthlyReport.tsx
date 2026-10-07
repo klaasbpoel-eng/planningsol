@@ -31,6 +31,7 @@ import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
 import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
+import { mapProductionLocation } from "@/lib/productionMetrics";
 import { toast } from "sonner";
 import { exportToExcel, exportToPDF } from "@/lib/export-utils";
 
@@ -186,7 +187,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
       const iso = raw.includes("T") ? raw.substring(0, 10)
         : (() => { const d = raw.includes("/") ? raw.replace(/\//g, "-") : raw; const p = d.split("-"); if (p.length === 3 && p[0].length === 4) return d; return p.length === 3 ? (p[0].length === 4 ? raw : `${p[2]}-${p[1]}-${p[0]}`) : raw; })();
       if (iso < from || iso > to) return false;
-      const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg";
+      const loc = mapProductionLocation(row.Locatie);
       return loc === locationParam;
     });
   };

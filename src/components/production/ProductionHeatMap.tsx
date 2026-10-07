@@ -14,6 +14,7 @@ import {
   Snowflake
 } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
+import { mapProductionLocation } from "@/lib/productionMetrics";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths } from "date-fns";
 import { nl } from "date-fns/locale";
 import { FadeIn } from "@/components/ui/fade-in";
@@ -81,7 +82,7 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
         if (!raw) continue;
         const iso = raw.includes("T") ? raw.substring(0,10) : (() => { const p = raw.split("-"); return p.length===3 ? (p[0].length===4 ? raw : `${p[2]}-${p[1]}-${p[0]}`) : raw; })();
         if (iso < fromDate || iso > toDate) continue;
-        if (locationParam) { const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg"; if (loc !== locationParam) continue; }
+        if (locationParam && mapProductionLocation(row.Locatie) !== locationParam) continue;
         const existing = dataMap.get(iso) || { date: iso, cylinders: 0, dryIce: 0 };
         existing.cylinders += row.Aantal || 0;
         dataMap.set(iso, existing);

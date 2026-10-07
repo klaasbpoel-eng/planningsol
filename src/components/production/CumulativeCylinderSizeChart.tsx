@@ -7,6 +7,7 @@ import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger }
 import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown, Minus, Trophy, Ruler } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { mapProductionLocation } from "@/lib/productionMetrics";
 import {
   LineChart,
   Line,
@@ -118,7 +119,7 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
         if (!data || data.length === 0) break;
         if (locationParam) {
           allRows.push(...data.filter((r: any) =>
-            (r.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg") === locationParam
+            mapProductionLocation(r.Locatie) === locationParam
           ));
         } else {
           allRows.push(...data);

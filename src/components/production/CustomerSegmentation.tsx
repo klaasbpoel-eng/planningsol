@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn, formatNumber } from "@/lib/utils";
+import { mapProductionLocation } from "@/lib/productionMetrics";
 import { FadeIn } from "@/components/ui/fade-in";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format } from "date-fns";
@@ -96,7 +97,7 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
           if (!raw) return false;
           const iso = raw.includes("T") ? raw.substring(0,10) : (() => { const p = raw.split("-"); return p.length===3 ? (p[0].length===4 ? raw : `${p[2]}-${p[1]}-${p[0]}`) : raw; })();
           if (iso < from || iso > to) return false;
-          if (locationParam) { const loc = row.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg"; if (loc !== locationParam) return false; }
+          if (locationParam && mapProductionLocation(row.Locatie) !== locationParam) return false;
           return true;
         });
       };

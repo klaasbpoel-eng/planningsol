@@ -8,6 +8,7 @@ import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown
 import { formatNumber } from "@/lib/utils";
 import { getGasColor } from "@/constants/gasColors";
 import { supabase } from "@/integrations/supabase/client";
+import { mapProductionLocation } from "@/lib/productionMetrics";
 import { api } from "@/lib/api";
 import {
   LineChart,
@@ -101,7 +102,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
         if (!data || data.length === 0) break;
         if (locationParam) {
           allRows.push(...data.filter((r: any) =>
-            (r.Locatie?.toLowerCase().includes("emmen") ? "sol_emmen" : "sol_tilburg") === locationParam
+            mapProductionLocation(r.Locatie) === locationParam
           ));
         } else {
           allRows.push(...data);
