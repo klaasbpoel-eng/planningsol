@@ -136,7 +136,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
 
   useEffect(() => {
     fetchData();
-  }, [selectedYear, hideDigital]);
+  }, [selectedYear, hideDigital, ytdMode]);
 
   const fetchData = async () => {
     setLoading(true);

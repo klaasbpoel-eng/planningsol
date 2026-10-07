@@ -96,7 +96,7 @@ const TopCustomersWidget = lazy(() => import("./TopCustomersWidget").then(m => (
 const ChartLoadingFallback = () => (
   <ChartSkeleton height={300} showLegend={false} />
 );
-import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, differenceInDays, subDays, startOfYear, endOfYear, subYears, isSameDay, isSameMonth, isSameYear } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, differenceInDays, startOfYear, endOfYear, subYears, isSameDay, isSameMonth, isSameYear } from "date-fns";
 import { nl } from "date-fns/locale";
 import { cn, formatNumber, normalizeDatum } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -852,6 +852,13 @@ export function ProductionReports({
         const cylinderValue = gasTypeDistributionData.filter(includeType).reduce((sum, item) => sum + Number(item.total_cylinders || 0), 0);
         const previousCylinderValue = previousGasTypeDistributionData.filter(includeType).reduce((sum, item) => sum + Number(item.total_cylinders || 0), 0);
         const cylinderTrend = calculateTrend(cylinderValue, previousCylinderValue);
+        const cylinderLabel = hideDigital && hideExternal
+          ? "Fysieke interne cilinders"
+          : hideDigital
+            ? "Fysieke cilinders"
+            : hideExternal
+              ? "Interne cilinders"
+              : "Cilinders";
         const cylinderTrendMeaningful = cylinderTrend !== null && Math.abs(cylinderTrend) >= 5;
         const cylinderTrendColor = !cylinderTrendMeaningful
           ? "text-muted-foreground"
@@ -885,7 +892,7 @@ export function ProductionReports({
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
-                        {hideDigital ? "Fysieke cilinders" : hideExternal ? "Interne cilinders" : "Cilinders"}
+                        {cylinderLabel}
                       </p>
                       <p className="text-3xl font-bold leading-tight">{formatNumber(cylinderValue, 0)}</p>
                     </div>

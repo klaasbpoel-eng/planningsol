@@ -287,10 +287,11 @@ export function ProductionPlanning({
   };
 
   // Determine which tabs to show based on permissions
-  const showAdvancedTabs = permissions?.canViewReports ?? true;
-  const showKPIDashboard = permissions?.canViewKPIDashboard ?? true;
-  const showAdvancedWidgets = permissions?.canViewAdvancedWidgets ?? true;
+  const showAdvancedTabs = permissions?.canViewReports ?? false;
+  const showKPIDashboard = permissions?.canViewKPIDashboard ?? false;
+  const showAdvancedWidgets = permissions?.canViewAdvancedWidgets ?? false;
   const showRecipemaker = permissions?.canManageUsers ?? false; // Admin only
+  const comparisonLabel = getComparisonRange(dateRange.from, dateRange.to).label;
 
   const productionSections = [
     { value: "gascilinders", label: "Gascilinders", visible: true },
@@ -485,7 +486,7 @@ export function ProductionPlanning({
                   iconBgColor="bg-cyan-500/10"
                   trend={{
                     value: calculateTrend(dryIceToday, previousDryIceToday),
-                    label: "vs. vorige periode"
+                    label: `vs. ${comparisonLabel}`
                   }}
                   className={cn(
                     "glass-card transition-all duration-300",
@@ -502,7 +503,7 @@ export function ProductionPlanning({
                   iconBgColor="bg-orange-500/10"
                   trend={{
                     value: calculateTrend(cylindersToday, previousCylindersToday),
-                    label: "vs. vorige periode"
+                    label: `vs. ${comparisonLabel}`
                   }}
                   className={cn(
                     "glass-card transition-all duration-300",
@@ -524,7 +525,7 @@ export function ProductionPlanning({
                   iconBgColor="bg-green-500/10"
                   trend={{
                     value: calculateTrend(weekOrders, previousWeekOrders),
-                    label: "vs. vorige periode"
+                    label: `vs. ${comparisonLabel}`
                   }}
                   className={cn(
                     "glass-card transition-all duration-300",
