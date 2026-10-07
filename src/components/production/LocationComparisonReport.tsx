@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Building2, TrendingUp, TrendingDown, Minus, Cylinder, Sparkles, Calendar, RefreshCw, Download } from "lucide-react";
 import { api } from "@/lib/api";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, normalizeDatum } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getGasColor } from "@/constants/gasColors";
@@ -122,7 +122,6 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
   const [emmenTotal, setEmmenTotal] = useState(0);
   const [tilburgTotal, setTilburgTotal] = useState(0);
   const [hasDigitalTypes, setHasDigitalTypes] = useState(false);
-  const [digitalGasTypeIds, setDigitalGasTypeIds] = useState<Set<string>>(new Set());
 
   const availableYears = useMemo(() => {
     const years: number[] = [];
@@ -177,12 +176,25 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
 
       // Fetch rows for both locations + previous year in parallel
       const prevYear = selectedYear - 1;
-      const [emmenRows, tilburgRows, emmenRowsPrev, tilburgRowsPrev] = await Promise.all([
+      const [emmenRowsRaw, tilburgRowsRaw, emmenRowsPrevRaw, tilburgRowsPrevRaw, gasTypes] = await Promise.all([
         fetchAllRowsForYear(selectedYear, "sol_emmen"),
         fetchAllRowsForYear(selectedYear, "sol_tilburg"),
         fetchAllRowsForYear(prevYear, "sol_emmen"),
         fetchAllRowsForYear(prevYear, "sol_tilburg"),
+        api.gasTypes.getAllIncludingInactive(),
       ]);
+
+      const cutoffMonthDay = `${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
+      const throughYtdDay = (rows: any[], year: number) => rows.filter(row => {
+        if (!ytdMode) return true;
+        const iso = normalizeDatum(row.Datum);
+        return iso !== "" && iso <= `${year}-${cutoffMonthDay}`;
+      });
+      const emmenRows = throughYtdDay(emmenRowsRaw, selectedYear);
+      const tilburgRows = throughYtdDay(tilburgRowsRaw, selectedYear);
+      const emmenRowsPrev = throughYtdDay(emmenRowsPrevRaw, prevYear);
+      const tilburgRowsPrev = throughYtdDay(tilburgRowsPrevRaw, prevYear);
+      const digitalNames = new Set<string>((gasTypes || []).filter((type: any) => type.is_digital).map((type: any) => String(type.name)));
 
       // Aggregate monthly totals per location
       const buildMonthlyMap = (rows: any[]): Map<number, number> => {
@@ -217,9 +229,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
       setEmmenTotal(monthly.reduce((s, m) => s + m.emmen, 0));
       setTilburgTotal(monthly.reduce((s, m) => s + m.tilburg, 0));
 
-      // No digital types from Productie
-      setHasDigitalTypes(false);
-      setDigitalGasTypeIds(new Set());
+      setHasDigitalTypes(digitalNames.size > 0);
 
       // Aggregate gas type totals per location, per month
       const buildGasMap = (rows: any[], loc: "emmen" | "tilburg"): Map<string, { emmen: number; tilburg: number; emmenMonths: number[]; tilburgMonths: number[] }> => {
@@ -287,7 +297,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
           return {
             gas_type_name: name,
             gas_type_color: getGasColor(name, "#3b82f6"),
-            is_digital: false,
+            is_digital: digitalNames.has(name),
             emmen: vals.emmen,
             tilburg: vals.tilburg,
             total: vals.emmen + vals.tilburg,
