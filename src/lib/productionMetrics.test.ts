@@ -1,7 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { calculatePercentageTrend, getComparisonRange, isYearToDateRange, mapProductionLocation } from "./productionMetrics";
+import { calculatePercentageChange, calculatePercentageTrend, getComparisonRange, isYearToDateRange, mapProductionLocation } from "./productionMetrics";
 
 describe("productionMetrics", () => {
+  it("berekent groei ten opzichte van dezelfde vorige periode", () => {
+    expect(calculatePercentageChange(80160, 76629)).toBeCloseTo(4.6079, 4);
+  });
+
+  it("berekent daling en volledige uitval zonder de verandering te begrenzen", () => {
+    expect(calculatePercentageChange(24429, 34735)).toBeCloseTo(-29.6704, 4);
+    expect(calculatePercentageChange(0, 100)).toBe(-100);
+    expect(calculatePercentageChange(800, 100)).toBe(700);
+  });
+
+  it("onderscheidt ongewijzigde aantallen van een ontbrekende vergelijkingsbasis", () => {
+    expect(calculatePercentageChange(100, 100)).toBe(0);
+    expect(calculatePercentageChange(25, 0)).toBeNull();
+    expect(calculatePercentageChange(0, 0)).toBeNull();
+  });
+
   it("classificeert alleen bekende locaties en maakt onbekende waarden expliciet", () => {
     expect(mapProductionLocation("SOL Nederland-Depot Emmen")).toBe("sol_emmen");
     expect(mapProductionLocation("SOL Nederland-Tilburg")).toBe("sol_tilburg");

@@ -35,8 +35,14 @@ export function getComparisonRange(from: Date, to: Date, today = new Date()): { 
   };
 }
 
-export function calculatePercentageTrend(current: number, previous: number): number | null {
+export function calculatePercentageChange(current: number, previous: number): number | null {
   if (previous === 0) return null;
-  const percentage = Math.round(((current - previous) / previous) * 100);
+  return ((current - previous) / previous) * 100;
+}
+
+export function calculatePercentageTrend(current: number, previous: number): number | null {
+  const change = calculatePercentageChange(current, previous);
+  if (change === null) return null;
+  const percentage = Math.round(change);
   return Math.max(-500, Math.min(500, percentage));
 }
