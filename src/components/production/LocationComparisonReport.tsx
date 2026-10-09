@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { getGasColor } from "@/constants/gasColors";
 import { supabase } from "@/integrations/supabase/client";
 import { periodLabel, yearWithYtdSuffix, totalsRowLabel } from "@/lib/periodLabels";
+import { calculatePercentageChange } from "@/lib/productionMetrics";
 import {
   BarChart,
   Bar,
@@ -882,7 +883,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
           {filteredGasTypeData.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={Math.max(300, filteredGasTypeData.length * (showComparison ? 50 : 36))}>
-                <BarChart data={filteredGasTypeData} layout="vertical" margin={{ left: 10, right: 70 }}>
+                <BarChart data={filteredGasTypeData} layout="vertical" margin={{ left: 10, right: showComparison ? 155 : 70 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
                   <XAxis type="number" className="text-xs" tickFormatter={(v) => formatNumber(v, 0)} tickLine={false} axisLine={false} />
                   <YAxis
@@ -926,6 +927,20 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                       position="right"
                       className="text-[11px] font-medium fill-foreground"
                       formatter={(v: number) => formatNumber(v, 0)}
+                      content={showComparison ? (props) => {
+                        const { x, y, width, height, index } = props;
+                        const item = typeof index === "number" ? filteredGasTypeData[index] : undefined;
+                        if (!item) return null;
+                        const delta = calculatePercentageChange(item.total, item.total_prev ?? 0);
+                        const changeLabel = delta === null ? "—" : `${delta > 0 ? "+" : ""}${delta.toLocaleString("nl-NL", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+                        const colorClass = delta === null || delta === 0 ? "fill-muted-foreground" : delta > 0 ? "fill-success" : "fill-destructive";
+                        return (
+                          <text x={Number(x) + Number(width) + 6} y={Number(y) + Number(height) / 2} dominantBaseline="central" className="text-[11px] font-medium fill-foreground">
+                            {formatNumber(item.total, 0)}
+                            <tspan dx={8} className={colorClass}>{changeLabel}</tspan>
+                          </text>
+                        );
+                      } : undefined}
                     />
                   </Bar>
                   {showComparison && <Bar dataKey="emmen_prev" fill="#93c5fd" radius={[0, 2, 2, 0]} barSize={9} stackId="prev" />}
