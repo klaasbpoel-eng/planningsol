@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { AppRole } from "@/hooks/useUserPermissions";
 
 export function useUserRole(userId: string | undefined) {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState<AppRole>("user");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!userId) {
+      setRole("user");
       setLoading(false);
       return;
     }
@@ -17,14 +19,14 @@ export function useUserRole(userId: string | undefined) {
           .from("user_roles")
           .select("role")
           .eq("user_id", userId)
-          .eq("role", "admin")
           .maybeSingle();
 
         if (error) throw error;
-        setIsAdmin(!!data);
+        const value = data?.role as AppRole | undefined;
+        setRole(value === "admin" || value === "supervisor" || value === "operator" ? value : "user");
       } catch (error) {
         console.error("Error checking role:", error);
-        setIsAdmin(false);
+        setRole("user");
       } finally {
         setLoading(false);
       }
@@ -33,5 +35,5 @@ export function useUserRole(userId: string | undefined) {
     checkRole();
   }, [userId]);
 
-  return { isAdmin, loading };
+  return { role, isAdmin: role === "admin", loading };
 }

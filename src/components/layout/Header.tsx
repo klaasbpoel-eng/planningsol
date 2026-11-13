@@ -24,13 +24,6 @@ import { openCommandPalette } from "@/lib/command-palette";
 import { useCurrentCustomRole } from "@/hooks/useCustomRole";
 import { filterNavigationForRole, roleDisplayName } from "@/lib/customRoles";
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Admin",
-  supervisor: "Supervisor",
-  operator: "Operator",
-  user: "Gebruiker",
-};
-
 const ROLE_COLORS: Record<string, string> = {
   admin: "bg-destructive/10 text-destructive border-destructive/30",
   supervisor: "bg-accent/10 text-accent border-accent/30",

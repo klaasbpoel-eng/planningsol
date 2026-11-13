@@ -134,6 +134,7 @@ export function CommandPalette() {
           <>
             <CommandGroup heading="Recent">
               {recentActions.map((recent) => {
+                if (customRole?.hiddenMenuItems.includes(recent.id)) return null;
                 const item = allItems.find((i) => i.id === recent.id);
                 const Icon = item?.icon || History;
                 return (
