@@ -143,6 +143,43 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const toggleGroup = (label: string) =>
     setCollapsedGroups((current) => (current.includes(label) ? current.filter((l) => l !== label) : [...current, label]));
 
+  const openLabels = () => {
+    setLabelDrafts(columnLabelDrafts(visibleColumns));
+    setLabelsOpen(true);
+  };
+
+  const saveLabels = async () => {
+    setSavingLabels(true);
+    try {
+      const map = buildColumnLabelMap(baseColumns, labelDrafts);
+      await api.appSettings.upsert(columnLabelsKey(TABLE_NAME), JSON.stringify(map), `Kolomnamen voor ${TABLE_NAME}`);
+      setColumnLabels(map);
+      setLabelsOpen(false);
+      toast({
+        title: "Kolomnamen opgeslagen",
+        description: `${Object.keys(map).length} ${Object.keys(map).length === 1 ? "kolom" : "kolommen"} aangepast.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Opslaan mislukt", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingLabels(false);
+    }
+  };
+
+  const resetLabels = async () => {
+    setSavingLabels(true);
+    try {
+      await api.appSettings.upsert(columnLabelsKey(TABLE_NAME), "{}", `Kolomnamen voor ${TABLE_NAME}`);
+      setColumnLabels({});
+      setLabelDrafts(columnLabelDrafts(baseColumns));
+      toast({ title: "Kolomnamen hersteld", description: "De automatische namen zijn weer in gebruik." });
+    } catch (e: any) {
+      toast({ title: "Herstellen mislukt", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingLabels(false);
+    }
+  };
+
   const stripeClass = (parity: 0 | 1 | null) =>
     parity === null ? "" : `border-l-4 ${parity === 0 ? "border-l-primary" : "border-l-accent"}`;
 
@@ -206,7 +243,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
         all.push(...((data ?? []) as DataRow[]));
         if (!data || data.length < EXPORT_BATCH) break;
       }
-      const csv = rowsToCsv(columns ?? deriveColumns(all), all);
+      const csv = rowsToCsv(applyColumnLabels(columns ?? deriveColumns(all), columnLabels), all);
       const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -251,6 +288,10 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                 disabled={!columns}
               />
             </div>
+            <Button variant="outline" onClick={openLabels} disabled={!columns}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Kolomnamen
+            </Button>
             <Button variant="outline" onClick={load} disabled={loading}>
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Vernieuwen
