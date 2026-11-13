@@ -149,7 +149,7 @@ describe("kolomnamen op de Ramses-correctiespagina", () => {
 
 describe("filteren op kolom op de Ramses-correctiespagina", () => {
   const kiesKolom = async (label: string) => {
-    fireEvent.click(screen.getByRole("combobox", { name: "Kies een kolom" }));
+    fireEvent.click(screen.getByRole("combobox", { name: /Kolom kiezen om op te filteren/ }));
     fireEvent.click(await screen.findByRole("option", { name: label }));
   };
 
@@ -173,6 +173,7 @@ describe("filteren op kolom op de Ramses-correctiespagina", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Filter wissen" }));
     expect((screen.getByLabelText("Filterwaarde") as HTMLInputElement).value).toBe("");
-    expect(screen.getByRole("combobox", { name: "Alle kolommen" })).toBeInTheDocument();
+    // Back to no column picked, so the value box is out of use again.
+    expect(screen.getByLabelText("Filterwaarde")).toBeDisabled();
   });
 });

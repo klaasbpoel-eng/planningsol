@@ -361,6 +361,9 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
               searchPlaceholder="Zoek een kolom…"
               className="w-full sm:w-60"
               disabled={!columns}
+              ariaLabel={`Kolom kiezen om op te filteren, nu: ${
+                visibleColumns.find((col) => col.key === filterColumn)?.label ?? "Alle kolommen"
+              }`}
             />
             <Input
               value={filterInput}
