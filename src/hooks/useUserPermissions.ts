@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { effectivePermissions, resolveCustomRole, type CustomRole } from "@/lib/customRoles";
+import { loadCustomRoleConfig, onCustomRolesChanged } from "@/lib/customRoleStore";
 
 export type AppRole = "admin" | "supervisor" | "operator" | "user";
 export type ProductionLocation = Database["public"]["Enums"]["production_location"] | null;
@@ -126,6 +128,11 @@ export function useUserPermissions(userId: string | undefined) {
   // id we report loading, so protected pages never judge a fresh sign-in with
   // the default "user" role (which bounced admins away from /admin).
   const [loadedUserId, setLoadedUserId] = useState<string | undefined>(undefined);
+  // Own role made on the Rollen page; it can only switch rights off, never add them.
+  const [customRole, setCustomRole] = useState<CustomRole | null>(null);
+  const [rolesVersion, setRolesVersion] = useState(0);
+
+  useEffect(() => onCustomRolesChanged(() => setRolesVersion((v) => v + 1)), []);
 
   useEffect(() => {
     if (!userId) {
@@ -146,7 +153,10 @@ export function useUserPermissions(userId: string | undefined) {
         
         const userRole = (roleData?.role as AppRole) || "user";
         setRole(userRole);
-        setPermissions(ROLE_PERMISSIONS[userRole]);
+        const config = await loadCustomRoleConfig();
+        const ownRole = resolveCustomRole(userId, userRole, config.roles, config.assignments);
+        setCustomRole(ownRole);
+        setPermissions(effectivePermissions(ROLE_PERMISSIONS[userRole], ownRole));
 
         // Fetch production location from profile
         const { data: profileData, error: profileError } = await supabase
@@ -167,6 +177,7 @@ export function useUserPermissions(userId: string | undefined) {
       } catch (error) {
         console.error("Error fetching role/location:", error);
         setRole("user");
+        setCustomRole(null);
         setPermissions(ROLE_PERMISSIONS.user);
         setProductionLocation(null);
       } finally {
@@ -176,10 +187,11 @@ export function useUserPermissions(userId: string | undefined) {
     };
 
     fetchRoleAndLocation();
-  }, [userId]);
+  }, [userId, rolesVersion]);
 
   return { 
     role, 
+    customRole,
     permissions, 
     loading: loading || (!!userId && loadedUserId !== userId), 
     isAdmin: role === "admin",
