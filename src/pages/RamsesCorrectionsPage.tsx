@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, FileSpreadsheet, RefreshCw, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { buildSearchFilter, deriveColumns, findTimestampColumn, formatCellValue, rowsToCsv, timestampGroupParity, type DataColumn, type DataRow } from "@/lib/dataTable";
+import { buildSearchFilter, deriveColumns, findTimestampColumn, formatCellValue, groupRowsByTimestamp, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
 
 const TABLE_NAME = "RamsesCorrecties";
 const PAGE_SIZES = [25, 50, 100];
@@ -41,6 +41,8 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<{ key: string; ascending: boolean } | null>(null);
   const [exporting, setExporting] = useState(false);
+  // Labels of the time groups the user has closed; open by default.
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
 
   // Short pause while typing so we don't query on every keystroke.
   useEffect(() => {
@@ -86,12 +88,13 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
 
   const visibleColumns = useMemo(() => columns ?? deriveColumns(rows), [columns, rows]);
   const timestampKey = useMemo(() => findTimestampColumn(visibleColumns), [visibleColumns]);
-  const groupParities = useMemo(() => {
+  const groups = useMemo(() => {
     if (!timestampKey) return null;
     const kind = visibleColumns.find((c) => c.key === timestampKey)?.kind ?? "text";
     // Group on what the user sees (to the minute), not on hidden seconds.
-    return timestampGroupParity(rows, timestampKey, (value) => formatCellValue(value, kind));
+    return groupRowsByTimestamp(rows, timestampKey, (value) => formatCellValue(value, kind));
   }, [rows, timestampKey, visibleColumns]);
+  const collapsed = useMemo(() => new Set(collapsedGroups), [collapsedGroups]);
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const firstRow = total === 0 ? 0 : page * pageSize + 1;
   const lastRow = Math.min(total, (page + 1) * pageSize);
@@ -103,6 +106,51 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
       if (current.ascending) return { key, ascending: false };
       return null;
     });
+  };
+
+  const toggleGroup = (label: string) =>
+    setCollapsedGroups((current) => (current.includes(label) ? current.filter((l) => l !== label) : [...current, label]));
+
+  const stripeClass = (parity: 0 | 1 | null) =>
+    parity === null ? "" : `border-l-4 ${parity === 0 ? "border-l-primary" : "border-l-muted-foreground/30"}`;
+
+  const renderRow = (row: DataRow, index: number, parity: 0 | 1 | null) => (
+    <TableRow key={String(row.id ?? index)} className={`${parity === 0 ? "bg-primary/15 hover:bg-primary/20" : ""} ${loading ? "opacity-60" : ""}`}>
+      {visibleColumns.map((col, colIndex) => (
+        <TableCell
+          key={col.key}
+          className={`whitespace-nowrap ${col.kind === "number" ? "text-right tabular-nums" : ""} ${
+            colIndex === 0 ? stripeClass(parity) : ""
+          }`}
+        >
+          {formatCellValue(row[col.key], col.kind)}
+        </TableCell>
+      ))}
+    </TableRow>
+  );
+
+  const renderGroupHeader = (group: TimestampGroup) => {
+    const open = !collapsed.has(group.label);
+    const count = group.indexes.length;
+    return (
+      <TableRow key={`groep-${group.label}-${group.indexes[0]}`} className="bg-muted/50 hover:bg-muted/50">
+        <TableCell colSpan={Math.max(visibleColumns.length, 1)} className={`p-0 ${stripeClass(group.parity)}`}>
+          <button
+            type="button"
+            onClick={() => toggleGroup(group.label)}
+            aria-expanded={open}
+            aria-label={`${open ? "Klap" : "Open"} tijdgroep ${group.empty ? "zonder tijdstip" : group.label}`}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            <ChevronRight className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
+            <span className="whitespace-nowrap">{group.empty ? "Zonder tijdstip" : group.label}</span>
+            <span className="whitespace-nowrap text-muted-foreground/70">
+              {count.toLocaleString("nl-NL")} {count === 1 ? "regel" : "regels"}
+            </span>
+          </button>
+        </TableCell>
+      </TableRow>
+    );
   };
 
   const exportCsv = async () => {
@@ -177,7 +225,35 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
               <p className="mt-1 text-muted-foreground">{error}</p>
             </div>
           ) : (
-            <div className="max-h-[65vh] overflow-auto rounded-md border">
+            <>
+              {groups && groups.length > 1 && (
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                  <span>
+                    {groups.length.toLocaleString("nl-NL")} tijdgroepen op deze pagina
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setCollapsedGroups([])}
+                      disabled={collapsedGroups.length === 0}
+                    >
+                      Alles openen
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setCollapsedGroups(groups.map((g) => g.label))}
+                      disabled={groups.every((g) => collapsed.has(g.label))}
+                    >
+                      Alles sluiten
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="max-h-[65vh] overflow-auto rounded-md border">
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
@@ -215,30 +291,20 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                         {search ? "Geen correcties gevonden voor deze zoekopdracht." : "Er zijn (nog) geen correcties zichtbaar."}
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    rows.map((row, i) => (
-                      <TableRow
-                        key={String(row.id ?? i)}
-                        className={`${groupParities?.[i] === 0 ? "bg-primary/15 hover:bg-primary/20" : ""} ${loading ? "opacity-60" : ""}`}
-                      >
-                        {visibleColumns.map((col, colIndex) => (
-                          <TableCell
-                            key={col.key}
-                            className={`whitespace-nowrap ${col.kind === "number" ? "text-right tabular-nums" : ""} ${
-                              colIndex === 0 && groupParities?.[i] != null
-                                ? `border-l-4 ${groupParities[i] === 0 ? "border-l-primary" : "border-l-muted-foreground/30"}`
-                                : ""
-                            }`}
-                          >
-                            {formatCellValue(row[col.key], col.kind)}
-                          </TableCell>
-                        ))}
-                      </TableRow>
+                  ) : groups ? (
+                    groups.map((group) => (
+                      <Fragment key={`groep-${group.label}-${group.indexes[0]}`}>
+                        {renderGroupHeader(group)}
+                        {!collapsed.has(group.label) && group.indexes.map((i) => renderRow(rows[i], i, group.parity))}
+                      </Fragment>
                     ))
+                  ) : (
+                    rows.map((row, i) => renderRow(row, i, null))
                   )}
                 </TableBody>
               </Table>
-            </div>
+              </div>
+            </>
           )}
 
           <div className="flex flex-col items-center justify-between gap-3 text-sm text-muted-foreground sm:flex-row">
