@@ -5,17 +5,12 @@ import { useLocation, Link } from "react-router-dom";
 import type { AppRole } from "@/hooks/useUserPermissions";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { WifiOff, Wifi } from "lucide-react";
+import { NAVIGATION_ITEMS } from "@/config/navigation";
 
-const ROUTE_LABELS: Record<string, string> = {
-  "": "Home",
-  "kalender": "Kalender",
-  "productie": "Productieplanning",
-  "interne-bestellingen": "Interne Bestellingen",
-  "verlof": "Verlof & Aanvragen",
-  "toolbox": "Toolbox",
-  "barcode": "Barcode Generator",
-  "dagoverzicht": "Dagelijks Overzicht",
-};
+// Breadcrumb labels come from the shared menu so names match everywhere.
+const ROUTE_LABELS: Record<string, string> = Object.fromEntries(
+  NAVIGATION_ITEMS.filter(item => !item.path.includes("?") && item.path !== "/").map(item => [item.path.slice(1), item.label])
+);
 
 interface PageLayoutProps {
   userEmail?: string;
@@ -51,7 +46,7 @@ export function PageLayout({
     const segments = location.pathname.split("/").filter(Boolean);
     if (segments.length === 0) return [];
     return [
-      { label: "Home", href: "/" },
+      { label: "Vandaag", href: "/" },
       ...segments.map((seg, i) => ({
         label: ROUTE_LABELS[seg] || seg,
         href: i < segments.length - 1 ? "/" + segments.slice(0, i + 1).join("/") : undefined,

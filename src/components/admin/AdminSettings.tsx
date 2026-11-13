@@ -3,9 +3,7 @@ import { LeaveTypeManagement } from "./LeaveTypeManagement";
 import { GasCylinderSettings } from "./GasCylinderSettings";
 import { DryIceSettings } from "./DryIceSettings";
 import { DefaultCustomerSetting } from "./DefaultCustomerSetting";
-import { UserApprovalManagement } from "./UserApprovalManagement";
 import { CustomerManagement } from "../customers/CustomerManagement";
-import { EmployeeList } from "./EmployeeList";
 import { DatabaseBackupRestore } from "./DatabaseBackupRestore";
 import { MigrationSettings } from "./MigrationSettings";
 import { DataSourceSettings } from "./DataSourceSettings";
@@ -13,7 +11,7 @@ import { DirectAdminExport } from "./DirectAdminExport";
 import { DeploymentManual } from "./DeploymentManual";
 import { DeploymentControl } from "./DeploymentControl";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Factory, Calendar, Building2, UserCog, Download, Server } from "lucide-react";
+import { Settings, Factory, Calendar, Building2, Download, Server } from "lucide-react";
 
 export function AdminSettings() {
   return (
@@ -31,10 +29,6 @@ export function AdminSettings() {
             <Settings className="h-4 w-4" />
             Algemeen
           </TabsTrigger>
-          <TabsTrigger value="users" className="gap-2 data-[state=active]:bg-background">
-            <UserCog className="h-4 w-4" />
-            Medewerkers & Toegang
-          </TabsTrigger>
           <TabsTrigger value="production" className="gap-2 data-[state=active]:bg-background">
             <Factory className="h-4 w-4" />
             Productie
@@ -47,6 +41,9 @@ export function AdminSettings() {
             <Building2 className="h-4 w-4" />
             Klanten
           </TabsTrigger>
+          <span className="flex items-center px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-l border-border/60 ml-1" aria-hidden="true">
+            Geavanceerd
+          </span>
           <TabsTrigger value="deployment" className="gap-2 data-[state=active]:bg-background">
             <Server className="h-4 w-4" />
             Server & herstel
@@ -60,24 +57,6 @@ export function AdminSettings() {
         <TabsContent value="general" className="space-y-4 animate-fade-in-up">
           <div className="grid gap-4">
             <DefaultCustomerSetting />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="users" className="space-y-4 animate-fade-in-up">
-          <div className="grid gap-6">
-            {/* Employee List Section */}
-            <div className="space-y-2">
-              <h3 className="text-lg font-medium">Medewerkerslijst</h3>
-              <p className="text-sm text-muted-foreground">Overzicht van alle actieve en inactieve medewerkers.</p>
-              <EmployeeList />
-            </div>
-
-            {/* Approval Section */}
-            <div className="space-y-2 pt-4 border-t">
-              <h3 className="text-lg font-medium">Nieuwe Aanmeldingen</h3>
-              <p className="text-sm text-muted-foreground">Keur nieuwe accountaanvragen goed of wijs ze af.</p>
-              <UserApprovalManagement />
-            </div>
           </div>
         </TabsContent>
 

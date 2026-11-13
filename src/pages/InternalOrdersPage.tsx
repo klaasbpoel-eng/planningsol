@@ -98,7 +98,7 @@ function InternalOrdersContent({
     <PageLayout
       userEmail={userEmail}
       role={role as any}
-      title="Interne Bestellingen"
+      title="Interne bestellingen"
       description="Beheer goederenstromen tussen Emmen en Tilburg"
       titleIcon={<ArrowLeftRight className="h-8 w-8 text-primary" />}
     >

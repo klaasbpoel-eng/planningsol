@@ -1,15 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-    LayoutDashboard,
-    ListChecks,
-    ClipboardList,
-    CalendarDays,
-    BookOpen,
-    Users,
-    Settings,
-    Menu,
-} from "lucide-react";
+import { LayoutDashboard, Menu } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ADMIN_SECTIONS } from "@/config/navigation";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -49,14 +42,8 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         }
     };
 
-    const navItems = [
-        { id: "requests", label: "Aanvragen", icon: ListChecks, badgeKey: "requests" as const },
-        { id: "tasks", label: "Taken", icon: ClipboardList, badgeKey: null },
-        { id: "calendar", label: "Teamkalender", icon: CalendarDays, badgeKey: null },
-        { id: "logbook", label: "Toolbox Logboek", icon: BookOpen, badgeKey: null },
-        { id: "employees", label: "Medewerkers", icon: Users, badgeKey: "employees" as const },
-        { id: "settings", label: "Instellingen", icon: Settings, badgeKey: null },
-    ];
+    const badgeKeys: Record<string, keyof BadgeCounts> = { requests: "requests", employees: "employees" };
+    const navItems = ADMIN_SECTIONS;
 
     const handleTabChange = (tabId: string) => {
         onTabChange(tabId);
@@ -74,20 +61,34 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
             <div className="flex-1 px-3 py-2 space-y-1">
                 {navItems.map((item) => {
                     const Icon = item.icon;
-                    const isActive = activeTab === item.id;
-                    const badgeCount = item.badgeKey ? badges[item.badgeKey] : 0;
+                    const isActive = item.tab !== null && activeTab === item.tab;
+                    const badgeKey = item.tab ? badgeKeys[item.tab] : undefined;
+                    const badgeCount = badgeKey ? badges[badgeKey] : 0;
+                    const itemClass = cn(
+                        "w-full justify-start gap-3 relative transition-all duration-200",
+                        isActive
+                            ? "bg-primary/10 text-primary hover:bg-primary/15 font-medium shadow-sm"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    );
+
+                    if (!item.tab) {
+                        return (
+                            <Button key={item.id} variant="ghost" className={itemClass} asChild>
+                                <Link to={item.path} onClick={() => isMobile && setIsOpen(false)}>
+                                    <Icon className="h-4 w-4 text-muted-foreground" />
+                                    {item.label}
+                                </Link>
+                            </Button>
+                        );
+                    }
 
                     return (
                         <Button
                             key={item.id}
                             variant={isActive ? "secondary" : "ghost"}
-                            className={cn(
-                                "w-full justify-start gap-3 relative transition-all duration-200",
-                                isActive
-                                    ? "bg-primary/10 text-primary hover:bg-primary/15 font-medium shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                            )}
-                            onClick={() => handleTabChange(item.id)}
+                            className={itemClass}
+                            aria-current={isActive ? "page" : undefined}
+                            onClick={() => handleTabChange(item.tab!)}
                         >
                             {isActive && (
                                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full" />
