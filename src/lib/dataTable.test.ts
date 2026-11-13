@@ -40,6 +40,67 @@ describe("buildSearchFilter", () => {
   });
 });
 
+describe("quoteColumnName", () => {
+  it("haalt gewone kolomnamen ongemoeid en omringt namen met spaties", () => {
+    expect(quoteColumnName("dt_dn")).toBe("dt_dn");
+    expect(quoteColumnName("Tx dn series Nr")).toBe('"Tx dn series Nr"');
+  });
+});
+
+describe("buildColumnFilters", () => {
+  const cols = deriveColumns([{ Code: "A1", Aantal: 5, Datum: "2026-11-13", Actief: true }]);
+  const col = (key: string) => cols.find((c) => c.key === key);
+
+  it("zoekt in een tekstkolom op 'bevat'", () => {
+    expect(buildColumnFilters(col("Code"), "a1")).toEqual([{ key: "Code", op: "ilike", value: "*a1*" }]);
+  });
+
+  it("kent getalvergelijkingen toe", () => {
+    expect(buildColumnFilters(col("Aantal"), "5")).toEqual([{ key: "Aantal", op: "eq", value: 5 }]);
+    expect(buildColumnFilters(col("Aantal"), ">10")).toEqual([{ key: "Aantal", op: "gt", value: 10 }]);
+    expect(buildColumnFilters(col("Aantal"), "<=2,5")).toEqual([{ key: "Aantal", op: "lte", value: 2.5 }]);
+    expect(buildColumnFilters(col("Aantal"), "1.234,5")).toEqual([{ key: "Aantal", op: "eq", value: 1234.5 }]);
+    expect(buildColumnFilters(col("Aantal"), "veel")).toEqual([]);
+  });
+
+  it("maakt van een dag het bereik van die dag", () => {
+    const dag = [
+      { key: "Datum", op: "gte", value: "2026-11-03" },
+      { key: "Datum", op: "lt", value: "2026-11-04" },
+    ];
+    expect(buildColumnFilters(col("Datum"), "03-11-2026")).toEqual(dag);
+    expect(buildColumnFilters(col("Datum"), "2026-11-03 10:45")).toEqual(dag);
+  });
+
+  it("kent een maand en een jaar toe", () => {
+    expect(buildColumnFilters(col("Datum"), "11-2026")).toEqual([
+      { key: "Datum", op: "gte", value: "2026-11-01" },
+      { key: "Datum", op: "lt", value: "2026-12-01" },
+    ]);
+    expect(buildColumnFilters(col("Datum"), "2026")).toEqual([
+      { key: "Datum", op: "gte", value: "2026-01-01" },
+      { key: "Datum", op: "lt", value: "2027-01-01" },
+    ]);
+  });
+
+  it("wijst onbestaande datums af", () => {
+    expect(buildColumnFilters(col("Datum"), "31-02-2026")).toEqual([]);
+    expect(buildColumnFilters(col("Datum"), "13-13-2026")).toEqual([]);
+    expect(buildColumnFilters(col("Datum"), "vorige week")).toEqual([]);
+  });
+
+  it("begrijpt ja en nee", () => {
+    expect(buildColumnFilters(col("Actief"), "ja")).toEqual([{ key: "Actief", op: "eq", value: true }]);
+    expect(buildColumnFilters(col("Actief"), "Nee")).toEqual([{ key: "Actief", op: "eq", value: false }]);
+    expect(buildColumnFilters(col("Actief"), "misschien")).toEqual([]);
+  });
+
+  it("geeft niets terug zonder kolom of zonder waarde", () => {
+    expect(buildColumnFilters(undefined, "x")).toEqual([]);
+    expect(buildColumnFilters(col("Code"), "   ")).toEqual([]);
+  });
+});
+
 describe("rowsToCsv", () => {
   it("gebruikt puntkomma en decimale komma", () => {
     const cols = deriveColumns([{ Code: "A;1", Aantal: 2.5 }]);
