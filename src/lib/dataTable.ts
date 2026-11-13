@@ -157,6 +157,98 @@ export function buildSearchFilter(columns: DataColumn[], term: string): string |
   return textColumns.map((c) => `${quoteColumnName(c.key)}.ilike.*${cleaned}*`).join(",");
 }
 
+export type ColumnFilterOp = "eq" | "ilike" | "gt" | "gte" | "lt" | "lte";
+
+/** One condition on a single column. Several conditions are combined with AND by the caller. */
+export interface ColumnFilter {
+  key: string;
+  op: ColumnFilterOp;
+  value: unknown;
+}
+
+const COMPARISON = /^(>=|<=|>|<|=)\s*(.+)$/;
+const OP_BY_SYMBOL: Record<string, ColumnFilterOp> = { "=": "eq", ">": "gt", ">=": "gte", "<": "lt", "<=": "lte" };
+
+/** Dutch number text ("1.234,5", ">10") to an operator and a number; null when it isn't a number. */
+function parseNumberTerm(term: string): { op: ColumnFilterOp; value: number } | null {
+  const match = COMPARISON.exec(term);
+  const body = (match?.[2] ?? term).trim();
+  if (!body) return null;
+  const normalized = body.includes(",") ? body.replace(/\./g, "").replace(",", ".") : body;
+  if (!/^-?\d+(?:\.\d+)?$/.test(normalized)) return null;
+  return { op: OP_BY_SYMBOL[match?.[1] ?? "="] ?? "eq", value: Number(normalized) };
+}
+
+const DAY_PATTERN = /^(?:(\d{4})-(\d{1,2})-(\d{1,2})|(\d{1,2})[.-](\d{1,2})[.-](\d{4}))$/;
+const MONTH_PATTERN = /^(?:(\d{1,2})[.-](\d{4})|(\d{4})-(\d{1,2}))$/;
+const DAY_MS = 86400000;
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const isoDay = (utcMs: number) => {
+  const date = new Date(utcMs);
+  return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
+};
+
+/** Day, month or year text to a [start, end) ISO-day range; null when it isn't a date. */
+function parseDateRange(term: string): [string, string] | null {
+  const text = term.trim();
+  const day = DAY_PATTERN.exec(text) ?? DAY_PATTERN.exec(text.split(/[T ]/)[0] ?? "");
+  if (day) {
+    const [y, m, d] = day[1]
+      ? [Number(day[1]), Number(day[2]), Number(day[3])]
+      : [Number(day[6]), Number(day[5]), Number(day[4])];
+    if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+    const start = Date.UTC(y, m - 1, d);
+    // Rejects impossible days such as 31-02.
+    if (new Date(start).getUTCMonth() !== m - 1) return null;
+    return [isoDay(start), isoDay(start + DAY_MS)];
+  }
+  const month = MONTH_PATTERN.exec(text);
+  if (month) {
+    const [y, m] = month[1] ? [Number(month[2]), Number(month[1])] : [Number(month[3]), Number(month[4])];
+    if (m < 1 || m > 12) return null;
+    return [isoDay(Date.UTC(y, m - 1, 1)), isoDay(Date.UTC(y, m, 1))];
+  }
+  if (/^\d{4}$/.test(text)) {
+    const y = Number(text);
+    return [isoDay(Date.UTC(y, 0, 1)), isoDay(Date.UTC(y + 1, 0, 1))];
+  }
+  return null;
+}
+
+const TRUE_WORDS = new Set(["ja", "yes", "y", "true", "waar", "1"]);
+const FALSE_WORDS = new Set(["nee", "no", "n", "false", "onwaar", "0"]);
+
+/**
+ * Conditions that keep only the rows whose column matches the typed text. The value is read the way the
+ * column is shown: text searches "contains", numbers accept >, >=, <, <= and =, dates accept a day,
+ * month or year, booleans accept ja/nee. Nothing comes back when the text cannot be used for that column.
+ */
+export function buildColumnFilters(column: DataColumn | undefined, term: string): ColumnFilter[] {
+  const cleaned = term.trim().replace(/[,()*"\\]/g, " ").replace(/\s+/g, " ").trim();
+  if (!column || !cleaned) return [];
+  if (column.kind === "number") {
+    const parsed = parseNumberTerm(cleaned);
+    return parsed ? [{ key: column.key, op: parsed.op, value: parsed.value }] : [];
+  }
+  if (column.kind === "boolean") {
+    const word = cleaned.toLowerCase();
+    if (TRUE_WORDS.has(word)) return [{ key: column.key, op: "eq", value: true }];
+    if (FALSE_WORDS.has(word)) return [{ key: column.key, op: "eq", value: false }];
+    return [];
+  }
+  if (column.kind === "date") {
+    const range = parseDateRange(cleaned);
+    return range
+      ? [
+          { key: column.key, op: "gte", value: range[0] },
+          { key: column.key, op: "lt", value: range[1] },
+        ]
+      : [];
+  }
+  return [{ key: column.key, op: "ilike", value: `*${cleaned}*` }];
+}
+
 function csvCell(value: unknown): string {
   if (value === null || value === undefined) return "";
   const text = typeof value === "object" ? JSON.stringify(value) : String(value);
