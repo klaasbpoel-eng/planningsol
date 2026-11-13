@@ -225,7 +225,8 @@ const FALSE_WORDS = new Set(["nee", "no", "n", "false", "onwaar", "0"]);
  * month or year, booleans accept ja/nee. Nothing comes back when the text cannot be used for that column.
  */
 export function buildColumnFilters(column: DataColumn | undefined, term: string): ColumnFilter[] {
-  const cleaned = term.trim().replace(/[,()*"\\]/g, " ").replace(/\s+/g, " ").trim();
+  // Commas stay: this filter is sent on its own, so a comma is part of the value, not a separator.
+  const cleaned = term.trim().replace(/[()*"\\]/g, " ").replace(/\s+/g, " ").trim();
   if (!column || !cleaned) return [];
   if (column.kind === "number") {
     const parsed = parseNumberTerm(cleaned);
