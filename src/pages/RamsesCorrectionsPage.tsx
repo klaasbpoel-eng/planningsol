@@ -225,7 +225,35 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
               <p className="mt-1 text-muted-foreground">{error}</p>
             </div>
           ) : (
-            <div className="max-h-[65vh] overflow-auto rounded-md border">
+            <>
+              {groups && groups.length > 1 && (
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                  <span>
+                    {groups.length.toLocaleString("nl-NL")} tijdgroepen op deze pagina
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setCollapsedGroups([])}
+                      disabled={collapsedGroups.length === 0}
+                    >
+                      Alles openen
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setCollapsedGroups(groups.map((g) => g.label))}
+                      disabled={groups.every((g) => collapsed.has(g.label))}
+                    >
+                      Alles sluiten
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="max-h-[65vh] overflow-auto rounded-md border">
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
@@ -263,30 +291,20 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                         {search ? "Geen correcties gevonden voor deze zoekopdracht." : "Er zijn (nog) geen correcties zichtbaar."}
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    rows.map((row, i) => (
-                      <TableRow
-                        key={String(row.id ?? i)}
-                        className={`${groupParities?.[i] === 0 ? "bg-primary/15 hover:bg-primary/20" : ""} ${loading ? "opacity-60" : ""}`}
-                      >
-                        {visibleColumns.map((col, colIndex) => (
-                          <TableCell
-                            key={col.key}
-                            className={`whitespace-nowrap ${col.kind === "number" ? "text-right tabular-nums" : ""} ${
-                              colIndex === 0 && groupParities?.[i] != null
-                                ? `border-l-4 ${groupParities[i] === 0 ? "border-l-primary" : "border-l-muted-foreground/30"}`
-                                : ""
-                            }`}
-                          >
-                            {formatCellValue(row[col.key], col.kind)}
-                          </TableCell>
-                        ))}
-                      </TableRow>
+                  ) : groups ? (
+                    groups.map((group) => (
+                      <Fragment key={`groep-${group.label}-${group.indexes[0]}`}>
+                        {renderGroupHeader(group)}
+                        {!collapsed.has(group.label) && group.indexes.map((i) => renderRow(rows[i], i, group.parity))}
+                      </Fragment>
                     ))
+                  ) : (
+                    rows.map((row, i) => renderRow(row, i, null))
                   )}
                 </TableBody>
               </Table>
-            </div>
+              </div>
+            </>
           )}
 
           <div className="flex flex-col items-center justify-between gap-3 text-sm text-muted-foreground sm:flex-row">
