@@ -24,6 +24,7 @@ const Index = () => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
+        console.log('DBG_AUTH', _event, !!session);
         setUser(session?.user ?? null);
         setLoading(false);
       }
