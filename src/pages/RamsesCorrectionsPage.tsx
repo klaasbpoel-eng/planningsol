@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { buildSearchFilter, deriveColumns, formatCellValue, rowsToCsv, type DataColumn, type DataRow } from "@/lib/dataTable";
+import { buildSearchFilter, deriveColumns, findTimestampColumn, formatCellValue, rowsToCsv, timestampGroupParity, type DataColumn, type DataRow } from "@/lib/dataTable";
 
 const TABLE_NAME = "RamsesCorrecties";
 const PAGE_SIZES = [25, 50, 100];
@@ -85,6 +85,8 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   }, [load]);
 
   const visibleColumns = useMemo(() => columns ?? deriveColumns(rows), [columns, rows]);
+  const timestampKey = useMemo(() => findTimestampColumn(visibleColumns), [visibleColumns]);
+  const groupParities = useMemo(() => (timestampKey ? timestampGroupParity(rows, timestampKey) : null), [rows, timestampKey]);
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const firstRow = total === 0 ? 0 : page * pageSize + 1;
   const lastRow = Math.min(total, (page + 1) * pageSize);
