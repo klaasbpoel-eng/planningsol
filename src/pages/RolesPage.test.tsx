@@ -108,7 +108,7 @@ describe("pagina Rollen", () => {
 
   it("toont de databaseregels om te kopiëren", async () => {
     openPage("database");
-    expect(await screen.findByLabelText("Databaseregels")).toHaveTextContent("create or replace function public.own_role_allows");
+    expect(await screen.findByLabelText("SQL voor de databaseregels")).toHaveTextContent("create or replace function public.own_role_allows");
     expect(screen.getByRole("button", { name: "Kopiëren" })).toBeInTheDocument();
   });
 
