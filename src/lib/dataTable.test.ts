@@ -35,7 +35,7 @@ describe("formatCellValue", () => {
 describe("buildSearchFilter", () => {
   it("zoekt alleen in tekstkolommen", () => {
     const cols = deriveColumns([{ Aantal: 1, Code: "A1" }]);
-    expect(buildSearchFilter(cols, "fles")).toBe('"Code".ilike.*fles*');
+    expect(buildSearchFilter(cols, "fles")).toBe("Code.ilike.*fles*");
     expect(buildSearchFilter(cols, "  ")).toBeNull();
   });
 });

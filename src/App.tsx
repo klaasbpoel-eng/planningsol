@@ -17,6 +17,7 @@ import SafetyStoragePage from "./pages/SafetyStoragePage";
 import { CommandPalette } from "@/components/command-palette";
 import SqlSyncTasksPage from "./pages/SqlSyncTasksPage";
 import AdminPage from "./pages/AdminPage";
+import RamsesCorrectionsPage from "./pages/RamsesCorrectionsPage";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/dagoverzicht" element={<Navigate to="/" replace />} />
               <Route path="/pgs-register" element={<SafetyStoragePage />} />
               <Route path="/sync-instellingen" element={<SqlSyncTasksPage />} />
+              <Route path="/ramses-correcties" element={<RamsesCorrectionsPage />} />
               <Route path="/admin" element={<AdminPage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

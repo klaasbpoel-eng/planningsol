@@ -43,6 +43,7 @@ describe("Hoofdmenu met een beheerdersaccount", () => {
       ["Toolbox-logboek", "/admin?tab=logbook"],
       ["Instellingen", "/admin?tab=settings"],
       ["Synchronisatie", "/sync-instellingen"],
+      ["Ramses-correcties", "/ramses-correcties"],
     ]);
   });
 

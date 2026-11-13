@@ -6,6 +6,7 @@ import {
   Clock,
   Database,
   Factory,
+  FileSpreadsheet,
   FileUp,
   Home,
   Inbox,
@@ -91,6 +92,7 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
       { id: "admin-logbook", path: "/admin?tab=logbook", label: "Toolbox-logboek", icon: ClipboardCheck, keywords: ["toolbox", "logboek", "voltooid"] },
       { id: "admin-settings", path: "/admin?tab=settings", label: "Instellingen", icon: Settings, keywords: ["settings", "configuratie", "beheer"] },
       { id: "admin-sync", path: "/sync-instellingen", label: "Synchronisatie", icon: Database, keywords: ["sync", "sql", "koppeling", "import"] },
+      { id: "admin-ramses", path: "/ramses-correcties", label: "Ramses-correcties", icon: FileSpreadsheet, keywords: ["ramses", "correcties", "correctie", "voorraad"] },
     ],
   },
 ];

@@ -73,7 +73,9 @@ export function buildSearchFilter(columns: DataColumn[], term: string): string |
   const cleaned = term.trim().replace(/[,()*"\\]/g, " ").replace(/\s+/g, " ").trim();
   const textColumns = columns.filter((c) => c.kind === "text");
   if (!cleaned || textColumns.length === 0) return null;
-  return textColumns.map((c) => `"${c.key}".ilike.*${cleaned}*`).join(",");
+  return textColumns
+    .map((c) => `${/^[A-Za-z0-9_]+$/.test(c.key) ? c.key : `"${c.key}"`}.ilike.*${cleaned}*`)
+    .join(",");
 }
 
 function csvCell(value: unknown): string {
