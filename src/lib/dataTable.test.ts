@@ -93,3 +93,47 @@ describe("timestampGroupParity", () => {
     expect(timestampGroupParity(rows, "ts", (v) => formatCellValue(v, "date"))).toEqual([0, 0, 1]);
   });
 });
+
+describe("groupRowsByTimestamp", () => {
+  it("maakt van opeenvolgende gelijke tijden één groep", () => {
+    const rows = [
+      { ts: "2026-11-02T11:05:00" },
+      { ts: "2026-11-02T11:05:00" },
+      { ts: "2026-11-02T14:38:00" },
+      { ts: "2026-11-03T10:45:00" },
+      { ts: "2026-11-03T10:45:00" },
+    ];
+    expect(groupRowsByTimestamp(rows, "ts").map((g) => [g.label, g.indexes])).toEqual([
+      ["2026-11-02T11:05:00", [0, 1]],
+      ["2026-11-02T14:38:00", [2]],
+      ["2026-11-03T10:45:00", [3, 4]],
+    ]);
+  });
+  it("wisselt de kleur per groep en houdt die bij herhiling", () => {
+    const rows = [{ ts: "a" }, { ts: "b" }, { ts: "a" }];
+    expect(groupRowsByTimestamp(rows, "ts").map((g) => [g.label, g.parity, g.indexes])).toEqual([
+      ["a", 0, [0]],
+      ["b", 1, [1]],
+      ["a", 0, [2]],
+    ]);
+  });
+  it("groepeert op de weergave tot op de minuut", () => {
+    const rows = [
+      { ts: "2026-11-03T10:45:02" },
+      { ts: "2026-11-03T10:45:41" },
+      { ts: "2026-11-03T11:51:00" },
+    ];
+    const groups = groupRowsByTimestamp(rows, "ts", (v) => formatCellValue(v, "date"));
+    expect(groups.map((g) => [g.label, g.indexes])).toEqual([
+      ["03-11-2026 10:45", [0, 1]],
+      ["03-11-2026 11:51", [2]],
+    ]);
+  });
+  it("geeft regels zonder tijdstip één groep zonder kleur", () => {
+    const groups = groupRowsByTimestamp([{ ts: null }, { ts: "" }, { ts: "a" }], "ts");
+    expect(groups.map((g) => [g.empty, g.label, g.parity, g.indexes])).toEqual([
+      [true, "", null, [0, 1]],
+      [false, "a", 0, [2]],
+    ]);
+  });
+});
