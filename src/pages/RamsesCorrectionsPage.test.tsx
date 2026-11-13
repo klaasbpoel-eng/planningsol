@@ -16,7 +16,10 @@ const ROWS = vi.hoisted(() => [
 const SETTINGS = vi.hoisted(() => ({
   stored: '{"dt_dn":"Tijdstip"}',
   getByKey: vi.fn(async () => ({ value: SETTINGS.stored, description: null })),
-  upsert: vi.fn(async (_key: string, value: string) => ({ key: "column_labels_RamsesCorrecties", value })),
+  upsert: vi.fn(async (_key: string, value: string, _description?: string) => ({
+    key: "column_labels_RamsesCorrecties",
+    value,
+  })),
 }));
 
 vi.mock("@/lib/api", () => ({ api: { appSettings: { getByKey: SETTINGS.getByKey, upsert: SETTINGS.upsert } } }));
