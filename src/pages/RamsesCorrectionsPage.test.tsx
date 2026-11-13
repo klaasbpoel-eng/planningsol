@@ -119,7 +119,7 @@ describe("kolomnamen op de Ramses-correctiespagina", () => {
     fireEvent.click(screen.getByRole("button", { name: "Opslaan" }));
 
     await waitFor(() => expect(SETTINGS.upsert).toHaveBeenCalled());
-    const [key, value, description] = SETTINGS.upsert.mock.calls[0];
+    const [key, value, description] = SETTINGS.upsert.mock.calls.at(-1);
     expect(key).toBe("column_labels_RamsesCorrecties");
     expect(JSON.parse(value)).toEqual({ dt_dn: "Datumcorrectie" });
     expect(description).toContain("RamsesCorrecties");
