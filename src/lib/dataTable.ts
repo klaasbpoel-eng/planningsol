@@ -144,14 +144,17 @@ export function formatCellValue(value: unknown, kind: ColumnKind): string {
   return String(value);
 }
 
+/** PostgREST column reference: quoted when the name contains spaces or other special characters. */
+export function quoteColumnName(key: string): string {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(key) ? key : `"${key.replace(/"/g, "")}"`;
+}
+
 /** PostgREST `or` filter that searches all text columns; null when there is nothing to search. */
 export function buildSearchFilter(columns: DataColumn[], term: string): string | null {
   const cleaned = term.trim().replace(/[,()*"\\]/g, " ").replace(/\s+/g, " ").trim();
   const textColumns = columns.filter((c) => c.kind === "text");
   if (!cleaned || textColumns.length === 0) return null;
-  return textColumns
-    .map((c) => `${/^[A-Za-z0-9_]+$/.test(c.key) ? c.key : `"${c.key}"`}.ilike.*${cleaned}*`)
-    .join(",");
+  return textColumns.map((c) => `${quoteColumnName(c.key)}.ilike.*${cleaned}*`).join(",");
 }
 
 function csvCell(value: unknown): string {
