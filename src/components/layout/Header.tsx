@@ -46,7 +46,6 @@ interface HeaderProps {
 export function Header({
   userEmail,
   isAdmin,
-  onSwitchView,
   role = "user",
 }: HeaderProps) {
   const location = useLocation();
