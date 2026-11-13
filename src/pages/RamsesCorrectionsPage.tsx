@@ -427,6 +427,49 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={labelsOpen} onOpenChange={setLabelsOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Kolomnamen</DialogTitle>
+            <DialogDescription>
+              Geef elke kolom een eigen naam. De namen worden in de database opgeslagen en gelden voor iedereen.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {baseColumns.map((col) => (
+              <div key={col.key} className="space-y-1">
+                <label htmlFor={`kolomnaam-${col.key}`} className="text-xs text-muted-foreground">
+                  Achter de schermen: {col.key}
+                </label>
+                <Input
+                  id={`kolomnaam-${col.key}`}
+                  value={labelDrafts[col.key] ?? ""}
+                  onChange={(e) => setLabelDrafts((current) => ({ ...current, [col.key]: e.target.value }))}
+                  placeholder={col.label}
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="flex-wrap gap-2 sm:justify-between">
+            <Button
+              variant="ghost"
+              onClick={resetLabels}
+              disabled={savingLabels || Object.keys(columnLabels).length === 0}
+            >
+              Automatische namen herstellen
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setLabelsOpen(false)} disabled={savingLabels}>
+                Sluiten
+              </Button>
+              <Button onClick={saveLabels} disabled={savingLabels}>
+                {savingLabels ? "Opslaan…" : "Opslaan"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   );
 }
