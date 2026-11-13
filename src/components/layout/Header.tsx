@@ -63,7 +63,7 @@ export function Header({
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
-  const navigationGroups = getNavigationGroups(Boolean(isAdmin));
+  const navigationGroups = getNavigationGroups(Boolean(isAdmin) || role === "admin");
   const isActive = (item: NavigationItem) => isNavigationItemActive(item, location.pathname, location.search);
 
 
