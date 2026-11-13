@@ -9,3 +9,4 @@
 - [x] Tijdgroepen op de Ramses-correctiespagina inklapbaar maken en de kleuren duidelijker maken.
 - [x] Kolomnamen van de Ramses-correcties via de backend hernoembaar maken.
 - [x] Op de Ramses-correctiespagina kunnen filteren per kolom.- [x] Op de Ramses-correctiespagina waarden van een kolom kunnen aanvinken in plaats van typen.
+- [x] Ramses-correcties: zoeken in gewone taal, Lovable AI zet de vraag om in filters.
