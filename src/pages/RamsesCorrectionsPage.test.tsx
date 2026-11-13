@@ -55,7 +55,7 @@ async function openPage() {
 describe("tijdgroepen op de Ramses-correctiespagina", () => {
   it("toont per tijdgroep een kop met het aantal regels", async () => {
     await openPage();
-    expect(screen.getByText("03-11-2026, 10:45")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Klap tijdgroep 03-11-2026, 10:45" })).toBeInTheDocument();
     expect(screen.getByText("2 regels")).toBeInTheDocument();
     expect(screen.getByText("1 regel")).toBeInTheDocument();
     expect(screen.getByText("2 tijdgroepen op deze pagina")).toBeInTheDocument();
