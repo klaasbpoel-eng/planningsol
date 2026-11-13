@@ -312,7 +312,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
           <div>
             <CardTitle>Correcties</CardTitle>
             <CardDescription>
-              {loading ? "Laden…" : `${total.toLocaleString("nl-NL")} ${total === 1 ? "regel" : "regels"}${search ? " gevonden" : ""}`}
+              {loading ? "Laden…" : `${total.toLocaleString("nl-NL")} ${total === 1 ? "regel" : "regels"}${anyFilter ? " gevonden" : ""}`}
             </CardDescription>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -342,6 +342,41 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Filter className="h-3.5 w-3.5" />
+              Filteren op kolom
+            </span>
+            <SearchableSelect
+              options={[
+                { value: "none", label: "Alle kolommen" },
+                ...visibleColumns.map((col) => ({ value: col.key, label: col.label })),
+              ]}
+              value={filterColumn}
+              onValueChange={(value) => {
+                setFilterColumn(value);
+                setPage(0);
+              }}
+              placeholder="Kies een kolom"
+              searchPlaceholder="Zoek een kolom…"
+              className="w-full sm:w-60"
+              disabled={!columns}
+            />
+            <Input
+              value={filterInput}
+              onChange={(e) => setFilterInput(e.target.value)}
+              placeholder={filterPlaceholder}
+              className="w-full sm:w-56"
+              aria-label="Filterwaarde"
+              disabled={!columns || filterColumn === "none"}
+            />
+            {(filterColumn !== "none" || filterInput !== "") && (
+              <Button variant="ghost" size="sm" onClick={clearFilter}>
+                Filter wissen
+              </Button>
+            )}
+            {filterInvalid && <p className="w-full text-xs text-muted-foreground">{filterHint}</p>}
+          </div>
           {error ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm">
               <p className="font-medium text-destructive">De correcties konden niet worden geladen.</p>
@@ -411,7 +446,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                   ) : rows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={Math.max(visibleColumns.length, 1)} className="h-24 text-center text-muted-foreground">
-                        {search ? "Geen correcties gevonden voor deze zoekopdracht." : "Er zijn (nog) geen correcties zichtbaar."}
+                        {anyFilter ? "Geen correcties gevonden voor deze filter." : "Er zijn (nog) geen correcties zichtbaar."}
                       </TableCell>
                     </TableRow>
                   ) : groups ? (
