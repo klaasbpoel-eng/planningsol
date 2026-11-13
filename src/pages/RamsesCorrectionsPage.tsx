@@ -1,12 +1,22 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, FileSpreadsheet, RefreshCw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Pencil, RefreshCw, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import type { AppRole } from "@/hooks/useUserPermissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { api } from "@/lib/api";
+import {
+  applyColumnLabels,
+  buildColumnLabelMap,
+  columnLabelDrafts,
+  columnLabelsKey,
+  parseColumnLabels,
+  type ColumnLabelMap,
+} from "@/lib/columnLabels";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,6 +53,27 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const [exporting, setExporting] = useState(false);
   // Labels of the time groups the user has closed; open by default.
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
+  // Column names picked by an admin, loaded from and saved to the backend.
+  const [columnLabels, setColumnLabels] = useState<ColumnLabelMap>({});
+  const [labelsOpen, setLabelsOpen] = useState(false);
+  const [labelDrafts, setLabelDrafts] = useState<ColumnLabelMap>({});
+  const [savingLabels, setSavingLabels] = useState(false);
+
+  // Stored column names are optional: when they cannot be read, the automatic names stay in place.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const stored = await api.appSettings.getByKey(columnLabelsKey(TABLE_NAME));
+        if (!cancelled) setColumnLabels(parseColumnLabels(stored?.value));
+      } catch {
+        /* automatic names are fine */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Short pause while typing so we don't query on every keystroke.
   useEffect(() => {
@@ -86,7 +117,8 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
     load();
   }, [load]);
 
-  const visibleColumns = useMemo(() => columns ?? deriveColumns(rows), [columns, rows]);
+  const baseColumns = useMemo(() => columns ?? deriveColumns(rows), [columns, rows]);
+  const visibleColumns = useMemo(() => applyColumnLabels(baseColumns, columnLabels), [baseColumns, columnLabels]);
   const timestampKey = useMemo(() => findTimestampColumn(visibleColumns), [visibleColumns]);
   const groups = useMemo(() => {
     if (!timestampKey) return null;
@@ -111,11 +143,58 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const toggleGroup = (label: string) =>
     setCollapsedGroups((current) => (current.includes(label) ? current.filter((l) => l !== label) : [...current, label]));
 
+  const openLabels = () => {
+    setLabelDrafts(columnLabelDrafts(visibleColumns));
+    setLabelsOpen(true);
+  };
+
+  const saveLabels = async () => {
+    setSavingLabels(true);
+    try {
+      const map = buildColumnLabelMap(baseColumns, labelDrafts);
+      await api.appSettings.upsert(columnLabelsKey(TABLE_NAME), JSON.stringify(map), `Kolomnamen voor ${TABLE_NAME}`);
+      setColumnLabels(map);
+      setLabelsOpen(false);
+      toast({
+        title: "Kolomnamen opgeslagen",
+        description: `${Object.keys(map).length} ${Object.keys(map).length === 1 ? "kolom" : "kolommen"} aangepast.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Opslaan mislukt", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingLabels(false);
+    }
+  };
+
+  const resetLabels = async () => {
+    setSavingLabels(true);
+    try {
+      await api.appSettings.upsert(columnLabelsKey(TABLE_NAME), "{}", `Kolomnamen voor ${TABLE_NAME}`);
+      setColumnLabels({});
+      setLabelDrafts(columnLabelDrafts(baseColumns));
+      toast({ title: "Kolomnamen hersteld", description: "De automatische namen zijn weer in gebruik." });
+    } catch (e: any) {
+      toast({ title: "Herstellen mislukt", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingLabels(false);
+    }
+  };
+
   const stripeClass = (parity: 0 | 1 | null) =>
-    parity === null ? "" : `border-l-4 ${parity === 0 ? "border-l-primary" : "border-l-muted-foreground/30"}`;
+    parity === null ? "" : `border-l-4 ${parity === 0 ? "border-l-primary" : "border-l-accent"}`;
+
+  // Each time group gets its own tint so neighbours are easy to tell apart.
+  const rowTint = (parity: 0 | 1 | null) =>
+    parity === 0 ? "bg-primary/20 hover:bg-primary/30" : parity === 1 ? "bg-accent/20 hover:bg-accent/30" : "";
+
+  const headerTint = (parity: 0 | 1 | null) =>
+    parity === 0 ? "bg-primary/10 hover:bg-primary/10" : parity === 1 ? "bg-accent/10 hover:bg-accent/10" : "bg-muted/50 hover:bg-muted/50";
+
+  const swatchClass = (parity: 0 | 1 | null) =>
+    parity === 0 ? "bg-primary" : parity === 1 ? "bg-accent" : "bg-muted-foreground/40";
 
   const renderRow = (row: DataRow, index: number, parity: 0 | 1 | null) => (
-    <TableRow key={String(row.id ?? index)} className={`${parity === 0 ? "bg-primary/15 hover:bg-primary/20" : ""} ${loading ? "opacity-60" : ""}`}>
+    <TableRow key={String(row.id ?? index)} className={`${rowTint(parity)} ${loading ? "opacity-60" : ""}`}>
       {visibleColumns.map((col, colIndex) => (
         <TableCell
           key={col.key}
@@ -133,7 +212,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
     const open = !collapsed.has(group.label);
     const count = group.indexes.length;
     return (
-      <TableRow key={`groep-${group.label}-${group.indexes[0]}`} className="bg-muted/50 hover:bg-muted/50">
+      <TableRow key={`groep-${group.label}-${group.indexes[0]}`} className={headerTint(group.parity)}>
         <TableCell colSpan={Math.max(visibleColumns.length, 1)} className={`p-0 ${stripeClass(group.parity)}`}>
           <button
             type="button"
@@ -143,6 +222,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
             className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
           >
             <ChevronRight className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
+            <span className={`h-2.5 w-2.5 shrink-0 rounded-[2px] ${swatchClass(group.parity)}`} aria-hidden="true" />
             <span className="whitespace-nowrap">{group.empty ? "Zonder tijdstip" : group.label}</span>
             <span className="whitespace-nowrap text-muted-foreground/70">
               {count.toLocaleString("nl-NL")} {count === 1 ? "regel" : "regels"}
@@ -163,7 +243,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
         all.push(...((data ?? []) as DataRow[]));
         if (!data || data.length < EXPORT_BATCH) break;
       }
-      const csv = rowsToCsv(columns ?? deriveColumns(all), all);
+      const csv = rowsToCsv(applyColumnLabels(columns ?? deriveColumns(all), columnLabels), all);
       const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -208,6 +288,10 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                 disabled={!columns}
               />
             </div>
+            <Button variant="outline" onClick={openLabels} disabled={!columns}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Kolomnamen
+            </Button>
             <Button variant="outline" onClick={load} disabled={loading}>
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Vernieuwen
@@ -343,6 +427,49 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={labelsOpen} onOpenChange={setLabelsOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Kolomnamen</DialogTitle>
+            <DialogDescription>
+              Geef elke kolom een eigen naam. De namen worden in de database opgeslagen en gelden voor iedereen.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {baseColumns.map((col) => (
+              <div key={col.key} className="space-y-1">
+                <label htmlFor={`kolomnaam-${col.key}`} className="text-xs text-muted-foreground">
+                  Achter de schermen: {col.key}
+                </label>
+                <Input
+                  id={`kolomnaam-${col.key}`}
+                  value={labelDrafts[col.key] ?? ""}
+                  onChange={(e) => setLabelDrafts((current) => ({ ...current, [col.key]: e.target.value }))}
+                  placeholder={col.label}
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="flex-wrap gap-2 sm:justify-between">
+            <Button
+              variant="ghost"
+              onClick={resetLabels}
+              disabled={savingLabels || Object.keys(columnLabels).length === 0}
+            >
+              Automatische namen herstellen
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setLabelsOpen(false)} disabled={savingLabels}>
+                Sluiten
+              </Button>
+              <Button onClick={saveLabels} disabled={savingLabels}>
+                {savingLabels ? "Opslaan…" : "Opslaan"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   );
 }

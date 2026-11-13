@@ -12,6 +12,18 @@ const ROWS = vi.hoisted(() => [
   { id: 3, dt_dn: "2026-11-03T11:51:00", code: "A3" },
 ]);
 
+// Stored column names, as they live in the backend settings table.
+const SETTINGS = vi.hoisted(() => ({
+  stored: '{"dt_dn":"Tijdstip"}',
+  getByKey: vi.fn(async () => ({ value: SETTINGS.stored, description: null })),
+  upsert: vi.fn(async (_key: string, value: string, _description?: string) => ({
+    key: "column_labels_RamsesCorrecties",
+    value,
+  })),
+}));
+
+vi.mock("@/lib/api", () => ({ api: { appSettings: { getByKey: SETTINGS.getByKey, upsert: SETTINGS.upsert } } }));
+
 vi.mock("@/components/auth/ProtectedRoute", () => ({
   ProtectedRoute: ({ children }: { children: (props: ProtectedRouteChildProps) => ReactNode }) =>
     children({
@@ -52,6 +64,8 @@ async function openPage() {
   await waitFor(() => expect(screen.getByText("A3")).toBeInTheDocument());
 }
 
+const columnNameInput = (key: string) => document.getElementById(`kolomnaam-${key}`) as HTMLInputElement;
+
 describe("tijdgroepen op de Ramses-correctiespagina", () => {
   it("toont per tijdgroep een kop met het aantal regels", async () => {
     await openPage();
@@ -87,5 +101,41 @@ describe("tijdgroepen op de Ramses-correctiespagina", () => {
     fireEvent.click(screen.getByRole("button", { name: "Alles openen" }));
     expect(screen.getByText("A1")).toBeInTheDocument();
     expect(screen.getByText("A3")).toBeInTheDocument();
+  });
+});
+
+describe("kolomnamen op de Ramses-correctiespagina", () => {
+  it("gebruikt de opgeslagen kolomnamen in de tabelkop", async () => {
+    await openPage();
+    expect(screen.getByRole("button", { name: "Sorteer op Tijdstip" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sorteer op Dt dn" })).not.toBeInTheDocument();
+  });
+
+  it("leest een kolomnaam uit de backend en slaat een nieuwe naam daar op", async () => {
+    await openPage();
+    fireEvent.click(screen.getByRole("button", { name: "Kolomnamen" }));
+
+    const input = columnNameInput("dt_dn");
+    expect(input.value).toBe("Tijdstip");
+
+    fireEvent.change(input, { target: { value: "Datumcorrectie" } });
+    fireEvent.click(screen.getByRole("button", { name: "Opslaan" }));
+
+    await waitFor(() => expect(SETTINGS.upsert).toHaveBeenCalled());
+    const [key, value, description] = SETTINGS.upsert.mock.calls.at(-1);
+    expect(key).toBe("column_labels_RamsesCorrecties");
+    expect(JSON.parse(value)).toEqual({ dt_dn: "Datumcorrectie" });
+    expect(description).toContain("RamsesCorrecties");
+    expect(screen.getByRole("button", { name: "Sorteer op Datumcorrectie" })).toBeInTheDocument();
+  });
+
+  it("zet alle kolomnamen terug naar de automatische namen", async () => {
+    await openPage();
+    fireEvent.click(screen.getByRole("button", { name: "Kolomnamen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Automatische namen herstellen" }));
+
+    await waitFor(() => expect(SETTINGS.upsert).toHaveBeenCalledWith("column_labels_RamsesCorrecties", "{}", expect.any(String)));
+    fireEvent.click(screen.getByRole("button", { name: "Sluiten" }));
+    expect(screen.getByRole("button", { name: "Sorteer op Dt dn" })).toBeInTheDocument();
   });
 });
