@@ -42,6 +42,7 @@ import { format, parseISO, addDays, isWithinInterval, isSameDay, differenceInCal
 import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { getPrimarySupabaseClient } from "@/lib/api";
+import { useCurrentPermissions } from "@/hooks/useUserPermissions";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -84,6 +85,10 @@ export function CalendarItemDialog({
   profiles = [],
   timeOffTypes = [],
 }: CalendarItemDialogProps) {
+  const { permissions, loading: permissionsLoading } = useCurrentPermissions();
+  // Only people allowed to approve can move a leave request to approved or rejected.
+  const canApprove = !permissionsLoading && permissions.canApproveRequests;
+  const savedTimeOffStatus = item?.type === "timeoff" ? (item.data as { status?: string })?.status : undefined;
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -830,8 +835,8 @@ export function CalendarItemDialog({
                     </SelectTrigger>
                     <SelectContent className="bg-background border shadow-lg z-50">
                       <SelectItem value="pending">In behandeling</SelectItem>
-                      <SelectItem value="approved">Goedgekeurd</SelectItem>
-                      <SelectItem value="rejected">Afgewezen</SelectItem>
+                      <SelectItem value="approved" disabled={!canApprove && savedTimeOffStatus !== "approved"}>Goedgekeurd</SelectItem>
+                      <SelectItem value="rejected" disabled={!canApprove && savedTimeOffStatus !== "rejected"}>Afgewezen</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
