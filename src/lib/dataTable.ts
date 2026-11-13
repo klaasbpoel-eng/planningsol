@@ -59,29 +59,67 @@ export function findTimestampColumn(columns: DataColumn[]): string | null {
   return columns.find((c) => c.kind === "date")?.key ?? null;
 }
 
+export interface TimestampGroup {
+  /** Displayed value shared by the rows in this run, e.g. "03-11-2026 10:45". Empty string when the value is missing. */
+  label: string;
+  /** True when the rows have no value in the timestamp column. */
+  empty: boolean;
+  /** Row indexes (in display order) belonging to this run. */
+  indexes: number[];
+  /** Color alternation (0/1) matching the row backgrounds; null for rows without a value. */
+  parity: 0 | 1 | null;
+}
+
+/**
+ * Splits rows into runs of equal displayed timestamp values, in display order, so each run can be shown
+ * under its own collapsible header. `toGroupKey` lets callers group on the displayed value (e.g. to the
+ * minute), so rows that look identical on screen share a group even if seconds differ.
+ * Color alternation follows first appearance, so equal timestamps keep their color even when sorted apart.
+ */
+export function groupRowsByTimestamp(
+  rows: DataRow[],
+  key: string,
+  toGroupKey: (value: unknown) => string = (value) => String(value),
+): TimestampGroup[] {
+  const groups: TimestampGroup[] = [];
+  const parityByValue = new Map<string, 0 | 1>();
+  rows.forEach((row, index) => {
+    const value = row[key];
+    const empty = value === null || value === undefined || value === "";
+    const label = empty ? "" : toGroupKey(value);
+    const current = groups[groups.length - 1];
+    if (current && current.label === label) {
+      current.indexes.push(index);
+      return;
+    }
+    let parity: 0 | 1 | null = null;
+    if (!empty) {
+      let known = parityByValue.get(label);
+      if (known === undefined) {
+        known = (parityByValue.size % 2) as 0 | 1;
+        parityByValue.set(label, known);
+      }
+      parity = known;
+    }
+    groups.push({ label, empty, indexes: [index], parity });
+  });
+  return groups;
+}
+
 /**
  * Parity (0/1) per row so rows sharing a timestamp get the same color and neighbouring groups alternate.
- * Alternation follows first appearance, so equal timestamps keep their color even when sorted apart.
- * Rows without a value get null (no group color). `toGroupKey` lets callers group on the displayed value
- * (e.g. to the minute), so rows that look identical on screen share a color even if seconds differ.
+ * Rows without a value get null (no group color).
  */
 export function timestampGroupParity(
   rows: DataRow[],
   key: string,
   toGroupKey: (value: unknown) => string = (value) => String(value),
 ): (0 | 1 | null)[] {
-  const parityByValue = new Map<string, 0 | 1>();
-  return rows.map((row) => {
-    const value = row[key];
-    if (value === null || value === undefined || value === "") return null;
-    const text = toGroupKey(value);
-    let parity = parityByValue.get(text);
-    if (parity === undefined) {
-      parity = (parityByValue.size % 2) as 0 | 1;
-      parityByValue.set(text, parity);
-    }
-    return parity;
-  });
+  const parity: (0 | 1 | null)[] = new Array(rows.length).fill(null);
+  for (const group of groupRowsByTimestamp(rows, key, toGroupKey)) {
+    for (const index of group.indexes) parity[index] = group.parity;
+  }
+  return parity;
 }
 
 const numberFormat = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 3 });
