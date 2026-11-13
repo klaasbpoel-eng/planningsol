@@ -26,7 +26,7 @@ const SETTINGS = vi.hoisted(() => ({
 }));
 
 const AI = vi.hoisted(() => ({
-  requestFilterPlan: vi.fn(async () => ({
+  requestFilterPlan: vi.fn(async (_input: { question: string }) => ({
     filters: [{ column: "code", operator: "contains", value: "a1", values: [] }],
     explanation: "Regels waarvan de code a1 bevat.",
   })),
