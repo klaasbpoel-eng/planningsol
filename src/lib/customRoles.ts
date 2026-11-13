@@ -23,10 +23,19 @@ export type PermissionKey = keyof RolePermissions;
 /** Rights that pages in the app actually check, with a description in plain words. */
 export const CONFIGURABLE_PERMISSIONS: { key: PermissionKey; label: string; description: string }[] = [
   { key: "canCreateOrders", label: "Droogijsorders aanmaken", description: "Knop \"Nieuwe order\" bij Productie → Droogijs." },
-  { key: "canEditOrders", label: "Orders wijzigen vanuit Vandaag", description: "Orders openen en aanpassen op de startpagina." },
-  { key: "canViewReports", label: "PGS-register bekijken", description: "Tabblad Register op de PGS-pagina." },
+  { key: "canEditOrders", label: "Orders wijzigen", description: "Orders openen en aanpassen vanaf Vandaag." },
+  { key: "canViewReports", label: "Rapporten bekijken", description: "Tabblad Rapportage bij Productie, met grafieken en exports." },
+  { key: "canApproveRequests", label: "Aanvragen goedkeuren", description: "Verlofaanvragen en PGS-uitbreidingsaanvragen goedkeuren of afwijzen." },
+  { key: "canManageCustomers", label: "Klanten beheren", description: "Klanten toevoegen, wijzigen, samenvoegen en verwijderen, ook vanuit een order." },
+  { key: "canViewPGSRegister", label: "PGS-register bekijken", description: "Tabblad Register op de PGS-pagina." },
   { key: "canManageUsers", label: "PGS-register bewerken", description: "Stoffen en opslagplaatsen in het register aanpassen." },
 ];
+
+/**
+ * Version of the stored rights list. In version 1 "canViewReports" stood for the PGS register tab;
+ * roles saved before that keep the register switched off as well.
+ */
+export const ROLE_FORMAT_VERSION = 2;
 
 export interface CustomRole {
   id: string;
@@ -65,13 +74,26 @@ export function parseCustomRoles(value: unknown): CustomRole[] {
         name: item.name.trim(),
         description: typeof item.description === "string" ? item.description : "",
         baseRole: item.baseRole,
-        disabledPermissions: Array.isArray(item.disabledPermissions)
-          ? item.disabledPermissions.filter((k: unknown) => KNOWN_PERMISSIONS.has(k as PermissionKey))
-          : [],
+        disabledPermissions: readDisabledPermissions(item),
         hiddenMenuItems: Array.isArray(item.hiddenMenuItems) ? item.hiddenMenuItems.filter((k: unknown) => typeof k === "string") : [],
       },
     ];
   });
+}
+
+function readDisabledPermissions(item: any): PermissionKey[] {
+  const keys: PermissionKey[] = Array.isArray(item.disabledPermissions)
+    ? item.disabledPermissions.filter((k: unknown) => KNOWN_PERMISSIONS.has(k as PermissionKey))
+    : [];
+  if (item.formatVersion !== ROLE_FORMAT_VERSION && keys.includes("canViewReports") && !keys.includes("canViewPGSRegister")) {
+    keys.push("canViewPGSRegister");
+  }
+  return [...new Set(keys)];
+}
+
+/** Roles as stored, marked with the current format so older lists can be recognised later. */
+export function serializeCustomRoles(roles: CustomRole[]): string {
+  return JSON.stringify(roles.map((role) => ({ ...role, formatVersion: ROLE_FORMAT_VERSION })));
 }
 
 export function parseAssignments(value: unknown): RoleAssignments {

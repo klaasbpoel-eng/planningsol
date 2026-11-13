@@ -217,3 +217,20 @@ export function useUserPermissions(userId: string | undefined) {
 export function getPermissionsForRole(role: AppRole): RolePermissions {
   return ROLE_PERMISSIONS[role];
 }
+
+/** Rights of whoever is signed in, for components that do not get them from their page. */
+export function useCurrentPermissions() {
+  const [userId, setUserId] = useState<string | undefined>();
+  useEffect(() => {
+    let active = true;
+    Promise.resolve(supabase.auth?.getSession?.())
+      .then((result) => {
+        if (active) setUserId(result?.data?.session?.user?.id);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  return useUserPermissions(userId);
+}
