@@ -298,6 +298,8 @@ export function ProductionPlanning({
 
   // Determine which tabs to show based on permissions
   const showAdvancedTabs = permissions?.canViewReports ?? false;
+  // Fill planning is a planning tool, not a report, so switching reports off leaves it in place.
+  const showFillPlanning = permissions?.canViewKPIDashboard ?? false;
   const showKPIDashboard = permissions?.canViewKPIDashboard ?? false;
   const showAdvancedWidgets = permissions?.canViewAdvancedWidgets ?? false;
   const showRecipemaker = permissions?.canManageUsers ?? false; // Admin only
@@ -306,7 +308,7 @@ export function ProductionPlanning({
   const productionSections = [
     { value: "gascilinders", label: "Gascilinders", visible: true },
     { value: "droogijs", label: "Droogijs", visible: true },
-    { value: "vulplanning", label: "Vulplanning", visible: showAdvancedTabs },
+    { value: "vulplanning", label: "Vulplanning", visible: showFillPlanning },
     { value: "rapportage", label: "Rapportage", visible: showAdvancedTabs },
     { value: "recepten", label: "Recepten", visible: showRecipemaker },
   ].filter(section => section.visible);
@@ -323,7 +325,7 @@ export function ProductionPlanning({
     const nextTab = allowed ? urlTab : "gascilinders";
     if (nextTab !== activeTab) setActiveTabState(nextTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlTab, showAdvancedTabs, showRecipemaker]);
+  }, [urlTab, showAdvancedTabs, showFillPlanning, showRecipemaker]);
 
   return (
     <div className="space-y-6">
@@ -615,7 +617,7 @@ export function ProductionPlanning({
             <span className="hidden sm:inline">Droogijs</span>
             <span className="sm:hidden">Droogijs</span>
           </TabsTrigger>
-          {showAdvancedTabs && (
+          {showFillPlanning && (
             <TabsTrigger
               value="vulplanning"
               className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
@@ -669,7 +671,7 @@ export function ProductionPlanning({
           </Suspense>
         </TabsContent>
 
-        {showAdvancedTabs && (
+        {showFillPlanning && (
           <TabsContent value="vulplanning" className="mt-6">
             <Suspense fallback={<TabLoadingFallback />}>
               <FillPlanning />

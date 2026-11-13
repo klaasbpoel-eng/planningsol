@@ -25,8 +25,8 @@ interface SafetyStorageProps {
 
 export function SafetyStorage({ permissions, userProductionLocation, canViewAllLocations }: SafetyStorageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
-  // Same visibility rules as the former Productie tabs: register for report viewers, floor plan for everyone.
-  const canViewRegister = permissions.canViewReports;
+  // Register for people allowed to see it (own roles can switch it off), floor plan for everyone.
+  const canViewRegister = permissions.canViewPGSRegister;
   const defaultTab = canViewRegister ? "register" : "plattegrond";
   const requestedTab = searchParams.get("tab");
   const activeTab = requestedTab === "plattegrond" || (requestedTab === "register" && canViewRegister) ? requestedTab : defaultTab;
