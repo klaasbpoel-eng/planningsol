@@ -132,6 +132,7 @@ describe("kolomnamen op de Ramses-correctiespagina", () => {
     fireEvent.click(screen.getByRole("button", { name: "Automatische namen herstellen" }));
 
     await waitFor(() => expect(SETTINGS.upsert).toHaveBeenCalledWith("column_labels_RamsesCorrecties", "{}", expect.any(String)));
+    fireEvent.click(screen.getByRole("button", { name: "Sluiten" }));
     expect(screen.getByRole("button", { name: "Sorteer op Dt dn" })).toBeInTheDocument();
   });
 });
