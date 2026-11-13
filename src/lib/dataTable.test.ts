@@ -48,6 +48,10 @@ describe("rowsToCsv", () => {
 });
 
 describe("findTimestampColumn", () => {
+  it("kiest dt_dn boven andere kolommen", () => {
+    const cols = deriveColumns([{ Datum: "2026-11-13", dt_dn: "2026-11-13T08:00:00", Timestamp: "2026-11-13T08:00:00" }]);
+    expect(findTimestampColumn(cols)).toBe("dt_dn");
+  });
   it("kiest een kolom met timestamp in de naam", () => {
     const cols = deriveColumns([{ Datum: "2026-11-13", Timestamp: "2026-11-13T08:00:00" }]);
     expect(findTimestampColumn(cols)).toBe("Timestamp");
