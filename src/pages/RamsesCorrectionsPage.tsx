@@ -41,6 +41,8 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<{ key: string; ascending: boolean } | null>(null);
   const [exporting, setExporting] = useState(false);
+  // Labels of the time groups the user has closed; open by default.
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
 
   // Short pause while typing so we don't query on every keystroke.
   useEffect(() => {
@@ -86,12 +88,13 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
 
   const visibleColumns = useMemo(() => columns ?? deriveColumns(rows), [columns, rows]);
   const timestampKey = useMemo(() => findTimestampColumn(visibleColumns), [visibleColumns]);
-  const groupParities = useMemo(() => {
+  const groups = useMemo(() => {
     if (!timestampKey) return null;
     const kind = visibleColumns.find((c) => c.key === timestampKey)?.kind ?? "text";
     // Group on what the user sees (to the minute), not on hidden seconds.
-    return timestampGroupParity(rows, timestampKey, (value) => formatCellValue(value, kind));
+    return groupRowsByTimestamp(rows, timestampKey, (value) => formatCellValue(value, kind));
   }, [rows, timestampKey, visibleColumns]);
+  const collapsed = useMemo(() => new Set(collapsedGroups), [collapsedGroups]);
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const firstRow = total === 0 ? 0 : page * pageSize + 1;
   const lastRow = Math.min(total, (page + 1) * pageSize);
