@@ -31,7 +31,7 @@ describe("kolomnamen opslaan en toepassen", () => {
 
   it("past namen toe en laat kolommen zonder naam onveranderd", () => {
     const applied = applyColumnLabels(BASE, { dt_dn: "Tijdstip" });
-    expect(applied.map((c) => c.label)).toEqual(["Dt dn".replace("Dt dn", "Dt dn"), "Code"].map((l, i) => (i === 0 ? "Tijdstip" : l)));
+    expect(applied[0].label).toBe("Tijdstip");
     expect(applied[1].label).toBe("Code");
     // the original column objects are not modified
     expect(BASE[0].label).toBe("Dt dn");

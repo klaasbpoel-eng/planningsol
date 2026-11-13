@@ -6,3 +6,5 @@
 - [x] Fase 3: groepeer PGS-acties en verbeter filter-/exportduidelijkheid.
 - [x] Fase 4: scheid geavanceerd beheer en herstel de belangrijkste semantische kleur- en tabelproblemen.
 - [x] Valideer tests, build en kernschermen.
+- [x] Tijdgroepen op de Ramses-correctiespagina inklapbaar maken en de kleuren duidelijker maken.
+- [ ] Kolomnamen van de Ramses-correcties via de backend hernoembaar maken.
