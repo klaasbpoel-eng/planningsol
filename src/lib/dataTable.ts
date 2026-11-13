@@ -47,9 +47,13 @@ export function deriveColumns(rows: DataRow[]): DataColumn[] {
 }
 
 const TIMESTAMP_KEY = /timestamp|tijdstip|datetime/i;
+/** Exact keys that always win over the loose timestamp match (RamsesCorrecties uses `dt_dn`). */
+const PREFERRED_TIMESTAMP_KEYS = ["dt_dn", "dtdn"];
 
-/** Column whose value groups rows that belong together: a timestamp-like key, else the first date column. */
+/** Column whose value groups rows that belong together: `dt_dn`, else a timestamp-like key, else the first date column. */
 export function findTimestampColumn(columns: DataColumn[]): string | null {
+  const preferred = columns.find((c) => PREFERRED_TIMESTAMP_KEYS.includes(c.key.toLowerCase()));
+  if (preferred) return preferred.key;
   const named = columns.find((c) => TIMESTAMP_KEY.test(c.key));
   if (named) return named.key;
   return columns.find((c) => c.kind === "date")?.key ?? null;
