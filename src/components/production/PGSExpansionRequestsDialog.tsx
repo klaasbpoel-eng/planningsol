@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useCurrentPermissions } from "@/hooks/useUserPermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,9 @@ interface Props {
 }
 
 export function PGSExpansionRequestsDialog({ open, onOpenChange, isAdmin, defaultLocation = "sol_emmen" }: Props) {
+  // Own roles can switch approving off for admins; the database rules enforce the same.
+  const { permissions, loading: permissionsLoading } = useCurrentPermissions();
+  const canApprove = isAdmin && !permissionsLoading && permissions.canApproveRequests;
   const [requests, setRequests] = useState<ExpansionRequest[]>([]);
   const [places, setPlaces] = useState<StoragePlace[]>([]);
   const [substances, setSubstances] = useState<Array<{ id: string; gas_type_id: string | null; gas_type_name: string; location: string; max_allowed_kg: number }>>([]);
@@ -307,7 +311,7 @@ export function PGSExpansionRequestsDialog({ open, onOpenChange, isAdmin, defaul
                         {isAdmin && r.status === "draft" && (
                           <Button size="sm" variant="outline" onClick={() => setStatus(r.id, "submitted")}>Indienen</Button>
                         )}
-                        {isAdmin && r.status === "submitted" && (
+                        {canApprove && r.status === "submitted" && (
                           <>
                             <Button size="sm" variant="outline" onClick={() => setStatus(r.id, "approved")}>Goedkeuren</Button>
                             <Button size="sm" variant="outline" onClick={() => setStatus(r.id, "rejected")}>Afwijzen</Button>
