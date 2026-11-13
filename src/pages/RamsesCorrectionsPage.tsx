@@ -212,7 +212,10 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                     </TableRow>
                   ) : (
                     rows.map((row, i) => (
-                      <TableRow key={String(row.id ?? i)} className={loading ? "opacity-60" : ""}>
+                      <TableRow
+                        key={String(row.id ?? i)}
+                        className={`${groupParities?.[i] === 0 ? "bg-primary/5 hover:bg-primary/10" : ""} ${loading ? "opacity-60" : ""}`}
+                      >
                         {visibleColumns.map((col) => (
                           <TableCell
                             key={col.key}
