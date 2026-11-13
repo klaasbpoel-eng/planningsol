@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Filter, Pencil, RefreshCw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Filter, ListChecks, Pencil, RefreshCw, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -20,14 +20,18 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { buildColumnFilters, buildSearchFilter, deriveColumns, findTimestampColumn, formatCellValue, groupRowsByTimestamp, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
+import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, groupRowsByTimestamp, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
 
 const TABLE_NAME = "RamsesCorrecties";
 const PAGE_SIZES = [25, 50, 100];
 const EXPORT_BATCH = 1000;
+// Rows read to build a tick list of values; enough for the whole table in normal use.
+const VALUE_SCAN_LIMIT = 20000;
 
 export default function RamsesCorrectionsPage() {
   return (
@@ -63,6 +67,12 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const [filterColumn, setFilterColumn] = useState("none");
   const [filterInput, setFilterInput] = useState("");
   const [filterTerm, setFilterTerm] = useState("");
+  // Values ticked in the list for the picked column, and the lists already read per column.
+  const [pickedValues, setPickedValues] = useState<string[]>([]);
+  const [valueLists, setValueLists] = useState<Record<string, { values: DistinctValue[]; partial: boolean }>>({});
+  const [valuesOpen, setValuesOpen] = useState(false);
+  const [valuesLoading, setValuesLoading] = useState(false);
+  const [valuesError, setValuesError] = useState<string | null>(null);
 
   // Stored column names are optional: when they cannot be read, the automatic names stay in place.
   useEffect(() => {
@@ -99,7 +109,49 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   }, [filterInput]);
 
   const activeFilterColumn = useMemo(() => (columns ?? []).find((col) => col.key === filterColumn), [columns, filterColumn]);
-  const columnFilters = useMemo(() => buildColumnFilters(activeFilterColumn, filterTerm), [activeFilterColumn, filterTerm]);
+  const columnFilters = useMemo(
+    () => [...buildColumnFilters(activeFilterColumn, filterTerm), ...buildValueFilter(activeFilterColumn, pickedValues)],
+    [activeFilterColumn, filterTerm, pickedValues],
+  );
+  const valuesPickable = canPickValues(activeFilterColumn);
+  const valueList = activeFilterColumn ? valueLists[activeFilterColumn.key] : undefined;
+
+  // Reads the values of one column once, so they can be ticked instead of typed.
+  const loadValues = useCallback(
+    async (column: DataColumn) => {
+      if (valueLists[column.key]) return;
+      setValuesLoading(true);
+      setValuesError(null);
+      try {
+        const all: DataRow[] = [];
+        let partial = false;
+        for (let from = 0; ; from += EXPORT_BATCH) {
+          if (from >= VALUE_SCAN_LIMIT) {
+            partial = true;
+            break;
+          }
+          const { data, error: queryError } = await (supabase as any)
+            .from(TABLE_NAME)
+            .select(quoteColumnName(column.key))
+            .range(from, from + EXPORT_BATCH - 1);
+          if (queryError) throw queryError;
+          all.push(...((data ?? []) as DataRow[]));
+          if (!data || data.length < EXPORT_BATCH) break;
+        }
+        setValueLists((current) => ({ ...current, [column.key]: { values: collectDistinctValues(all, column), partial } }));
+      } catch (e: any) {
+        setValuesError(e.message ?? "Onbekende fout");
+      } finally {
+        setValuesLoading(false);
+      }
+    },
+    [valueLists],
+  );
+
+  const togglePickedValue = (value: string) => {
+    setPickedValues((current) => (current.includes(value) ? current.filter((v) => v !== value) : [...current, value]));
+    setPage(0);
+  };
 
   const buildQuery = useCallback(
     (withCount: boolean) => {
@@ -149,7 +201,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const firstRow = total === 0 ? 0 : page * pageSize + 1;
   const lastRow = Math.min(total, (page + 1) * pageSize);
 
-  const anyFilter = search.trim() !== "" || filterTerm.trim() !== "";
+  const anyFilter = search.trim() !== "" || filterTerm.trim() !== "" || pickedValues.length > 0;
   // What the value box expects depends on the kind of the picked column.
   const filterPlaceholder =
     activeFilterColumn?.kind === "number"
@@ -179,6 +231,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
     setFilterColumn("none");
     setFilterInput("");
     setFilterTerm("");
+    setPickedValues([]);
     setPage(0);
   };
 
@@ -355,6 +408,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
               value={filterColumn}
               onValueChange={(value) => {
                 setFilterColumn(value);
+                setPickedValues([]);
                 setPage(0);
               }}
               placeholder="Kies een kolom"
@@ -373,6 +427,85 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
               aria-label="Filterwaarde"
               disabled={!columns || filterColumn === "none"}
             />
+            {valuesPickable && activeFilterColumn && (
+              <Popover
+                open={valuesOpen}
+                onOpenChange={(open) => {
+                  setValuesOpen(open);
+                  if (open) loadValues(activeFilterColumn);
+                }}
+              >
+                <PopoverTrigger asChild>
+                  <Button variant={pickedValues.length > 0 ? "secondary" : "outline"} className="w-full sm:w-auto">
+                    <ListChecks className="mr-2 h-4 w-4" />
+                    {pickedValues.length === 0
+                      ? "Waarden kiezen"
+                      : `${pickedValues.length.toLocaleString("nl-NL")} ${pickedValues.length === 1 ? "waarde" : "waarden"} gekozen`}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder={`Zoek in ${activeFilterColumn.label}…`} />
+                    <CommandList className="max-h-72">
+                      {valuesLoading ? (
+                        <p className="p-4 text-center text-sm text-muted-foreground">Waarden laden…</p>
+                      ) : valuesError ? (
+                        <p className="p-4 text-sm text-destructive">De waarden konden niet worden geladen: {valuesError}</p>
+                      ) : (
+                        <>
+                          <CommandEmpty>Geen waarden gevonden.</CommandEmpty>
+                          <CommandGroup>
+                            {(valueList?.values ?? []).map((option) => {
+                              const picked = pickedValues.includes(option.value);
+                              return (
+                                <CommandItem
+                                  key={option.value}
+                                  value={option.label}
+                                  onSelect={() => togglePickedValue(option.value)}
+                                  aria-selected={picked}
+                                >
+                                  <span
+                                    className={`mr-2 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary ${
+                                      picked ? "bg-primary text-primary-foreground" : "opacity-60"
+                                    }`}
+                                    aria-hidden="true"
+                                  >
+                                    {picked && <Check className="h-3 w-3" />}
+                                  </span>
+                                  <span className="flex-1 truncate">{option.label}</span>
+                                  <span className="ml-2 text-xs tabular-nums text-muted-foreground">
+                                    {option.count.toLocaleString("nl-NL")}
+                                  </span>
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        </>
+                      )}
+                    </CommandList>
+                  </Command>
+                  <div className="flex items-center justify-between gap-2 border-t p-2 text-xs text-muted-foreground">
+                    <span>
+                      {valueList?.partial
+                        ? `Eerste ${VALUE_SCAN_LIMIT.toLocaleString("nl-NL")} regels bekeken`
+                        : `${(valueList?.values.length ?? 0).toLocaleString("nl-NL")} verschillende waarden`}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => {
+                        setPickedValues([]);
+                        setPage(0);
+                      }}
+                      disabled={pickedValues.length === 0}
+                    >
+                      Vinkjes wissen
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
             {(filterColumn !== "none" || filterInput !== "") && (
               <Button variant="ghost" size="sm" onClick={clearFilter}>
                 Filter wissen
