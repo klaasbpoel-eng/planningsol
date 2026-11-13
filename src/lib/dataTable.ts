@@ -157,7 +157,7 @@ export function buildSearchFilter(columns: DataColumn[], term: string): string |
   return textColumns.map((c) => `${quoteColumnName(c.key)}.ilike.*${cleaned}*`).join(",");
 }
 
-export type ColumnFilterOp = "eq" | "ilike" | "gt" | "gte" | "lt" | "lte";
+export type ColumnFilterOp = "eq" | "ilike" | "gt" | "gte" | "lt" | "lte" | "in";
 
 /** One condition on a single column. Several conditions are combined with AND by the caller. */
 export interface ColumnFilter {
@@ -248,6 +248,53 @@ export function buildColumnFilters(column: DataColumn | undefined, term: string)
       : [];
   }
   return [{ key: column.key, op: "ilike", value: `*${cleaned}*` }];
+}
+
+/** A value that occurs in a column, with how often it occurs, for a tick list. */
+export interface DistinctValue {
+  /** Raw value as text, used to ask the database for it. */
+  value: string;
+  /** Value as shown in the table. */
+  label: string;
+  count: number;
+}
+
+/** Columns whose values can be ticked in a list: text and numbers (dates and ja/nee have their own input). */
+export function canPickValues(column: DataColumn | undefined): boolean {
+  return column?.kind === "text" || column?.kind === "number";
+}
+
+/** Every filled value in a column once, with its count; numbers in numeric order, text alphabetically. */
+export function collectDistinctValues(rows: DataRow[], column: DataColumn): DistinctValue[] {
+  const counts = new Map<string, { raw: unknown; count: number }>();
+  for (const row of rows) {
+    const raw = row[column.key];
+    if (raw === null || raw === undefined || raw === "") continue;
+    const value = typeof raw === "object" ? JSON.stringify(raw) : String(raw);
+    const entry = counts.get(value);
+    if (entry) entry.count += 1;
+    else counts.set(value, { raw, count: 1 });
+  }
+  const list = [...counts.entries()].map(([value, { raw, count }]) => ({
+    value,
+    label: formatCellValue(raw, column.kind),
+    count,
+    raw,
+  }));
+  list.sort((a, b) =>
+    typeof a.raw === "number" && typeof b.raw === "number"
+      ? a.raw - b.raw
+      : a.label.localeCompare(b.label, "nl-NL", { numeric: true, sensitivity: "base" }),
+  );
+  return list.map(({ value, label, count }) => ({ value, label, count }));
+}
+
+/** PostgREST `in` condition for the ticked values; text values are quoted so commas and brackets stay literal. */
+export function buildValueFilter(column: DataColumn | undefined, values: string[]): ColumnFilter[] {
+  if (!column || values.length === 0) return [];
+  const quote = (v: string) =>
+    column.kind === "number" ? v : `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  return [{ key: column.key, op: "in", value: `(${values.map(quote).join(",")})` }];
 }
 
 function csvCell(value: unknown): string {
