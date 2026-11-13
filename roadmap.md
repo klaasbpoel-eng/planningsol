@@ -8,4 +8,4 @@
 - [x] Valideer tests, build en kernschermen.
 - [x] Tijdgroepen op de Ramses-correctiespagina inklapbaar maken en de kleuren duidelijker maken.
 - [x] Kolomnamen van de Ramses-correcties via de backend hernoembaar maken.
-- [x] Op de Ramses-correctiespagina kunnen filteren per kolom.
+- [x] Op de Ramses-correctiespagina kunnen filteren per kolom.- [x] Op de Ramses-correctiespagina waarden van een kolom kunnen aanvinken in plaats van typen.

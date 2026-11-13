@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildColumnFilters, buildSearchFilter, deriveColumns, findTimestampColumn, formatCellValue, groupRowsByTimestamp, humanizeColumnName, quoteColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
+import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, deriveColumns, findTimestampColumn, formatCellValue, groupRowsByTimestamp, humanizeColumnName, quoteColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
 
 describe("humanizeColumnName", () => {
   it("maakt leesbare kolomnamen", () => {
@@ -196,5 +196,40 @@ describe("groupRowsByTimestamp", () => {
       [true, "", null, [0, 1]],
       [false, "a", 0, [2]],
     ]);
+  });
+});
+
+describe("waarden aanvinken", () => {
+  const code = { key: "code", label: "Code", kind: "text" as const };
+  const aantal = { key: "aantal", label: "Aantal", kind: "number" as const };
+
+  it("telt elke gevulde waarde één keer, lege waarden vallen weg, alfabetisch", () => {
+    const rows = [{ code: "B" }, { code: "a" }, { code: "B" }, { code: null }, { code: "" }, { code: "C10" }, { code: "C9" }];
+    expect(collectDistinctValues(rows, code)).toEqual([
+      { value: "a", label: "a", count: 1 },
+      { value: "B", label: "B", count: 2 },
+      { value: "C9", label: "C9", count: 1 },
+      { value: "C10", label: "C10", count: 1 },
+    ]);
+  });
+
+  it("zet getallen op volgorde van grootte met Nederlandse notatie", () => {
+    const rows = [{ aantal: 1234.5 }, { aantal: 20 }, { aantal: 3 }];
+    expect(collectDistinctValues(rows, aantal).map((v) => v.label)).toEqual(["3", "20", "1.234,5"]);
+  });
+
+  it("vraagt de aangevinkte waarden op, ook met komma's en aanhalingstekens", () => {
+    expect(buildValueFilter(code, ["A1", 'Zending "x", 2'])).toEqual([
+      { key: "code", op: "in", value: '("A1","Zending \\"x\\", 2")' },
+    ]);
+    expect(buildValueFilter(aantal, ["3", "20"])).toEqual([{ key: "aantal", op: "in", value: "(3,20)" }]);
+  });
+
+  it("filtert niet zonder vinkjes en biedt geen lijst voor datum- en ja/nee-kolommen", () => {
+    expect(buildValueFilter(code, [])).toEqual([]);
+    expect(canPickValues(code)).toBe(true);
+    expect(canPickValues(aantal)).toBe(true);
+    expect(canPickValues({ key: "d", label: "D", kind: "date" })).toBe(false);
+    expect(canPickValues({ key: "b", label: "B", kind: "boolean" })).toBe(false);
   });
 });
