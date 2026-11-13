@@ -23,7 +23,7 @@ const all = (table: string, actions: GuardedAction[] = ["insert", "update", "del
 const status = (table: string): TableGuard => ({ table, actions: ["insert", "update"], mode: "status" });
 
 /** Which tables each right protects. Every right on the Rollen page has an entry. */
-export const PERMISSION_RULES: Record<PermissionKey, PermissionRule | undefined> = {
+export const PERMISSION_RULES: Partial<Record<PermissionKey, PermissionRule>> = {
   canCreateOrders: { kind: "database", guards: [all("dry_ice_orders", ["insert"])] },
   canEditOrders: { kind: "database", guards: [all("dry_ice_orders", ["update"]), all("gas_cylinder_orders", ["update"])] },
   canManageCustomers: { kind: "database", guards: [all("customers"), all("customer_locations"), all("customer_products")] },
@@ -37,7 +37,7 @@ export const PERMISSION_RULES: Record<PermissionKey, PermissionRule | undefined>
     kind: "app",
     reason: "De plattegrond en voorraad lezen dezelfde gegevens; het tabblad wordt in de app verborgen.",
   },
-} as Record<PermissionKey, PermissionRule | undefined>;
+};
 
 const labelOf = (key: PermissionKey) => CONFIGURABLE_PERMISSIONS.find((p) => p.key === key)?.label ?? key;
 const triggerName = (key: PermissionKey, table: string) => `eigen_rol_${key}_${table}`.toLowerCase().slice(0, 63);
