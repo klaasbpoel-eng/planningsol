@@ -351,7 +351,9 @@ function RolesContent({ userId, userEmail, role }: { userId: string; userEmail?:
                       {filteredPeople.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={3} className="h-20 text-center text-muted-foreground">
-                            Geen personen gevonden.
+                            {people.length === 0
+                              ? "Geen medewerkers met een inlogaccount gevonden. Alleen medewerkers die aan een account gekoppeld zijn, kunnen hier een rol krijgen."
+                              : "Geen personen gevonden."}
                           </TableCell>
                         </TableRow>
                       ) : (
