@@ -89,15 +89,28 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
     return () => clearTimeout(t);
   }, [searchInput]);
 
+  // Same short pause for the column filter, so typing does not query per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFilterTerm(filterInput);
+      setPage(0);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [filterInput]);
+
+  const activeFilterColumn = useMemo(() => (columns ?? []).find((col) => col.key === filterColumn), [columns, filterColumn]);
+  const columnFilters = useMemo(() => buildColumnFilters(activeFilterColumn, filterTerm), [activeFilterColumn, filterTerm]);
+
   const buildQuery = useCallback(
     (withCount: boolean) => {
       let query = (supabase as any).from(TABLE_NAME).select("*", withCount ? { count: "exact" } : undefined);
       const filter = columns ? buildSearchFilter(columns, search) : null;
       if (filter) query = query.or(filter);
+      for (const columnFilter of columnFilters) query = query.filter(quoteColumnName(columnFilter.key), columnFilter.op, columnFilter.value);
       if (sort) query = query.order(sort.key, { ascending: sort.ascending, nullsFirst: false });
       return query;
     },
-    [columns, search, sort],
+    [columns, search, sort, columnFilters],
   );
 
   const load = useCallback(async () => {
