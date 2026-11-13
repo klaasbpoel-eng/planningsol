@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSearchFilter, deriveColumns, formatCellValue, humanizeColumnName, rowsToCsv } from "./dataTable";
+import { buildSearchFilter, deriveColumns, findTimestampColumn, formatCellValue, humanizeColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
 
 describe("humanizeColumnName", () => {
   it("maakt leesbare kolomnamen", () => {
@@ -44,5 +44,39 @@ describe("rowsToCsv", () => {
   it("gebruikt puntkomma en decimale komma", () => {
     const cols = deriveColumns([{ Code: "A;1", Aantal: 2.5 }]);
     expect(rowsToCsv(cols, [{ Code: "A;1", Aantal: 2.5 }])).toBe('Code;Aantal\r\n"A;1";2,5');
+  });
+});
+
+describe("findTimestampColumn", () => {
+  it("kiest een kolom met timestamp in de naam", () => {
+    const cols = deriveColumns([{ Datum: "2026-11-13", Timestamp: "2026-11-13T08:00:00" }]);
+    expect(findTimestampColumn(cols)).toBe("Timestamp");
+  });
+  it("valt terug op de eerste datumkolom", () => {
+    const cols = deriveColumns([{ Code: "A1", CorrectieDatum: "2026-11-13 08:00:00" }]);
+    expect(findTimestampColumn(cols)).toBe("CorrectieDatum");
+  });
+  it("geeft null zonder datumkolom", () => {
+    expect(findTimestampColumn(deriveColumns([{ Code: "A1" }]))).toBeNull();
+  });
+});
+
+describe("timestampGroupParity", () => {
+  it("geeft dezelfde timestamp dezelfde kleur en wisselt per groep", () => {
+    const rows = [
+      { ts: "2026-11-13T08:00:00" },
+      { ts: "2026-11-13T08:00:00" },
+      { ts: "2026-11-13T09:15:00" },
+      { ts: "2026-11-13T10:30:00" },
+      { ts: "2026-11-13T10:30:00" },
+    ];
+    expect(timestampGroupParity(rows, "ts")).toEqual([0, 0, 1, 0, 0]);
+  });
+  it("behoudt de kleur als gelijke timestamps door sortering verspreid staan", () => {
+    const rows = [{ ts: "a" }, { ts: "b" }, { ts: "a" }];
+    expect(timestampGroupParity(rows, "ts")).toEqual([0, 1, 0]);
+  });
+  it("geeft lege waarden geen groepskleur", () => {
+    expect(timestampGroupParity([{ ts: null }, { ts: "" }, { ts: "a" }], "ts")).toEqual([null, null, 0]);
   });
 });
