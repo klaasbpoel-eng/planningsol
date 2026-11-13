@@ -46,6 +46,35 @@ export function deriveColumns(rows: DataRow[]): DataColumn[] {
   }));
 }
 
+const TIMESTAMP_KEY = /timestamp|tijdstip|datetime/i;
+
+/** Column whose value groups rows that belong together: a timestamp-like key, else the first date column. */
+export function findTimestampColumn(columns: DataColumn[]): string | null {
+  const named = columns.find((c) => TIMESTAMP_KEY.test(c.key));
+  if (named) return named.key;
+  return columns.find((c) => c.kind === "date")?.key ?? null;
+}
+
+/**
+ * Parity (0/1) per row so rows sharing a timestamp get the same color and neighbouring groups alternate.
+ * Alternation follows first appearance, so equal timestamps keep their color even when sorted apart.
+ * Rows without a value get null (no group color).
+ */
+export function timestampGroupParity(rows: DataRow[], key: string): (0 | 1 | null)[] {
+  const parityByValue = new Map<string, 0 | 1>();
+  return rows.map((row) => {
+    const value = row[key];
+    if (value === null || value === undefined || value === "") return null;
+    const text = String(value);
+    let parity = parityByValue.get(text);
+    if (parity === undefined) {
+      parity = (parityByValue.size % 2) as 0 | 1;
+      parityByValue.set(text, parity);
+    }
+    return parity;
+  });
+}
+
 const numberFormat = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 3 });
 
 /** Dutch display value: dot for thousands, comma for decimals, dd-mm-jjjj dates. */

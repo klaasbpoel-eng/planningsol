@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSearchFilter, deriveColumns, formatCellValue, humanizeColumnName, rowsToCsv } from "./dataTable";
+import { buildSearchFilter, deriveColumns, findTimestampColumn, formatCellValue, humanizeColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
 
 describe("humanizeColumnName", () => {
   it("maakt leesbare kolomnamen", () => {
