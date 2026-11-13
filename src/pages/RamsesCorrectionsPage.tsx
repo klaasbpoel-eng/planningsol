@@ -149,6 +149,20 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const firstRow = total === 0 ? 0 : page * pageSize + 1;
   const lastRow = Math.min(total, (page + 1) * pageSize);
 
+  const anyFilter = search.trim() !== "" || filterTerm.trim() !== "";
+  // What the value box expects depends on the kind of the picked column.
+  const filterPlaceholder =
+    activeFilterColumn?.kind === "number"
+      ? "Bijv. 5 of >10"
+      : activeFilterColumn?.kind === "date"
+        ? "Bijv. 03-11-2026 of 11-2026"
+        : activeFilterColumn?.kind === "boolean"
+          ? "Ja of Nee"
+          : "Waarde invoegen…";
+  const filterInvalid =
+    filterTerm.trim() !== "" && !!activeFilterColumn && activeFilterColumn.kind !== "text" && columnFilters.length === 0;
+  const filterHint = activeFilterColumn ? `Gebruik voor "${activeFilterColumn.label}" ${filterPlaceholder}` : "";
+
   const toggleSort = (key: string) => {
     setPage(0);
     setSort((current) => {
@@ -160,6 +174,13 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
 
   const toggleGroup = (label: string) =>
     setCollapsedGroups((current) => (current.includes(label) ? current.filter((l) => l !== label) : [...current, label]));
+
+  const clearFilter = () => {
+    setFilterColumn("none");
+    setFilterInput("");
+    setFilterTerm("");
+    setPage(0);
+  };
 
   const openLabels = () => {
     setLabelDrafts(columnLabelDrafts(visibleColumns));
