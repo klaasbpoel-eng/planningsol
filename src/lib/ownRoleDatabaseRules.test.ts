@@ -76,6 +76,7 @@ describe("databaseregels voor eigen rollen", () => {
         ('custom_roles', '${JSON.stringify(roles)}'),
         ('custom_role_assignments', '${JSON.stringify({ [PLANNER]: "r1", [ADMIN]: "r2" })}');
       insert into dry_ice_orders(note) values ('x');
+      insert into customers(name) values ('bestaand');
       insert into time_off_requests(reason) values ('vakantie');
     `);
   });
