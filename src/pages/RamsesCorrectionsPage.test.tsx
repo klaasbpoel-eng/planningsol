@@ -12,6 +12,9 @@ const ROWS = vi.hoisted(() => [
   { id: 3, dt_dn: "2026-11-03T11:51:00", code: "A3" },
 ]);
 
+// Column filters the page sends to the database, recorded so tests can read them back.
+const FILTER_CALLS = vi.hoisted(() => [] as string[][]);
+
 // Stored column names, as they live in the backend settings table.
 const SETTINGS = vi.hoisted(() => ({
   stored: '{"dt_dn":"Tijdstip"}',
@@ -39,6 +42,10 @@ vi.mock("@/components/auth/ProtectedRoute", () => ({
 vi.mock("@/integrations/supabase/client", () => {
   const query: Record<string, unknown> = {};
   for (const method of ["select", "order", "eq", "or"]) query[method] = () => query;
+  query.filter = (column: string, op: string, value: unknown) => {
+    FILTER_CALLS.push([column, op, String(value)]);
+    return query;
+  };
   query.range = (_from: number, to: number) =>
     Promise.resolve({ data: ROWS.slice(0, to + 1), error: null, count: ROWS.length });
   return { supabase: { from: () => query, auth: { signOut: vi.fn() } } };
@@ -137,5 +144,36 @@ describe("kolomnamen op de Ramses-correctiespagina", () => {
     await waitFor(() => expect(SETTINGS.upsert).toHaveBeenCalledWith("column_labels_RamsesCorrecties", "{}", expect.any(String)));
     fireEvent.click(screen.getByRole("button", { name: "Sluiten" }));
     expect(screen.getByRole("button", { name: "Sorteer op Dt dn" })).toBeInTheDocument();
+  });
+});
+
+describe("filteren op kolom op de Ramses-correctiespagina", () => {
+  const kiesKolom = async (label: string) => {
+    fireEvent.click(screen.getByRole("combobox", { name: /Kolom kiezen om op te filteren/ }));
+    fireEvent.click(await screen.findByRole("option", { name: label }));
+  };
+
+  it("vraagt alleen regels op van de gekozen kolom met de ingetypte waarde", async () => {
+    await openPage();
+    // Nothing to filter on until a column is picked.
+    expect(screen.getByLabelText("Filterwaarde")).toBeDisabled();
+
+    FILTER_CALLS.length = 0;
+    await kiesKolom("Code");
+    fireEvent.change(screen.getByLabelText("Filterwaarde"), { target: { value: "a1" } });
+
+    await waitFor(() => expect(FILTER_CALLS).toContainEqual(["code", "ilike", "*a1*"]), { timeout: 3000 });
+  });
+
+  it("wist de filterkeuze weer", async () => {
+    await openPage();
+    await kiesKolom("Code");
+    fireEvent.change(screen.getByLabelText("Filterwaarde"), { target: { value: "a1" } });
+    await waitFor(() => expect(FILTER_CALLS).toContainEqual(["code", "ilike", "*a1*"]), { timeout: 3000 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Filter wissen" }));
+    expect((screen.getByLabelText("Filterwaarde") as HTMLInputElement).value).toBe("");
+    // Back to no column picked, so the value box is out of use again.
+    expect(screen.getByLabelText("Filterwaarde")).toBeDisabled();
   });
 });

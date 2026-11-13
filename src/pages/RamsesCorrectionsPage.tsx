@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Pencil, RefreshCw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Filter, Pencil, RefreshCw, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -19,10 +19,11 @@ import {
 } from "@/lib/columnLabels";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { buildSearchFilter, deriveColumns, findTimestampColumn, formatCellValue, groupRowsByTimestamp, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
+import { buildColumnFilters, buildSearchFilter, deriveColumns, findTimestampColumn, formatCellValue, groupRowsByTimestamp, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
 
 const TABLE_NAME = "RamsesCorrecties";
 const PAGE_SIZES = [25, 50, 100];
@@ -58,6 +59,10 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [labelDrafts, setLabelDrafts] = useState<ColumnLabelMap>({});
   const [savingLabels, setSavingLabels] = useState(false);
+  // Filter on one column: the picked column and the value typed for it.
+  const [filterColumn, setFilterColumn] = useState("none");
+  const [filterInput, setFilterInput] = useState("");
+  const [filterTerm, setFilterTerm] = useState("");
 
   // Stored column names are optional: when they cannot be read, the automatic names stay in place.
   useEffect(() => {
@@ -84,15 +89,28 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
     return () => clearTimeout(t);
   }, [searchInput]);
 
+  // Same short pause for the column filter, so typing does not query per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFilterTerm(filterInput);
+      setPage(0);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [filterInput]);
+
+  const activeFilterColumn = useMemo(() => (columns ?? []).find((col) => col.key === filterColumn), [columns, filterColumn]);
+  const columnFilters = useMemo(() => buildColumnFilters(activeFilterColumn, filterTerm), [activeFilterColumn, filterTerm]);
+
   const buildQuery = useCallback(
     (withCount: boolean) => {
       let query = (supabase as any).from(TABLE_NAME).select("*", withCount ? { count: "exact" } : undefined);
       const filter = columns ? buildSearchFilter(columns, search) : null;
       if (filter) query = query.or(filter);
+      for (const columnFilter of columnFilters) query = query.filter(quoteColumnName(columnFilter.key), columnFilter.op, columnFilter.value);
       if (sort) query = query.order(sort.key, { ascending: sort.ascending, nullsFirst: false });
       return query;
     },
-    [columns, search, sort],
+    [columns, search, sort, columnFilters],
   );
 
   const load = useCallback(async () => {
@@ -131,6 +149,20 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const firstRow = total === 0 ? 0 : page * pageSize + 1;
   const lastRow = Math.min(total, (page + 1) * pageSize);
 
+  const anyFilter = search.trim() !== "" || filterTerm.trim() !== "";
+  // What the value box expects depends on the kind of the picked column.
+  const filterPlaceholder =
+    activeFilterColumn?.kind === "number"
+      ? "Bijv. 5 of >10"
+      : activeFilterColumn?.kind === "date"
+        ? "Bijv. 03-11-2026 of 11-2026"
+        : activeFilterColumn?.kind === "boolean"
+          ? "Ja of Nee"
+          : "Waarde invoegen…";
+  const filterInvalid =
+    filterTerm.trim() !== "" && !!activeFilterColumn && activeFilterColumn.kind !== "text" && columnFilters.length === 0;
+  const filterHint = activeFilterColumn ? `Gebruik voor "${activeFilterColumn.label}" ${filterPlaceholder}` : "";
+
   const toggleSort = (key: string) => {
     setPage(0);
     setSort((current) => {
@@ -142,6 +174,13 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
 
   const toggleGroup = (label: string) =>
     setCollapsedGroups((current) => (current.includes(label) ? current.filter((l) => l !== label) : [...current, label]));
+
+  const clearFilter = () => {
+    setFilterColumn("none");
+    setFilterInput("");
+    setFilterTerm("");
+    setPage(0);
+  };
 
   const openLabels = () => {
     setLabelDrafts(columnLabelDrafts(visibleColumns));
@@ -273,7 +312,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
           <div>
             <CardTitle>Correcties</CardTitle>
             <CardDescription>
-              {loading ? "Laden…" : `${total.toLocaleString("nl-NL")} ${total === 1 ? "regel" : "regels"}${search ? " gevonden" : ""}`}
+              {loading ? "Laden…" : `${total.toLocaleString("nl-NL")} ${total === 1 ? "regel" : "regels"}${anyFilter ? " gevonden" : ""}`}
             </CardDescription>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -303,6 +342,44 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Filter className="h-3.5 w-3.5" />
+              Filteren op kolom
+            </span>
+            <SearchableSelect
+              options={[
+                { value: "none", label: "Alle kolommen" },
+                ...visibleColumns.map((col) => ({ value: col.key, label: col.label })),
+              ]}
+              value={filterColumn}
+              onValueChange={(value) => {
+                setFilterColumn(value);
+                setPage(0);
+              }}
+              placeholder="Kies een kolom"
+              searchPlaceholder="Zoek een kolom…"
+              className="w-full sm:w-60"
+              disabled={!columns}
+              ariaLabel={`Kolom kiezen om op te filteren, nu: ${
+                visibleColumns.find((col) => col.key === filterColumn)?.label ?? "Alle kolommen"
+              }`}
+            />
+            <Input
+              value={filterInput}
+              onChange={(e) => setFilterInput(e.target.value)}
+              placeholder={filterPlaceholder}
+              className="w-full sm:w-56"
+              aria-label="Filterwaarde"
+              disabled={!columns || filterColumn === "none"}
+            />
+            {(filterColumn !== "none" || filterInput !== "") && (
+              <Button variant="ghost" size="sm" onClick={clearFilter}>
+                Filter wissen
+              </Button>
+            )}
+            {filterInvalid && <p className="w-full text-xs text-muted-foreground">{filterHint}</p>}
+          </div>
           {error ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm">
               <p className="font-medium text-destructive">De correcties konden niet worden geladen.</p>
@@ -372,7 +449,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                   ) : rows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={Math.max(visibleColumns.length, 1)} className="h-24 text-center text-muted-foreground">
-                        {search ? "Geen correcties gevonden voor deze zoekopdracht." : "Er zijn (nog) geen correcties zichtbaar."}
+                        {anyFilter ? "Geen correcties gevonden voor deze filter." : "Er zijn (nog) geen correcties zichtbaar."}
                       </TableCell>
                     </TableRow>
                   ) : groups ? (

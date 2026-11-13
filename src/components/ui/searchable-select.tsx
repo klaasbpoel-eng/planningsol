@@ -36,6 +36,8 @@ interface SearchableSelectProps {
   emptyMessage?: string;
   className?: string;
   disabled?: boolean;
+  /** Screen-reader name for the control; a role of combobox does not pick up the visible text. */
+  ariaLabel?: string;
 }
 
 export function SearchableSelect({
@@ -48,6 +50,7 @@ export function SearchableSelect({
   emptyMessage = "Geen resultaten gevonden.",
   className,
   disabled = false,
+  ariaLabel,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
 
@@ -72,6 +75,7 @@ export function SearchableSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          aria-label={ariaLabel}
           disabled={disabled}
           className={cn("w-full justify-between bg-background", className)}
         >
