@@ -238,7 +238,7 @@ export function Header({
           {!isMobile && (
             <>
               {userEmail && (
-                <div className="hidden lg:flex items-center gap-2 text-primary/80 text-sm ml-1">
+                <div className="hidden 2xl:flex items-center gap-2 text-primary/80 text-sm ml-1">
                   <User className="h-4 w-4 shrink-0" />
                   <span className="max-w-[120px] truncate">{userEmail}</span>
                 </div>
@@ -251,7 +251,7 @@ export function Header({
                 className="text-primary hover:bg-primary/10 hover:text-primary shrink-0"
               >
                 <LogOut className="h-4 w-4 mr-2" />
-                <span className="hidden lg:inline">Uitloggen</span>
+                <span className="hidden xl:inline">Uitloggen</span>
               </Button>
             </>
           )}

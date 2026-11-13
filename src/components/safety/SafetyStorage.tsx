@@ -72,7 +72,7 @@ export function SafetyStorage({ permissions, userProductionLocation, canViewAllL
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="h-11 p-1">
+        <TabsList className={canViewRegister ? "h-11 p-1" : "hidden"}>
           {canViewRegister && (
             <TabsTrigger value="register" className="gap-2">
               <ShieldAlert className="h-4 w-4" />

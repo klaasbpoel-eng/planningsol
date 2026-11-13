@@ -1,4 +1,3 @@
-import { ShieldAlert } from "lucide-react";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { SafetyStorage } from "@/components/safety/SafetyStorage";
@@ -12,7 +11,6 @@ const SafetyStoragePage = () => (
         isAdmin={isAdmin}
         title="PGS-register & opslag"
         description="Gevaarlijke stoffen per opslagplaats en de plattegrond van het terrein"
-        titleIcon={<ShieldAlert className="h-8 w-8" />}
       >
         <SafetyStorage
           permissions={permissions}
