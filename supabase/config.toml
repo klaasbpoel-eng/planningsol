@@ -16,3 +16,5 @@ verify_jwt = false
 
 [functions.trigger-github-workflow]
 verify_jwt = false
+[functions.ramses-filter-ai]
+verify_jwt = false

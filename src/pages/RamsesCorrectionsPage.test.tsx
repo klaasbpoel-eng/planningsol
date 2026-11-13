@@ -25,6 +25,14 @@ const SETTINGS = vi.hoisted(() => ({
   })),
 }));
 
+const AI = vi.hoisted(() => ({
+  requestFilterPlan: vi.fn(async (_input: { question: string }) => ({
+    filters: [{ column: "code", operator: "contains", value: "a1", values: [] }],
+    explanation: "Regels waarvan de code a1 bevat.",
+  })),
+}));
+vi.mock("@/lib/aiFilterClient", () => ({ requestFilterPlan: AI.requestFilterPlan }));
+
 vi.mock("@/lib/api", () => ({ api: { appSettings: { getByKey: SETTINGS.getByKey, upsert: SETTINGS.upsert } } }));
 
 vi.mock("@/components/auth/ProtectedRoute", () => ({
@@ -194,5 +202,33 @@ describe("filteren op kolom op de Ramses-correctiespagina", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Vinkjes wissen" }));
     expect(screen.getByRole("button", { name: "Waarden kiezen" })).toBeInTheDocument();
+  });
+});
+
+describe("zoeken in gewone taal op de Ramses-correctiespagina", () => {
+  it("zet de vraag om in filters die je los weer weghaalt", async () => {
+    await openPage();
+    FILTER_CALLS.length = 0;
+    fireEvent.change(screen.getByLabelText("Zoeken in gewone taal"), { target: { value: "alles met code a1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Filters maken" }));
+
+    expect(await screen.findByText('Code bevat "a1"')).toBeInTheDocument();
+    expect(screen.getByText("Regels waarvan de code a1 bevat.")).toBeInTheDocument();
+    expect(AI.requestFilterPlan.mock.calls[0][0]).toMatchObject({ question: "alles met code a1" });
+    await waitFor(() => expect(FILTER_CALLS).toContainEqual(["code", "ilike", "*a1*"]));
+
+    FILTER_CALLS.length = 0;
+    fireEvent.click(screen.getByRole("button", { name: 'Filter weghalen: Code bevat "a1"' }));
+    expect(screen.queryByText('Code bevat "a1"')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("A3")).toBeInTheDocument());
+    expect(FILTER_CALLS).not.toContainEqual(["code", "ilike", "*a1*"]);
+  });
+
+  it("toont de foutmelding als de AI niet kan helpen", async () => {
+    AI.requestFilterPlan.mockRejectedValueOnce(new Error("Het AI-tegoed is op."));
+    await openPage();
+    fireEvent.change(screen.getByLabelText("Zoeken in gewone taal"), { target: { value: "iets" } });
+    fireEvent.click(screen.getByRole("button", { name: "Filters maken" }));
+    expect(await screen.findByText("Het AI-tegoed is op.")).toBeInTheDocument();
   });
 });

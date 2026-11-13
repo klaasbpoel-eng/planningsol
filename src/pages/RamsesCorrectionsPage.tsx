@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Filter, ListChecks, Pencil, RefreshCw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Filter, ListChecks, Loader2, Pencil, RefreshCw, Search, Sparkles, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -25,6 +25,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { planToRules, sampleValues, type AiRule } from "@/lib/aiFilters";
+import { requestFilterPlan } from "@/lib/aiFilterClient";
 import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, groupRowsByTimestamp, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
 
 const TABLE_NAME = "RamsesCorrecties";
@@ -73,6 +76,12 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const [valuesOpen, setValuesOpen] = useState(false);
   const [valuesLoading, setValuesLoading] = useState(false);
   const [valuesError, setValuesError] = useState<string | null>(null);
+  // Filters that Lovable AI made from a request in plain language.
+  const [aiQuestion, setAiQuestion] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiRules, setAiRules] = useState<AiRule[]>([]);
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
 
   // Stored column names are optional: when they cannot be read, the automatic names stay in place.
   useEffect(() => {
@@ -158,11 +167,12 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
       let query = (supabase as any).from(TABLE_NAME).select("*", withCount ? { count: "exact" } : undefined);
       const filter = columns ? buildSearchFilter(columns, search) : null;
       if (filter) query = query.or(filter);
+      for (const rule of aiRules) for (const f of rule.filters) query = query.filter(quoteColumnName(f.key), f.op, f.value);
       for (const columnFilter of columnFilters) query = query.filter(quoteColumnName(columnFilter.key), columnFilter.op, columnFilter.value);
       if (sort) query = query.order(sort.key, { ascending: sort.ascending, nullsFirst: false });
       return query;
     },
-    [columns, search, sort, columnFilters],
+    [columns, search, sort, columnFilters, aiRules],
   );
 
   const load = useCallback(async () => {
@@ -201,7 +211,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const firstRow = total === 0 ? 0 : page * pageSize + 1;
   const lastRow = Math.min(total, (page + 1) * pageSize);
 
-  const anyFilter = search.trim() !== "" || filterTerm.trim() !== "" || pickedValues.length > 0;
+  const anyFilter = search.trim() !== "" || filterTerm.trim() !== "" || pickedValues.length > 0 || aiRules.length > 0;
   // What the value box expects depends on the kind of the picked column.
   const filterPlaceholder =
     activeFilterColumn?.kind === "number"
@@ -232,6 +242,46 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
     setFilterInput("");
     setFilterTerm("");
     setPickedValues([]);
+    setPage(0);
+  };
+
+  const askAi = async () => {
+    const question = aiQuestion.trim();
+    if (!question || !columns) return;
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const extra = Object.fromEntries(Object.entries(valueLists).map(([key, list]) => [key, list.values.map((v) => v.value)]));
+      const plan = await requestFilterPlan({
+        question,
+        columns: visibleColumns,
+        samples: sampleValues(visibleColumns, rows, extra),
+        today: format(new Date(), "yyyy-MM-dd"),
+      });
+      const { rules, skipped } = planToRules(visibleColumns, plan);
+      setAiRules(rules);
+      setAiExplanation(
+        rules.length === 0
+          ? plan.explanation || "De AI kon hier geen filter van maken. Probeer het anders te omschrijven."
+          : `${plan.explanation}${skipped > 0 ? ` (${skipped} onderdeel${skipped === 1 ? "" : "en"} kon niet worden toegepast.)` : ""}`,
+      );
+      setPage(0);
+    } catch (e: any) {
+      setAiError(e.message ?? "De AI kon je vraag nu niet verwerken.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const removeAiRule = (id: string) => {
+    setAiRules((current) => current.filter((rule) => rule.id !== id));
+    setPage(0);
+  };
+
+  const clearAi = () => {
+    setAiRules([]);
+    setAiExplanation(null);
+    setAiError(null);
     setPage(0);
   };
 
@@ -395,6 +445,57 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <form
+            className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              askAi();
+            }}
+          >
+            <label htmlFor="ai-vraag" className="flex items-center gap-1.5 text-sm font-medium">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Zoeken in gewone taal
+            </label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                id="ai-vraag"
+                value={aiQuestion}
+                onChange={(e) => setAiQuestion(e.target.value)}
+                placeholder="Bijv. alle correcties van Jansen in oktober, of zending 123 en 456"
+                maxLength={500}
+                disabled={!columns || aiLoading}
+              />
+              <Button type="submit" disabled={!columns || aiLoading || aiQuestion.trim() === ""} className="sm:w-auto">
+                {aiLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                {aiLoading ? "Bezig…" : "Filters maken"}
+              </Button>
+            </div>
+            {aiError && <p className="text-sm text-destructive">{aiError}</p>}
+            {aiExplanation && <p className="text-sm text-muted-foreground">{aiExplanation}</p>}
+            {aiRules.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                {aiRules.map((rule) => (
+                  <span
+                    key={rule.id}
+                    className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/15 py-0.5 pl-3 pr-1 text-xs"
+                  >
+                    {rule.description}
+                    <button
+                      type="button"
+                      onClick={() => removeAiRule(rule.id)}
+                      className="rounded-full p-0.5 text-muted-foreground hover:bg-primary/20 hover:text-foreground"
+                      aria-label={`Filter weghalen: ${rule.description}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={clearAi}>
+                  AI-filters wissen
+                </Button>
+              </div>
+            )}
+          </form>
           <div className="flex flex-wrap items-center gap-2">
             <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Filter className="h-3.5 w-3.5" />
