@@ -15,6 +15,14 @@ vi.mock("@/integrations/supabase/client", () => {
   return { supabase: { from: (table: string) => makeQuery(table) } };
 });
 
+const ROLES = vi.hoisted(() => ({
+  config: { roles: [] as unknown[], assignments: {} as Record<string, string> },
+}));
+vi.mock("@/lib/customRoleStore", () => ({
+  loadCustomRoleConfig: () => Promise.resolve(ROLES.config),
+  onCustomRolesChanged: () => () => {},
+}));
+
 import { useUserPermissions } from "./useUserPermissions";
 
 describe("useUserPermissions", () => {
@@ -31,5 +39,19 @@ describe("useUserPermissions", () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.isAdmin).toBe(true);
+  });
+
+  it("zet rechten uit die de eigen rol van de persoon niet heeft, zonder de standaardrol te veranderen", async () => {
+    ROLES.config = {
+      roles: [{ id: "r1", name: "Kijker", description: "", baseRole: "admin", disabledPermissions: ["canCreateOrders"], hiddenMenuItems: [] }],
+      assignments: { "admin-user": "r1" },
+    };
+    const { result } = renderHook(() => useUserPermissions("admin-user"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.isAdmin).toBe(true);
+    expect(result.current.customRole?.name).toBe("Kijker");
+    expect(result.current.permissions.canCreateOrders).toBe(false);
+    expect(result.current.permissions.canEditOrders).toBe(true);
+    ROLES.config = { roles: [], assignments: {} };
   });
 });

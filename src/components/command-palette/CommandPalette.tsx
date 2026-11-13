@@ -27,6 +27,8 @@ import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { useUserRole } from "@/hooks/useUserRole";
 import { HOME_ITEM, NAVIGATION_ITEMS, getNavigationGroups } from "@/config/navigation";
+import { useCustomRole } from "@/hooks/useCustomRole";
+import { filterNavigationForRole } from "@/lib/customRoles";
 import { OPEN_COMMAND_PALETTE_EVENT } from "@/lib/command-palette";
 
 const RECENT_KEY = "command-palette-recent";
@@ -70,7 +72,8 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [recentActions, setRecentActions] = useState<RecentAction[]>([]);
   const [userId, setUserId] = useState<string | undefined>();
-  const { isAdmin } = useUserRole(userId);
+  const { isAdmin, role } = useUserRole(userId);
+  const customRole = useCustomRole(userId, role);
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
 
@@ -118,7 +121,7 @@ export function CommandPalette() {
 
   // Build a lookup for rendering recent items
   const allItems = [...QUICK_ACTIONS, ...NAVIGATION_ITEMS, ...PRODUCTION_ITEMS];
-  const navigationGroups = getNavigationGroups(isAdmin);
+  const navigationGroups = filterNavigationForRole(getNavigationGroups(isAdmin), customRole);
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
@@ -131,6 +134,7 @@ export function CommandPalette() {
           <>
             <CommandGroup heading="Recent">
               {recentActions.map((recent) => {
+                if (customRole?.hiddenMenuItems.includes(recent.id)) return null;
                 const item = allItems.find((i) => i.id === recent.id);
                 const Icon = item?.icon || History;
                 return (

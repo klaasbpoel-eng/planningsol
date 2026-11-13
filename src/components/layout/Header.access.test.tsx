@@ -40,6 +40,7 @@ describe("Hoofdmenu met een beheerdersaccount", () => {
       ["Taken", "/admin?tab=tasks"],
       ["Teamkalender", "/admin?tab=calendar"],
       ["Medewerkers", "/admin?tab=employees"],
+      ["Rollen", "/rollen"],
       ["Toolbox-logboek", "/admin?tab=logbook"],
       ["Instellingen", "/admin?tab=settings"],
       ["Synchronisatie", "/sync-instellingen"],

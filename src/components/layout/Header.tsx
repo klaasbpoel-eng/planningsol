@@ -21,13 +21,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { openCommandPalette } from "@/lib/command-palette";
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Admin",
-  supervisor: "Supervisor",
-  operator: "Operator",
-  user: "Gebruiker",
-};
+import { useCurrentCustomRole } from "@/hooks/useCustomRole";
+import { filterNavigationForRole, roleDisplayName } from "@/lib/customRoles";
 
 const ROLE_COLORS: Record<string, string> = {
   admin: "bg-destructive/10 text-destructive border-destructive/30",
@@ -63,7 +58,9 @@ export function Header({
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
-  const navigationGroups = getNavigationGroups(Boolean(isAdmin) || role === "admin");
+  const customRole = useCurrentCustomRole(role);
+  const roleName = roleDisplayName(role, customRole);
+  const navigationGroups = filterNavigationForRole(getNavigationGroups(Boolean(isAdmin) || role === "admin"), customRole);
   const isActive = (item: NavigationItem) => isNavigationItemActive(item, location.pathname, location.search);
 
 
@@ -77,7 +74,7 @@ export function Header({
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{userEmail}</p>
             <p className="text-xs text-muted-foreground">
-              {ROLE_LABELS[role] || "Gebruiker"}
+              {roleName}
             </p>
           </div>
         </div>
@@ -151,7 +148,7 @@ export function Header({
                   variant="outline"
                   className={`text-xs hidden md:inline-flex ${ROLE_COLORS[role] || ROLE_COLORS.user}`}
                 >
-                  {ROLE_LABELS[role] || "Gebruiker"}
+                  {roleName}
                 </Badge>
               </div>
             </div>
