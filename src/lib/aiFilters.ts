@@ -126,11 +126,34 @@ function toRule(column: DataColumn, filter: AiPlanFilter): Omit<AiRule, "id"> | 
 export function planToRules(columns: DataColumn[], plan: AiFilterPlan): { rules: AiRule[]; skipped: number } {
   const rules: AiRule[] = [];
   let skipped = 0;
+  const used = new Set<number>();
   plan.filters.forEach((filter, index) => {
+    if (used.has(index)) return;
     const column = columns.find((c) => c.key === filter.column);
     const rule = column ? toRule(column, filter) : null;
-    if (rule) rules.push({ id: `ai-${index}`, ...rule });
-    else skipped += 1;
+    if (!column || !rule) {
+      skipped += 1;
+      return;
+    }
+    // A start and an end on the same date column read as one period.
+    if (column.kind === "date" && filter.operator === "gte") {
+      const endIndex = plan.filters.findIndex(
+        (f, i) => i > index && !used.has(i) && f.column === filter.column && (f.operator === "lt" || f.operator === "lte"),
+      );
+      const endRule = endIndex >= 0 ? toRule(column, plan.filters[endIndex]) : null;
+      if (endRule) {
+        used.add(endIndex);
+        const from = rule.description.replace(`${column.label} vanaf `, "");
+        const to = endRule.description.replace(`${column.label} tot en met `, "").replace(`${column.label} vóór `, "vóór ");
+        rules.push({
+          id: `ai-${index}`,
+          description: `${column.label} van ${from} t/m ${to.replace(/^vóór /, "")}`,
+          filters: [...rule.filters, ...endRule.filters],
+        });
+        return;
+      }
+    }
+    rules.push({ id: `ai-${index}`, ...rule });
   });
   return { rules, skipped };
 }
