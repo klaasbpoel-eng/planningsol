@@ -65,6 +65,7 @@ describe("toegang tot beheer- en veiligheidspagina's met een beheerdersaccount",
 
   it("opent de synchronisatiepagina", () => {
     renderAt("/sync-instellingen");
+    expect(screen.getByRole("heading", { name: "Synchronisatie" })).toBeInTheDocument();
     expect(screen.queryByText("Startpagina")).not.toBeInTheDocument();
   });
 
@@ -91,9 +92,11 @@ describe.each<AppRole>(["supervisor", "operator", "user"])("toegang voor rol %s"
     expect(screen.getByText("Startpagina")).toBeInTheDocument();
   });
 
-  it("laat de PGS-pagina wel open", async () => {
+  it("laat de PGS-pagina wel open, met het register alleen voor rapportagerechten", async () => {
     renderAt("/pgs-register");
     expect(screen.getByRole("heading", { name: "PGS-register & opslag" })).toBeInTheDocument();
-    expect(await screen.findByTestId("site-map")).toBeInTheDocument();
+    const expected = role === "supervisor" ? "pgs-registry" : "site-map";
+    expect(await screen.findByTestId(expected)).toBeInTheDocument();
+    if (role !== "supervisor") expect(screen.queryByTestId("pgs-registry")).not.toBeInTheDocument();
   });
 });
