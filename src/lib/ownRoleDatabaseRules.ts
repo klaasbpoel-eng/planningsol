@@ -243,3 +243,30 @@ export function buildOwnRoleRulesRemovalSql(): string {
     "",
   ].join("\n");
 }
+
+const TABLE_LABELS: Record<string, string> = {
+  customers: "klanten",
+  customer_locations: "klantlocaties",
+  customer_products: "klantproducten",
+  dry_ice_orders: "droogijsorders",
+  gas_cylinder_orders: "gascilinderorders",
+  time_off_requests: "verlofaanvragen",
+  pgs_expansion_requests: "PGS-uitbreidingsaanvragen",
+  pgs_substances: "PGS-stoffen",
+  storage_places: "opslagplaatsen",
+  bulk_storage_tanks: "bulktanks",
+};
+const ACTION_LABELS: Record<GuardedAction, string> = { insert: "toevoegen", update: "wijzigen", delete: "verwijderen" };
+
+/** What the database refuses when this right is switched off, in plain words. */
+export function describePermissionRule(key: PermissionKey): { inDatabase: boolean; text: string } {
+  const rule = PERMISSION_RULES[key];
+  if (!rule) return { inDatabase: false, text: "Alleen in de app." };
+  if (rule.kind === "app") return { inDatabase: false, text: `Alleen in de app. ${rule.reason}` };
+  const parts = rule.guards.map((g) => {
+    const what = TABLE_LABELS[g.table] ?? g.table;
+    if (g.mode === "status") return `${what} goedkeuren of afwijzen`;
+    return `${what} ${g.actions.map((a) => ACTION_LABELS[a]).join("/")}`;
+  });
+  return { inDatabase: true, text: `Database weigert: ${parts.join(", ")}.` };
+}
