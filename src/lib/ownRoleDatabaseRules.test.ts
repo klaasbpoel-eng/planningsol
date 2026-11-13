@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
 import { getPermissionsForRole } from "@/hooks/useUserPermissions";
