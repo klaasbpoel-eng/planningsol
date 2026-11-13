@@ -122,6 +122,10 @@ export function useUserPermissions(userId: string | undefined) {
   const [permissions, setPermissions] = useState<RolePermissions>(ROLE_PERMISSIONS.user);
   const [productionLocation, setProductionLocation] = useState<ProductionLocation>(null);
   const [loading, setLoading] = useState(true);
+  // The user id whose role has finished loading. Until it matches the current
+  // id we report loading, so protected pages never judge a fresh sign-in with
+  // the default "user" role (which bounced admins away from /admin).
+  const [loadedUserId, setLoadedUserId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!userId) {
@@ -166,6 +170,7 @@ export function useUserPermissions(userId: string | undefined) {
         setPermissions(ROLE_PERMISSIONS.user);
         setProductionLocation(null);
       } finally {
+        setLoadedUserId(userId);
         setLoading(false);
       }
     };
@@ -176,7 +181,7 @@ export function useUserPermissions(userId: string | undefined) {
   return { 
     role, 
     permissions, 
-    loading, 
+    loading: loading || (!!userId && loadedUserId !== userId), 
     isAdmin: role === "admin",
     productionLocation,
     // Helper to check if user can view all locations
