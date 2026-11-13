@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Pencil, RefreshCw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Filter, Pencil, RefreshCw, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -19,10 +19,11 @@ import {
 } from "@/lib/columnLabels";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { buildSearchFilter, deriveColumns, findTimestampColumn, formatCellValue, groupRowsByTimestamp, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
+import { buildColumnFilters, buildSearchFilter, deriveColumns, findTimestampColumn, formatCellValue, groupRowsByTimestamp, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
 
 const TABLE_NAME = "RamsesCorrecties";
 const PAGE_SIZES = [25, 50, 100];
@@ -58,6 +59,10 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [labelDrafts, setLabelDrafts] = useState<ColumnLabelMap>({});
   const [savingLabels, setSavingLabels] = useState(false);
+  // Filter on one column: the picked column and the value typed for it.
+  const [filterColumn, setFilterColumn] = useState("none");
+  const [filterInput, setFilterInput] = useState("");
+  const [filterTerm, setFilterTerm] = useState("");
 
   // Stored column names are optional: when they cannot be read, the automatic names stay in place.
   useEffect(() => {
