@@ -176,4 +176,20 @@ describe("filteren op kolom op de Ramses-correctiespagina", () => {
     // Back to no column picked, so the value box is out of use again.
     expect(screen.getByLabelText("Filterwaarde")).toBeDisabled();
   });
+
+  it("vraagt alleen de aangevinkte waarden op", async () => {
+    await openPage();
+    await kiesKolom("Code");
+    fireEvent.click(screen.getByRole("button", { name: "Waarden kiezen" }));
+
+    FILTER_CALLS.length = 0;
+    fireEvent.click(await screen.findByRole("option", { name: /A1/ }));
+    fireEvent.click(screen.getByRole("option", { name: /A3/ }));
+
+    await waitFor(() => expect(FILTER_CALLS).toContainEqual(["code", "in", '("A1","A3")']));
+    expect(screen.getByRole("button", { name: "2 waarden gekozen" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Vinkjes wissen" }));
+    expect(screen.getByRole("button", { name: "Waarden kiezen" })).toBeInTheDocument();
+  });
 });
