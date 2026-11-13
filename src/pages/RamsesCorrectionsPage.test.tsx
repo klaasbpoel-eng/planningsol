@@ -146,3 +146,33 @@ describe("kolomnamen op de Ramses-correctiespagina", () => {
     expect(screen.getByRole("button", { name: "Sorteer op Dt dn" })).toBeInTheDocument();
   });
 });
+
+describe("filteren op kolom op de Ramses-correctiespagina", () => {
+  const kiesKolom = async (label: string) => {
+    fireEvent.click(screen.getByRole("combobox", { name: "Kies een kolom" }));
+    fireEvent.click(await screen.findByRole("option", { name: label }));
+  };
+
+  it("vraagt alleen regels op van de gekozen kolom met de ingetypte waarde", async () => {
+    await openPage();
+    // Nothing to filter on until a column is picked.
+    expect(screen.getByLabelText("Filterwaarde")).toBeDisabled();
+
+    FILTER_CALLS.length = 0;
+    await kiesKolom("Code");
+    fireEvent.change(screen.getByLabelText("Filterwaarde"), { target: { value: "a1" } });
+
+    await waitFor(() => expect(FILTER_CALLS).toContainEqual(["code", "ilike", "*a1*"]), { timeout: 3000 });
+  });
+
+  it("wist de filterkeuze weer", async () => {
+    await openPage();
+    await kiesKolom("Code");
+    fireEvent.change(screen.getByLabelText("Filterwaarde"), { target: { value: "a1" } });
+    await waitFor(() => expect(FILTER_CALLS).toContainEqual(["code", "ilike", "*a1*"]), { timeout: 3000 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Filter wissen" }));
+    expect((screen.getByLabelText("Filterwaarde") as HTMLInputElement).value).toBe("");
+    expect(screen.getByRole("combobox", { name: "Alle kolommen" })).toBeInTheDocument();
+  });
+});
