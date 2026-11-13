@@ -263,6 +263,8 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                     </div>
                     
                     <div className="flex items-center gap-2">
+                      {canApprove && (
+                      <>
                       <Button
                         size="sm"
                         className="bg-success hover:bg-success/90 text-success-foreground"
@@ -294,6 +296,8 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                           </>
                         )}
                       </Button>
+                      </>
+                      )}
                       <RequestActions request={request} />
                     </div>
                   </div>
