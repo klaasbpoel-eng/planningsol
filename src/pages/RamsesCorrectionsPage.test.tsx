@@ -12,6 +12,9 @@ const ROWS = vi.hoisted(() => [
   { id: 3, dt_dn: "2026-11-03T11:51:00", code: "A3" },
 ]);
 
+// Column filters the page sends to the database, recorded so tests can read them back.
+const FILTER_CALLS = vi.hoisted(() => [] as string[][]);
+
 // Stored column names, as they live in the backend settings table.
 const SETTINGS = vi.hoisted(() => ({
   stored: '{"dt_dn":"Tijdstip"}',
@@ -39,6 +42,10 @@ vi.mock("@/components/auth/ProtectedRoute", () => ({
 vi.mock("@/integrations/supabase/client", () => {
   const query: Record<string, unknown> = {};
   for (const method of ["select", "order", "eq", "or"]) query[method] = () => query;
+  query.filter = (column: string, op: string, value: unknown) => {
+    FILTER_CALLS.push([column, op, String(value)]);
+    return query;
+  };
   query.range = (_from: number, to: number) =>
     Promise.resolve({ data: ROWS.slice(0, to + 1), error: null, count: ROWS.length });
   return { supabase: { from: () => query, auth: { signOut: vi.fn() } } };
