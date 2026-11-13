@@ -143,11 +143,12 @@ export function planToRules(columns: DataColumn[], plan: AiFilterPlan): { rules:
       const endRule = endIndex >= 0 ? toRule(column, plan.filters[endIndex]) : null;
       if (endRule) {
         used.add(endIndex);
-        const from = rule.description.replace(`${column.label} vanaf `, "");
-        const to = endRule.description.replace(`${column.label} tot en met `, "").replace(`${column.label} vóór `, "vóór ");
+        const from = rule.description.slice(`${column.label} vanaf `.length);
+        const endText = endRule.description.slice(column.label.length + 1);
+        const to = endText.startsWith("tot en met ") ? `t/m ${endText.slice(11)}` : `tot ${endText.replace(/^(vóór|tot en met) /, "")}`;
         rules.push({
           id: `ai-${index}`,
-          description: `${column.label} van ${from} t/m ${to.replace(/^vóór /, "")}`,
+          description: `${column.label} van ${from} ${to}`,
           filters: [...rule.filters, ...endRule.filters],
         });
         return;
