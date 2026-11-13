@@ -1,12 +1,22 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, FileSpreadsheet, RefreshCw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Pencil, RefreshCw, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import type { AppRole } from "@/hooks/useUserPermissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { api } from "@/lib/api";
+import {
+  applyColumnLabels,
+  buildColumnLabelMap,
+  columnLabelDrafts,
+  columnLabelsKey,
+  parseColumnLabels,
+  type ColumnLabelMap,
+} from "@/lib/columnLabels";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,6 +53,27 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const [exporting, setExporting] = useState(false);
   // Labels of the time groups the user has closed; open by default.
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
+  // Column names picked by an admin, loaded from and saved to the backend.
+  const [columnLabels, setColumnLabels] = useState<ColumnLabelMap>({});
+  const [labelsOpen, setLabelsOpen] = useState(false);
+  const [labelDrafts, setLabelDrafts] = useState<ColumnLabelMap>({});
+  const [savingLabels, setSavingLabels] = useState(false);
+
+  // Stored column names are optional: when they cannot be read, the automatic names stay in place.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const stored = await api.appSettings.getByKey(columnLabelsKey(TABLE_NAME));
+        if (!cancelled) setColumnLabels(parseColumnLabels(stored?.value));
+      } catch {
+        /* automatic names are fine */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Short pause while typing so we don't query on every keystroke.
   useEffect(() => {
@@ -86,7 +117,8 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
     load();
   }, [load]);
 
-  const visibleColumns = useMemo(() => columns ?? deriveColumns(rows), [columns, rows]);
+  const baseColumns = useMemo(() => columns ?? deriveColumns(rows), [columns, rows]);
+  const visibleColumns = useMemo(() => applyColumnLabels(baseColumns, columnLabels), [baseColumns, columnLabels]);
   const timestampKey = useMemo(() => findTimestampColumn(visibleColumns), [visibleColumns]);
   const groups = useMemo(() => {
     if (!timestampKey) return null;
