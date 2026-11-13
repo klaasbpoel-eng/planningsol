@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Users, Edit, Mail, Briefcase, Building, UserPlus, Trash2, MoreHorizontal, MapPin } from "lucide-react";
+import { Search, Users, Edit, Mail, Briefcase, Building, UserPlus, Trash2, MoreHorizontal, MapPin, KeyRound } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +26,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { EmployeeDetailDialog } from "./EmployeeDetailDialog";
 import { EmployeeLeaveBalances } from "./EmployeeLeaveBalances";
+import { CreateAccountDialog, type AccountTarget } from "./CreateAccountDialog";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -56,6 +57,13 @@ export function EmployeeList() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Profile | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [accountDialogOpen, setAccountDialogOpen] = useState(false);
+  const [accountTarget, setAccountTarget] = useState<AccountTarget | null>(null);
+
+  const openAccountDialog = (employee: Profile | null) => {
+    setAccountTarget(employee ? { id: employee.id, full_name: employee.full_name, email: employee.email } : null);
+    setAccountDialogOpen(true);
+  };
 
   const fetchEmployees = async () => {
     try {
@@ -171,10 +179,16 @@ export function EmployeeList() {
               <Users className="h-5 w-5" />
               Medewerkers ({filteredEmployees.length})
             </CardTitle>
-            <Button onClick={handleAddEmployee} className="gap-2">
-              <UserPlus className="h-4 w-4" />
-              Medewerker Toevoegen
-            </Button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" onClick={() => openAccountDialog(null)} className="gap-2">
+                <KeyRound className="h-4 w-4" />
+                Medewerker met account
+              </Button>
+              <Button onClick={handleAddEmployee} className="gap-2">
+                <UserPlus className="h-4 w-4" />
+                Medewerker Toevoegen
+              </Button>
+            </div>
           </div>
           <div className="relative mt-4">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -220,6 +234,12 @@ export function EmployeeList() {
                               <Mail className="h-3 w-3" />
                               {employee.email || "Geen e-mail"}
                             </div>
+                            <Badge
+                              variant={employee.user_id ? "secondary" : "outline"}
+                              className="mt-1 text-[10px] font-normal"
+                            >
+                              {employee.user_id ? "Kan inloggen" : "Geen account"}
+                            </Badge>
                             {employee.job_title && (
                               <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                                 <Briefcase className="h-3 w-3" />
@@ -279,6 +299,12 @@ export function EmployeeList() {
                                 <Edit className="h-4 w-4 mr-2" />
                                 Details Bewerken
                               </DropdownMenuItem>
+                              {!employee.user_id && (
+                                <DropdownMenuItem onClick={() => openAccountDialog(employee)}>
+                                  <KeyRound className="h-4 w-4 mr-2" />
+                                  Inlogaccount aanmaken
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem 
                                 onClick={() => handleDeleteClick(employee)}
@@ -307,6 +333,13 @@ export function EmployeeList() {
         onUpdate={fetchEmployees}
         allEmployees={employees}
         mode={dialogMode}
+      />
+
+      <CreateAccountDialog
+        open={accountDialogOpen}
+        onOpenChange={setAccountDialogOpen}
+        employee={accountTarget}
+        onCreated={fetchEmployees}
       />
 
       <EmployeeLeaveBalances

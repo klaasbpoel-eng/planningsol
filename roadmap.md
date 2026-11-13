@@ -13,3 +13,4 @@
 - [x] Pagina Rollen: eigen rollen maken, bewerken en per persoon toewijzen.
 - [x] Rollen: extra rechten (rapporten bekijken, aanvragen/correcties goedkeuren, klanten beheren) en echt toegepast in de schermen.
 - [x] Rollen: databaseregels (SQL) leveren zodat eigen rollen ook in de echte database beperkt blijven.
+- [x] Beheer: inlogaccount aanmaken voor medewerkers (vanuit Medewerkers).
