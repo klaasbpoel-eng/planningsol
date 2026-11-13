@@ -1,11 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { LogOut, User, ArrowLeftRight, Menu, Search, Calendar, Shield } from "lucide-react";
+import { LogOut, User, Menu, Search, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "react-router-dom";
-import { format } from "date-fns";
-import { nl } from "date-fns/locale";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import siteLogo from "@/assets/site_logo.png";
@@ -14,7 +12,14 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { NAVIGATION_GROUPS } from "@/config/navigation";
+import { HOME_ITEM, getNavigationGroups, isNavigationItemActive, type NavigationItem } from "@/config/navigation";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { openCommandPalette } from "@/lib/command-palette";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -59,7 +64,8 @@ export function Header({
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
-  const isActive = (path: string) => location.pathname === path;
+  const navigationGroups = getNavigationGroups(Boolean(isAdmin));
+  const isActive = (item: NavigationItem) => isNavigationItemActive(item, location.pathname, location.search);
 
 
   const MobileNav = () => (
@@ -78,28 +84,28 @@ export function Header({
         </div>
       )}
 
-      <nav className="flex flex-col gap-1">
+      <nav className="flex flex-col gap-1" aria-label="Hoofdmenu">
         <div className="grid grid-cols-2 gap-2 px-2 pb-3">
-          <Link to="/dagoverzicht" onClick={closeMobileMenu}>
-            <Button variant="outline" className="w-full gap-2">
-              <Calendar className="h-4 w-4" /> Vandaag
+          <Link to={HOME_ITEM.path} onClick={closeMobileMenu} aria-current={isActive(HOME_ITEM) ? "page" : undefined}>
+            <Button variant={isActive(HOME_ITEM) ? "secondary" : "outline"} className="w-full gap-2">
+              <HOME_ITEM.icon className="h-4 w-4" /> {HOME_ITEM.label}
             </Button>
           </Link>
           <Button variant="outline" className="w-full gap-2" onClick={() => { openCommandPalette(); closeMobileMenu(); }}>
             <Search className="h-4 w-4" /> Zoeken
           </Button>
         </div>
-        {NAVIGATION_GROUPS.map((group) => (
-          <div key={group.label}>
+        {navigationGroups.map((group) => (
+          <div key={group.id}>
             <p className="text-xs font-medium text-muted-foreground px-3 py-2 uppercase tracking-wider">{group.label}</p>
             {group.items.map((item) => (
-              <Link key={item.path} to={item.path} onClick={closeMobileMenu} aria-current={isActive(item.path) ? "page" : undefined}>
+              <Link key={item.path} to={item.path} onClick={closeMobileMenu} aria-current={isActive(item) ? "page" : undefined}>
                 <Button
                   variant="ghost"
                   size="lg"
                   className={cn(
                     "w-full justify-start text-base h-12 gap-3",
-                    isActive(item.path)
+                    isActive(item)
                       ? "bg-primary/10 text-primary font-semibold border-l-4 border-primary"
                       : "text-foreground border-l-4 border-transparent"
                   )}
@@ -111,23 +117,6 @@ export function Header({
             ))}
           </div>
         ))}
-
-        {isAdmin && (
-          <div>
-            <p className="text-xs font-medium text-muted-foreground px-3 py-2 uppercase tracking-wider">Admin</p>
-            {location.pathname.startsWith("/admin") ? (
-              <Button variant="ghost" size="lg" onClick={() => { onSwitchView?.(); closeMobileMenu(); }} className="w-full justify-start text-base h-12 gap-3 text-foreground">
-                <ArrowLeftRight className="h-4 w-4" /> Medewerkersweergave
-              </Button>
-            ) : (
-              <Link to="/admin" onClick={closeMobileMenu}>
-                <Button variant="ghost" size="lg" className="w-full justify-start text-base h-12 gap-3 text-foreground">
-                  <Shield className="h-4 w-4" /> Beheerpaneel
-                </Button>
-              </Link>
-            )}
-          </div>
-        )}
       </nav>
 
       <div className="mt-auto pt-4 border-t mt-4">
@@ -171,61 +160,73 @@ export function Header({
         </div>
 
 
-        {/* Desktop navigation */}
+        {/* Desktop navigation: Vandaag + one menu per group */}
         {!isMobile && (
-          <nav className="hidden md:flex items-center gap-0.5">
-            {NAVIGATION_GROUPS.map((group, gi) => (
-              <div key={group.label} className="flex items-center">
-                {gi > 0 && <span className="w-px h-4 bg-border/50 mx-1" />}
-                {group.items.map((item) => (
-                  <Link key={item.path} to={item.path} aria-current={isActive(item.path) ? "page" : undefined}>
+          <nav className="hidden md:flex items-center gap-1" aria-label="Hoofdmenu">
+            <Link to={HOME_ITEM.path} aria-current={isActive(HOME_ITEM) ? "page" : undefined}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-8 gap-1.5 px-2.5 text-sm",
+                  isActive(HOME_ITEM) ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <HOME_ITEM.icon className="h-4 w-4" />
+                <span>{HOME_ITEM.label}</span>
+              </Button>
+            </Link>
+            {navigationGroups.map((group) => {
+              const groupActive = group.items.some(isActive);
+              return (
+                <DropdownMenu key={group.id}>
+                  <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
                       size="sm"
                       className={cn(
-                        "h-8 gap-1.5 px-2.5 text-xs",
-                        isActive(item.path)
-                          ? "bg-primary/10 text-primary font-semibold"
-                          : "text-muted-foreground hover:text-foreground"
+                        "h-8 gap-1.5 px-2.5 text-sm",
+                        groupActive ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.shortLabel || item.label}</span>
+                      <group.icon className="h-4 w-4" />
+                      <span>{group.label}</span>
+                      <ChevronDown className="h-3.5 w-3.5 opacity-70" />
                     </Button>
-                  </Link>
-                ))}
-              </div>
-            ))}
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-60">
+                    <DropdownMenuLabel className="text-xs uppercase tracking-wider text-muted-foreground">{group.label}</DropdownMenuLabel>
+                    {group.items.map((item) => (
+                      <DropdownMenuItem key={item.path} asChild>
+                        <Link
+                          to={item.path}
+                          aria-current={isActive(item) ? "page" : undefined}
+                          className={cn("flex items-center gap-2 cursor-pointer", isActive(item) && "text-primary font-semibold")}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          {item.label}
+                        </Link>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              );
+            })}
           </nav>
         )}
 
         {/* Right side - Actions */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Today quick-link */}
-          {!isMobile && (
-            <Link to="/dagoverzicht">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="hidden md:flex items-center gap-1.5 text-muted-foreground hover:text-foreground h-8 px-2.5"
-              >
-                <Calendar className="h-3.5 w-3.5" />
-                <span className="text-xs font-medium capitalize">
-                  {format(new Date(), "EEE d MMM", { locale: nl })}
-                </span>
-              </Button>
-            </Link>
-          )}
           {!isMobile && (
             <Button
               variant="outline"
               size="sm"
               className="hidden md:flex items-center gap-2 text-muted-foreground hover:text-foreground h-8 px-3 border-border/50"
-                onClick={openCommandPalette}
+              onClick={openCommandPalette}
             >
               <Search className="h-3.5 w-3.5" />
               <span className="text-xs">Zoeken</span>
-              <kbd className="pointer-events-none ml-1 inline-flex h-5 select-none items-center gap-0.5 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+              <kbd className="pointer-events-none ml-1 hidden lg:inline-flex h-5 select-none items-center gap-0.5 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
                 <span className="text-xs">⌘</span>K
               </kbd>
             </Button>
@@ -233,15 +234,6 @@ export function Header({
 
           <ThemeToggle variant="header" />
           <NotificationBell />
-
-          {!isMobile && isAdmin && !location.pathname.startsWith("/admin") && (
-            <Link to="/admin">
-              <Button variant="outline" size="sm" className="h-8 gap-1.5" aria-label="Open beheerpaneel">
-                <Shield className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">Beheer</span>
-              </Button>
-            </Link>
-          )}
 
           {/* Desktop user & logout */}
           {!isMobile && (
