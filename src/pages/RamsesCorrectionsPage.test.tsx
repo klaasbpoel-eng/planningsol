@@ -183,7 +183,7 @@ describe("filteren op kolom op de Ramses-correctiespagina", () => {
     fireEvent.click(screen.getByRole("button", { name: "Waarden kiezen" }));
 
     FILTER_CALLS.length = 0;
-    const opt = await screen.findByRole("option", { name: /A1/ }); console.log("BEFORE", opt.outerHTML.slice(0,300)); fireEvent.click(opt);
+    const opt = await screen.findByRole("option", { name: /A1/ }); console.log("BEFORE", screen.queryAllByRole("option").map((o) => o.textContent), opt.textContent); fireEvent.click(opt);
     await new Promise((r) => setTimeout(r, 50)); console.log("OPTS", screen.queryAllByRole("button").map((b) => b.textContent).join("|"), JSON.stringify(FILTER_CALLS), screen.queryAllByRole("option").map((o) => o.textContent), screen.queryAllByRole("dialog").length);
     fireEvent.click(screen.getByRole("option", { name: /A3/ }));
 
