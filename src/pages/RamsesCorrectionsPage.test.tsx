@@ -184,6 +184,7 @@ describe("filteren op kolom op de Ramses-correctiespagina", () => {
 
     FILTER_CALLS.length = 0;
     fireEvent.click(await screen.findByRole("option", { name: /A1/ }));
+    await new Promise((r) => setTimeout(r, 50)); console.log("OPTS", screen.queryAllByRole("option").map((o) => o.textContent), screen.queryAllByRole("dialog").length);
     fireEvent.click(screen.getByRole("option", { name: /A3/ }));
 
     await waitFor(() => expect(FILTER_CALLS).toContainEqual(["code", "in", '("A1","A3")']));
