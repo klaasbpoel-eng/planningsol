@@ -112,10 +112,20 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
     setCollapsedGroups((current) => (current.includes(label) ? current.filter((l) => l !== label) : [...current, label]));
 
   const stripeClass = (parity: 0 | 1 | null) =>
-    parity === null ? "" : `border-l-4 ${parity === 0 ? "border-l-primary" : "border-l-muted-foreground/30"}`;
+    parity === null ? "" : `border-l-4 ${parity === 0 ? "border-l-primary" : "border-l-accent"}`;
+
+  // Each time group gets its own tint so neighbours are easy to tell apart.
+  const rowTint = (parity: 0 | 1 | null) =>
+    parity === 0 ? "bg-primary/20 hover:bg-primary/30" : parity === 1 ? "bg-accent/20 hover:bg-accent/30" : "";
+
+  const headerTint = (parity: 0 | 1 | null) =>
+    parity === 0 ? "bg-primary/10 hover:bg-primary/10" : parity === 1 ? "bg-accent/10 hover:bg-accent/10" : "bg-muted/50 hover:bg-muted/50";
+
+  const swatchClass = (parity: 0 | 1 | null) =>
+    parity === 0 ? "bg-primary" : parity === 1 ? "bg-accent" : "bg-muted-foreground/40";
 
   const renderRow = (row: DataRow, index: number, parity: 0 | 1 | null) => (
-    <TableRow key={String(row.id ?? index)} className={`${parity === 0 ? "bg-primary/15 hover:bg-primary/20" : ""} ${loading ? "opacity-60" : ""}`}>
+    <TableRow key={String(row.id ?? index)} className={`${rowTint(parity)} ${loading ? "opacity-60" : ""}`}>
       {visibleColumns.map((col, colIndex) => (
         <TableCell
           key={col.key}
@@ -133,7 +143,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
     const open = !collapsed.has(group.label);
     const count = group.indexes.length;
     return (
-      <TableRow key={`groep-${group.label}-${group.indexes[0]}`} className="bg-muted/50 hover:bg-muted/50">
+      <TableRow key={`groep-${group.label}-${group.indexes[0]}`} className={headerTint(group.parity)}>
         <TableCell colSpan={Math.max(visibleColumns.length, 1)} className={`p-0 ${stripeClass(group.parity)}`}>
           <button
             type="button"
@@ -143,6 +153,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
             className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
           >
             <ChevronRight className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
+            <span className={`h-2.5 w-2.5 shrink-0 rounded-[2px] ${swatchClass(group.parity)}`} aria-hidden="true" />
             <span className="whitespace-nowrap">{group.empty ? "Zonder tijdstip" : group.label}</span>
             <span className="whitespace-nowrap text-muted-foreground/70">
               {count.toLocaleString("nl-NL")} {count === 1 ? "regel" : "regels"}
