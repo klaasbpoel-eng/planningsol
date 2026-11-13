@@ -188,6 +188,8 @@ describe("filteren op kolom op de Ramses-correctiespagina", () => {
     fireEvent.click(await screen.findByRole("option", { name: /A1/ }));
     fireEvent.click(screen.getByRole("option", { name: /A3/ }));
 
+    await waitFor(() => expect(FILTER_CALLS).toContainEqual(["code", "in", '("A1","A3")']));
+
     expect(screen.getByRole("button", { name: "2 waarden gekozen" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Vinkjes wissen" }));
