@@ -1,7 +1,7 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import Index from "./pages/Index";
@@ -13,7 +13,7 @@ import ToolboxPage from "./pages/ToolboxPage";
 import DashboardPage from "./pages/DashboardPage";
 import { BarcodeGenerator } from "@/components/barcode/BarcodeGenerator";
 import VrijgavesPage from "./pages/VrijgavesPage";
-import DailyOverviewPage from "./pages/DailyOverviewPage";
+import SafetyStoragePage from "./pages/SafetyStoragePage";
 import { CommandPalette } from "@/components/command-palette";
 import SqlSyncTasksPage from "./pages/SqlSyncTasksPage";
 import AdminPage from "./pages/AdminPage";
@@ -37,7 +37,8 @@ const App = () => (
               <Route path="/toolbox" element={<ToolboxPage />} />
               <Route path="/barcode" element={<BarcodeGenerator />} />
               <Route path="/vrijgaves" element={<VrijgavesPage />} />
-              <Route path="/dagoverzicht" element={<DailyOverviewPage />} />
+              <Route path="/dagoverzicht" element={<Navigate to="/" replace />} />
+              <Route path="/pgs-register" element={<SafetyStoragePage />} />
               <Route path="/sync-instellingen" element={<SqlSyncTasksPage />} />
               <Route path="/admin" element={<AdminPage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

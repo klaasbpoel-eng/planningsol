@@ -10,7 +10,6 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import {
-  Home,
   LogOut,
   Moon,
   Sun,
@@ -18,6 +17,8 @@ import {
   Snowflake,
   Cylinder,
   BarChart3,
+  CalendarClock,
+  FlaskConical,
   Plus,
   History,
 } from "lucide-react";
@@ -25,7 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { useUserRole } from "@/hooks/useUserRole";
-import { NAVIGATION_ITEMS } from "@/config/navigation";
+import { HOME_ITEM, NAVIGATION_ITEMS, getNavigationGroups } from "@/config/navigation";
 import { OPEN_COMMAND_PALETTE_EVENT } from "@/lib/command-palette";
 
 const RECENT_KEY = "command-palette-recent";
@@ -50,22 +51,19 @@ function addRecentAction(action: RecentAction) {
   localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, MAX_RECENT)));
 }
 
-// All navigable items with keywords for fuzzy search
-const NAV_ITEMS = [
-  { id: "dashboard", label: "Start", path: "/", icon: Home, keywords: ["home", "start", "overzicht"] },
-  ...NAVIGATION_ITEMS,
-];
 
 const QUICK_ACTIONS = [
   { id: "qa-verlof", label: "Verlof aanvragen", path: "/verlof", icon: Plus, iconClass: "text-warning", keywords: ["vrij", "vakantie", "aanvragen"] },
   { id: "qa-bestelling", label: "Nieuwe interne bestelling", path: "/interne-bestellingen", icon: Plus, iconClass: "text-success", keywords: ["order", "nieuw", "bestelling"] },
-  { id: "qa-productie", label: "Nieuwe productieorder", path: "/productie", icon: Plus, iconClass: "text-primary", keywords: ["prod", "nieuw", "order"] },
+  { id: "qa-productie", label: "Nieuwe droogijsorder", path: "/productie?tab=droogijs", icon: Plus, iconClass: "text-primary", keywords: ["prod", "nieuw", "order"] },
 ];
 
 const PRODUCTION_ITEMS = [
-  { id: "droogijs", label: "Droogijs Planning", path: "/productie", icon: Snowflake, iconClass: "text-cyan-500", keywords: ["dry ice", "ijs", "co2", "koud"] },
-  { id: "gascilinder", label: "Gascilinder Planning", path: "/productie", icon: Cylinder, iconClass: "text-blue-500", keywords: ["gas", "fles", "cilinder", "vullen"] },
-  { id: "rapportages", label: "Rapportages", path: "/productie", icon: BarChart3, iconClass: "text-primary", keywords: ["rapport", "report", "grafiek", "chart", "statistiek"] },
+  { id: "gascilinder", label: "Gascilinders", path: "/productie?tab=gascilinders", icon: Cylinder, iconClass: "text-blue-500", keywords: ["gas", "fles", "cilinder"] },
+  { id: "droogijs", label: "Droogijs", path: "/productie?tab=droogijs", icon: Snowflake, iconClass: "text-cyan-500", keywords: ["dry ice", "ijs", "co2", "koud"] },
+  { id: "vulplanning", label: "Vulplanning", path: "/productie?tab=vulplanning", icon: CalendarClock, iconClass: "text-primary", keywords: ["vullen", "planning", "vulling"] },
+  { id: "rapportages", label: "Rapportage", path: "/productie?tab=rapportage", icon: BarChart3, iconClass: "text-primary", keywords: ["rapport", "report", "grafiek", "chart", "statistiek"] },
+  { id: "recepten", label: "Recepten", path: "/productie?tab=recepten", icon: FlaskConical, iconClass: "text-primary", keywords: ["mengsel", "recept", "gasmengsel"] },
 ];
 
 export function CommandPalette() {
@@ -119,7 +117,8 @@ export function CommandPalette() {
   };
 
   // Build a lookup for rendering recent items
-  const allItems = [...QUICK_ACTIONS, ...NAV_ITEMS, ...PRODUCTION_ITEMS];
+  const allItems = [...QUICK_ACTIONS, ...NAVIGATION_ITEMS, ...PRODUCTION_ITEMS];
+  const navigationGroups = getNavigationGroups(isAdmin);
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
@@ -168,30 +167,32 @@ export function CommandPalette() {
 
         <CommandSeparator />
 
-        <CommandGroup heading="Navigatie">
-          {NAV_ITEMS.map((item) => (
-            <CommandItem
-              key={item.id}
-              onSelect={() => runCommand(() => navigate(item.path), { id: item.id, label: item.label })}
-              className="gap-2"
-              keywords={item.keywords}
-            >
-              <item.icon className="h-4 w-4" />
-              <span>{item.label}</span>
-            </CommandItem>
-          ))}
-          {isAdmin && (
-            <CommandItem
-              key="admin-settings"
-              onSelect={() => runCommand(() => navigate("/admin?tab=settings"), { id: "admin-settings", label: "Instellingen" })}
-              className="gap-2"
-              keywords={["settings", "instellingen", "beheer", "admin", "configuratie"]}
-            >
-              <Settings className="h-4 w-4" />
-              <span>Instellingen</span>
-            </CommandItem>
-          )}
+        <CommandGroup heading="Start">
+          <CommandItem
+            onSelect={() => runCommand(() => navigate(HOME_ITEM.path), { id: HOME_ITEM.id, label: HOME_ITEM.label })}
+            className="gap-2"
+            keywords={HOME_ITEM.keywords}
+          >
+            <HOME_ITEM.icon className="h-4 w-4" />
+            <span>{HOME_ITEM.label}</span>
+          </CommandItem>
         </CommandGroup>
+
+        {navigationGroups.map((group) => (
+          <CommandGroup key={group.id} heading={group.label}>
+            {group.items.map((item) => (
+              <CommandItem
+                key={item.id}
+                onSelect={() => runCommand(() => navigate(item.path), { id: item.id, label: item.label })}
+                className="gap-2"
+                keywords={[...item.keywords, group.label.toLowerCase()]}
+              >
+                <item.icon className="h-4 w-4" />
+                <span>{item.label}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ))}
 
         <CommandSeparator />
 

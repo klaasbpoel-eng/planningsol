@@ -101,7 +101,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
 
   if (loading) {
     return (
-      <PageLayout userEmail={userEmail} role={role} title="Verlof & Aanvragen" description="Beheer uw verlofaanvragen en bekijk uw saldo" titleIcon={<Clock className="h-7 w-7" />}>
+      <PageLayout userEmail={userEmail} role={role} title="Verlof" description="Beheer uw verlofaanvragen en bekijk uw saldo" titleIcon={<Clock className="h-7 w-7" />}>
         {/* Role buttons skeleton */}
         <div className="flex flex-wrap gap-3 mb-6">
           <div className="h-10 w-44 rounded-md bg-muted animate-pulse" />
@@ -125,7 +125,7 @@ export function Dashboard({ userEmail, isAdmin, onSwitchToAdmin, permissions, ro
   }
 
   return (
-    <PageLayout userEmail={userEmail} role={role} title="Verlof & Aanvragen" description="Beheer uw verlofaanvragen en bekijk uw saldo" titleIcon={<Clock className="h-7 w-7" />}>
+    <PageLayout userEmail={userEmail} role={role} title="Verlof" description="Beheer uw verlofaanvragen en bekijk uw saldo" titleIcon={<Clock className="h-7 w-7" />}>
       <FadeIn show={!loading}>
 
           {/* Quick navigation */}

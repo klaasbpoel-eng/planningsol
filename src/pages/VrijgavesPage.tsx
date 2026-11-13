@@ -187,7 +187,7 @@ const VrijgavesPage = () => {
 
     return (
         <div className="container mx-auto py-8 max-w-2xl px-4">
-            <h1 className="text-3xl font-bold mb-8 text-primary">Vrijgaves Genereren</h1>
+            <h1 className="text-3xl font-bold mb-8 text-primary">Vrijgaves</h1>
 
             <Card>
                 <CardHeader>

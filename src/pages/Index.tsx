@@ -70,8 +70,8 @@ const Index = () => {
         role={role}
         isAdmin={isAdmin}
         onSwitchView={() => navigate("/admin")}
-        title="Dagelijks Overzicht"
-        description="Bekijk alle taken, orders en verlof per dag of week."
+        title="Vandaag"
+        description="Alle taken, orders en verlof per dag of week."
         titleIcon={<CalendarDays className="h-8 w-8" />}
       >
         <DailyOverview />

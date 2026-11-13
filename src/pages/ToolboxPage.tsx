@@ -157,7 +157,7 @@ const ToolboxPage = () => {
     <PageLayout
       userEmail={session?.user?.email}
       role={role}
-      title="Toolbox Meetingen"
+      title="Toolbox"
       description="Training en instructies voor operators en medewerkers."
     >
       {canManage && (

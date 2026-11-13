@@ -74,7 +74,7 @@ export function UserLaunchpad({ userEmail, isAdmin, permissions, role, onSwitchT
             title: "Dagelijks Overzicht",
             description: "Bekijk alle taken, orders en verlof per dag",
             icon: <CalendarDays className="h-8 w-8 text-primary" />,
-            path: "/dagoverzicht",
+            path: "/",
             enabled: true,
             color: "bg-primary/10 hover:bg-primary/20",
             stat: stats.pendingTasks > 0 ? `${stats.pendingTasks} openstaande taken` : undefined,

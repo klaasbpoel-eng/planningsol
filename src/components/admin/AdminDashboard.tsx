@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Header } from "@/components/layout/Header";
 import { AdminRequestsPage } from "@/components/admin/pages/AdminRequestsPage";
 import { TeamCalendar } from "@/components/admin/TeamCalendar";
+import { UserApprovalManagement } from "./UserApprovalManagement";
 import { EmployeeList } from "@/components/admin/EmployeeList";
 import { TaskList } from "@/components/admin/TaskList";
 import { FilterState } from "@/components/admin/AdminFilters";
@@ -201,7 +202,7 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
             {activeTab === 'logbook' && (
               <div className="animate-fade-in space-y-6">
                 <div className="flex flex-col gap-2 mb-6">
-                  <h2 className="text-2xl font-bold tracking-tight">Toolbox Logboek</h2>
+                  <h2 className="text-2xl font-bold tracking-tight">Toolbox-logboek</h2>
                   <p className="text-muted-foreground">Overzicht van voltooide toolboxen.</p>
                 </div>
                 <ToolboxLogbook />
@@ -212,9 +213,14 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
               <div className="animate-fade-in space-y-6">
                 <div className="flex flex-col gap-2 mb-6">
                   <h2 className="text-2xl font-bold tracking-tight">Medewerkers</h2>
-                  <p className="text-muted-foreground">Beheer profielen en gegevens.</p>
+                  <p className="text-muted-foreground">Beheer profielen, toegang en nieuwe aanmeldingen.</p>
                 </div>
                 <EmployeeList />
+                <div className="space-y-2 pt-4 border-t">
+                  <h3 className="text-lg font-medium">Nieuwe aanmeldingen</h3>
+                  <p className="text-sm text-muted-foreground">Keur nieuwe accountaanvragen goed of wijs ze af.</p>
+                  <UserApprovalManagement />
+                </div>
               </div>
             )}
 
