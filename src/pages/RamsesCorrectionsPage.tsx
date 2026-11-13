@@ -108,6 +108,51 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
     });
   };
 
+  const toggleGroup = (label: string) =>
+    setCollapsedGroups((current) => (current.includes(label) ? current.filter((l) => l !== label) : [...current, label]));
+
+  const stripeClass = (parity: 0 | 1 | null) =>
+    parity === null ? "" : `border-l-4 ${parity === 0 ? "border-l-primary" : "border-l-muted-foreground/30"}`;
+
+  const renderRow = (row: DataRow, index: number, parity: 0 | 1 | null) => (
+    <TableRow key={String(row.id ?? index)} className={`${parity === 0 ? "bg-primary/15 hover:bg-primary/20" : ""} ${loading ? "opacity-60" : ""}`}>
+      {visibleColumns.map((col, colIndex) => (
+        <TableCell
+          key={col.key}
+          className={`whitespace-nowrap ${col.kind === "number" ? "text-right tabular-nums" : ""} ${
+            colIndex === 0 ? stripeClass(parity) : ""
+          }`}
+        >
+          {formatCellValue(row[col.key], col.kind)}
+        </TableCell>
+      ))}
+    </TableRow>
+  );
+
+  const renderGroupHeader = (group: TimestampGroup) => {
+    const open = !collapsed.has(group.label);
+    const count = group.indexes.length;
+    return (
+      <TableRow key={`groep-${group.label}-${group.indexes[0]}`} className="bg-muted/50 hover:bg-muted/50">
+        <TableCell colSpan={Math.max(visibleColumns.length, 1)} className={`p-0 ${stripeClass(group.parity)}`}>
+          <button
+            type="button"
+            onClick={() => toggleGroup(group.label)}
+            aria-expanded={open}
+            aria-label={`${open ? "Klap" : "Open"} tijdgroep ${group.empty ? "zonder tijdstip" : group.label}`}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            <ChevronRight className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
+            <span className="whitespace-nowrap">{group.empty ? "Zonder tijdstip" : group.label}</span>
+            <span className="whitespace-nowrap text-muted-foreground/70">
+              {count.toLocaleString("nl-NL")} {count === 1 ? "regel" : "regels"}
+            </span>
+          </button>
+        </TableCell>
+      </TableRow>
+    );
+  };
+
   const exportCsv = async () => {
     setExporting(true);
     try {
