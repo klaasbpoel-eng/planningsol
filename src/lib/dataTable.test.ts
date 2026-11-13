@@ -125,8 +125,8 @@ describe("groupRowsByTimestamp", () => {
     ];
     const groups = groupRowsByTimestamp(rows, "ts", (v) => formatCellValue(v, "date"));
     expect(groups.map((g) => [g.label, g.indexes])).toEqual([
-      ["03-11-2026 10:45", [0, 1]],
-      ["03-11-2026 11:51", [2]],
+      ["03-11-2026, 10:45", [0, 1]],
+      ["03-11-2026, 11:51", [2]],
     ]);
   });
   it("geeft regels zonder tijdstip één groep zonder kleur", () => {
