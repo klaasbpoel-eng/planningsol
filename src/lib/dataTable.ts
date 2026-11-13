@@ -62,14 +62,19 @@ export function findTimestampColumn(columns: DataColumn[]): string | null {
 /**
  * Parity (0/1) per row so rows sharing a timestamp get the same color and neighbouring groups alternate.
  * Alternation follows first appearance, so equal timestamps keep their color even when sorted apart.
- * Rows without a value get null (no group color).
+ * Rows without a value get null (no group color). `toGroupKey` lets callers group on the displayed value
+ * (e.g. to the minute), so rows that look identical on screen share a color even if seconds differ.
  */
-export function timestampGroupParity(rows: DataRow[], key: string): (0 | 1 | null)[] {
+export function timestampGroupParity(
+  rows: DataRow[],
+  key: string,
+  toGroupKey: (value: unknown) => string = (value) => String(value),
+): (0 | 1 | null)[] {
   const parityByValue = new Map<string, 0 | 1>();
   return rows.map((row) => {
     const value = row[key];
     if (value === null || value === undefined || value === "") return null;
-    const text = String(value);
+    const text = toGroupKey(value);
     let parity = parityByValue.get(text);
     if (parity === undefined) {
       parity = (parityByValue.size % 2) as 0 | 1;

@@ -86,7 +86,12 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
 
   const visibleColumns = useMemo(() => columns ?? deriveColumns(rows), [columns, rows]);
   const timestampKey = useMemo(() => findTimestampColumn(visibleColumns), [visibleColumns]);
-  const groupParities = useMemo(() => (timestampKey ? timestampGroupParity(rows, timestampKey) : null), [rows, timestampKey]);
+  const groupParities = useMemo(() => {
+    if (!timestampKey) return null;
+    const kind = visibleColumns.find((c) => c.key === timestampKey)?.kind ?? "text";
+    // Group on what the user sees (to the minute), not on hidden seconds.
+    return timestampGroupParity(rows, timestampKey, (value) => formatCellValue(value, kind));
+  }, [rows, timestampKey, visibleColumns]);
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const firstRow = total === 0 ? 0 : page * pageSize + 1;
   const lastRow = Math.min(total, (page + 1) * pageSize);
@@ -214,12 +219,16 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                     rows.map((row, i) => (
                       <TableRow
                         key={String(row.id ?? i)}
-                        className={`${groupParities?.[i] === 0 ? "bg-primary/5 hover:bg-primary/10" : ""} ${loading ? "opacity-60" : ""}`}
+                        className={`${groupParities?.[i] === 0 ? "bg-primary/15 hover:bg-primary/20" : ""} ${loading ? "opacity-60" : ""}`}
                       >
-                        {visibleColumns.map((col) => (
+                        {visibleColumns.map((col, colIndex) => (
                           <TableCell
                             key={col.key}
-                            className={`whitespace-nowrap ${col.kind === "number" ? "text-right tabular-nums" : ""}`}
+                            className={`whitespace-nowrap ${col.kind === "number" ? "text-right tabular-nums" : ""} ${
+                              colIndex === 0 && groupParities?.[i] != null
+                                ? `border-l-4 ${groupParities[i] === 0 ? "border-l-primary" : "border-l-muted-foreground/30"}`
+                                : ""
+                            }`}
                           >
                             {formatCellValue(row[col.key], col.kind)}
                           </TableCell>

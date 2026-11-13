@@ -83,4 +83,13 @@ describe("timestampGroupParity", () => {
   it("geeft lege waarden geen groepskleur", () => {
     expect(timestampGroupParity([{ ts: null }, { ts: "" }, { ts: "a" }], "ts")).toEqual([null, null, 0]);
   });
+
+  it("groups rows that show the same minute even when seconds differ", () => {
+    const rows = [
+      { ts: "2026-11-03T10:45:02" },
+      { ts: "2026-11-03T10:45:41" },
+      { ts: "2026-11-03T11:51:00" },
+    ];
+    expect(timestampGroupParity(rows, "ts", (v) => formatCellValue(v, "date"))).toEqual([0, 0, 1]);
+  });
 });
