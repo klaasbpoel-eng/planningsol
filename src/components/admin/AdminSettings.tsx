@@ -4,6 +4,7 @@ import { GasCylinderSettings } from "./GasCylinderSettings";
 import { DryIceSettings } from "./DryIceSettings";
 import { DefaultCustomerSetting } from "./DefaultCustomerSetting";
 import { CustomerManagement } from "../customers/CustomerManagement";
+import { useCurrentPermissions } from "@/hooks/useUserPermissions";
 import { DatabaseBackupRestore } from "./DatabaseBackupRestore";
 import { MigrationSettings } from "./MigrationSettings";
 import { DataSourceSettings } from "./DataSourceSettings";
@@ -14,6 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Factory, Calendar, Building2, Download, Server } from "lucide-react";
 
 export function AdminSettings() {
+  // Own roles can switch customer management off; the list itself stays readable.
+  const { permissions } = useCurrentPermissions();
   return (
     <div className="space-y-6">
       <div>
@@ -71,7 +74,7 @@ export function AdminSettings() {
         </TabsContent>
 
         <TabsContent value="customers" className="space-y-4 animate-fade-in-up">
-          <CustomerManagement isAdmin />
+          <CustomerManagement isAdmin={permissions.canManageCustomers} />
         </TabsContent>
 
         <TabsContent value="deployment" className="space-y-4 animate-fade-in-up">

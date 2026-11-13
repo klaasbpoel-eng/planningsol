@@ -10,6 +10,7 @@ import {
   removeRole,
   resolveCustomRole,
   roleDisplayName,
+  serializeCustomRoles,
   validateCustomRole,
   type CustomRole,
 } from "./customRoles";
@@ -79,5 +80,17 @@ describe("eigen rollen", () => {
     expect(
       parseCustomRoles(JSON.stringify([{ id: "a", name: "X", baseRole: "superuser" }, { ...planner, disabledPermissions: ["canCreateOrders", "onbekend"] }])),
     ).toEqual([{ ...planner, disabledPermissions: ["canCreateOrders"] }]);
+  });
+});
+
+describe("opslagformaat eigen rollen", () => {
+  it("houdt bij oude rollen het PGS-register uit als 'rapporten' uit stond", () => {
+    const [legacy] = parseCustomRoles(JSON.stringify([{ ...planner, disabledPermissions: ["canViewReports"] }]));
+    expect(legacy.disabledPermissions).toEqual(["canViewReports", "canViewPGSRegister"]);
+  });
+
+  it("houdt rapporten en PGS-register los na opnieuw opslaan", () => {
+    const [saved] = parseCustomRoles(serializeCustomRoles([{ ...planner, disabledPermissions: ["canViewReports"] }]));
+    expect(saved.disabledPermissions).toEqual(["canViewReports"]);
   });
 });

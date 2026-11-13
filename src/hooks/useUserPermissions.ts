@@ -19,6 +19,9 @@ export interface RolePermissions {
   // Time off
   canApproveTimeOff: boolean;
   canManageOwnTimeOff: boolean;
+
+  // Approving leave requests and PGS expansion requests
+  canApproveRequests: boolean;
   
   // Production orders
   canViewOrders: boolean;
@@ -32,6 +35,7 @@ export interface RolePermissions {
   
   // Reports & Dashboards
   canViewReports: boolean;
+  canViewPGSRegister: boolean;
   canViewKPIDashboard: boolean;
   canViewAdvancedWidgets: boolean;
   
@@ -48,6 +52,7 @@ const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
     canAccessSettings: true,
     canApproveTimeOff: true,
     canManageOwnTimeOff: true,
+    canApproveRequests: true,
     canViewOrders: true,
     canCreateOrders: true,
     canEditOrders: true,
@@ -55,6 +60,7 @@ const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
     canManageCustomers: true,
     canViewCustomers: true,
     canViewReports: true,
+    canViewPGSRegister: true,
     canViewKPIDashboard: true,
     canViewAdvancedWidgets: true,
     canViewCalendar: true,
@@ -67,6 +73,7 @@ const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
     canAccessSettings: false,
     canApproveTimeOff: false,
     canManageOwnTimeOff: true,
+    canApproveRequests: false,
     canViewOrders: true,
     canCreateOrders: true,
     canEditOrders: true,
@@ -74,6 +81,7 @@ const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
     canManageCustomers: true,
     canViewCustomers: true,
     canViewReports: true,
+    canViewPGSRegister: true,
     canViewKPIDashboard: true,
     canViewAdvancedWidgets: true,
     canViewCalendar: true,
@@ -86,13 +94,16 @@ const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
     canAccessSettings: false,
     canApproveTimeOff: false,
     canManageOwnTimeOff: true,
+    canApproveRequests: false,
     canViewOrders: true,
     canCreateOrders: true,
     canEditOrders: true,
     canDeleteOrders: true,
-    canManageCustomers: false,
+    // Operators add new customers from the order forms.
+    canManageCustomers: true,
     canViewCustomers: true,
     canViewReports: false,
+    canViewPGSRegister: false,
     canViewKPIDashboard: false,
     canViewAdvancedWidgets: false,
     canViewCalendar: true,
@@ -105,6 +116,7 @@ const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
     canAccessSettings: false,
     canApproveTimeOff: false,
     canManageOwnTimeOff: true,
+    canApproveRequests: false,
     canViewOrders: false,
     canCreateOrders: false,
     canEditOrders: false,
@@ -112,6 +124,7 @@ const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
     canManageCustomers: false,
     canViewCustomers: false,
     canViewReports: false,
+    canViewPGSRegister: false,
     canViewKPIDashboard: false,
     canViewAdvancedWidgets: false,
     canViewCalendar: true,
@@ -203,4 +216,21 @@ export function useUserPermissions(userId: string | undefined) {
 
 export function getPermissionsForRole(role: AppRole): RolePermissions {
   return ROLE_PERMISSIONS[role];
+}
+
+/** Rights of whoever is signed in, for components that do not get them from their page. */
+export function useCurrentPermissions() {
+  const [userId, setUserId] = useState<string | undefined>();
+  useEffect(() => {
+    let active = true;
+    Promise.resolve(supabase.auth?.getSession?.())
+      .then((result) => {
+        if (active) setUserId(result?.data?.session?.user?.id);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  return useUserPermissions(userId);
 }

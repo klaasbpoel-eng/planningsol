@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useCurrentPermissions } from "@/hooks/useUserPermissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +51,9 @@ interface CustomerSelectProps {
 
 export function CustomerSelect({ value, onValueChange, defaultCustomerName: propDefaultCustomer, location }: CustomerSelectProps) {
   const isMobile = useIsMobile();
+  // Own roles can take away adding customers; hidden until the rights are known.
+  const { permissions, loading: permissionsLoading } = useCurrentPermissions();
+  const canAddCustomer = !permissionsLoading && permissions.canManageCustomers;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -183,6 +187,7 @@ export function CustomerSelect({ value, onValueChange, defaultCustomerName: prop
               )}
             </CommandItem>
           ))}
+          {canAddCustomer && (
           <CommandItem
             value="nieuwe-klant-toevoegen"
             onSelect={() => {
@@ -194,6 +199,7 @@ export function CustomerSelect({ value, onValueChange, defaultCustomerName: prop
             <Plus className="mr-2 h-4 w-4" />
             <span>Nieuwe klant toevoegen</span>
           </CommandItem>
+          )}
         </CommandGroup>
       </CommandList>
     </Command>

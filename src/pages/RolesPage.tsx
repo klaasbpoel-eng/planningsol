@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
-import { KeyRound, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
+import { Copy, Database, Download, KeyRound, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { PageLayout } from "@/components/layout/PageLayout";
@@ -20,6 +20,7 @@ import {
   type RoleAssignments,
 } from "@/lib/customRoles";
 import { loadCustomRoleConfig, saveCustomRoles, saveRoleAssignments } from "@/lib/customRoleStore";
+import { buildOwnRoleRulesRemovalSql, buildOwnRoleRulesSql, describePermissionRule } from "@/lib/ownRoleDatabaseRules";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -51,7 +52,7 @@ interface Person {
   role: AppRole;
 }
 
-const TABS = ["rollen", "toewijzen"] as const;
+const TABS = ["rollen", "toewijzen", "database"] as const;
 
 const emptyDraft = (): CustomRole => ({
   id: "",
@@ -248,6 +249,7 @@ function RolesContent({ userId, userEmail, role }: { userId: string; userEmail?:
         <TabsList>
           <TabsTrigger value="rollen">Rollen</TabsTrigger>
           <TabsTrigger value="toewijzen">Toewijzen</TabsTrigger>
+          <TabsTrigger value="database">Databaseregels</TabsTrigger>
         </TabsList>
 
         {loadError && (
@@ -405,6 +407,9 @@ function RolesContent({ userId, userEmail, role }: { userId: string; userEmail?:
             </CardContent>
           </Card>
         </TabsContent>
+        <TabsContent value="database" className="mt-4">
+          <DatabaseRulesCard />
+        </TabsContent>
       </Tabs>
 
       <Dialog open={!!draft} onOpenChange={(open) => !open && setDraft(null)}>
@@ -482,6 +487,11 @@ function RolesContent({ userId, userEmail, role }: { userId: string; userEmail?:
                         <p className="text-xs text-muted-foreground">
                           {possible ? perm.description : `Niet mogelijk met de standaardrol ${STANDARD_ROLE_LABELS[draft.baseRole]}.`}
                         </p>
+                        {possible && (
+                          <p className="text-xs text-muted-foreground/80">
+                            {describePermissionRule(perm.key).inDatabase ? "Ook geblokkeerd in de database (met de databaseregels)." : "Alleen in de app."}
+                          </p>
+                        )}
                       </div>
                       <Switch
                         id={`recht-${perm.key}`}
@@ -551,5 +561,88 @@ function RolesContent({ userId, userEmail, role }: { userId: string; userEmail?:
         </AlertDialogContent>
       </AlertDialog>
     </PageLayout>
+  );
+}
+
+function downloadText(fileName: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function DatabaseRulesCard() {
+  const sql = useMemo(() => buildOwnRoleRulesSql(), []);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(sql);
+      toast.success("Databaseregels gekopieerd");
+    } catch {
+      toast.error("Kopiëren lukte niet; gebruik Downloaden.");
+    }
+  };
+
+  return (
+    <Card className="glass-card">
+      <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between sm:space-y-0">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            Databaseregels voor eigen rollen
+          </CardTitle>
+          <CardDescription>
+            Voer deze regels één keer uit in de SQL-editor van de database. Daarna weigert de database wat een eigen rol niet
+            mag, ook buiten de app om. Rollen die je later maakt of wijzigt gelden direct; opnieuw uitvoeren is alleen nodig na
+            een update van deze pagina.
+          </CardDescription>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={copy}>
+            <Copy className="mr-1.5 h-3.5 w-3.5" />
+            Kopiëren
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => downloadText("eigen-rollen-databaseregels.sql", sql)}>
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            Downloaden
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <ul className="space-y-2">
+          {CONFIGURABLE_PERMISSIONS.map((perm) => {
+            const rule = describePermissionRule(perm.key);
+            return (
+              <li key={perm.key} className="flex flex-col gap-1 rounded-md border p-2.5 sm:flex-row sm:items-center sm:justify-between">
+                <span className="font-medium">{perm.label}</span>
+                <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Badge variant={rule.inDatabase ? "default" : "outline"}>{rule.inDatabase ? "Database" : "Alleen app"}</Badge>
+                  <span>{rule.text}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        <pre
+          aria-label="SQL voor de databaseregels"
+          className="max-h-96 overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-xs leading-relaxed select-text"
+        >
+          {sql}
+        </pre>
+        <p className="text-xs text-muted-foreground">
+          Wil je de regels weer weghalen?{" "}
+          <button
+            type="button"
+            className="underline underline-offset-2 hover:text-foreground"
+            onClick={() => downloadText("eigen-rollen-databaseregels-verwijderen.sql", buildOwnRoleRulesRemovalSql())}
+          >
+            Download de SQL om ze te verwijderen
+          </button>
+          .
+        </p>
+      </CardContent>
+    </Card>
   );
 }

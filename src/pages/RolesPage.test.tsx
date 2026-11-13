@@ -90,6 +90,28 @@ const openPage = (tab = "rollen") =>
   );
 
 describe("pagina Rollen", () => {
+  it("laat klanten beheren uitzetten op een operator-rol, maar goedkeuren en rapporten niet aanzetten", async () => {
+    STORE.saveCustomRoles.mockClear();
+    openPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Nieuwe rol" }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("switch", { name: "Aanvragen goedkeuren" })).toBeDisabled();
+    expect(within(dialog).getByRole("switch", { name: "Rapporten bekijken" })).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText("Naam"), { target: { value: "Inpakker" } });
+    fireEvent.click(within(dialog).getByRole("switch", { name: "Klanten beheren" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Opslaan" }));
+
+    await waitFor(() => expect(STORE.saveCustomRoles).toHaveBeenCalled());
+    const [saved] = STORE.saveCustomRoles.mock.calls.at(-1)!;
+    expect(saved).toEqual([expect.objectContaining({ name: "Inpakker", disabledPermissions: ["canManageCustomers"] })]);
+  });
+
+  it("toont de databaseregels om te kopiëren", async () => {
+    openPage("database");
+    expect(await screen.findByLabelText("SQL voor de databaseregels")).toHaveTextContent("create or replace function public.own_role_allows");
+    expect(screen.getByRole("button", { name: "Kopiëren" })).toBeInTheDocument();
+  });
+
   it("maakt een eigen rol met een uitgezet recht en een verborgen menu-onderdeel", async () => {
     openPage();
     fireEvent.click(await screen.findByRole("button", { name: "Nieuwe rol" }));

@@ -11,3 +11,5 @@
 - [x] Op de Ramses-correctiespagina kunnen filteren per kolom.- [x] Op de Ramses-correctiespagina waarden van een kolom kunnen aanvinken in plaats van typen.
 - [x] Ramses-correcties: zoeken in gewone taal, Lovable AI zet de vraag om in filters.
 - [x] Pagina Rollen: eigen rollen maken, bewerken en per persoon toewijzen.
+- [x] Rollen: extra rechten (rapporten bekijken, aanvragen/correcties goedkeuren, klanten beheren) en echt toegepast in de schermen.
+- [x] Rollen: databaseregels (SQL) leveren zodat eigen rollen ook in de echte database beperkt blijven.

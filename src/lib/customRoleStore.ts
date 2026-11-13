@@ -5,6 +5,7 @@ import {
   CUSTOM_ROLES_KEY,
   parseAssignments,
   parseCustomRoles,
+  serializeCustomRoles,
   type CustomRole,
   type RoleAssignments,
 } from "@/lib/customRoles";
@@ -32,7 +33,7 @@ export function loadCustomRoleConfig(force = false): Promise<CustomRoleConfig> {
 }
 
 export async function saveCustomRoles(roles: CustomRole[]) {
-  await api.appSettings.upsert(CUSTOM_ROLES_KEY, JSON.stringify(roles), "Eigen rollen (gemaakt op de pagina Rollen)");
+  await api.appSettings.upsert(CUSTOM_ROLES_KEY, serializeCustomRoles(roles), "Eigen rollen (gemaakt op de pagina Rollen)");
   notifyChanged();
 }
 

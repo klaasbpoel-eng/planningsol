@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { RequestFormDialog } from "./RequestFormDialog";
+import { useCurrentPermissions } from "@/hooks/useUserPermissions";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import type { Database } from "@/integrations/supabase/types";
@@ -43,6 +44,9 @@ interface AdminRequestListProps {
 }
 
 export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) {
+  // Own roles can switch approving off; the buttons only show once the rights are known.
+  const { permissions, loading: permissionsLoading } = useCurrentPermissions();
+  const canApprove = !permissionsLoading && permissions.canApproveRequests;
   const [updating, setUpdating] = useState<string | null>(null);
   const [employees, setEmployees] = useState<Profile[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<RequestWithProfile | null>(null);
@@ -259,6 +263,8 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                     </div>
                     
                     <div className="flex items-center gap-2">
+                      {canApprove && (
+                      <>
                       <Button
                         size="sm"
                         className="bg-success hover:bg-success/90 text-success-foreground"
@@ -290,6 +296,8 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                           </>
                         )}
                       </Button>
+                      </>
+                      )}
                       <RequestActions request={request} />
                     </div>
                   </div>
