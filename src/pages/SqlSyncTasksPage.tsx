@@ -15,12 +15,23 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
-// App layout wrapping
-// App layout wrapping
+import { Navigate } from "react-router-dom";
 import { PageLayout } from "@/components/layout/PageLayout";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import type { AppRole } from "@/hooks/useUserPermissions";
 import { SqlSyncTaskForm, SqlSyncTask } from "@/components/admin/SqlSyncTaskForm";
 
 export default function SqlSyncTasksPage() {
+    return (
+        <ProtectedRoute>
+            {({ user, role, isAdmin }) =>
+                isAdmin ? <SqlSyncTasksContent userEmail={user.email} role={role} /> : <Navigate to="/" replace />
+            }
+        </ProtectedRoute>
+    );
+}
+
+function SqlSyncTasksContent({ userEmail, role }: { userEmail?: string; role: AppRole }) {
     const [tasks, setTasks] = useState<SqlSyncTask[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -103,8 +114,11 @@ export default function SqlSyncTasksPage() {
 
     return (
         <PageLayout
-            title="SQL Data Sync Settings"
-            description="Beheer de synchronisatie instellingen tussen je lokale MS SQL Server en Supabase."
+            userEmail={userEmail}
+            role={role}
+            isAdmin
+            title="Synchronisatie"
+            description="Beheer de synchronisatie tussen de lokale MS SQL Server en de database."
             titleIcon={<Database className="h-6 w-6 text-primary" />}
         >
             <div className="flex w-full">
