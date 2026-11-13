@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock, ShieldAlert, Truck, FlaskConical, ChevronUp, ChevronDown, CalendarClock } from "lucide-react";
+import { Snowflake, Cylinder, Package, BarChart3, MapPin, Lock, Truck, FlaskConical, ChevronUp, ChevronDown, CalendarClock } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { MOVED_PRODUCTION_TABS } from "@/config/navigation";
 import { StatCard } from "@/components/ui/stat-card";
 import { TopCustomersWidget } from "./TopCustomersWidget";
 import { KPIDashboard } from "./KPIDashboard";
@@ -13,8 +15,6 @@ const GasCylinderPlanning = lazy(() => import("./GasCylinderPlanning").then(m =>
 const ProductionReports = lazy(() => import("./ProductionReports").then(m => ({ default: m.ProductionReports })));
 const DryIcePlanning = lazy(() => import("./DryIcePlanning").then(m => ({ default: m.DryIcePlanning })));
 const GasMixtureRecipemaker = lazy(() => import("./GasMixtureRecipemaker"));
-const SiteMap = lazy(() => import("./SiteMap").then(m => ({ default: m.SiteMap })));
-const PGSRegistry = lazy(() => import("./PGSRegistry").then(m => ({ default: m.PGSRegistry })));
 const FillPlanning = lazy(() => import("./FillPlanning").then(m => ({ default: m.FillPlanning })));
 
 
@@ -62,7 +62,17 @@ export function ProductionPlanning({
   canViewAllLocations = true,
   permissions
 }: ProductionPlanningProps) {
-  const [activeTab, setActiveTab] = useState("gascilinders");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTabState] = useState(() => searchParams.get("tab") || "gascilinders");
+  const setActiveTab = useCallback((tab: string) => {
+    setActiveTabState(tab);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", tab);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
   const [dryIceToday, setDryIceToday] = useState(0);
   const [cylindersToday, setCylindersToday] = useState(0);
   const [weekOrders, setWeekOrders] = useState(0);
@@ -299,9 +309,21 @@ export function ProductionPlanning({
     { value: "vulplanning", label: "Vulplanning", visible: showAdvancedTabs },
     { value: "rapportage", label: "Rapportage", visible: showAdvancedTabs },
     { value: "recepten", label: "Recepten", visible: showRecipemaker },
-    { value: "plattegrond", label: "Plattegrond", visible: true },
-    { value: "pgs-register", label: "PGS Register", visible: showAdvancedTabs },
   ].filter(section => section.visible);
+
+  // Keep the active tab in sync with the address bar so search results and bookmarks open the right tab.
+  const urlTab = searchParams.get("tab");
+  useEffect(() => {
+    if (!urlTab) return;
+    if (MOVED_PRODUCTION_TABS[urlTab]) {
+      navigate(MOVED_PRODUCTION_TABS[urlTab], { replace: true });
+      return;
+    }
+    const allowed = productionSections.some(section => section.value === urlTab);
+    const nextTab = allowed ? urlTab : "gascilinders";
+    if (nextTab !== activeTab) setActiveTabState(nextTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlTab, showAdvancedTabs, showRecipemaker]);
 
   return (
     <div className="space-y-6">
@@ -625,24 +647,6 @@ export function ProductionPlanning({
               <span className="sm:hidden">Recept</span>
             </TabsTrigger>
           )}
-          <TabsTrigger
-            value="plattegrond"
-            className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
-          >
-            <MapPin className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden sm:inline">Plattegrond</span>
-            <span className="sm:hidden">Kaart</span>
-          </TabsTrigger>
-          {showAdvancedTabs && (
-            <TabsTrigger
-              value="pgs-register"
-              className="data-[state=active]:bg-red-500 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
-            >
-              <ShieldAlert className="h-4 w-4 flex-shrink-0" />
-              <span className="hidden sm:inline">PGS Register</span>
-              <span className="sm:hidden">PGS</span>
-            </TabsTrigger>
-          )}
         </TabsList>
 
 
@@ -698,23 +702,6 @@ export function ProductionPlanning({
           <TabsContent value="recepten" className="mt-6">
             <Suspense fallback={<TabLoadingFallback />}>
               <GasMixtureRecipemaker />
-            </Suspense>
-          </TabsContent>
-        )}
-
-        <TabsContent value="plattegrond" className="mt-6">
-          <Suspense fallback={<TabLoadingFallback />}>
-            <SiteMap location={selectedLocation} />
-          </Suspense>
-        </TabsContent>
-
-        {showAdvancedTabs && (
-          <TabsContent value="pgs-register" className="mt-6">
-            <Suspense fallback={<TabLoadingFallback />}>
-              <PGSRegistry
-                location={selectedLocation}
-                isAdmin={showRecipemaker}
-              />
             </Suspense>
           </TabsContent>
         )}
