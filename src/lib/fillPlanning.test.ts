@@ -192,4 +192,28 @@ describe("fillPlanning calculation engine", () => {
     expect(cylOnly.fillPlanByDay[0].items).toHaveLength(1);
     expect(cylOnly.fillPlanByDay[0].totalSuggestedFill).toBe(10);
   });
+
+  it("excludes discontinued Zuurstof aluminium integrated 200 Bar product", () => {
+    const oldProduct = makeInput({
+      product: "Zuurstof Medicinaal Gasv. SOL in Cylinders aluminium integrated",
+      packageType: "Cylinders aluminium integrated 200 Bar",
+      startStock: 0,
+    });
+    const activeProduct = makeInput({
+      product: "Zuurstof Medicinaal Gasv. SOL in Cylinders Active Integrated Alu.",
+      packageType: "Cylinders Active Integrated Alu 200 Bar.",
+      startStock: 0,
+    });
+
+    const plan = computeFillPlan([oldProduct, activeProduct], {
+      horizonDays: 5,
+      safetyBuffer: 0,
+      safetyBufferMode: "units",
+      method: "customer_interval",
+      today: BASE_TODAY,
+    });
+
+    expect(plan.fillPlan).toHaveLength(1);
+    expect(plan.fillPlan[0].product).toBe("Zuurstof Medicinaal Gasv. SOL in Cylinders Active Integrated Alu.");
+  });
 });

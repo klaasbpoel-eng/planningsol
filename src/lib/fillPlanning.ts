@@ -84,6 +84,29 @@ export interface FillPlanResult {
   fillPlanByDay: FillPlanDay[];
 }
 
+// Verouderde/uitgefaseerde producten of verpakkingstypes die niet in de vulplanning getoond hoeven te worden
+export const EXCLUDED_FILL_PLAN_PRODUCTS: { product?: string; packageType?: string }[] = [
+  {
+    product: "zuurstof medicinaal gasv. sol in cylinders aluminium integrated",
+  },
+  {
+    packageType: "cylinders aluminium integrated 200 bar",
+  },
+];
+
+export function isExcludedFillPlanProduct(product: string, packageType?: string): boolean {
+  const prodLower = (product || "").trim().toLowerCase();
+  const pkgLower = (packageType || "").trim().toLowerCase();
+  return EXCLUDED_FILL_PLAN_PRODUCTS.some((rule) => {
+    if (rule.product && rule.packageType) {
+      return prodLower === rule.product && pkgLower === rule.packageType;
+    }
+    if (rule.product) return prodLower === rule.product;
+    if (rule.packageType) return pkgLower === rule.packageType;
+    return false;
+  });
+}
+
 export function computeMedian(values: number[]): number {
   if (values.length === 0) return 1;
   const sorted = [...values].sort((a, b) => a - b);
@@ -145,6 +168,7 @@ export function computeFillPlan(
 
   for (const input of inputs) {
     if (!input.product || !input.location || input.product === "Onbekend") continue;
+    if (isExcludedFillPlanProduct(input.product, input.packageType)) continue;
 
     // 1. Customer-interval demand per day
     const customerDemand = new Array<number>(horizonDays).fill(0);
