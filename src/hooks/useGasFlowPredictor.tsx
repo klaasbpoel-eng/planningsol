@@ -172,15 +172,22 @@ export function useGasFlowPredictor() {
       const in10Days = addDays(today, 10);
       // Only consider deliveries from the last 12 months for predictions
       const cutoff = addDays(today, -365);
-      // Last 12 weeks (84 days) for weekday baseline demand
+      // Last 12 weeks (84 days) for weekday baseline demand & EWMA buckets
       const cutoff12w = addDays(today, -84);
+      // Last-year seasonal comparison windows (same 4-week window last year vs preceding 12 weeks last year)
+      const lyTargetStart = addDays(today, -365);
+      const lyTargetEnd = addDays(today, -337);
+      const lyBaseStart = addDays(today, -449);
+      const lyBaseEnd = addDays(today, -366);
       // Track latest delivery date per product-location-cap (for dead stock detection)
       const lastDeliveryPerPKey = new Map<string, Date>();
-      // Track 12-week weekday totals [Ma, Di, Wo, Do, Vr] and package metadata per pKey
+      // Track 12-week weekday totals, 12 weekly buckets per weekday, YoY seasonal counts, and package metadata per fKey
       const weekdayTotals12wMap = new Map<string, number[]>();
-      const productMetaMap = new Map<string, { isBundle: boolean; packSize: number }>();
+      const weekdayBuckets12wMap = new Map<string, number[][]>();
+      const lySeasonalMap = new Map<string, { target4w: number; base12w: number }>();
+      const productMetaMap = new Map<string, { isBundle: boolean; packSize: number; displayCapacityLiters: number }>();
 
-      const detectBundle = (rawCap: number, product: string, containerType?: any): { isBundle: boolean; packSize: number } => {
+      const detectBundle = (rawCap: number, product: string, containerType?: any): { isBundle: boolean; packSize: number; displayCapacityLiters: number } => {
         const pkg = packageMap.get(rawCap);
         const typeStr = safeStr(containerType, '').toLowerCase();
         const prodLower = product.toLowerCase();
@@ -191,7 +198,9 @@ export function useGasFlowPredictor() {
           typeStr.includes('pakket') ||
           prodLower.includes('bundle') ||
           prodLower.includes('bundel');
-        return { isBundle, packSize: pkg ? pkg.mult : 1 };
+        const packSize = pkg ? pkg.mult : 1;
+        const displayCapacityLiters = isBundle ? (rawCap >= 200 ? rawCap : 800) : rawCap;
+        return { isBundle, packSize, displayCapacityLiters };
       };
       // Churn risk: customers with regular history but gone silent
       const churnRiskMap = new Map<string, ChurnRisk>();
@@ -293,8 +302,8 @@ export function useGasFlowPredictor() {
           productMetaMap.set(fKey, bundleInfo);
         }
 
-        // Accumulate 12-week weekday totals [Ma..Vr] (captures ALL customers, including sporadic/one-off orders)
-        if (parsedDate >= cutoff12w && aantal > 0) {
+        // Accumulate 12-week weekday totals & per-week buckets [5][12] (captures ALL customers, including sporadic/one-off orders)
+        if (parsedDate >= cutoff12w && parsedDate <= today && aantal > 0) {
           const dow = parsedDate.getDay(); // 0=Sun..6=Sat
           if (dow >= 1 && dow <= 5) {
             let arr = weekdayTotals12wMap.get(fKey);
@@ -303,6 +312,27 @@ export function useGasFlowPredictor() {
               weekdayTotals12wMap.set(fKey, arr);
             }
             arr[dow - 1] += aantal;
+
+            const weekAge = Math.min(11, Math.max(0, Math.floor(differenceInDays(today, parsedDate) / 7)));
+            let buckets = weekdayBuckets12wMap.get(fKey);
+            if (!buckets) {
+              buckets = Array.from({ length: 5 }, () => new Array(12).fill(0));
+              weekdayBuckets12wMap.set(fKey, buckets);
+            }
+            buckets[dow - 1][weekAge] += aantal;
+          }
+        }
+
+        // Accumulate last-year seasonal comparison windows for YoY seasonal factor
+        if (aantal > 0) {
+          if (parsedDate >= lyTargetStart && parsedDate <= lyTargetEnd) {
+            let ly = lySeasonalMap.get(fKey);
+            if (!ly) { ly = { target4w: 0, base12w: 0 }; lySeasonalMap.set(fKey, ly); }
+            ly.target4w += aantal;
+          } else if (parsedDate >= lyBaseStart && parsedDate <= lyBaseEnd) {
+            let ly = lySeasonalMap.get(fKey);
+            if (!ly) { ly = { target4w: 0, base12w: 0 }; lySeasonalMap.set(fKey, ly); }
+            ly.base12w += aantal;
           }
         }
 
@@ -594,16 +624,25 @@ export function useGasFlowPredictor() {
         const fallbackStock = stockMap.get(`${product}__${location}__${capacityPerUnit}`)?.current ?? 0;
         const startStock = exactStock !== undefined ? exactStock : (packageType ? 0 : fallbackStock);
         const meta = productMetaMap.get(fKey) || detectBundle(capacityPerUnit, product, packageType);
+        const ly = lySeasonalMap.get(fKey);
+        const seasonalFactor =
+          ly && ly.target4w > 0 && ly.base12w > 0
+            ? Math.min(1.35, Math.max(0.75, (ly.target4w / 4) / (ly.base12w / 12)))
+            : 1.0;
+
         fillPlanInputs.push({
           key: fKey,
           product,
           packageType,
           location,
           capacityPerUnit,
+          displayCapacityLiters: meta.displayCapacityLiters,
           isBundle: meta.isBundle,
           packSize: meta.packSize,
           startStock,
           weekdayTotals12w: weekdayTotals12wMap.get(fKey) || [0, 0, 0, 0, 0],
+          weekdayBuckets12w: weekdayBuckets12wMap.get(fKey),
+          seasonalFactor,
           customerSchedules: customerSchedulesPerPKey.get(fKey) || [],
         });
       }
@@ -612,7 +651,7 @@ export function useGasFlowPredictor() {
         horizonDays: 5,
         safetyBuffer: 0,
         safetyBufferMode: 'units',
-        method: 'hybrid',
+        method: 'ewma_seasonal',
         today,
       });
 

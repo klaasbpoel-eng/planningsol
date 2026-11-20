@@ -36,8 +36,13 @@ import {
 import { cn } from "@/lib/utils";
 
 const METHOD_LABELS: Record<FillPlanMethod, { label: string; description: string }> = {
+  ewma_seasonal: {
+    label: "Gewogen + Seizoensfactor (aanbevolen)",
+    description:
+      "Recente weken wegen zwaarder (EWMA), eenmalige uitschieters worden gedempt en gecorrigeerd met de seizoensfactor van vorig jaar",
+  },
   hybrid: {
-    label: "Gecombineerd (aanbevolen)",
+    label: "Gecombineerd (klant + weekdag)",
     description: "Mix van mediaan klantinterval + 12-weken weekdaggemiddelde (vangt ook losse afnames op)",
   },
   customer_interval: {
@@ -63,7 +68,7 @@ export function FillPlanning() {
   const [horizonDays, setHorizonDays] = useState<5 | 10 | 15>(5);
   const [safetyBuffer, setSafetyBuffer] = useState<number>(0);
   const [safetyBufferMode, setSafetyBufferMode] = useState<SafetyBufferMode>("units");
-  const [method, setMethod] = useState<FillPlanMethod>("hybrid");
+  const [method, setMethod] = useState<FillPlanMethod>("ewma_seasonal");
   const [selectedDay, setSelectedDay] = useState<string>("");
 
   const computed = useMemo(() => {
@@ -111,7 +116,7 @@ export function FillPlanning() {
         Verpakking: it.packageType || (it.isBundle ? "Bundel" : "Cilinder"),
         Locatie: it.location,
         Type: it.isBundle ? "Bundel" : "Cilinder",
-        "Capaciteit (L)": it.capacityPerUnit,
+        "Capaciteit (L)": it.displayCapacityLiters,
         "Huidige voorraad": it.currentStock,
         "Verwachte vraag": it.expectedDemand,
         "Bufferdoel": it.safetyTarget,
@@ -136,7 +141,7 @@ export function FillPlanning() {
         Verpakking: fp.packageType || (fp.isBundle ? "Bundel" : "Cilinder"),
         Locatie: fp.location,
         Type: fp.isBundle ? "Bundel" : "Cilinder",
-        "Capaciteit (L)": fp.capacityPerUnit,
+        "Capaciteit (L)": fp.displayCapacityLiters,
         Startvoorraad: fp.startStock,
       };
       fp.perDay.forEach((d, idx) => {
@@ -348,22 +353,47 @@ export function FillPlanning() {
               <Label htmlFor="safety-buffer" className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
                 <Shield className="w-3.5 h-3.5" /> Buffer:
               </Label>
-              <Input
-                id="safety-buffer"
-                type="number"
-                min={0}
-                max={500}
-                value={safetyBuffer}
-                onChange={(e) => setSafetyBuffer(Math.max(0, Number(e.target.value) || 0))}
-                className="w-20 h-8 text-xs font-mono"
-              />
+              {safetyBufferMode === "service_level" ? (
+                <Select
+                  value={String(safetyBuffer >= 90 ? safetyBuffer : 95)}
+                  onValueChange={(v) => setSafetyBuffer(Number(v))}
+                >
+                  <SelectTrigger className="h-8 w-24 text-xs font-mono">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="90">90% (z=1,28)</SelectItem>
+                    <SelectItem value="95">95% (z=1,65)</SelectItem>
+                    <SelectItem value="99">99% (z=2,33)</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id="safety-buffer"
+                  type="number"
+                  min={0}
+                  max={500}
+                  value={safetyBuffer}
+                  onChange={(e) => setSafetyBuffer(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-20 h-8 text-xs font-mono"
+                />
+              )}
               <Tabs
                 value={safetyBufferMode}
-                onValueChange={(v) => setSafetyBufferMode(v as SafetyBufferMode)}
+                onValueChange={(v) => {
+                  const next = v as SafetyBufferMode;
+                  setSafetyBufferMode(next);
+                  if (next === "service_level") {
+                    setSafetyBuffer(95);
+                  } else if (safetyBufferMode === "service_level") {
+                    setSafetyBuffer(0);
+                  }
+                }}
               >
                 <TabsList className="h-8">
                   <TabsTrigger value="units" className="text-xs px-2 h-6">stuks</TabsTrigger>
                   <TabsTrigger value="percent" className="text-xs px-2 h-6">%</TabsTrigger>
+                  <TabsTrigger value="service_level" className="text-xs px-2 h-6">Service</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -374,10 +404,11 @@ export function FillPlanning() {
                 <SlidersHorizontal className="w-3.5 h-3.5" /> Berekening:
               </Label>
               <Select value={method} onValueChange={(v) => setMethod(v as FillPlanMethod)}>
-                <SelectTrigger className="h-8 w-full sm:w-64 text-xs">
+                <SelectTrigger className="h-8 w-full sm:w-72 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="ewma_seasonal">{METHOD_LABELS.ewma_seasonal.label}</SelectItem>
                   <SelectItem value="hybrid">{METHOD_LABELS.hybrid.label}</SelectItem>
                   <SelectItem value="customer_interval">{METHOD_LABELS.customer_interval.label}</SelectItem>
                   <SelectItem value="weekday_avg">{METHOD_LABELS.weekday_avg.label}</SelectItem>
@@ -496,7 +527,7 @@ function PerDayView({
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                        {it.capacityPerUnit} L
+                        {it.displayCapacityLiters} L
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {it.currentStock.toLocaleString("nl-NL")}
@@ -582,7 +613,7 @@ function PerProductView({ items, dayLabels }: { items: FillPlanItem[]; dayLabels
                 </Badge>
               </TableCell>
               <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                {fp.capacityPerUnit} L
+                {fp.displayCapacityLiters} L
               </TableCell>
               <TableCell className="text-right font-mono text-sm">
                 {fp.startStock.toLocaleString("nl-NL")}

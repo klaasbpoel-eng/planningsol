@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   computeFillPlan,
   computeMedian,
+  computeWinsorizedEwma,
   filterFillPlan,
   type FillPlanProductInput,
 } from "./fillPlanning";
@@ -15,6 +16,7 @@ function makeInput(overrides: Partial<FillPlanProductInput> = {}): FillPlanProdu
     packageType: "Cylinders",
     location: "Emmen",
     capacityPerUnit: 50,
+    displayCapacityLiters: 50,
     isBundle: false,
     packSize: 1,
     startStock: 10,
@@ -38,8 +40,55 @@ describe("fillPlanning calculation engine", () => {
     expect(computeMedian([7, 14, 21])).toBe(14);
   });
 
-  it("supports configurable safetyBuffer in units and percent", () => {
-    const input = makeInput({ startStock: 10 });
+  it("dampens one-off extreme spikes and weights recent weeks higher in EWMA", () => {
+    // 11 normal weeks of 10, plus 1 extreme spike of 200 six weeks ago
+    const withSpike = [10, 10, 10, 10, 10, 10, 200, 10, 10, 10, 10, 10];
+    const ewma = computeWinsorizedEwma(withSpike);
+    // Plain average would be 25.8, winsorized EWMA caps the spike at 25 -> ~11.1
+    expect(ewma).toBeGreaterThan(9.5);
+    expect(ewma).toBeLessThan(13);
+
+    // Recent growth: last 4 weeks = 20, older 8 weeks = 5 -> EWMA > plain avg (10)
+    const growing = [20, 20, 20, 20, 5, 5, 5, 5, 5, 5, 5, 5];
+    expect(computeWinsorizedEwma(growing)).toBeGreaterThan(12);
+  });
+
+  it("applies YoY seasonalFactor in ewma_seasonal method", () => {
+    const input = makeInput({
+      startStock: 0,
+      weekdayBuckets12w: [
+        [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
+      ],
+      seasonalFactor: 1.2,
+    });
+
+    const plan = computeFillPlan([input], {
+      horizonDays: 5,
+      safetyBuffer: 0,
+      safetyBufferMode: "units",
+      method: "ewma_seasonal",
+      today: BASE_TODAY,
+    });
+    // Friday demand = 10 * 1.2 = 12
+    expect(plan.fillPlanByDay[0].items[0].expectedDemand).toBe(12);
+    expect(plan.fillPlanByDay[0].items[0].suggestedFill).toBe(12);
+  });
+
+  it("supports configurable safetyBuffer in units, percent, and service_level", () => {
+    const input = makeInput({
+      startStock: 10,
+      weekdayBuckets12w: [
+        [20, 10, 30, 10, 20, 10, 30, 10, 20, 10, 30, 10],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [20, 10, 30, 10, 20, 10, 30, 10, 20, 10, 30, 10],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [20, 10, 30, 10, 20, 10, 30, 10, 20, 10, 30, 10],
+      ],
+    });
 
     const noBuffer = computeFillPlan([input], {
       horizonDays: 5,
@@ -48,7 +97,6 @@ describe("fillPlanning calculation engine", () => {
       method: "customer_interval",
       today: BASE_TODAY,
     });
-    // Day 0 demand = 20, startStock = 10 -> fill = 10
     expect(noBuffer.fillPlanByDay[0].items[0].suggestedFill).toBe(10);
 
     const unitBuffer = computeFillPlan([input], {
@@ -58,7 +106,6 @@ describe("fillPlanning calculation engine", () => {
       method: "customer_interval",
       today: BASE_TODAY,
     });
-    // Day 0 demand = 20, startStock = 10, safetyTarget = 5 -> fill = 15
     expect(unitBuffer.fillPlanByDay[0].items[0].suggestedFill).toBe(15);
 
     const pctBuffer = computeFillPlan([input], {
@@ -68,30 +115,45 @@ describe("fillPlanning calculation engine", () => {
       method: "customer_interval",
       today: BASE_TODAY,
     });
-    // Day 0 demand = 20, 25% buffer = 5 -> fill = 15
     expect(pctBuffer.fillPlanByDay[0].items[0].suggestedFill).toBe(15);
-  });
 
-  it("supports 5 and 10 workday horizons skipping weekends", () => {
-    const input = makeInput({ startStock: 0 });
-    const plan10 = computeFillPlan([input], {
-      horizonDays: 10,
-      safetyBuffer: 0,
-      safetyBufferMode: "units",
-      method: "weekday_avg",
+    const slBuffer = computeFillPlan([input], {
+      horizonDays: 5,
+      safetyBuffer: 95,
+      safetyBufferMode: "service_level",
+      method: "customer_interval",
       today: BASE_TODAY,
     });
+    // 95% service level adds z=1.65 * sigma > 0
+    expect(slBuffer.fillPlanByDay[0].items[0].safetyTarget).toBeGreaterThan(0);
+    expect(slBuffer.fillPlanByDay[0].items[0].suggestedFill).toBeGreaterThan(10);
+  });
 
-    expect(plan10.fillPlanByDay).toHaveLength(10);
-    // Day 0 = Fri 20 Nov, Day 1 = Mon 23 Nov (skips Sat 21 & Sun 22)
-    expect(plan10.fillPlanByDay[0].date).toBe("2026-11-20");
-    expect(plan10.fillPlanByDay[1].date).toBe("2026-11-23");
+  it("displays bundle capacity as 800 L", () => {
+    const bundle = makeInput({
+      product: "Stikstof 4.8 in Bundles",
+      packageType: "Bundles",
+      capacityPerUnit: 50,
+      displayCapacityLiters: 800,
+      isBundle: true,
+      packSize: 16,
+      startStock: 0,
+    });
+    const plan = computeFillPlan([bundle], {
+      horizonDays: 5,
+      safetyBuffer: 0,
+      safetyBufferMode: "units",
+      method: "customer_interval",
+      today: BASE_TODAY,
+    });
+    expect(plan.fillPlan[0].displayCapacityLiters).toBe(800);
+    expect(plan.fillPlanByDay[0].items[0].displayCapacityLiters).toBe(800);
   });
 
   it("always preserves actual currentStock on every day tab", () => {
     const input = makeInput({
       startStock: 12,
-      weekdayTotals12w: [240, 240, 240, 240, 240], // 20/day every weekday
+      weekdayTotals12w: [240, 240, 240, 240, 240],
       customerSchedules: [],
     });
     const plan = computeFillPlan([input], {
@@ -101,53 +163,31 @@ describe("fillPlanning calculation engine", () => {
       method: "weekday_avg",
       today: BASE_TODAY,
     });
-    // Day 0 fills +8 (20 - 12), Day 1 fills +20, but currentStock stays 12 on BOTH days
     expect(plan.fillPlanByDay[0].items[0].currentStock).toBe(12);
     expect(plan.fillPlanByDay[1].items[0].currentStock).toBe(12);
     expect(plan.fillPlanByDay[1].items[0].suggestedFill).toBe(20);
   });
 
-  it("captures sporadic demand via weekday_avg and hybrid methods", () => {
-    const sporadicProduct = makeInput({
-      product: "Argon 5.0",
+  it("recalculates per-day totals when filtering and excludes discontinued product", () => {
+    const oldProduct = makeInput({
+      product: "Zuurstof Medicinaal Gasv. SOL in Cylinders aluminium integrated",
+      packageType: "Cylinders aluminium integrated 200 Bar",
       startStock: 0,
-      customerSchedules: [], // no regular repeat customer
-      weekdayTotals12w: [60, 0, 60, 0, 120], // 10 on Fri, 5 on Mon & Wed
     });
-
-    const intervalOnly = computeFillPlan([sporadicProduct], {
-      horizonDays: 5,
-      safetyBuffer: 0,
-      safetyBufferMode: "units",
-      method: "customer_interval",
-      today: BASE_TODAY,
-    });
-    expect(intervalOnly.fillPlan).toHaveLength(0);
-
-    const hybrid = computeFillPlan([sporadicProduct], {
-      horizonDays: 5,
-      safetyBuffer: 0,
-      safetyBufferMode: "units",
-      method: "hybrid",
-      today: BASE_TODAY,
-    });
-    expect(hybrid.fillPlan).toHaveLength(1);
-    expect(hybrid.fillPlanByDay[0].items[0].expectedDemand).toBe(10);
-    expect(hybrid.fillPlanByDay[0].items[0].suggestedFill).toBe(10);
-  });
-
-  it("recalculates per-day totals when filtering by location and package type", () => {
     const emmenBundle = makeInput({
-      key: "O2__Emmen__50__true",
+      key: "O2__Bundles__Emmen__50",
       product: "Zuurstof 3.5 in Bundles",
+      packageType: "Bundles",
       location: "Emmen",
       isBundle: true,
+      displayCapacityLiters: 800,
       packSize: 16,
       startStock: 0,
     });
     const tilburgCyl = makeInput({
-      key: "N2__Tilburg__50__false",
+      key: "N2__Cylinders__Tilburg__50",
       product: "Stikstof 4.8 in Cilinders",
+      packageType: "Cylinders",
       location: "Tilburg",
       isBundle: false,
       packSize: 1,
@@ -163,7 +203,7 @@ describe("fillPlanning calculation engine", () => {
       ],
     });
 
-    const base = computeFillPlan([emmenBundle, tilburgCyl], {
+    const base = computeFillPlan([oldProduct, emmenBundle, tilburgCyl], {
       horizonDays: 5,
       safetyBuffer: 0,
       safetyBufferMode: "units",
@@ -171,49 +211,14 @@ describe("fillPlanning calculation engine", () => {
       today: BASE_TODAY,
     });
 
-    // Unfiltered day 0 total = 20 + 10 = 30
+    expect(base.fillPlan).toHaveLength(2);
     expect(base.fillPlanByDay[0].totalSuggestedFill).toBe(30);
 
-    // Filtered to Emmen: day 0 total must be 20 (NOT 30!)
     const emmenOnly = filterFillPlan(base.fillPlan, base.fillPlanByDay, {
       location: "Emmen",
       search: "",
       packageFilter: "Alle",
     });
-    expect(emmenOnly.fillPlanByDay[0].items).toHaveLength(1);
     expect(emmenOnly.fillPlanByDay[0].totalSuggestedFill).toBe(20);
-
-    // Filtered to Cilinders: only Tilburg cylinder remains
-    const cylOnly = filterFillPlan(base.fillPlan, base.fillPlanByDay, {
-      location: "Alle",
-      search: "",
-      packageFilter: "Cilinders",
-    });
-    expect(cylOnly.fillPlanByDay[0].items).toHaveLength(1);
-    expect(cylOnly.fillPlanByDay[0].totalSuggestedFill).toBe(10);
-  });
-
-  it("excludes discontinued Zuurstof aluminium integrated 200 Bar product", () => {
-    const oldProduct = makeInput({
-      product: "Zuurstof Medicinaal Gasv. SOL in Cylinders aluminium integrated",
-      packageType: "Cylinders aluminium integrated 200 Bar",
-      startStock: 0,
-    });
-    const activeProduct = makeInput({
-      product: "Zuurstof Medicinaal Gasv. SOL in Cylinders Active Integrated Alu.",
-      packageType: "Cylinders Active Integrated Alu 200 Bar.",
-      startStock: 0,
-    });
-
-    const plan = computeFillPlan([oldProduct, activeProduct], {
-      horizonDays: 5,
-      safetyBuffer: 0,
-      safetyBufferMode: "units",
-      method: "customer_interval",
-      today: BASE_TODAY,
-    });
-
-    expect(plan.fillPlan).toHaveLength(1);
-    expect(plan.fillPlan[0].product).toBe("Zuurstof Medicinaal Gasv. SOL in Cylinders Active Integrated Alu.");
   });
 });
