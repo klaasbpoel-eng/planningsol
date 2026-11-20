@@ -6,6 +6,7 @@ import type { AppRole } from "@/hooks/useUserPermissions";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { WifiOff, Wifi } from "lucide-react";
 import { NAVIGATION_ITEMS } from "@/config/navigation";
+import { useLayoutWidth } from "@/hooks/useLayoutWidth";
 
 // Breadcrumb labels come from the shared menu so names match everywhere.
 const ROUTE_LABELS: Record<string, string> = Object.fromEntries(
@@ -23,6 +24,8 @@ interface PageLayoutProps {
   children: React.ReactNode;
   className?: string;
   breadcrumbs?: { label: string; href?: string }[];
+  /** Always use the full screen width (wide tables). */
+  fullWidth?: boolean;
 }
 
 export function PageLayout({
@@ -36,7 +39,10 @@ export function PageLayout({
   children,
   className = "",
   breadcrumbs,
+  fullWidth = false,
 }: PageLayoutProps) {
+  const { width } = useLayoutWidth();
+  const wide = fullWidth || width === "full";
   const location = useLocation();
   const { isOnline, wasOffline } = useOnlineStatus();
 
@@ -79,7 +85,7 @@ export function PageLayout({
           </div>
         )}
 
-        <main id="main-content" className={`flex-1 w-full container mx-auto px-4 py-8 ${className}`}>
+        <main id="main-content" className={`flex-1 w-full container py-8 ${wide ? "max-w-none" : ""} ${className}`}>
           {autoBreadcrumbs.length > 2 && (
             <Breadcrumb className="mb-4">
               <BreadcrumbList>

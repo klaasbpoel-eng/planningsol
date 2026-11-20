@@ -406,6 +406,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
       userEmail={userEmail}
       role={role}
       isAdmin
+      fullWidth
       title="Ramses-correcties"
       description="Overzicht van alle correcties uit Ramses."
       titleIcon={<FileSpreadsheet className="h-6 w-6 text-primary" />}

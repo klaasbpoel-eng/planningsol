@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { LogOut, User, Menu, Search, ChevronDown } from "lucide-react";
+import { LogOut, User, Menu, Search, ChevronDown, Maximize2, Minimize2 } from "lucide-react";
+import { useLayoutWidth } from "@/hooks/useLayoutWidth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,7 @@ export function Header({
 }: HeaderProps) {
   const location = useLocation();
   const isMobile = useIsMobile();
+  const { width: layoutWidth, toggle: toggleLayoutWidth } = useLayoutWidth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -134,7 +136,7 @@ export function Header({
 
   return (
     <header className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-xl shadow-sm border-b border-border/50">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between overflow-x-hidden">
+      <div className={cn("container h-16", layoutWidth === "full" && "max-w-none", " flex items-center justify-between overflow-x-hidden")}>
         {/* Left side - Logo */}
         <div className="flex items-center gap-3 shrink-0">
           <Link to="/" className="flex items-center gap-3">
@@ -228,6 +230,17 @@ export function Header({
             </Button>
           )}
 
+          {!isMobile && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleLayoutWidth}
+              aria-label={layoutWidth === "full" ? "Normale breedte" : "Volledige breedte"}
+              title={layoutWidth === "full" ? "Normale breedte" : "Volledige breedte"}
+            >
+              {layoutWidth === "full" ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+          )}
           <ThemeToggle variant="header" />
           <NotificationBell />
 
