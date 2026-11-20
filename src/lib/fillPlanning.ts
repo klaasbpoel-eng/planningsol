@@ -250,6 +250,10 @@ export function computeFillPlan(
     if (!input.product || !input.location || input.product === "Onbekend") continue;
     if (isExcludedFillPlanProduct(input.product, input.packageType)) continue;
 
+    // For bundles expanded by gas_packages (packSize > 1), convert back to bundle count
+    // so stock, demand, buffer, and fill suggestions are all consistently expressed in bundles.
+    const unitDivisor = input.isBundle && input.packSize > 1 ? input.packSize : 1;
+
     // 1. Customer-interval demand per day
     const customerDemand = new Array<number>(horizonDays).fill(0);
     for (const sched of input.customerSchedules) {
@@ -259,7 +263,7 @@ export function computeFillPlan(
       while (cursorDate <= planLastDate && safety < 30) {
         const idx = dayIndexFor(cursorDate);
         if (idx >= 0) {
-          customerDemand[idx] += sched.avgAmount;
+          customerDemand[idx] += sched.avgAmount / unitDivisor;
         }
         cursorDate = addDays(cursorDate, interval);
         safety++;
@@ -268,7 +272,7 @@ export function computeFillPlan(
 
     // 2. Plain 12-week weekday average demand per day
     const weekdayDemand = planDays.map((pd) => {
-      const total12w = input.weekdayTotals12w[pd.weekdayIdx] || 0;
+      const total12w = (input.weekdayTotals12w[pd.weekdayIdx] || 0) / unitDivisor;
       return total12w / 12;
     });
 
@@ -277,8 +281,8 @@ export function computeFillPlan(
     const ewmaSeasonalDemand = planDays.map((pd) => {
       const buckets = input.weekdayBuckets12w?.[pd.weekdayIdx];
       const base = buckets
-        ? computeWinsorizedEwma(buckets)
-        : (input.weekdayTotals12w[pd.weekdayIdx] || 0) / 12;
+        ? computeWinsorizedEwma(buckets) / unitDivisor
+        : ((input.weekdayTotals12w[pd.weekdayIdx] || 0) / unitDivisor) / 12;
       return base * seasonalFactor;
     });
 
@@ -305,10 +309,11 @@ export function computeFillPlan(
     const hasAnyRoundedDemand = combinedDemand.some((d) => Math.round(d) > 0);
     if (totalRawDemand <= 0 || (!hasAnyRoundedDemand && totalRawDemand < 0.5)) continue;
 
-    const dailyStdDev = computeDailyStdDev(input.weekdayBuckets12w, input.weekdayTotals12w);
+    const dailyStdDev = computeDailyStdDev(input.weekdayBuckets12w, input.weekdayTotals12w) / unitDivisor;
     const serviceLevelZ = safetyBufferMode === "service_level" ? serviceLevelToZ(safetyBuffer) : 0;
 
-    let running = input.startStock;
+    const startStockUnits = input.startStock / unitDivisor;
+    let running = startStockUnits;
     let totalFill = 0;
     let totalRoundedDemand = 0;
 
@@ -363,7 +368,7 @@ export function computeFillPlan(
       displayCapacityLiters,
       isBundle: input.isBundle,
       packSize: input.packSize,
-      startStock: Math.round(input.startStock),
+      startStock: Math.round(startStockUnits),
       seasonalFactor,
       dailyStdDev: Math.round(dailyStdDev * 10) / 10,
       totalExpectedDemand: totalRoundedDemand,

@@ -120,10 +120,8 @@ export function FillPlanning() {
         "Huidige voorraad": it.currentStock,
         "Verwachte vraag": it.expectedDemand,
         "Bufferdoel": it.safetyTarget,
-        "Bijvullen (stuks)": it.suggestedFill,
-        ...(it.isBundle && it.packSize > 1
-          ? { "Bijvullen (bundels)": Math.ceil(it.suggestedFill / it.packSize) }
-          : {}),
+        "Bijvullen": it.suggestedFill,
+        Eenheid: it.isBundle ? "bundels" : "cilinders",
       }))
     );
 
@@ -531,6 +529,11 @@ function PerDayView({
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {it.currentStock.toLocaleString("nl-NL")}
+                        {it.isBundle && (
+                          <span className="ml-1 text-[10px] text-muted-foreground">
+                            {it.currentStock === 1 ? "bundel" : "bundels"}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm text-amber-600">
                         {it.expectedDemand.toLocaleString("nl-NL")}
@@ -541,13 +544,14 @@ function PerDayView({
                         </TableCell>
                       )}
                       <TableCell className="text-right font-bold text-blue-600">
-                        <div>+{it.suggestedFill.toLocaleString("nl-NL")}</div>
-                        {it.isBundle && it.packSize > 1 && (
-                          <div className="text-[10px] font-normal text-muted-foreground">
-                            ≈ {Math.ceil(it.suggestedFill / it.packSize)} bundel
-                            {Math.ceil(it.suggestedFill / it.packSize) === 1 ? "" : "s"}
-                          </div>
-                        )}
+                        <div>
+                          +{it.suggestedFill.toLocaleString("nl-NL")}
+                          {it.isBundle && (
+                            <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+                              {it.suggestedFill === 1 ? "bundel" : "bundels"}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

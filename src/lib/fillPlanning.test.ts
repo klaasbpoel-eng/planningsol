@@ -129,7 +129,7 @@ describe("fillPlanning calculation engine", () => {
     expect(slBuffer.fillPlanByDay[0].items[0].suggestedFill).toBeGreaterThan(10);
   });
 
-  it("displays bundle capacity as 800 L", () => {
+  it("displays bundle capacity as 800 L and converts stock & demand back to bundles", () => {
     const bundle = makeInput({
       product: "Stikstof 4.8 in Bundles",
       packageType: "Bundles",
@@ -137,7 +137,16 @@ describe("fillPlanning calculation engine", () => {
       displayCapacityLiters: 800,
       isBundle: true,
       packSize: 16,
-      startStock: 0,
+      startStock: 32, // 32 expanded cylinders = 2 bundles
+      customerSchedules: [
+        {
+          customerName: "Klant A",
+          lastDeliveryDate: new Date(2026, 10, 13),
+          medianInterval: 7,
+          avgAmount: 48, // 48 expanded cylinders = 3 bundles
+          deliveryCount: 5,
+        },
+      ],
     });
     const plan = computeFillPlan([bundle], {
       horizonDays: 5,
@@ -147,7 +156,11 @@ describe("fillPlanning calculation engine", () => {
       today: BASE_TODAY,
     });
     expect(plan.fillPlan[0].displayCapacityLiters).toBe(800);
+    expect(plan.fillPlan[0].startStock).toBe(2);
     expect(plan.fillPlanByDay[0].items[0].displayCapacityLiters).toBe(800);
+    expect(plan.fillPlanByDay[0].items[0].currentStock).toBe(2);
+    expect(plan.fillPlanByDay[0].items[0].expectedDemand).toBe(3);
+    expect(plan.fillPlanByDay[0].items[0].suggestedFill).toBe(1);
   });
 
   it("always preserves actual currentStock on every day tab", () => {
@@ -183,6 +196,15 @@ describe("fillPlanning calculation engine", () => {
       displayCapacityLiters: 800,
       packSize: 16,
       startStock: 0,
+      customerSchedules: [
+        {
+          customerName: "Klant A",
+          lastDeliveryDate: new Date(2026, 10, 13),
+          medianInterval: 7,
+          avgAmount: 320, // 320 expanded cylinders = 20 bundles
+          deliveryCount: 5,
+        },
+      ],
     });
     const tilburgCyl = makeInput({
       key: "N2__Cylinders__Tilburg__50",
