@@ -1,6 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { differenceInDays, addDays, isBefore, isAfter, startOfDay } from 'date-fns';
+import { differenceInDays, addDays, isBefore, startOfDay } from 'date-fns';
+import {
+  computeFillPlan,
+  computeMedian,
+  type CustomerScheduleInput,
+  type FillPlanDay,
+  type FillPlanItem,
+  type FillPlanProductInput,
+} from '@/lib/fillPlanning';
+
+export type { FillPlanItem, FillPlanDay, FillPlanProductInput };
 
 export interface GasFlowPrediction {
   product: string;
@@ -30,38 +40,6 @@ export interface DeadStockItem {
   capacityPerUnit: number;
   currentStock: number;          // stuks
   daysSinceLastDelivery: number | null; // null = geen geschiedenis afgelopen 12 maanden
-}
-
-export interface FillPlanItem {
-  product: string;
-  location: string;
-  capacityPerUnit: number;
-  startStock: number;             // huidige voorraad in stuks
-  totalExpectedDemand: number;    // som vraag over horizon
-  totalSuggestedFill: number;     // som vulsuggestie over horizon
-  perDay: {
-    date: string;                 // YYYY-MM-DD
-    expectedDemand: number;       // stuks verwacht deze dag
-    projectedStockBefore: number; // voorraad voor vraag van die dag
-    projectedStockAfter: number;  // voorraad na vraag, voor vullen
-    suggestedFill: number;        // stuks bij te vullen om voorraad >= safety te houden
-    endStock: number;             // voorraad einde dag (na vulling)
-  }[];
-}
-
-export interface FillPlanDay {
-  date: string;
-  dayLabel: string;        // bv. "ma 11 mei"
-  totalExpectedDemand: number;
-  totalSuggestedFill: number;
-  items: {
-    product: string;
-    location: string;
-    capacityPerUnit: number;
-    expectedDemand: number;
-    projectedStockBefore: number;
-    suggestedFill: number;
-  }[];
 }
 
 export interface ChurnRisk {
@@ -194,8 +172,27 @@ export function useGasFlowPredictor() {
       const in10Days = addDays(today, 10);
       // Only consider deliveries from the last 12 months for predictions
       const cutoff = addDays(today, -365);
+      // Last 12 weeks (84 days) for weekday baseline demand
+      const cutoff12w = addDays(today, -84);
       // Track latest delivery date per product-location-cap (for dead stock detection)
       const lastDeliveryPerPKey = new Map<string, Date>();
+      // Track 12-week weekday totals [Ma, Di, Wo, Do, Vr] and package metadata per pKey
+      const weekdayTotals12wMap = new Map<string, number[]>();
+      const productMetaMap = new Map<string, { isBundle: boolean; packSize: number }>();
+
+      const detectBundle = (rawCap: number, product: string, containerType?: any): { isBundle: boolean; packSize: number } => {
+        const pkg = packageMap.get(rawCap);
+        const typeStr = safeStr(containerType, '').toLowerCase();
+        const prodLower = product.toLowerCase();
+        const isBundle =
+          Boolean(pkg && pkg.mult > 1) ||
+          typeStr.includes('bundel') ||
+          typeStr.includes('bundle') ||
+          typeStr.includes('pakket') ||
+          prodLower.includes('bundle') ||
+          prodLower.includes('bundel');
+        return { isBundle, packSize: pkg ? pkg.mult : 1 };
+      };
       // Churn risk: customers with regular history but gone silent
       const churnRiskMap = new Map<string, ChurnRisk>();
       // Track deliveries per driver per day (for driver statistics)
@@ -238,9 +235,15 @@ export function useGasFlowPredictor() {
         const aantal    = expanded.aantal;
         const cap       = expanded.cap;
 
-        // Derive supply location from SyncID (contains "Tilburg" or "Emmen") or legacy columns
+        // Derive supply location from SyncID, Locatie, or legacy columns
         const syncIdStr = safeStr(row.SyncID || '', '').toLowerCase();
-        const supplyLocDerived = syncIdStr.includes('tilburg') ? 'Tilburg' : syncIdStr.includes('emmen') ? 'Emmen' : safeStr(row.CenterDescription || row.DS_CENTER_DESCRIPTION, 'Overig');
+        const locColStr = safeStr(row.Locatie || row.CenterDescription || row.DS_CENTER_DESCRIPTION, '').toLowerCase();
+        const combinedLocStr = `${syncIdStr} ${locColStr}`;
+        const supplyLocDerived = combinedLocStr.includes('tilburg')
+          ? 'Tilburg'
+          : combinedLocStr.includes('emmen')
+          ? 'Emmen'
+          : safeStr(row.Locatie || row.CenterDescription || row.DS_CENTER_DESCRIPTION, 'Overig');
 
         // ── Globaal depot-totaal per jaar (ongeacht chauffeur, ook Aantal=0 telt als 1) ──
         {
@@ -274,6 +277,34 @@ export function useGasFlowPredictor() {
         const productName  = row.Product || row.ContentDescription;
         if (!productName || !customerName) continue;
 
+        const prodStr = safeStr(productName);
+        if (prodStr.toLowerCase().includes('leeg')) continue;
+
+        const bundleInfo = detectBundle(rawCap, prodStr, row.TypeVerpakking || row.ContainerTypeDescription);
+        const normLoc = supplyLocDerived.toLowerCase().includes('tilburg')
+          ? 'Tilburg'
+          : supplyLocDerived.toLowerCase().includes('emmen')
+          ? 'Emmen'
+          : 'Overig';
+        const pKeyForWeekday = `${prodStr}__${normLoc}__${cap}`;
+        const prevMeta = productMetaMap.get(pKeyForWeekday);
+        if (!prevMeta || (bundleInfo.isBundle && !prevMeta.isBundle) || bundleInfo.packSize > prevMeta.packSize) {
+          productMetaMap.set(pKeyForWeekday, bundleInfo);
+        }
+
+        // Accumulate 12-week weekday totals [Ma..Vr] (captures ALL customers, including sporadic/one-off orders)
+        if (parsedDate >= cutoff12w && aantal > 0) {
+          const dow = parsedDate.getDay(); // 0=Sun..6=Sat
+          if (dow >= 1 && dow <= 5) {
+            let arr = weekdayTotals12wMap.get(pKeyForWeekday);
+            if (!arr) {
+              arr = [0, 0, 0, 0, 0];
+              weekdayTotals12wMap.set(pKeyForWeekday, arr);
+            }
+            arr[dow - 1] += aantal;
+          }
+        }
+
         if (parsedDate < cutoff) continue;
 
         const key = `${customerName}__${productName}__${cap}__${supplyLocDerived}`;
@@ -284,7 +315,7 @@ export function useGasFlowPredictor() {
           aantal,
           cap,
           city: safeStr(row.Stad || row.TX_CITY || row.City || row.CustomerCity, 'Unknown'),
-          product: safeStr(productName),
+          product: prodStr,
           customer: safeStr(customerName),
           supplyLocation: supplyLocDerived,
           driver: safeStr(row.Gebruiker || row.UserName || row.Username || row.username || row.User)
@@ -295,40 +326,8 @@ export function useGasFlowPredictor() {
       const productDemand7Days = new Map<string, number>();
       const productDemand10Days = new Map<string, number>();
 
-      // ── Vulplanning: vraag per (pKey, dagIndex 0..N-1) over komende werkdagen ──
-      const FILL_PLAN_DAYS = 5; // werkdagen
-      // Bouw lijst van komende werkdagen (ma-vr), startend bij vandaag (of eerstvolgende werkdag)
-      const planDays: { date: Date; key: string }[] = [];
-      {
-        const cursor = new Date(today);
-        while (planDays.length < FILL_PLAN_DAYS) {
-          const dow = cursor.getDay(); // 0 zo, 6 za
-          if (dow !== 0 && dow !== 6) {
-            const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
-            planDays.push({ date: new Date(cursor), key });
-          }
-          cursor.setDate(cursor.getDate() + 1);
-        }
-      }
-      const planLastDate = planDays[planDays.length - 1].date;
-      // demandPerDay[pKey] = number[FILL_PLAN_DAYS]
-      const demandPerDay = new Map<string, number[]>();
-      const ensureDemandRow = (pKey: string) => {
-        let row = demandPerDay.get(pKey);
-        if (!row) { row = new Array(FILL_PLAN_DAYS).fill(0); demandPerDay.set(pKey, row); }
-        return row;
-      };
-      const dayIndexFor = (d: Date): number => {
-        // Map elke datum naar eerstvolgende werkdag-slot binnen het venster
-        if (d < today) {
-          // Achterstallig → eerste werkdag (vandaag/eerstvolgende werkdag)
-          return 0;
-        }
-        for (let i = 0; i < planDays.length; i++) {
-          if (d <= planDays[i].date) return i;
-        }
-        return -1; // buiten venster
-      };
+      // ── Vulplanning: verzamel genormaliseerde klantschema's per pKey ──
+      const customerSchedulesPerPKey = new Map<string, CustomerScheduleInput[]>();
 
       for (const [key, deliveries] of customerHistory.entries()) {
         // Sort by date ascending
@@ -345,28 +344,35 @@ export function useGasFlowPredictor() {
 
         if (deliveries.length < 2) continue; // Need at least 2 deliveries to calculate interval
         
-        // Calculate average interval and average stuks per delivery
+        // Calculate intervals (median for robustness against holiday/outlier gaps) and recent-weighted average amount
+        const intervals: number[] = [];
         let totalDays   = 0;
         let totalAantal = 0;
 
         for (let i = 1; i < deliveries.length; i++) {
           const days = differenceInDays(deliveries[i].date, deliveries[i-1].date);
-          if (days > 0) totalDays += days;
-          totalAantal += deliveries[i].aantal; // bundels blijven bundels — eenheid consistent met voorraad
+          if (days > 0) {
+            totalDays += days;
+            intervals.push(days);
+          }
+          totalAantal += deliveries[i].aantal;
         }
 
         const avgInterval = Math.max(1, Math.round(totalDays / (deliveries.length - 1)));
-        const avgAmount   = totalAantal / (deliveries.length - 1); // avg stuks per delivery
+        const medianInterval = Math.max(1, Math.round(intervals.length > 0 ? computeMedian(intervals) : avgInterval));
+        // Recent-weighted average amount (last 6 deliveries weighted heavier for seasonal accuracy)
+        const recentSlice = deliveries.slice(-6);
+        const avgAmount = recentSlice.reduce((s, d) => s + d.aantal, 0) / recentSlice.length;
         const capPerUnit  = deliveries[deliveries.length - 1].cap; // capacity of this cylinder type
         const lastDelivery = deliveries[deliveries.length - 1];
 
-        // Skip inactive customers: last delivery was more than 2× the average interval ago
+        // Skip inactive customers: last delivery was more than 2× the median interval ago
         const daysSinceLast = differenceInDays(today, lastDelivery.date);
-        if (daysSinceLast > avgInterval * 2) {
+        if (daysSinceLast > medianInterval * 2) {
           // Churn risk: klant had regelmatig patroon maar is gestopt
           // Minimaal 3 leveringen voor betrouwbaar patroon
           if (deliveries.length >= 3) {
-            const riskLevel: ChurnRisk['riskLevel'] = daysSinceLast > avgInterval * 3 ? 'Hoog' : 'Middel';
+            const riskLevel: ChurnRisk['riskLevel'] = daysSinceLast > medianInterval * 3 ? 'Hoog' : 'Middel';
             const products = [...new Set(deliveries.map(d => d.product))];
             const existing = churnRiskMap.get(lastDelivery.customer);
             if (!existing) {
@@ -375,8 +381,8 @@ export function useGasFlowPredictor() {
                 city: lastDelivery.city,
                 lastDeliveryDate: lastDelivery.date,
                 daysSinceLastDelivery: daysSinceLast,
-                avgInterval,
-                overdueBy: daysSinceLast - avgInterval,
+                avgInterval: medianInterval,
+                overdueBy: daysSinceLast - medianInterval,
                 totalDeliveries: deliveries.length,
                 avgCylindersPerDelivery: Math.round(totalAantal / (deliveries.length - 1)),
                 products,
@@ -398,7 +404,7 @@ export function useGasFlowPredictor() {
           continue;
         }
 
-        const nextDate = addDays(lastDelivery.date, avgInterval);
+        const nextDate = addDays(lastDelivery.date, medianInterval);
 
         // If next date is already passed or within 10 days, we aggregate demand
         if (isBefore(nextDate, in10Days)) {
@@ -414,7 +420,7 @@ export function useGasFlowPredictor() {
               city: lastDelivery.city,
               products: [product],
               nextDeliveryDate: nextDate,
-              avgInterval,
+              avgInterval: medianInterval,
               urgency: 'Kritiek',
               driver: lastDelivery.driver,
             });
@@ -426,31 +432,27 @@ export function useGasFlowPredictor() {
               city: lastDelivery.city,
               products: [product],
               nextDeliveryDate: nextDate,
-              avgInterval,
+              avgInterval: medianInterval,
               urgency: 'Actie',
               driver: lastDelivery.driver,
             });
           }
         }
 
-        // ── Vulplanning: voeg verwachte leveringen binnen het werkdag-venster toe ──
+        // ── Vulplanning: sla klantschema op voor dynamische herberekening (elke horizon/buffer/methode) ──
         {
           const product = lastDelivery.product;
           const supplyLocStr = lastDelivery.supplyLocation.toLowerCase();
           const location = supplyLocStr.includes('tilburg') ? 'Tilburg' : supplyLocStr.includes('emmen') ? 'Emmen' : 'Overig';
           const pKey = `${product}__${location}__${capPerUnit}`;
-          // Stap door volgende verwachte leveringen
-          let cursorDate = new Date(nextDate);
-          let safety = 0;
-          while (cursorDate <= planLastDate && safety < 20) {
-            const idx = dayIndexFor(cursorDate);
-            if (idx >= 0) {
-              const row = ensureDemandRow(pKey);
-              row[idx] += avgAmount;
-            }
-            cursorDate = addDays(cursorDate, avgInterval);
-            safety++;
-          }
+          if (!customerSchedulesPerPKey.has(pKey)) customerSchedulesPerPKey.set(pKey, []);
+          customerSchedulesPerPKey.get(pKey)!.push({
+            customerName: lastDelivery.customer,
+            lastDeliveryDate: lastDelivery.date,
+            medianInterval,
+            avgAmount,
+            deliveryCount: deliveries.length,
+          });
         }
       }
 
@@ -478,7 +480,7 @@ export function useGasFlowPredictor() {
       const stockMap = new Map<string, { current: number, capacityPerUnit: number, location: string }>();
       for (const row of voorraadRows) {
         const product = safeStr(row.ContentDescription || row.SubCodeDescription || row.Product, '');
-        if (!product || product === 'Onbekend') continue;
+        if (!product || product === 'Onbekend' || product.toLowerCase().includes('leeg')) continue;
 
         const rawLoc = safeStr(row.DS_ENTITY_DESCRIPTION || row.CenterDescription || row.DS_CENTER_DESCRIPTION || row.Locatie, '');
         const locStr = rawLoc.toLowerCase();
@@ -490,6 +492,12 @@ export function useGasFlowPredictor() {
         const rowCapacity = exp.cap;
         const rowAantal = exp.aantal;
         const key = `${product}__${location}__${rowCapacity}`;
+
+        const bInfo = detectBundle(rawCapacity, product, row.TypeVerpakking || row.ContainerTypeDescr);
+        const prevMeta = productMetaMap.get(key);
+        if (!prevMeta || (bInfo.isBundle && !prevMeta.isBundle) || bInfo.packSize > prevMeta.packSize) {
+          productMetaMap.set(key, bInfo);
+        }
 
         if (!stockMap.has(key)) {
           stockMap.set(key, { current: 0, capacityPerUnit: rowCapacity, location });
@@ -563,12 +571,12 @@ export function useGasFlowPredictor() {
       }
       deadStock.sort((a, b) => b.currentStock - a.currentStock);
 
-      // ── Bouw FillPlan: per product+locatie de dag-per-dag projectie ──
-      const fillPlan: FillPlanItem[] = [];
-      const SAFETY_BUFFER = 0; // stuks; verhogen voor extra marge
+      // ── Bouw genormaliseerde FillPlanInputs (voor directe herberekening bij buffer/horizon/methode wijziging) ──
       const allFillKeys = new Set<string>([
-        ...Array.from(demandPerDay.keys()),
+        ...Array.from(customerSchedulesPerPKey.keys()),
+        ...Array.from(weekdayTotals12wMap.keys()),
       ]);
+      const fillPlanInputs: FillPlanProductInput[] = [];
       for (const pKey of allFillKeys) {
         const parts = pKey.split('__');
         if (parts.length < 3) continue;
@@ -576,74 +584,26 @@ export function useGasFlowPredictor() {
         if (!product || !location || product === 'Onbekend') continue;
         const capacityPerUnit = Number(capStr) || 1;
         const stock = stockMap.get(pKey);
-        const startStock = stock ? stock.current : 0;
-        const demands = demandPerDay.get(pKey)!;
-        // Som vraag — als nul, sla over
-        const totalDemand = demands.reduce((s, d) => s + d, 0);
-        if (totalDemand <= 0) continue;
-
-        let running = startStock;
-        let totalFill = 0;
-        const perDay = planDays.map((pd, i) => {
-          const expectedDemand = Math.round(demands[i]);
-          const projectedStockBefore = Math.round(running);
-          const projectedStockAfter = Math.round(running - expectedDemand);
-          let suggestedFill = 0;
-          if (projectedStockAfter < SAFETY_BUFFER) {
-            suggestedFill = Math.ceil(SAFETY_BUFFER - projectedStockAfter);
-          }
-          totalFill += suggestedFill;
-          const endStock = projectedStockAfter + suggestedFill;
-          running = endStock;
-          return {
-            date: pd.key,
-            expectedDemand,
-            projectedStockBefore,
-            projectedStockAfter,
-            suggestedFill,
-            endStock: Math.round(endStock),
-          };
-        });
-
-        fillPlan.push({
-          product, location, capacityPerUnit,
-          startStock: Math.round(startStock),
-          totalExpectedDemand: Math.round(totalDemand),
-          totalSuggestedFill: totalFill,
-          perDay,
+        const meta = productMetaMap.get(pKey) || detectBundle(capacityPerUnit, product);
+        fillPlanInputs.push({
+          key: pKey,
+          product,
+          location,
+          capacityPerUnit,
+          isBundle: meta.isBundle,
+          packSize: meta.packSize,
+          startStock: stock ? stock.current : 0,
+          weekdayTotals12w: weekdayTotals12wMap.get(pKey) || [0, 0, 0, 0, 0],
+          customerSchedules: customerSchedulesPerPKey.get(pKey) || [],
         });
       }
-      // Sorteer: meest dringend (vroegste vulling eerst, dan grootste totaalvulling)
-      fillPlan.sort((a, b) => {
-        const aFirstFillDay = a.perDay.findIndex(p => p.suggestedFill > 0);
-        const bFirstFillDay = b.perDay.findIndex(p => p.suggestedFill > 0);
-        const aDay = aFirstFillDay === -1 ? 999 : aFirstFillDay;
-        const bDay = bFirstFillDay === -1 ? 999 : bFirstFillDay;
-        if (aDay !== bDay) return aDay - bDay;
-        return b.totalSuggestedFill - a.totalSuggestedFill;
-      });
 
-      // Per-dag aggregatie voor "wat moet vandaag/morgen gevuld worden"
-      const fillPlanByDay: FillPlanDay[] = planDays.map((pd, i) => {
-        const items = fillPlan
-          .filter(fp => fp.perDay[i].suggestedFill > 0)
-          .map(fp => ({
-            product: fp.product,
-            location: fp.location,
-            capacityPerUnit: fp.capacityPerUnit,
-            expectedDemand: fp.perDay[i].expectedDemand,
-            projectedStockBefore: fp.perDay[i].projectedStockBefore,
-            suggestedFill: fp.perDay[i].suggestedFill,
-          }))
-          .sort((a, b) => b.suggestedFill - a.suggestedFill);
-        const dayLabel = pd.date.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
-        return {
-          date: pd.key,
-          dayLabel,
-          totalExpectedDemand: items.reduce((s, it) => s + it.expectedDemand, 0),
-          totalSuggestedFill: items.reduce((s, it) => s + it.suggestedFill, 0),
-          items,
-        };
+      const { fillPlan, fillPlanByDay } = computeFillPlan(fillPlanInputs, {
+        horizonDays: 5,
+        safetyBuffer: 0,
+        safetyBufferMode: 'units',
+        method: 'hybrid',
+        today,
       });
 
       // 5. Driver Statistics
@@ -828,6 +788,7 @@ export function useGasFlowPredictor() {
         churnRisks,
         fillPlan,
         fillPlanByDay,
+        fillPlanInputs,
         lastUpdated: new Date(),
         _diagnostics: {
           afnameRows: afnameRows.length,
