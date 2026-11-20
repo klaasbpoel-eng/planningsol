@@ -163,6 +163,34 @@ describe("fillPlanning calculation engine", () => {
     expect(plan.fillPlanByDay[0].items[0].suggestedFill).toBe(1);
   });
 
+  it("accumulates fractional daily bundle demand instead of rounding to zero (e.g. Argon 300bar bundles)", () => {
+    // 17 bundles in 12 weeks (~0.28 bundles/day across 5 weekdays) -> ~1.4 bundles in 5 days, ~4.2 bundles in 15 days
+    const argon300 = makeInput({
+      product: "Argon 5.0 in Bundles 300bar",
+      packageType: "Bundel 300 Bar",
+      capacityPerUnit: 50,
+      displayCapacityLiters: 800,
+      isBundle: true,
+      packSize: 16,
+      startStock: 16, // 1 bundle in stock
+      weekdayTotals12w: [3 * 16, 4 * 16, 3 * 16, 3 * 16, 4 * 16], // 17 bundles * 16 cylinders
+      customerSchedules: [],
+    });
+
+    const plan15 = computeFillPlan([argon300], {
+      horizonDays: 15,
+      safetyBuffer: 0,
+      safetyBufferMode: "units",
+      method: "weekday_avg",
+      today: BASE_TODAY,
+    });
+
+    expect(plan15.fillPlan).toHaveLength(1);
+    expect(plan15.fillPlan[0].startStock).toBe(1);
+    expect(plan15.fillPlan[0].totalExpectedDemand).toBeGreaterThanOrEqual(4);
+    expect(plan15.fillPlan[0].totalSuggestedFill).toBeGreaterThanOrEqual(3);
+  });
+
   it("always preserves actual currentStock on every day tab", () => {
     const input = makeInput({
       startStock: 12,

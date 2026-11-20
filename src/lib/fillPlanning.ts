@@ -306,8 +306,7 @@ export function computeFillPlan(
     });
 
     const totalRawDemand = combinedDemand.reduce((s, d) => s + d, 0);
-    const hasAnyRoundedDemand = combinedDemand.some((d) => Math.round(d) > 0);
-    if (totalRawDemand <= 0 || (!hasAnyRoundedDemand && totalRawDemand < 0.5)) continue;
+    if (totalRawDemand < 0.5) continue;
 
     const dailyStdDev = computeDailyStdDev(input.weekdayBuckets12w, input.weekdayTotals12w) / unitDivisor;
     const serviceLevelZ = safetyBufferMode === "service_level" ? serviceLevelToZ(safetyBuffer) : 0;
@@ -316,9 +315,14 @@ export function computeFillPlan(
     let running = startStockUnits;
     let totalFill = 0;
     let totalRoundedDemand = 0;
+    // Fractional demand carryover so low-frequency items (e.g. 0.25 bundles/day = 1.25/week)
+    // accumulate to whole units instead of rounding to 0 on every individual day.
+    let demandCarry = 0;
 
     const perDay: FillPlanDayEntry[] = planDays.map((pd, i) => {
-      const expectedDemand = Math.round(combinedDemand[i]);
+      const withCarry = combinedDemand[i] + demandCarry;
+      const expectedDemand = Math.max(0, Math.round(withCarry));
+      demandCarry = withCarry - expectedDemand;
       totalRoundedDemand += expectedDemand;
       const projectedStockBefore = Math.round(running);
       const projectedStockAfter = Math.round(running - expectedDemand);
