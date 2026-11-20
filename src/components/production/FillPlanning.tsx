@@ -111,7 +111,7 @@ export function FillPlanning() {
         Locatie: it.location,
         Type: it.isBundle ? "Bundel" : "Cilinder",
         "Capaciteit (L)": it.capacityPerUnit,
-        "Voorraad vooraf": it.projectedStockBefore,
+        "Huidige voorraad": it.currentStock,
         "Verwachte vraag": it.expectedDemand,
         "Bufferdoel": it.safetyTarget,
         "Bijvullen (stuks)": it.suggestedFill,
@@ -258,12 +258,12 @@ export function FillPlanning() {
                 Vulplanning komende {horizonDays === 5 ? "werkweek" : `${horizonDays} werkdagen`}
               </CardTitle>
               <CardDescription>
-                {METHOD_LABELS[method].description}. Voorraad rolt per dag mee — vulling vindt plaats wanneer voorraad
-                onder{" "}
+                {METHOD_LABELS[method].description}. De kolom Huidige voorraad toont altijd de actuele voorraad uit
+                Supabase; vulling wordt geadviseerd zodra de cumulatieve vraag onder{" "}
                 {safetyBuffer > 0
                   ? `de veiligheidsbuffer (${safetyBuffer}${safetyBufferMode === "percent" ? "%" : " stuks"})`
                   : "nul"}{" "}
-                dreigt te zakken.
+                dreigt uit te komen.
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2 shrink-0 print:hidden">
@@ -464,7 +464,7 @@ function PerDayView({
                     <TableHead>Product</TableHead>
                     <TableHead>Locatie</TableHead>
                     <TableHead className="text-right">Capaciteit</TableHead>
-                    <TableHead className="text-right">Voorraad</TableHead>
+                    <TableHead className="text-right">Huidige voorraad</TableHead>
                     <TableHead className="text-right">Verwachte vraag</TableHead>
                     {showBufferColumn && <TableHead className="text-right">Bufferdoel</TableHead>}
                     <TableHead className="text-right">Bijvullen</TableHead>
@@ -493,7 +493,7 @@ function PerDayView({
                         {it.capacityPerUnit} L
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
-                        {it.projectedStockBefore.toLocaleString("nl-NL")}
+                        {it.currentStock.toLocaleString("nl-NL")}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm text-amber-600">
                         {it.expectedDemand.toLocaleString("nl-NL")}

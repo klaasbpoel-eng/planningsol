@@ -61,6 +61,7 @@ export interface FillPlanDayProductItem {
   capacityPerUnit: number;
   isBundle: boolean;
   packSize: number;
+  currentStock: number;
   expectedDemand: number;
   projectedStockBefore: number;
   safetyTarget: number;
@@ -253,6 +254,7 @@ export function computeFillPlan(
         capacityPerUnit: fp.capacityPerUnit,
         isBundle: fp.isBundle,
         packSize: fp.packSize,
+        currentStock: fp.startStock,
         expectedDemand: fp.perDay[i].expectedDemand,
         projectedStockBefore: fp.perDay[i].projectedStockBefore,
         safetyTarget: fp.perDay[i].safetyTarget,

@@ -87,6 +87,25 @@ describe("fillPlanning calculation engine", () => {
     expect(plan10.fillPlanByDay[1].date).toBe("2026-11-23");
   });
 
+  it("always preserves actual currentStock on every day tab", () => {
+    const input = makeInput({
+      startStock: 12,
+      weekdayTotals12w: [240, 240, 240, 240, 240], // 20/day every weekday
+      customerSchedules: [],
+    });
+    const plan = computeFillPlan([input], {
+      horizonDays: 5,
+      safetyBuffer: 0,
+      safetyBufferMode: "units",
+      method: "weekday_avg",
+      today: BASE_TODAY,
+    });
+    // Day 0 fills +8 (20 - 12), Day 1 fills +20, but currentStock stays 12 on BOTH days
+    expect(plan.fillPlanByDay[0].items[0].currentStock).toBe(12);
+    expect(plan.fillPlanByDay[1].items[0].currentStock).toBe(12);
+    expect(plan.fillPlanByDay[1].items[0].suggestedFill).toBe(20);
+  });
+
   it("captures sporadic demand via weekday_avg and hybrid methods", () => {
     const sporadicProduct = makeInput({
       product: "Argon 5.0",
