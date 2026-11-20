@@ -16,6 +16,7 @@ import { parseISO, isWithinInterval, isAfter, isBefore, startOfDay, endOfDay } f
 import type { Database } from "@/integrations/supabase/types";
 import type { RolePermissions, AppRole } from "@/hooks/useUserPermissions";
 import { useSearchParams } from "react-router-dom";
+import { useLayoutWidth } from "@/hooks/useLayoutWidth";
 
 type TimeOffRequest = Database["public"]["Tables"]["time_off_requests"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -32,6 +33,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: AdminDashboardProps) {
+  const { width: layoutWidth } = useLayoutWidth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [requests, setRequests] = useState<RequestWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,13 +162,13 @@ export function AdminDashboard({ userEmail, onSwitchView, permissions, role }: A
     <div className="min-h-screen bg-background flex flex-col">
       <Header userEmail={userEmail} isAdmin onSwitchView={onSwitchView} role={role} />
 
-      <div className="flex-1 flex max-w-screen-2xl mx-auto w-full">
+      <div className={`flex-1 flex mx-auto w-full ${layoutWidth === "full" ? "max-w-none" : "max-w-[1800px]"}`}>
         {/* Navigation adapts internally for desktop and mobile. */}
         <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Main Content Area */}
         <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full">
-          <div className="max-w-6xl mx-auto w-full space-y-6">
+          <div className={`mx-auto w-full space-y-6 ${layoutWidth === "full" ? "max-w-none" : "max-w-[1400px]"}`}>
             {activeTab === 'requests' && <DailyOverview />}
 
             {activeTab === 'requests' && (
