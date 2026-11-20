@@ -13,6 +13,12 @@ export interface DataColumn {
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
 const HIDDEN_COLUMNS = new Set(["id"]);
 
+/** Keys (lowercase, letters and digits only) that stay text even when every value is a number,
+ * because they are codes or identifiers, not quantities (RamsesCorrecties uses `Nr dn num`). */
+const TEXT_ONLY_COLUMNS = new Set(["nrdnnum"]);
+
+const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
+
 /** Turns `ArtikelCode`, `artikel_code` or `artikelCode` into "Artikel code". */
 export function humanizeColumnName(key: string): string {
   const words = key
@@ -42,7 +48,7 @@ export function deriveColumns(rows: DataRow[]): DataColumn[] {
   return (visible.length ? visible : keys).map((key) => ({
     key,
     label: humanizeColumnName(key),
-    kind: detectKind(rows.map((r) => r[key])),
+    kind: TEXT_ONLY_COLUMNS.has(normalizeKey(key)) ? "text" : detectKind(rows.map((r) => r[key])),
   }));
 }
 

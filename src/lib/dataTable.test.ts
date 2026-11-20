@@ -18,6 +18,14 @@ describe("deriveColumns", () => {
       ["Omschrijving", "text"],
     ]);
   });
+
+  it("houdt Nr dn num tekst, ook als alle waarden getallen zijn", () => {
+    const cols = deriveColumns([{ "Nr dn num": 1234567, Aantal: 5 }]);
+    const nr = cols.find((c) => c.key === "Nr dn num");
+    expect(nr?.kind).toBe("text");
+    expect(formatCellValue(1234567, nr!.kind)).toBe("1234567");
+    expect(cols.find((c) => c.key === "Aantal")?.kind).toBe("number");
+  });
 });
 
 describe("formatCellValue", () => {
