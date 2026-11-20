@@ -16,6 +16,7 @@ export interface CustomerScheduleInput {
 export interface FillPlanProductInput {
   key: string;
   product: string;
+  packageType: string;        // TypeVerpakking uit Voorraad/Afname (bv. "Cylinders Active Integrated Alu 200 Bar.")
   location: string;
   capacityPerUnit: number;
   isBundle: boolean;
@@ -45,6 +46,7 @@ export interface FillPlanDayEntry {
 
 export interface FillPlanItem {
   product: string;
+  packageType: string;
   location: string;
   capacityPerUnit: number;
   isBundle: boolean;
@@ -57,6 +59,7 @@ export interface FillPlanItem {
 
 export interface FillPlanDayProductItem {
   product: string;
+  packageType: string;
   location: string;
   capacityPerUnit: number;
   isBundle: boolean;
@@ -223,6 +226,7 @@ export function computeFillPlan(
 
     fillPlan.push({
       product: input.product,
+      packageType: input.packageType,
       location: input.location,
       capacityPerUnit: input.capacityPerUnit,
       isBundle: input.isBundle,
@@ -250,6 +254,7 @@ export function computeFillPlan(
       .filter((fp) => fp.perDay[i].suggestedFill > 0)
       .map((fp) => ({
         product: fp.product,
+        packageType: fp.packageType,
         location: fp.location,
         capacityPerUnit: fp.capacityPerUnit,
         isBundle: fp.isBundle,
@@ -281,9 +286,12 @@ export function filterFillPlan(
 ): FillPlanResult {
   const qLower = filters.search.trim().toLowerCase();
 
-  const matches = (item: { product: string; location: string; isBundle: boolean }) => {
+  const matches = (item: { product: string; packageType: string; location: string; isBundle: boolean }) => {
     const matchLoc = filters.location === "Alle" || item.location === filters.location;
-    const matchQ = qLower === "" || item.product.toLowerCase().includes(qLower);
+    const matchQ =
+      qLower === "" ||
+      item.product.toLowerCase().includes(qLower) ||
+      (item.packageType || "").toLowerCase().includes(qLower);
     const matchPkg =
       filters.packageFilter === "Alle" ||
       (filters.packageFilter === "Bundels" ? item.isBundle : !item.isBundle);

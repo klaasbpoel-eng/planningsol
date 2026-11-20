@@ -10,8 +10,9 @@ const BASE_TODAY = new Date(2026, 10, 20); // Friday 20 Nov 2026
 
 function makeInput(overrides: Partial<FillPlanProductInput> = {}): FillPlanProductInput {
   return {
-    key: "Zuurstof 3.5__Emmen__50__false",
+    key: "Zuurstof 3.5__Cylinders__Emmen__50",
     product: "Zuurstof 3.5 in Cilinders",
+    packageType: "Cylinders",
     location: "Emmen",
     capacityPerUnit: 50,
     isBundle: false,

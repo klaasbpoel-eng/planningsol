@@ -277,29 +277,30 @@ export function useGasFlowPredictor() {
         const productName  = row.Product || row.ContentDescription;
         if (!productName || !customerName) continue;
 
-        const prodStr = safeStr(productName);
+        const prodStr = safeStr(productName).trim();
         if (prodStr.toLowerCase().includes('leeg')) continue;
 
-        const bundleInfo = detectBundle(rawCap, prodStr, row.TypeVerpakking || row.ContainerTypeDescription);
+        const pkgType = safeStr(row.TypeVerpakking || row.ContainerTypeDescription, '').trim();
+        const bundleInfo = detectBundle(rawCap, prodStr, pkgType);
         const normLoc = supplyLocDerived.toLowerCase().includes('tilburg')
           ? 'Tilburg'
           : supplyLocDerived.toLowerCase().includes('emmen')
           ? 'Emmen'
           : 'Overig';
-        const pKeyForWeekday = `${prodStr}__${normLoc}__${cap}`;
-        const prevMeta = productMetaMap.get(pKeyForWeekday);
+        const fKey = `${prodStr}__${pkgType}__${normLoc}__${cap}`;
+        const prevMeta = productMetaMap.get(fKey);
         if (!prevMeta || (bundleInfo.isBundle && !prevMeta.isBundle) || bundleInfo.packSize > prevMeta.packSize) {
-          productMetaMap.set(pKeyForWeekday, bundleInfo);
+          productMetaMap.set(fKey, bundleInfo);
         }
 
         // Accumulate 12-week weekday totals [Ma..Vr] (captures ALL customers, including sporadic/one-off orders)
         if (parsedDate >= cutoff12w && aantal > 0) {
           const dow = parsedDate.getDay(); // 0=Sun..6=Sat
           if (dow >= 1 && dow <= 5) {
-            let arr = weekdayTotals12wMap.get(pKeyForWeekday);
+            let arr = weekdayTotals12wMap.get(fKey);
             if (!arr) {
               arr = [0, 0, 0, 0, 0];
-              weekdayTotals12wMap.set(pKeyForWeekday, arr);
+              weekdayTotals12wMap.set(fKey, arr);
             }
             arr[dow - 1] += aantal;
           }
@@ -307,7 +308,7 @@ export function useGasFlowPredictor() {
 
         if (parsedDate < cutoff) continue;
 
-        const key = `${customerName}__${productName}__${cap}__${supplyLocDerived}`;
+        const key = `${customerName}__${prodStr}__${pkgType}__${cap}__${supplyLocDerived}`;
         if (!customerHistory.has(key)) customerHistory.set(key, []);
 
         customerHistory.get(key)!.push({
@@ -316,6 +317,7 @@ export function useGasFlowPredictor() {
           cap,
           city: safeStr(row.Stad || row.TX_CITY || row.City || row.CustomerCity, 'Unknown'),
           product: prodStr,
+          packageType: pkgType,
           customer: safeStr(customerName),
           supplyLocation: supplyLocDerived,
           driver: safeStr(row.Gebruiker || row.UserName || row.Username || row.username || row.User)
@@ -442,11 +444,12 @@ export function useGasFlowPredictor() {
         // ── Vulplanning: sla klantschema op voor dynamische herberekening (elke horizon/buffer/methode) ──
         {
           const product = lastDelivery.product;
+          const packageType = lastDelivery.packageType || '';
           const supplyLocStr = lastDelivery.supplyLocation.toLowerCase();
           const location = supplyLocStr.includes('tilburg') ? 'Tilburg' : supplyLocStr.includes('emmen') ? 'Emmen' : 'Overig';
-          const pKey = `${product}__${location}__${capPerUnit}`;
-          if (!customerSchedulesPerPKey.has(pKey)) customerSchedulesPerPKey.set(pKey, []);
-          customerSchedulesPerPKey.get(pKey)!.push({
+          const fKey = `${product}__${packageType}__${location}__${capPerUnit}`;
+          if (!customerSchedulesPerPKey.has(fKey)) customerSchedulesPerPKey.set(fKey, []);
+          customerSchedulesPerPKey.get(fKey)!.push({
             customerName: lastDelivery.customer,
             lastDeliveryDate: lastDelivery.date,
             medianInterval,
@@ -476,10 +479,11 @@ export function useGasFlowPredictor() {
         return acc;
       }, new Map<string, CustomerHotspot>()).values()).sort((a, b) => a.nextDeliveryDate.getTime() - b.nextDeliveryDate.getTime());
 
-      // 2. Aggregate current stock (Voorraad) — key includes capacity per unit
+      // 2. Aggregate current stock (Voorraad) — key includes capacity per unit (and separate map with TypeVerpakking for fill planning)
       const stockMap = new Map<string, { current: number, capacityPerUnit: number, location: string }>();
+      const fillStockMap = new Map<string, number>();
       for (const row of voorraadRows) {
-        const product = safeStr(row.ContentDescription || row.SubCodeDescription || row.Product, '');
+        const product = safeStr(row.ContentDescription || row.SubCodeDescription || row.Product, '').trim();
         if (!product || product === 'Onbekend' || product.toLowerCase().includes('leeg')) continue;
 
         const rawLoc = safeStr(row.DS_ENTITY_DESCRIPTION || row.CenterDescription || row.DS_CENTER_DESCRIPTION || row.Locatie, '');
@@ -493,16 +497,19 @@ export function useGasFlowPredictor() {
         const rowAantal = exp.aantal;
         const key = `${product}__${location}__${rowCapacity}`;
 
-        const bInfo = detectBundle(rawCapacity, product, row.TypeVerpakking || row.ContainerTypeDescr);
-        const prevMeta = productMetaMap.get(key);
+        const pkgType = safeStr(row.TypeVerpakking || row.ContainerTypeDescr, '').trim();
+        const fKey = `${product}__${pkgType}__${location}__${rowCapacity}`;
+        const bInfo = detectBundle(rawCapacity, product, pkgType);
+        const prevMeta = productMetaMap.get(fKey);
         if (!prevMeta || (bInfo.isBundle && !prevMeta.isBundle) || bInfo.packSize > prevMeta.packSize) {
-          productMetaMap.set(key, bInfo);
+          productMetaMap.set(fKey, bInfo);
         }
 
         if (!stockMap.has(key)) {
           stockMap.set(key, { current: 0, capacityPerUnit: rowCapacity, location });
         }
         stockMap.get(key)!.current += rowAantal; // stuks
+        fillStockMap.set(fKey, (fillStockMap.get(fKey) || 0) + rowAantal);
       }
 
       // 3. Gap Analysis
@@ -577,24 +584,27 @@ export function useGasFlowPredictor() {
         ...Array.from(weekdayTotals12wMap.keys()),
       ]);
       const fillPlanInputs: FillPlanProductInput[] = [];
-      for (const pKey of allFillKeys) {
-        const parts = pKey.split('__');
-        if (parts.length < 3) continue;
-        const [product, location, capStr] = parts;
+      for (const fKey of allFillKeys) {
+        const parts = fKey.split('__');
+        if (parts.length < 4) continue;
+        const [product, packageType, location, capStr] = parts;
         if (!product || !location || product === 'Onbekend') continue;
         const capacityPerUnit = Number(capStr) || 1;
-        const stock = stockMap.get(pKey);
-        const meta = productMetaMap.get(pKey) || detectBundle(capacityPerUnit, product);
+        const exactStock = fillStockMap.get(fKey);
+        const fallbackStock = stockMap.get(`${product}__${location}__${capacityPerUnit}`)?.current ?? 0;
+        const startStock = exactStock !== undefined ? exactStock : (packageType ? 0 : fallbackStock);
+        const meta = productMetaMap.get(fKey) || detectBundle(capacityPerUnit, product, packageType);
         fillPlanInputs.push({
-          key: pKey,
+          key: fKey,
           product,
+          packageType,
           location,
           capacityPerUnit,
           isBundle: meta.isBundle,
           packSize: meta.packSize,
-          startStock: stock ? stock.current : 0,
-          weekdayTotals12w: weekdayTotals12wMap.get(pKey) || [0, 0, 0, 0, 0],
-          customerSchedules: customerSchedulesPerPKey.get(pKey) || [],
+          startStock,
+          weekdayTotals12w: weekdayTotals12wMap.get(fKey) || [0, 0, 0, 0, 0],
+          customerSchedules: customerSchedulesPerPKey.get(fKey) || [],
         });
       }
 

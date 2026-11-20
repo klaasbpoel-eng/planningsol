@@ -108,6 +108,7 @@ export function FillPlanning() {
         Datum: d.date,
         Dag: d.dayLabel,
         Product: it.product,
+        Verpakking: it.packageType || (it.isBundle ? "Bundel" : "Cilinder"),
         Locatie: it.location,
         Type: it.isBundle ? "Bundel" : "Cilinder",
         "Capaciteit (L)": it.capacityPerUnit,
@@ -132,6 +133,7 @@ export function FillPlanning() {
     const productRows = filteredFillPlan.map((fp) => {
       const row: Record<string, string | number> = {
         Product: fp.product,
+        Verpakking: fp.packageType || (fp.isBundle ? "Bundel" : "Cilinder"),
         Locatie: fp.location,
         Type: fp.isBundle ? "Bundel" : "Cilinder",
         "Capaciteit (L)": fp.capacityPerUnit,
@@ -279,10 +281,10 @@ export function FillPlanning() {
           {/* Primary filters row */}
           <div className="flex flex-col lg:flex-row flex-wrap gap-2 items-stretch lg:items-center justify-between pt-1 print:hidden">
             <div className="flex flex-col sm:flex-row flex-wrap gap-2 items-stretch sm:items-center">
-              <div className="relative w-full sm:w-52">
+              <div className="relative w-full sm:w-60">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Zoek product..."
+                  placeholder="Zoek product of verpakking..."
                   className="pl-8"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
@@ -462,6 +464,7 @@ function PerDayView({
                 <TableHeader className="bg-muted/50 whitespace-nowrap">
                   <TableRow>
                     <TableHead>Product</TableHead>
+                    <TableHead>Verpakking</TableHead>
                     <TableHead>Locatie</TableHead>
                     <TableHead className="text-right">Capaciteit</TableHead>
                     <TableHead className="text-right">Huidige voorraad</TableHead>
@@ -472,7 +475,7 @@ function PerDayView({
                 </TableHeader>
                 <TableBody>
                   {d.items.map((it) => (
-                    <TableRow key={`${it.product}_${it.location}_${it.capacityPerUnit}_${it.isBundle}`}>
+                    <TableRow key={`${it.product}_${it.packageType}_${it.location}_${it.capacityPerUnit}_${it.isBundle}`}>
                       <TableCell className="font-medium text-primary">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span>{it.product}</span>
@@ -483,6 +486,9 @@ function PerDayView({
                             </Badge>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {it.packageType || "—"}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="font-normal text-muted-foreground bg-background">
@@ -539,6 +545,7 @@ function PerProductView({ items, dayLabels }: { items: FillPlanItem[]; dayLabels
         <TableHeader className="bg-muted/50 whitespace-nowrap">
           <TableRow>
             <TableHead className="sticky left-0 bg-muted/50 z-10">Product</TableHead>
+            <TableHead>Verpakking</TableHead>
             <TableHead>Locatie</TableHead>
             <TableHead className="text-right">Cap.</TableHead>
             <TableHead className="text-right">Start</TableHead>
@@ -553,7 +560,7 @@ function PerProductView({ items, dayLabels }: { items: FillPlanItem[]; dayLabels
         <TableBody>
           {items.map((fp) => (
             <TableRow
-              key={`${fp.product}_${fp.location}_${fp.capacityPerUnit}_${fp.isBundle}`}
+              key={`${fp.product}_${fp.packageType}_${fp.location}_${fp.capacityPerUnit}_${fp.isBundle}`}
               className={fp.totalSuggestedFill > 0 ? "" : "opacity-60"}
             >
               <TableCell className="font-medium text-primary sticky left-0 bg-background z-10">
@@ -565,6 +572,9 @@ function PerProductView({ items, dayLabels }: { items: FillPlanItem[]; dayLabels
                     </Badge>
                   )}
                 </div>
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                {fp.packageType || "—"}
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className="font-normal text-muted-foreground bg-background">
