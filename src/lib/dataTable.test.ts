@@ -38,6 +38,14 @@ describe("deriveColumns", () => {
     expect(formatCellValue(1234567, nr!.kind)).toBe("1234567");
     expect(cols.find((c) => c.key === "Aantal")?.kind).toBe("number");
   });
+
+  it("houdt OTHER_NR_DN_NUM tekst, ook als alle waarden getallen zijn", () => {
+    const cols = deriveColumns([{ OTHER_NR_DN_NUM: 1234567, Capaciteit: 5 }]);
+    const other = cols.find((c) => c.key === "OTHER_NR_DN_NUM");
+    expect(other?.kind).toBe("text");
+    expect(formatCellValue(1234567, other!.kind)).toBe("1234567");
+    expect(cols.find((c) => c.key === "Capaciteit")?.kind).toBe("number");
+  });
 });
 
 describe("formatCellValue", () => {

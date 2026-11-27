@@ -43,8 +43,9 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|
 const HIDDEN_COLUMNS = new Set(["id", "createdat"]);
 
 /** Keys (lowercase, letters and digits only) that stay text even when every value is a number,
- * because they are codes or identifiers, not quantities (RamsesCorrecties uses `Nr dn num`). */
-const TEXT_ONLY_COLUMNS = new Set(["nrdnnum"]);
+ * because they are codes or identifiers, not quantities (RamsesCorrecties uses `Nr dn num`
+ * and `OTHER_NR_DN_NUM`). */
+const TEXT_ONLY_COLUMNS = new Set(["nrdnnum", "othernrdnnum"]);
 
 const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
 
