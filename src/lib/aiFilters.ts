@@ -1,5 +1,5 @@
 /** Turns the filter plan that Lovable AI made from a plain-language request into database conditions. */
-import { buildValueFilter, formatCellValue, type ColumnFilter, type DataColumn } from "@/lib/dataTable";
+import { buildValueFilter, formatCellValue, parseListValue, type ColumnFilter, type DataColumn } from "@/lib/dataTable";
 
 export type AiOperator = "contains" | "equals" | "one_of" | "gt" | "gte" | "lt" | "lte";
 
@@ -50,7 +50,7 @@ function words(column: DataColumn, op: "gt" | "gte" | "lt" | "lte"): string {
 }
 
 /** Conditions and a Dutch description for one AI filter; null when it does not fit the column. */
-function toRule(column: DataColumn, filter: AiPlanFilter): Omit<AiRule, "id"> | null {
+function toRule(column: DataColumn, filter: AiPlanFilter, known: string[] = []): Omit<AiRule, "id"> | null {
   const value = (filter.value ?? "").trim();
   const name = column.label;
 
@@ -70,6 +70,15 @@ function toRule(column: DataColumn, filter: AiPlanFilter): Omit<AiRule, "id"> | 
   if (filter.operator === "contains") {
     const text = clean(value);
     if (column.kind !== "text" || !text) return null;
+    if (column.list === "array") {
+      // Real lists cannot be searched with "contains": use the known items that contain the text.
+      const needle = text.toLowerCase();
+      const matches = [...new Set(known)].filter((v) => v.toLowerCase().includes(needle));
+      return {
+        description: `${name} bevat "${text}"`,
+        filters: matches.length ? buildValueFilter(column, matches) : [{ key: column.key, op: "cs", value: JSON.stringify([text]) }],
+      };
+    }
     return { description: `${name} bevat "${text}"`, filters: [{ key: column.key, op: "ilike", value: `*${text}*` }] };
   }
 
@@ -99,6 +108,7 @@ function toRule(column: DataColumn, filter: AiPlanFilter): Omit<AiRule, "id"> | 
     }
     const text = clean(value);
     if (!text) return null;
+    if (column.list === "array") return { description: `${name} is "${text}"`, filters: [{ key: column.key, op: "cs", value: JSON.stringify([text]) }] };
     // Same text, any capitals.
     return { description: `${name} is "${text}"`, filters: [{ key: column.key, op: "ilike", value: text }] };
   }
@@ -123,14 +133,26 @@ function toRule(column: DataColumn, filter: AiPlanFilter): Omit<AiRule, "id"> | 
 }
 
 /** Usable rules from the AI's plan, plus how many suggestions had to be left out. */
-export function planToRules(columns: DataColumn[], plan: AiFilterPlan): { rules: AiRule[]; skipped: number } {
+/** Every list item that occurs in the loaded rows, per list column, plus extra known values. */
+export function knownListItems(columns: DataColumn[], rows: Record<string, unknown>[], extra: Record<string, string[]> = {}) {
+  const known: Record<string, string[]> = {};
+  for (const column of columns) {
+    if (!column.list) continue;
+    const items = new Set(extra[column.key] ?? []);
+    for (const row of rows) for (const item of parseListValue(row[column.key]) ?? []) items.add(String(item));
+    known[column.key] = [...items];
+  }
+  return known;
+}
+
+export function planToRules(columns: DataColumn[], plan: AiFilterPlan, known: Record<string, string[]> = {}): { rules: AiRule[]; skipped: number } {
   const rules: AiRule[] = [];
   let skipped = 0;
   const used = new Set<number>();
   plan.filters.forEach((filter, index) => {
     if (used.has(index)) return;
     const column = columns.find((c) => c.key === filter.column);
-    const rule = column ? toRule(column, filter) : null;
+    const rule = column ? toRule(column, filter, known[column.key]) : null;
     if (!column || !rule) {
       skipped += 1;
       return;

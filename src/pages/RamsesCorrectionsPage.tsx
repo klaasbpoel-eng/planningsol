@@ -26,7 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { planToRules, sampleValues, type AiRule } from "@/lib/aiFilters";
+import { knownListItems, planToRules, sampleValues, type AiRule } from "@/lib/aiFilters";
 import { requestFilterPlan } from "@/lib/aiFilterClient";
 import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, buildPeriodFilter, PERIOD_PRESETS, type PeriodPreset, parseListValue, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
 
@@ -341,7 +341,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
         samples: sampleValues(visibleColumns, rows, extra),
         today: format(new Date(), "yyyy-MM-dd"),
       });
-      const { rules, skipped } = planToRules(visibleColumns, plan);
+      const { rules, skipped } = planToRules(visibleColumns, plan, knownListItems(visibleColumns, rows, extra));
       setAiRules(rules);
       setAiExplanation(
         rules.length === 0

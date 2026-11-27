@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planToRules, sampleValues, type AiPlanFilter } from "./aiFilters";
+import { knownListItems, planToRules, sampleValues, type AiPlanFilter } from "./aiFilters";
 import type { DataColumn } from "./dataTable";
 
 const columns: DataColumn[] = [
@@ -72,5 +72,14 @@ describe("AI-filters omzetten", () => {
       tx_en_operator: ["De Vries", "Jansen"],
       aantal: ["3"],
     });
+  });
+});
+
+describe("AI-filter op lijstkolommen", () => {
+  it("zoekt 'bevat' in een echte lijstkolom via de bekende klanten, niet met ilike", () => {
+    const columns = [{ key: "Klant", label: "Klant", kind: "text", list: "array" }] as const;
+    const known = knownListItems([...columns], [{ Klant: ["UMCG", "AZG Post"] }, { Klant: ["Martini"] }]);
+    const { rules } = planToRules([...columns], { explanation: "", filters: [{ column: "Klant", operator: "contains", value: "umcg", values: [] }] }, known);
+    expect(rules[0].filters).toEqual([{ key: "Klant", op: "or", value: 'Klant.cs.["UMCG"]' }]);
   });
 });
