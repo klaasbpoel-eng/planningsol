@@ -7,9 +7,9 @@ import type { ProtectedRouteChildProps } from "@/components/auth/ProtectedRoute"
 
 // Two rows on one day and one row on the next day: the day is the group, the time of day is not shown.
 const ROWS = vi.hoisted(() => [
-  { id: 1, dt_dn: "2026-11-03T10:45:02", code: "A1" },
-  { id: 2, dt_dn: "2026-11-03T11:51:00", code: "A2" },
-  { id: 3, dt_dn: "2026-11-04T09:15:00", code: "A3" },
+  { id: 1, dt_dn: "2026-11-03T10:45:02", code: "A1", created_at: "2026-11-27T13:26:08.691118+00:00" },
+  { id: 2, dt_dn: "2026-11-03T11:51:00", code: "A2", created_at: "2026-11-27T13:26:08.691118+00:00" },
+  { id: 3, dt_dn: "2026-11-04T09:15:00", code: "A3", created_at: "2026-11-27T13:26:08.691118+00:00" },
 ]);
 
 // Column filters the page sends to the database, recorded so tests can read them back.
@@ -144,6 +144,21 @@ describe("tijdgroepen op de Ramses-correctiespagina", () => {
     // ...but the date is still there, in the header of each time group.
     expect(screen.getByRole("button", { name: "Klap tijdgroep 03-11-2026" })).toBeInTheDocument();
     expect(screen.getByText("2 regels")).toBeInTheDocument();
+  });
+
+  it("laat de kolom Created at nergens zien", async () => {
+    await openPage();
+    // Not a column of the table, and its value is nowhere on screen.
+    expect(screen.queryByRole("button", { name: /Sorteer op Created at/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/27-11-2026|13:26/)).not.toBeInTheDocument();
+    // No name field for it in the column-name dialog.
+    fireEvent.click(screen.getByRole("button", { name: "Kolomnamen" }));
+    expect(columnNameInput("created_at")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Sluiten" }));
+    // Not offered as a filter column either.
+    fireEvent.click(screen.getByRole("combobox", { name: /Kolom kiezen om op te filteren/ }));
+    await screen.findByRole("option", { name: "Code" });
+    expect(screen.queryByRole("option", { name: "Created at" })).not.toBeInTheDocument();
   });
 
   it("sorteert op datum via de knop bij de tijdgroepen", async () => {

@@ -38,7 +38,9 @@ function detectList(values: unknown[]): "array" | "text" | undefined {
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
-const HIDDEN_COLUMNS = new Set(["id"]);
+/** Technical columns that are never shown: the database key and the moment a row was loaded.
+ * Matched on the normalized key, so `created_at`, `createdAt` and `Created at` all count. */
+const HIDDEN_COLUMNS = new Set(["id", "createdat"]);
 
 /** Keys (lowercase, letters and digits only) that stay text even when every value is a number,
  * because they are codes or identifiers, not quantities (RamsesCorrecties uses `Nr dn num`). */
@@ -65,13 +67,13 @@ function detectKind(values: unknown[]): ColumnKind {
   return "text";
 }
 
-/** Columns in the order they first appear, technical `id` left out when other columns exist. */
+/** Columns in the order they first appear, technical columns such as `id` and `created_at` left out when other columns exist. */
 export function deriveColumns(rows: DataRow[]): DataColumn[] {
   const keys: string[] = [];
   for (const row of rows) {
     for (const key of Object.keys(row)) if (!keys.includes(key)) keys.push(key);
   }
-  const visible = keys.filter((k) => !HIDDEN_COLUMNS.has(k));
+  const visible = keys.filter((k) => !HIDDEN_COLUMNS.has(normalizeKey(k)));
   return (visible.length ? visible : keys).map((key) => {
     const values = rows.map((r) => r[key]);
     const list = detectList(values);

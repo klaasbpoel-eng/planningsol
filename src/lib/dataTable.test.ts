@@ -19,6 +19,18 @@ describe("deriveColumns", () => {
     ]);
   });
 
+  it("verbergt created_at, terwijl de datumkolom de groepering blijft", () => {
+    const rows = [
+      { id: 1, Datum: "2026-01-02T00:00:00+00:00", Capaciteit: 2, created_at: "2026-11-27T13:26:08.691118+00:00" },
+      { id: 2, Datum: "2026-01-05T00:00:00+00:00", Capaciteit: 3, created_at: "2026-11-27T13:26:08.691118+00:00" },
+    ];
+    const cols = deriveColumns(rows);
+    expect(cols.map((c) => c.key)).toEqual(["Datum", "Capaciteit"]);
+    // The grouping column is still the real date, not the load moment.
+    expect(findTimestampColumn(cols)).toBe("Datum");
+    expect(rowsToCsv(cols, rows)).not.toContain("Created at");
+  });
+
   it("houdt Nr dn num tekst, ook als alle waarden getallen zijn", () => {
     const cols = deriveColumns([{ "Nr dn num": 1234567, Aantal: 5 }]);
     const nr = cols.find((c) => c.key === "Nr dn num");
