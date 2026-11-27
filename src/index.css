@@ -376,8 +376,35 @@ All colors MUST be HSL.
   }
 
   .print-daily-overview,
-  .print-daily-overview * {
+  .print-daily-overview *,
+  .print-picklist,
+  .print-picklist * {
     visibility: visible !important;
+  }
+
+  /* Order-picking list (Orderpicken page) */
+  .print-picklist {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white !important;
+    color: #1a1a1a !important;
+  }
+
+  .print-picklist * {
+    background: transparent !important;
+    color: #1a1a1a !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .print-picklist .rounded-lg {
+    border: 1px solid #999 !important;
+    min-height: 0 !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+    break-inside: avoid;
   }
 
   .print-daily-overview {

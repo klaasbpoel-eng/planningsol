@@ -147,7 +147,7 @@ function OrderPickingContent({ userEmail, userId, role, isAdmin }: { userEmail?:
 
   return (
     <PageLayout userEmail={userEmail} role={role} isAdmin={isAdmin} title="Orderpicken" description="Zet per chauffeur de orders klaar en tik regels af zodra ze gepickt zijn." titleIcon={<PackageCheck className="h-6 w-6 text-primary" />}>
-      <div className="space-y-4">
+      <div className="space-y-4 print-picklist">
         <Card className="glass-card print:hidden">
           <CardContent className="space-y-4 pt-6">
             <div className="flex flex-wrap items-center gap-2">
