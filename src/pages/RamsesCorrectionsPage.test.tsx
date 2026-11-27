@@ -89,12 +89,18 @@ async function openPage() {
 const columnNameInput = (key: string) => document.getElementById(`kolomnaam-${key}`) as HTMLInputElement;
 
 describe("tijdgroepen op de Ramses-correctiespagina", () => {
-  it("toont per tijdgroep een kop met het aantal regels", async () => {
+  it("toont per tijdgroep een kop met het aantal correcties", async () => {
     await openPage();
     expect(screen.getByRole("button", { name: "Klap tijdgroep 03-11-2026" })).toBeInTheDocument();
-    expect(screen.getByText("2 regels")).toBeInTheDocument();
-    expect(screen.getByText("1 regel")).toBeInTheDocument();
+    expect(screen.getByText("2 correcties")).toBeInTheDocument();
+    expect(screen.getByText("1 correctie")).toBeInTheDocument();
     expect(screen.getByText("2 tijdgroepen op deze pagina")).toBeInTheDocument();
+  });
+
+  it("noemt het aantal boven de tabel correcties, geen regels", async () => {
+    await openPage();
+    expect(screen.getByText("3 correcties")).toBeInTheDocument();
+    expect(screen.queryByText(/regels?/i)).not.toBeInTheDocument();
   });
 
   it("toont in de groepskop alleen de dag, niet de tijd", async () => {
@@ -143,7 +149,7 @@ describe("tijdgroepen op de Ramses-correctiespagina", () => {
     }
     // ...but the date is still there, in the header of each time group.
     expect(screen.getByRole("button", { name: "Klap tijdgroep 03-11-2026" })).toBeInTheDocument();
-    expect(screen.getByText("2 regels")).toBeInTheDocument();
+    expect(screen.getByText("2 correcties")).toBeInTheDocument();
   });
 
   it("laat de kolom Created at nergens zien", async () => {

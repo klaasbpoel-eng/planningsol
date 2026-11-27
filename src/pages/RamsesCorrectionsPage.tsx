@@ -36,6 +36,9 @@ const EXPORT_BATCH = 1000;
 // Rows read to build a tick list of values; enough for the whole table in normal use.
 const VALUE_SCAN_LIMIT = 20000;
 
+/** "1 correctie" / "3 correcties" — the table shows corrections, not generic rows. */
+const correctieWord = (count: number) => (count === 1 ? "correctie" : "correcties");
+
 export default function RamsesCorrectionsPage() {
   return (
     <ProtectedRoute>
@@ -381,7 +384,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
             <ChevronRight className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
             <span className="whitespace-nowrap">{group.empty ? "Zonder tijdstip" : group.label}</span>
             <span className="whitespace-nowrap text-muted-foreground/70">
-              {count.toLocaleString("nl-NL")} {count === 1 ? "regel" : "regels"}
+              {count.toLocaleString("nl-NL")} {correctieWord(count)}
             </span>
           </button>
         </TableCell>
@@ -407,7 +410,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
       link.download = `ramses-correcties-${new Date().toLocaleDateString("nl-NL").replace(/\//g, "-")}.csv`;
       link.click();
       URL.revokeObjectURL(url);
-      toast({ title: "Export klaar", description: `${all.length.toLocaleString("nl-NL")} regels gedownload.` });
+      toast({ title: "Export klaar", description: `${all.length.toLocaleString("nl-NL")} ${correctieWord(all.length)} gedownload.` });
     } catch (e: any) {
       toast({ title: "Export mislukt", description: e.message, variant: "destructive" });
     } finally {
@@ -430,7 +433,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
           <div>
             <CardTitle>Correcties</CardTitle>
             <CardDescription>
-              {loading ? "Laden…" : `${total.toLocaleString("nl-NL")} ${total === 1 ? "regel" : "regels"}${anyFilter ? " gevonden" : ""}`}
+              {loading ? "Laden…" : `${total.toLocaleString("nl-NL")} ${correctieWord(total)}${anyFilter ? " gevonden" : ""}`}
             </CardDescription>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -603,7 +606,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                   <div className="flex items-center justify-between gap-2 border-t p-2 text-xs text-muted-foreground">
                     <span>
                       {valueList?.partial
-                        ? `Eerste ${VALUE_SCAN_LIMIT.toLocaleString("nl-NL")} regels bekeken`
+                        ? `Eerste ${VALUE_SCAN_LIMIT.toLocaleString("nl-NL")} correcties bekeken`
                         : `${(valueList?.values.length ?? 0).toLocaleString("nl-NL")} verschillende waarden`}
                     </span>
                     <Button
@@ -730,7 +733,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
 
           <div className="flex flex-col items-center justify-between gap-3 text-sm text-muted-foreground sm:flex-row">
             <div className="flex items-center gap-2">
-              <span>Regels per pagina</span>
+              <span>Correcties per pagina</span>
               <Select
                 value={String(pageSize)}
                 onValueChange={(v) => {
