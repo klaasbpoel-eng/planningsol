@@ -345,7 +345,7 @@ export function GasMixtureRecipemaker() {
   };
 
   return (
-    <div className="space-y-6 print:space-y-4">
+    <div className="space-y-6 print:space-y-4 print-area">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2 print:hidden">
         <div className="flex items-center gap-2">

@@ -377,13 +377,13 @@ All colors MUST be HSL.
 
   .print-daily-overview,
   .print-daily-overview *,
-  .print-picklist,
-  .print-picklist * {
+  .print-area,
+  .print-area * {
     visibility: visible !important;
   }
 
-  /* Order-picking list (Orderpicken page) */
-  .print-picklist {
+  /* Generic printable region: every screen with a print button marks what it prints with .print-area */
+  .print-area {
     position: absolute;
     left: 0;
     top: 0;
@@ -392,6 +392,7 @@ All colors MUST be HSL.
     color: #1a1a1a !important;
   }
 
+  /* Order-picking list (Orderpicken page) */
   .print-picklist * {
     background: transparent !important;
     color: #1a1a1a !important;

@@ -361,7 +361,7 @@ export function VoorraadBeheer({ selectedLocation = "all", refreshKey }: Voorraa
 
   return (
     <TooltipProvider>
-    <div className="space-y-3">
+    <div className="space-y-3 print-area">
 
       {/* ── Row 1: Locatie + acties ── */}
       <div className="flex items-center justify-between gap-3">

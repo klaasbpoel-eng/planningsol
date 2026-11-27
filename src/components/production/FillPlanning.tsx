@@ -200,7 +200,7 @@ export function FillPlanning() {
   const activeDay = filteredByDay.find((d) => d.date === selectedDay) ?? filteredByDay[0];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 print-area">
       {/* Print-only header */}
       <div className="hidden print:block mb-4 border-b pb-3">
         <h1 className="text-xl font-bold">

@@ -111,7 +111,7 @@ export function ToolboxViewer({ open, onOpenChange, toolbox }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl h-[95vh] flex flex-col p-0 gap-0 overflow-hidden bg-white dark:bg-zinc-950 [&>button:last-child]:hidden">
+      <DialogContent className="max-w-5xl h-[95vh] flex flex-col p-0 gap-0 overflow-hidden print-area print:h-auto print:overflow-visible print:translate-x-0 print:translate-y-0 print:max-w-none bg-white dark:bg-zinc-950 [&>button:last-child]:hidden">
 
         {/* Branding Header */}
         <div className="h-16 border-b flex items-center justify-between px-6 bg-white dark:bg-zinc-900 shrink-0">

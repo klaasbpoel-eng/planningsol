@@ -126,7 +126,7 @@ export function DayView({
 
               {/* Printbriefing */}
               {printGroupKey === groupKey && (
-                <div className="rounded border border-border/60 bg-white p-3 text-xs space-y-2 print-briefing print:block! hidden:block">
+                <div className="rounded border border-border/60 bg-white p-3 text-xs space-y-2 print-briefing print-area print:block! hidden:block">
                   <div className="flex justify-between items-start border-b pb-2">
                     <div>
                       <div className="font-bold text-sm">{label}</div>
