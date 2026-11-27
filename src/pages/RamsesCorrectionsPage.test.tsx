@@ -5,11 +5,11 @@ import type { ReactNode } from "react";
 import { getPermissionsForRole } from "@/hooks/useUserPermissions";
 import type { ProtectedRouteChildProps } from "@/components/auth/ProtectedRoute";
 
-// Two rows share the same displayed minute, so they must end up in one collapsible group.
+// Two rows on one day and one row on the next day: the day is the group, the time of day is not shown.
 const ROWS = vi.hoisted(() => [
   { id: 1, dt_dn: "2026-11-03T10:45:02", code: "A1" },
-  { id: 2, dt_dn: "2026-11-03T10:45:41", code: "A2" },
-  { id: 3, dt_dn: "2026-11-03T11:51:00", code: "A3" },
+  { id: 2, dt_dn: "2026-11-03T11:51:00", code: "A2" },
+  { id: 3, dt_dn: "2026-11-04T09:15:00", code: "A3" },
 ]);
 
 // Column filters the page sends to the database, recorded so tests can read them back.
@@ -91,15 +91,22 @@ const columnNameInput = (key: string) => document.getElementById(`kolomnaam-${ke
 describe("tijdgroepen op de Ramses-correctiespagina", () => {
   it("toont per tijdgroep een kop met het aantal regels", async () => {
     await openPage();
-    expect(screen.getByRole("button", { name: "Klap tijdgroep 03-11-2026, 10:45" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Klap tijdgroep 03-11-2026" })).toBeInTheDocument();
     expect(screen.getByText("2 regels")).toBeInTheDocument();
     expect(screen.getByText("1 regel")).toBeInTheDocument();
     expect(screen.getByText("2 tijdgroepen op deze pagina")).toBeInTheDocument();
   });
 
+  it("toont in de groepskop alleen de dag, niet de tijd", async () => {
+    await openPage();
+    expect(screen.getByRole("button", { name: "Klap tijdgroep 03-11-2026" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Klap tijdgroep 04-11-2026" })).toBeInTheDocument();
+    expect(screen.queryByText(/10:45|11:51|09:15/)).not.toBeInTheDocument();
+  });
+
   it("klapt een tijdgroep in en weer uit", async () => {
     await openPage();
-    const header = groupHeader("03-11-2026, 10:45");
+    const header = groupHeader("03-11-2026");
     expect(header).toHaveAttribute("aria-expanded", "true");
 
     fireEvent.click(header);
@@ -135,7 +142,7 @@ describe("tijdgroepen op de Ramses-correctiespagina", () => {
       expect(row.querySelectorAll("td")).toHaveLength(1);
     }
     // ...but the date is still there, in the header of each time group.
-    expect(screen.getByRole("button", { name: "Klap tijdgroep 03-11-2026, 10:45" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Klap tijdgroep 03-11-2026" })).toBeInTheDocument();
     expect(screen.getByText("2 regels")).toBeInTheDocument();
   });
 
@@ -157,7 +164,7 @@ describe("tijdgroepen op de Ramses-correctiespagina", () => {
     const rows = ["A1", "A2", "A3"].map(
       (code) => screen.getByText(code).closest("tr") as HTMLTableRowElement,
     );
-    const headers = ["03-11-2026, 10:45", "03-11-2026, 11:51"].map(
+    const headers = ["03-11-2026", "04-11-2026"].map(
       (time) => groupHeader(time).closest("tr") as HTMLTableRowElement,
     );
     expect(rows).toHaveLength(3);

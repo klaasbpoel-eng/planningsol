@@ -185,6 +185,17 @@ export function formatCellValue(value: unknown, kind: ColumnKind): string {
   return String(value);
 }
 
+/**
+ * Display value without the time of day: "2026-11-03T10:45:02" and "2026-11-03" both become "03-11-2026".
+ * Used when rows are grouped per day, so a group header does not show a time the user does not need.
+ */
+export function formatDateOnlyValue(value: unknown, kind: ColumnKind): string {
+  if (typeof value === "string" && ISO_DATE.test(value.trim())) {
+    return formatCellValue(value.trim().split(/[T ]/)[0], "date");
+  }
+  return formatCellValue(value, kind);
+}
+
 /** PostgREST column reference: quoted when the name contains spaces or other special characters. */
 export function quoteColumnName(key: string): string {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(key) ? key : `"${key.replace(/"/g, "")}"`;

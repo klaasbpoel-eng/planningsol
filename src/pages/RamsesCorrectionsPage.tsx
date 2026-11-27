@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { planToRules, sampleValues, type AiRule } from "@/lib/aiFilters";
 import { requestFilterPlan } from "@/lib/aiFilterClient";
-import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, groupRowsByTimestamp, parseListValue, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
+import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, parseListValue, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
 
 const TABLE_NAME = "RamsesCorrecties";
 const PAGE_SIZES = [25, 50, 100];
@@ -211,8 +211,8 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const groups = useMemo(() => {
     if (!timestampKey) return null;
     const kind = visibleColumns.find((c) => c.key === timestampKey)?.kind ?? "text";
-    // Group on what the user sees (to the minute), not on hidden seconds.
-    return groupRowsByTimestamp(rows, timestampKey, (value) => formatCellValue(value, kind));
+    // Group per day: rows on the same date share one header, and that header shows the date without a time.
+    return groupRowsByTimestamp(rows, timestampKey, (value) => formatDateOnlyValue(value, kind));
   }, [rows, timestampKey, visibleColumns]);
   const collapsed = useMemo(() => new Set(collapsedGroups), [collapsedGroups]);
   const pageCount = Math.max(1, Math.ceil(total / pageSize));

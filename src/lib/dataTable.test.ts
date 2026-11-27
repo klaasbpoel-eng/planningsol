@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, deriveColumns, findTimestampColumn, formatCellValue, groupRowsByTimestamp, humanizeColumnName, quoteColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
+import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, humanizeColumnName, quoteColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
 
 describe("humanizeColumnName", () => {
   it("maakt leesbare kolomnamen", () => {
@@ -37,6 +37,16 @@ describe("formatCellValue", () => {
   });
   it("toont lege waarden als streepje", () => {
     expect(formatCellValue(null, "text")).toBe("—");
+  });
+});
+
+describe("formatDateOnlyValue", () => {
+  it("laat de tijd weg, zodat een groepskop alleen de dag toont", () => {
+    expect(formatDateOnlyValue("2026-11-03T10:45:02", "date")).toBe("03-11-2026");
+    expect(formatDateOnlyValue("2026-11-03", "date")).toBe("03-11-2026");
+    expect(formatDateOnlyValue("2026-11-03T10:45:02", "text")).toBe("03-11-2026");
+    expect(formatDateOnlyValue("geen datum", "text")).toBe("geen datum");
+    expect(formatDateOnlyValue(null, "date")).toBe("—");
   });
 });
 
