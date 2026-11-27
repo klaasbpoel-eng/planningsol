@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { planToRules, sampleValues, type AiRule } from "@/lib/aiFilters";
 import { requestFilterPlan } from "@/lib/aiFilterClient";
-import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, groupRowsByTimestamp, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
+import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, groupRowsByTimestamp, parseListValue, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
 
 const TABLE_NAME = "RamsesCorrecties";
 const PAGE_SIZES = [25, 50, 100];
@@ -167,8 +167,11 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
       let query = (supabase as any).from(TABLE_NAME).select("*", withCount ? { count: "exact" } : undefined);
       const filter = columns ? buildSearchFilter(columns, search) : null;
       if (filter) query = query.or(filter);
-      for (const rule of aiRules) for (const f of rule.filters) query = query.filter(quoteColumnName(f.key), f.op, f.value);
-      for (const columnFilter of columnFilters) query = query.filter(quoteColumnName(columnFilter.key), columnFilter.op, columnFilter.value);
+      const apply = (f: { key: string; op: string; value: unknown }) => {
+        query = f.op === "or" ? query.or(String(f.value)) : query.filter(quoteColumnName(f.key), f.op, f.value);
+      };
+      for (const rule of aiRules) for (const f of rule.filters) apply(f);
+      for (const columnFilter of columnFilters) apply(columnFilter);
       if (sort) query = query.order(sort.key, { ascending: sort.ascending, nullsFirst: false });
       return query;
     },
@@ -344,7 +347,17 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
             colIndex === 0 ? stripeClass(parity) : ""
           }`}
         >
-          {formatCellValue(row[col.key], col.kind)}
+          {col.list && parseListValue(row[col.key])?.some(Boolean) ? (
+            <div className="flex flex-wrap gap-1">
+              {parseListValue(row[col.key])!.filter(Boolean).map((item, i) => (
+                <span key={i} className="rounded-md border border-border bg-background/60 px-1.5 py-0.5 text-xs">
+                  {item}
+                </span>
+              ))}
+            </div>
+          ) : (
+            formatCellValue(row[col.key], col.kind)
+          )}
         </TableCell>
       ))}
     </TableRow>

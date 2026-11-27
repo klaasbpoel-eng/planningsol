@@ -241,3 +241,29 @@ describe("waarden aanvinken", () => {
     expect(canPickValues({ key: "b", label: "B", kind: "boolean" })).toBe(false);
   });
 });
+
+import { parseListValue as _plv, deriveColumns as _dc, formatCellValue as _fcv, buildValueFilter as _bvf, collectDistinctValues as _cdv, rowsToCsv as _csv } from "./dataTable";
+import { describe as _d, it as _it, expect as _e } from "vitest";
+
+_d("lijstkolommen (Klant, Debiteurnummer)", () => {
+  const rows = [
+    { Klant: '["UMCG","AZG Post Groningen 1"]', Debiteurnummer: ["206091", "215184"] },
+    { Klant: '["UMCG"]', Debiteurnummer: ["206091"] },
+  ];
+  _it("herkent lijsten als tekst of echte array", () => {
+    const cols = _dc(rows);
+    _e(cols.map((c) => c.list)).toEqual(["text", "array"]);
+    _e(_plv('["a","b"]')).toEqual(["a", "b"]);
+    _e(_plv("gewoon")).toBeNull();
+  });
+  _it("toont lijst zonder haakjes en exporteert met puntkomma", () => {
+    _e(_fcv(rows[0].Klant, "text")).toBe("UMCG, AZG Post Groningen 1");
+    _e(_csv(_dc(rows), rows).split("\r\n")[1]).toBe('"UMCG; AZG Post Groningen 1";"206091; 215184"');
+  });
+  _it("aanvinklijst toont losse klanten en filtert met of", () => {
+    const [klant, deb] = _dc(rows);
+    _e(_cdv(rows, klant).map((v) => [v.value, v.count])).toEqual([["AZG Post Groningen 1", 1], ["UMCG", 2]]);
+    _e(_bvf(deb, ["206091"])).toEqual([{ key: "Debiteurnummer", op: "or", value: 'Debiteurnummer.cs.["206091"]' }]);
+    _e(_bvf(klant, ["UMCG"])[0].value).toBe('Klant.ilike.*"UMCG"*');
+  });
+});

@@ -8,6 +8,33 @@ export interface DataColumn {
   key: string;
   label: string;
   kind: ColumnKind;
+  /** Set when every value is a list (e.g. `["UMCG","AZG"]`): "array" when the database sends real arrays
+   * (jsonb/array column), "text" when it sends the list as JSON text. Kind stays "text". */
+  list?: "array" | "text";
+}
+
+/** Items of a list value (real array or JSON text like `["a","b"]`); null when the value is not a list. */
+export function parseListValue(value: unknown): string[] | null {
+  if (Array.isArray(value)) return value.map((v) => (v === null || v === undefined ? "" : String(v)));
+  if (typeof value === "string") {
+    const t = value.trim();
+    if (!t.startsWith("[") || !t.endsWith("]")) return null;
+    try {
+      const parsed = JSON.parse(t);
+      return Array.isArray(parsed) ? parsed.map((v) => (v === null || v === undefined ? "" : String(v))) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function detectList(values: unknown[]): "array" | "text" | undefined {
+  const present = values.filter((v) => v !== null && v !== undefined && v !== "");
+  if (present.length === 0) return undefined;
+  if (present.every((v) => Array.isArray(v))) return "array";
+  if (present.every((v) => typeof v === "string" && parseListValue(v) !== null)) return "text";
+  return undefined;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
@@ -45,11 +72,17 @@ export function deriveColumns(rows: DataRow[]): DataColumn[] {
     for (const key of Object.keys(row)) if (!keys.includes(key)) keys.push(key);
   }
   const visible = keys.filter((k) => !HIDDEN_COLUMNS.has(k));
-  return (visible.length ? visible : keys).map((key) => ({
-    key,
-    label: humanizeColumnName(key),
-    kind: TEXT_ONLY_COLUMNS.has(normalizeKey(key)) ? "text" : detectKind(rows.map((r) => r[key])),
-  }));
+  return (visible.length ? visible : keys).map((key) => {
+    const values = rows.map((r) => r[key]);
+    const list = detectList(values);
+    const column: DataColumn = {
+      key,
+      label: humanizeColumnName(key),
+      kind: list || TEXT_ONLY_COLUMNS.has(normalizeKey(key)) ? "text" : detectKind(values),
+    };
+    if (list) column.list = list;
+    return column;
+  });
 }
 
 const TIMESTAMP_KEY = /timestamp|tijdstip|datetime/i;
@@ -133,6 +166,8 @@ const numberFormat = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 3 }
 /** Dutch display value: dot for thousands, comma for decimals, dd-mm-jjjj dates. */
 export function formatCellValue(value: unknown, kind: ColumnKind): string {
   if (value === null || value === undefined || value === "") return "—";
+  const items = Array.isArray(value) || kind === "text" ? parseListValue(value) : null;
+  if (items) return items.filter(Boolean).join(", ") || "—";
   if (kind === "number" && typeof value === "number") return numberFormat.format(value);
   if (kind === "boolean" || typeof value === "boolean") return value ? "Ja" : "Nee";
   if (kind === "date" && typeof value === "string") {
@@ -158,12 +193,14 @@ export function quoteColumnName(key: string): string {
 /** PostgREST `or` filter that searches all text columns; null when there is nothing to search. */
 export function buildSearchFilter(columns: DataColumn[], term: string): string | null {
   const cleaned = term.trim().replace(/[,()*"\\]/g, " ").replace(/\s+/g, " ").trim();
-  const textColumns = columns.filter((c) => c.kind === "text");
+  // Real arrays cannot be searched with "contains"; lists stored as text can.
+  const textColumns = columns.filter((c) => c.kind === "text" && c.list !== "array");
   if (!cleaned || textColumns.length === 0) return null;
   return textColumns.map((c) => `${quoteColumnName(c.key)}.ilike.*${cleaned}*`).join(",");
 }
 
-export type ColumnFilterOp = "eq" | "ilike" | "gt" | "gte" | "lt" | "lte" | "in";
+/** "or" carries a complete PostgREST or-expression in `value` (used for "one of these list items"). */
+export type ColumnFilterOp = "eq" | "ilike" | "gt" | "gte" | "lt" | "lte" | "in" | "cs" | "or";
 
 /** One condition on a single column. Several conditions are combined with AND by the caller. */
 export interface ColumnFilter {
@@ -253,6 +290,7 @@ export function buildColumnFilters(column: DataColumn | undefined, term: string)
         ]
       : [];
   }
+  if (column.list === "array") return [{ key: column.key, op: "cs", value: JSON.stringify([cleaned]) }];
   return [{ key: column.key, op: "ilike", value: `*${cleaned}*` }];
 }
 
@@ -276,6 +314,15 @@ export function collectDistinctValues(rows: DataRow[], column: DataColumn): Dist
   for (const row of rows) {
     const raw = row[column.key];
     if (raw === null || raw === undefined || raw === "") continue;
+    if (column.list) {
+      for (const item of parseListValue(raw) ?? []) {
+        if (!item) continue;
+        const entry = counts.get(item);
+        if (entry) entry.count += 1;
+        else counts.set(item, { raw: item, count: 1 });
+      }
+      continue;
+    }
     const value = typeof raw === "object" ? JSON.stringify(raw) : String(raw);
     const entry = counts.get(value);
     if (entry) entry.count += 1;
@@ -298,6 +345,15 @@ export function collectDistinctValues(rows: DataRow[], column: DataColumn): Dist
 /** PostgREST `in` condition for the ticked values; text values are quoted so commas and brackets stay literal. */
 export function buildValueFilter(column: DataColumn | undefined, values: string[]): ColumnFilter[] {
   if (!column || values.length === 0) return [];
+  if (column.list) {
+    const col = quoteColumnName(column.key);
+    const parts = values.map((v) =>
+      column.list === "array"
+        ? `${col}.cs.${JSON.stringify([v])}`
+        : `${col}.ilike.*${JSON.stringify(v).replace(/[(),*]/g, "?")}*`,
+    );
+    return [{ key: column.key, op: "or", value: parts.join(",") }];
+  }
   const quote = (v: string) =>
     column.kind === "number" ? v : `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   return [{ key: column.key, op: "in", value: `(${values.map(quote).join(",")})` }];
@@ -305,6 +361,8 @@ export function buildValueFilter(column: DataColumn | undefined, values: string[
 
 function csvCell(value: unknown): string {
   if (value === null || value === undefined) return "";
+  const items = parseListValue(value);
+  if (items) value = items.filter(Boolean).join("; ");
   const text = typeof value === "object" ? JSON.stringify(value) : String(value);
   return /[";\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
