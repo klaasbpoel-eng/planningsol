@@ -1,3 +1,5 @@
+import { api } from "@/lib/api";
+import { buildExcludedProductNames } from "@/lib/gasTypeUtils";
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +15,7 @@ import {
   Cylinder,
   Snowflake
 } from "lucide-react";
-import { cn, formatNumber } from "@/lib/utils";
+import { cn, formatNumber, normalizeDatum } from "@/lib/utils";
 import { mapProductionLocation } from "@/lib/productionMetrics";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -43,6 +45,7 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
   const [viewType, setViewType] = useState<ViewType>("cylinders");
   const [dailyData, setDailyData] = useState<Map<string, DailyData>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
@@ -56,22 +59,24 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
 
   useEffect(() => {
     fetchHeatMapData();
-  }, [currentDate, location, refreshKey, hideDigital]);
+  }, [currentDate, location, refreshKey, hideDigital, hideExternal]);
 
   const fetchHeatMapData = async () => {
     setLoading(true);
+    setLoadError(false);
     const locationParam = location === "all" ? null : location;
     const fromDate = format(startOfMonth(currentDate), "yyyy-MM-dd");
     const toDate = format(endOfMonth(currentDate), "yyyy-MM-dd");
     const year = currentDate.getFullYear();
 
     try {
+      const excludedNames = await buildExcludedProductNames(hideDigital, hideExternal);
       const PAGE = 1000;
       const allRows: any[] = [];
       let from = 0;
       while (true) {
         const { data } = await (supabase.from("Productie" as never) as any)
-          .select("Datum,Locatie,Aantal").eq("Jaar", year).order("id", { ascending: true }).range(from, from + PAGE - 1);
+          .select("Datum,Locatie,Product,Aantal").eq("Jaar", year).order("id", { ascending: true }).range(from, from + PAGE - 1);
         if (!data || data.length === 0) break;
         allRows.push(...data); if (data.length < PAGE) break; from += PAGE;
       }
@@ -80,16 +85,26 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
       for (const row of allRows) {
         const raw: string = row.Datum || "";
         if (!raw) continue;
-        const iso = raw.includes("T") ? raw.substring(0,10) : (() => { const p = raw.split("-"); return p.length===3 ? (p[0].length===4 ? raw : `${p[2]}-${p[1]}-${p[0]}`) : raw; })();
+        const iso = normalizeDatum(raw);
+        if (excludedNames.has(row.Product)) continue;
         if (iso < fromDate || iso > toDate) continue;
         if (locationParam && mapProductionLocation(row.Locatie) !== locationParam) continue;
         const existing = dataMap.get(iso) || { date: iso, cylinders: 0, dryIce: 0 };
         existing.cylinders += row.Aantal || 0;
         dataMap.set(iso, existing);
       }
+      if (location !== "sol_tilburg") {
+        const daily = await api.reports.getDailyProductionByPeriod(fromDate, toDate, "sol_emmen");
+        for (const row of daily || []) {
+          const existing = dataMap.get(row.production_date) || { date: row.production_date, cylinders: 0, dryIce: 0 };
+          existing.dryIce = Number(row.dry_ice_kg) || 0;
+          dataMap.set(row.production_date, existing);
+        }
+      }
       setDailyData(dataMap);
     } catch (error) {
       console.error("Error fetching heatmap data:", error);
+      setLoadError(true);
     }
     setLoading(false);
   };
@@ -136,11 +151,11 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
   const getIntensityClass = (value: number): string => {
     if (value === 0) return "bg-muted/30";
     const intensity = value / maxValue;
-    if (intensity < 0.2) return "bg-green-200 dark:bg-green-900/50";
-    if (intensity < 0.4) return "bg-green-300 dark:bg-green-800/60";
-    if (intensity < 0.6) return "bg-yellow-300 dark:bg-yellow-700/60";
-    if (intensity < 0.8) return "bg-orange-400 dark:bg-orange-600/70";
-    return "bg-red-500 dark:bg-red-600/80";
+    if (intensity < 0.2) return "bg-primary/10";
+    if (intensity < 0.4) return "bg-primary/20";
+    if (intensity < 0.6) return "bg-primary/30";
+    if (intensity < 0.8) return "bg-primary/50";
+    return "bg-primary/80 text-primary-foreground";
   };
 
   const weekDays = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
@@ -162,14 +177,16 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
     );
   }
 
+  if (loadError) return <div role="alert" className="border border-destructive/40 rounded-lg p-4 text-sm text-destructive">De rapportgegevens konden niet volledig worden geladen. Wijzig de periode om opnieuw te laden; ontbrekende gegevens zijn niet nul.</div>;
+
   return (
     <Card className="glass-card">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <CardTitle className="text-lg flex items-center gap-2">
               <CalendarDays className="h-5 w-5 text-primary" />
-              Productie Heatmap
+              Productiekalender
               {hideDigital && hasDigitalTypes && (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-sky-400/40 text-sky-500 bg-sky-400/10 font-normal">
                   Alleen fysiek
@@ -177,7 +194,7 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
               )}
             </CardTitle>
             <CardDescription>
-              Volume-intensiteit per dag
+              Dagvolume · kleur is relatief aan de drukste dag van deze maand, geen waarschuwing of efficiëntiescore.
             </CardDescription>
           </div>
 
@@ -188,14 +205,14 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
               onValueChange={(v) => v && setViewType(v as ViewType)}
               className="bg-muted/50 rounded-lg p-0.5"
             >
-              <ToggleGroupItem value="cylinders" size="sm" className="text-xs gap-1 data-[state=on]:bg-orange-500 data-[state=on]:text-white">
+              <ToggleGroupItem value="cylinders" size="sm" className="text-xs gap-1 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground">
                 <Cylinder className="h-3 w-3" />
                 Cilinders
               </ToggleGroupItem>
-              <ToggleGroupItem value="dryIce" size="sm" className="text-xs gap-1 data-[state=on]:bg-cyan-500 data-[state=on]:text-white">
+              {location !== "sol_tilburg" && <ToggleGroupItem value="dryIce" size="sm" className="text-xs gap-1 data-[state=on]:bg-dryice data-[state=on]:text-dryice-foreground">
                 <Snowflake className="h-3 w-3" />
                 Droogijs
-              </ToggleGroupItem>
+              </ToggleGroupItem>}
             </ToggleGroup>
           </div>
         </div>
@@ -266,7 +283,7 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
               <p className="text-lg font-semibold">
                 {activeDays > 0 ? formatNumber(totalVolume / activeDays, 0) : 0}
               </p>
-              <p className="text-xs text-muted-foreground">Gem. per dag</p>
+              <p className="text-xs text-muted-foreground">Gem. per actieve dag</p>
             </div>
           </div>
 
@@ -302,15 +319,15 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
                     <TooltipTrigger asChild>
                       <div
                         className={cn(
-                          "aspect-square rounded-md flex flex-col items-center justify-center cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-primary/50 hover:scale-105",
+                          "min-h-16 sm:min-h-20 rounded-md flex flex-col items-center justify-center transition-colors",
                           getIntensityClass(value),
-                          value > 0 && "text-foreground"
+                          value / maxValue < 0.8 && "text-foreground"
                         )}
                       >
                         <span className="text-xs font-medium leading-tight">{format(day, "d")}</span>
                         {value > 0 && (
-                          <span className="text-[9px] leading-tight opacity-75 font-medium">
-                            {value >= 1000 ? `${Math.round(value / 1000)}k` : value}
+                          <span className="text-xs leading-tight font-medium tabular-nums">
+                            {formatNumber(value, 0)}
                           </span>
                         )}
                       </div>
@@ -348,20 +365,20 @@ export function ProductionHeatMap({ location, refreshKey = 0, dateRange, hideDig
               <span className="text-xs text-muted-foreground">0</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-4 h-4 rounded bg-green-200 dark:bg-green-900/50" />
+              <div className="w-4 h-4 rounded bg-primary/10" />
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-4 h-4 rounded bg-green-300 dark:bg-green-800/60" />
+              <div className="w-4 h-4 rounded bg-primary/20" />
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-4 h-4 rounded bg-yellow-300 dark:bg-yellow-700/60" />
+              <div className="w-4 h-4 rounded bg-primary/30" />
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-4 h-4 rounded bg-orange-400 dark:bg-orange-600/70" />
+              <div className="w-4 h-4 rounded bg-primary/50" />
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-4 h-4 rounded bg-red-500 dark:bg-red-600/80" />
-              <span className="text-xs text-muted-foreground">Max</span>
+              <div className="w-4 h-4 rounded bg-primary/80" />
+              <span className="text-xs text-muted-foreground">{formatNumber(maxValue, 0)}</span>
             </div>
           </div>
         </FadeIn>

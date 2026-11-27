@@ -30,7 +30,8 @@ import { nl } from "date-fns/locale";
 import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber } from "@/lib/utils";
-import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
+import { buildExcludedProductNames } from "@/lib/gasTypeUtils";
+import { reportChange, targetProgress } from "@/lib/reportPresentation";
 import { mapProductionLocation } from "@/lib/productionMetrics";
 import { toast } from "sonner";
 import { exportToExcel, exportToPDF } from "@/lib/export-utils";
@@ -88,12 +89,12 @@ const DEFAULT_TOGGLES: SectionToggles = {
 
 const TOGGLE_CONFIG: { key: keyof SectionToggles; label: string; icon: React.ReactNode }[] = [
   { key: "cylinders", label: "Cilinders", icon: <Cylinder className="h-3 w-3" /> },
-  { key: "efficiency", label: "Efficiëntie", icon: <Gauge className="h-3 w-3" /> },
-  { key: "avgPerOrder", label: "Gem. per order", icon: <BarChart3 className="h-3 w-3" /> },
+  { key: "efficiency", label: "Locatie-aandeel", icon: <Gauge className="h-3 w-3" /> },
+  { key: "avgPerOrder", label: "Gem. per productieregel", icon: <BarChart3 className="h-3 w-3" /> },
   { key: "gasTypes", label: "Gassoorten", icon: <BarChart3 className="h-3 w-3" /> },
   { key: "sizeDistribution", label: "Grootteverdeling", icon: <Ruler className="h-3 w-3" /> },
   { key: "dryIce", label: "Droogijs", icon: <Snowflake className="h-3 w-3" /> },
-  { key: "topCustomers", label: "Top 3 klanten", icon: <Users className="h-3 w-3" /> },
+  { key: "topCustomers", label: "Top 5 klanten", icon: <Users className="h-3 w-3" /> },
 ];
 
 const TOGGLES_STORAGE_KEY = "monthly-report-section-toggles";
@@ -109,8 +110,9 @@ const loadToggles = (): SectionToggles => {
   return DEFAULT_TOGGLES;
 };
 
-export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
+export function MonthlyReport({ hideDigital = false, hideExternal = false }: MonthlyReportProps) {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return format(now, "yyyy-MM");
@@ -204,7 +206,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
       fetchProductieForPeriod(from, to, location),
       isTilburg
         ? Promise.resolve([{ total_kg: 0, total_orders: 0 }])
-        : api.reports.getDryIceEfficiency(from, to, location).catch(() => [{ total_kg: 0, total_orders: 0 }]),
+        : api.reports.getDryIceEfficiency(from, to, location),
     ]);
 
     const rows = digitalNames.size > 0
@@ -222,7 +224,6 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
     }
     const customers = Array.from(custMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
       .map(([name, cylinders]) => ({ name, cylinders, dryIceKg: 0 }));
 
     // Gas type distribution grouped by Product
@@ -233,7 +234,6 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
     }
     const gasTypes = Array.from(typeMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
       .map(([name, count]) => ({ name, color: "#3b82f6", count }));
 
     // Size distribution grouped by Capaciteit
@@ -267,8 +267,9 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+    setLoadError(false);
       try {
-        const digitalNames = hideDigital ? await buildDigitalProductNames() : new Set<string>();
+        const digitalNames = await buildExcludedProductNames(hideDigital, hideExternal);
         const selectedYear = parseInt(selectedMonth.substring(0, 4));
         const ytdFrom = `${selectedYear}-01-01`;
         const [emmen, tilburg, prevEmmen, prevTilburg, ytdEmmen, ytdTilburg] = await Promise.all([
@@ -287,12 +288,13 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
         setYtdTilburgData(trendMode !== "ytd" ? ytdTilburg : tilburg);
       } catch (err) {
         console.error("Error loading monthly report:", err);
+      setLoadError(true);
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [fromDate, toDate, prevFromDate, prevToDate, hideDigital]);
+  }, [fromDate, toDate, prevFromDate, prevToDate, hideDigital, hideExternal]);
 
   const totalData = useMemo((): LocationKPI | null => {
     if (!emmenData || !tilburgData) return null;
@@ -378,6 +380,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
 
   const TrendBadge = ({ current, previous, label }: { current: number; previous: number; label?: string }) => {
     const trend = calcTrend(current, previous);
+    if (previous === 0) return <span className="text-xs text-muted-foreground" title="Geen volume in de vergelijkingsperiode">Geen basis</span>;
     const tooltipText = `${label ? label + ": " : ""}${formatNumber(previous, 0)} → ${formatNumber(current, 0)}`;
     const badge = trend === 0
       ? <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground cursor-help"><Minus className="h-3 w-3" />0%</span>
@@ -415,10 +418,10 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
       if (toggles.cylinders) {
         row.cilinder_orders = loc.cylinderOrders;
         row.totaal_cilinders = loc.totalCylinders;
-        row.trend_cilinders = loc.prev ? `${calcTrend(loc.totalCylinders, loc.prev.totalCylinders)}%` : "–";
+        row.trend_cilinders = loc.prev ? reportChange(loc.totalCylinders, loc.prev.totalCylinders) : "–";
       }
       if (toggles.efficiency) {
-        row.efficientie = `${loc.efficiencyRate}%`;
+        row.efficientie = totalData.totalCylinders > 0 ? `${formatNumber(loc.totalCylinders / totalData.totalCylinders * 100, 1)}%` : "—";
       }
       if (toggles.avgPerOrder) {
         row.gem_per_order = loc.avgCylindersPerOrder;
@@ -453,15 +456,15 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
       { header: "Locatie", key: "locatie", width: 14 },
     ];
     if (toggles.cylinders) {
-      cols.push({ header: "Cil. Orders", key: "cilinder_orders", width: 12 });
+      cols.push({ header: "Productieregels", key: "cilinder_orders", width: 12 });
       cols.push({ header: "Totaal Cil.", key: "totaal_cilinders", width: 12 });
-      cols.push({ header: trendMode === "prev_year" ? "Trend (jr)" : "Trend (mnd)", key: "trend_cilinders", width: 10 });
+      cols.push({ header: trendMode === "ytd" ? "Trend YTD (%)" : trendMode === "prev_year" ? "Trend (jr)" : "Trend (mnd)", key: "trend_cilinders", width: 10 });
     }
     if (toggles.efficiency) {
-      cols.push({ header: "Efficiëntie", key: "efficientie", width: 12 });
+      cols.push({ header: "Aandeel totaal", key: "efficientie", width: 12 });
     }
     if (toggles.avgPerOrder) {
-      cols.push({ header: "Gem./Order", key: "gem_per_order", width: 12 });
+      cols.push({ header: "Gem./regel", key: "gem_per_order", width: 12 });
     }
     if (toggles.gasTypes) {
       for (let i = 1; i <= 3; i++) {
@@ -484,10 +487,10 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
 
   const exportData = {
     title: `Maandrapport ${format(monthDate, "MMMM yyyy", { locale: nl })}`,
-    subtitle: "Productie overzicht per locatie",
+    subtitle: `${fromDate} t/m ${toDate} | vergelijking ${prevFromDate} t/m ${prevToDate}${hideDigital ? " | zonder digitaal" : ""}${hideExternal ? " | zonder extern" : ""}`,
     columns: buildExportColumns(),
     rows: buildExportRows(),
-    dateRange: { from: startOfMonth(monthDate), to: endOfMonth(monthDate) },
+    dateRange: { from: new Date(fromDate + "T00:00:00"), to: new Date(toDate + "T00:00:00") },
   };
 
   const handleExportExcel = () => {
@@ -519,11 +522,9 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
     color: string;
     totalCylinders?: number;
   }) => {
-    const totalGas = data.gasTypeDistribution.reduce((sum, g) => sum + g.count, 0);
-    const sharePercent =
-      totalCylinders && totalCylinders > 0 && data.location !== "all"
-        ? Math.round((data.totalCylinders / totalCylinders) * 100)
-        : null;
+    const totalGas = data.totalCylinders;
+    const shareBase = totalCylinders ?? data.totalCylinders;
+    const sharePercent = shareBase > 0 ? Math.round(data.totalCylinders / shareBase * 100) : null;
 
     return (
       <div className="space-y-4">
@@ -550,7 +551,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
               </div>
               <div className="bg-muted/30 rounded-lg p-2.5">
                 <div className="text-lg font-bold">{formatNumber(data.cylinderOrders, 0)}</div>
-                <div className="text-[11px] text-muted-foreground">Orders</div>
+                <div className="text-[11px] text-muted-foreground">Productieregels</div>
                 {prevData && <TrendBadge current={data.cylinderOrders} previous={prevData.cylinderOrders} />}
               </div>
             </div>
@@ -562,20 +563,20 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
           <div className="space-y-2">
             <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
               <Gauge className="h-3 w-3" />
-              {sharePercent !== null ? "Aandeel van totaal" : "Voltooiingsgraad"}
+              Aandeel van totaal
             </div>
             <div className="bg-muted/30 rounded-lg p-2.5 space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-lg font-bold">
-                  {sharePercent !== null ? `${sharePercent}%` : `${data.efficiencyRate}%`}
+                  {sharePercent !== null ? `${sharePercent}%` : "—"}
                 </span>
                 <span className="text-[11px] text-muted-foreground">
                   {sharePercent !== null
-                    ? `${formatNumber(data.totalCylinders, 0)} / ${formatNumber(totalCylinders!, 0)}`
+                    ? `${formatNumber(data.totalCylinders, 0)} / ${formatNumber(shareBase, 0)}`
                     : `${formatNumber(data.completedCylinders, 0)} / ${formatNumber(data.totalCylinders, 0)}`}
                 </span>
               </div>
-              <Progress value={sharePercent !== null ? sharePercent : data.efficiencyRate} className="h-2" />
+              <Progress value={sharePercent ?? 0} className="h-2" />
             </div>
           </div>
         )}
@@ -585,11 +586,11 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
           <div className="space-y-2">
             <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
               <BarChart3 className="h-3 w-3" />
-              Gem. cilinders per order
+              Gem. cilinders per productieregel
             </div>
             <div className="bg-muted/30 rounded-lg p-2.5">
-              <div className="text-lg font-bold">{data.avgCylindersPerOrder}</div>
-              <div className="text-[11px] text-muted-foreground">cilinders/order</div>
+              <div className="text-lg font-bold">{formatNumber(data.avgCylindersPerOrder, 1)}</div>
+              <div className="text-[11px] text-muted-foreground">cilinders/productieregel</div>
               {prevData && <TrendBadge current={data.avgCylindersPerOrder} previous={prevData.avgCylindersPerOrder} />}
             </div>
           </div>
@@ -663,7 +664,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
             <div className="grid grid-cols-2 gap-2">
               <div className="bg-muted/30 rounded-lg p-2.5">
                 <div className="text-lg font-bold">{formatNumber(data.totalDryIceKg, 0)} <span className="text-xs font-normal">kg</span></div>
-                <div className="text-[11px] text-muted-foreground">Geproduceerd</div>
+                <div className="text-[11px] text-muted-foreground">Ordervolume (incl. gepland)</div>
               </div>
               <div className="bg-muted/30 rounded-lg p-2.5">
                 <div className="text-lg font-bold">{formatNumber(data.dryIceOrders, 0)}</div>
@@ -681,8 +682,8 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
               Top 5 klanten
             </div>
             <div className="space-y-1">
-              {data.topCustomers.length > 0 ? data.topCustomers.map((c, i) => {
-                const isNew = prevData ? !prevData.topCustomers.some(p => p.name === c.name) : false;
+              {data.topCustomers.length > 0 ? data.topCustomers.slice(0, 5).map((c, i) => {
+                const isNew = prevData && prevData.topCustomers.length > 0 ? !prevData.topCustomers.some(p => p.name === c.name) : false;
                 return (
                   <div key={c.name} className="flex items-center justify-between text-xs py-1 px-2 rounded hover:bg-muted/30">
                     <span className="flex items-center gap-1.5 truncate">
@@ -719,6 +720,8 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
     );
   }
 
+  if (loadError) return <div role="alert" className="border border-destructive/40 rounded-lg p-4 text-sm text-destructive">De rapportgegevens konden niet volledig worden geladen. Wijzig de periode om opnieuw te laden; ontbrekende gegevens zijn niet nul.</div>;
+
   return (
     <Card>
       <CardHeader className="pb-4">
@@ -734,7 +737,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
                 : `Overzicht van KPI's per locatie — vergelijking t.o.v. ${trendMode === "prev_year" ? "dezelfde maand vorig jaar" : "vorige maand"}`}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-[180px] h-9 text-sm">
                 <SelectValue />
@@ -789,6 +792,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
           </div>
         </div>
 
+        <p className="text-sm text-muted-foreground mt-3">{fromDate} t/m {toDate} · vergelijking: {prevFromDate} t/m {prevToDate}. {monthDate.getMonth() === new Date().getMonth() && monthDate.getFullYear() === new Date().getFullYear() ? "Lopende maand: registratie is nog onvolledig." : ""}</p>
         {/* Section toggles */}
         {showSettings && (
           <div className="mt-4 p-3 bg-muted/30 rounded-lg border">
@@ -818,13 +822,13 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
         {emmenData && tilburgData && totalData ? (
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="border rounded-lg p-4 border-blue-500/20">
+              <div className="min-w-0 md:pr-4">
                 <LocationColumn data={emmenData} prevData={prevEmmenData} color="text-blue-500" totalCylinders={totalData?.totalCylinders} />
               </div>
-              <div className="border rounded-lg p-4 border-sky-400/20">
+              <div className="min-w-0 md:border-l md:px-4">
                 <LocationColumn data={tilburgData} prevData={prevTilburgData} color="text-sky-400" totalCylinders={totalData?.totalCylinders} />
               </div>
-              <div className="border rounded-lg p-4 border-primary/20 bg-primary/[0.02]">
+              <div className="min-w-0 md:border-l md:pl-4">
                 <LocationColumn data={totalData} prevData={prevTotalData} color="text-primary" />
               </div>
             </div>
@@ -857,7 +861,8 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
 
                 const ProgressBar = ({ label, colorBar, colorText, current, target }: { label: string; colorBar: string; colorText: string; current: number; target: number }) => {
                   if (target === 0) return null;
-                  const pct = Math.min(100, Math.round((current / target) * 100));
+                  const progress = targetProgress(current, target);
+                    const pct = Math.round(progress?.percentage ?? 0);
                   return (
                     <div>
                       <div className="flex justify-between text-xs mb-1">
@@ -868,7 +873,7 @@ export function MonthlyReport({ hideDigital = false }: MonthlyReportProps) {
                         </span>
                       </div>
                       <div className="w-full bg-muted/50 rounded-full h-1.5">
-                        <div className={`h-1.5 rounded-full transition-all ${colorBar}`} style={{ width: `${pct}%` }} />
+                        <div className={`h-1.5 rounded-full transition-all ${colorBar}`} style={{ width: `${progress?.barPercentage ?? 0}%` }} />
                       </div>
                     </div>
                   );

@@ -1,3 +1,4 @@
+import { buildExcludedProductNames } from "@/lib/gasTypeUtils";
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +22,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn, formatNumber } from "@/lib/utils";
-import { mapProductionLocation } from "@/lib/productionMetrics";
+import { getComparisonRange, mapProductionLocation } from "@/lib/productionMetrics";
 import { FadeIn } from "@/components/ui/fade-in";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format } from "date-fns";
@@ -54,9 +55,10 @@ interface CustomerSegment {
   churnRisk: boolean;
 }
 
-export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange, hideDigital = false, hasDigitalTypes = false }: CustomerSegmentationProps) {
+export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange, hideDigital = false, hideExternal = false, hasDigitalTypes = false }: CustomerSegmentationProps) {
   const [customers, setCustomers] = useState<CustomerSegment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -68,13 +70,15 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
 
   useEffect(() => {
     fetchCustomerSegments();
-  }, [location, refreshKey, currentYear, fromDateStr, toDateStr, hideDigital]);
+  }, [location, refreshKey, currentYear, fromDateStr, toDateStr, hideDigital, hideExternal]);
 
   const fetchCustomerSegments = async () => {
     setLoading(true);
+    setLoadError(false);
     const locationParam = location === "all" ? null : location;
 
     try {
+      const excludedNames = await buildExcludedProductNames(hideDigital, hideExternal);
       const fDate = fromDateStr ?? `${currentYear}-01-01`;
       const tDate = toDateStr ?? `${currentYear}-12-31`;
       const fromYear = parseInt(fDate.substring(0, 4));
@@ -87,7 +91,7 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
           const PAGE = 1000; let offset = 0;
           while (true) {
             const { data } = await (supabase.from("Productie" as never) as any)
-              .select("Datum,Locatie,Aantal,Klant").eq("Jaar", yr).order("id", { ascending: true }).range(offset, offset + PAGE - 1);
+              .select("Datum,Locatie,Product,Aantal,Klant").eq("Jaar", yr).order("id", { ascending: true }).range(offset, offset + PAGE - 1);
             if (!data || data.length === 0) break;
             all.push(...data); if (data.length < PAGE) break; offset += PAGE;
           }
@@ -98,16 +102,14 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
           const iso = raw.includes("T") ? raw.substring(0,10) : (() => { const p = raw.split("-"); return p.length===3 ? (p[0].length===4 ? raw : `${p[2]}-${p[1]}-${p[0]}`) : raw; })();
           if (iso < from || iso > to) return false;
           if (locationParam && mapProductionLocation(row.Locatie) !== locationParam) return false;
+          if (excludedNames.has(row.Product)) return false;
           return true;
         });
       };
 
-      // Prev period: same duration immediately before
-      const periodDays = Math.ceil((new Date(tDate).getTime() - new Date(fDate).getTime()) / 86400000);
-      const prevTo = new Date(fDate); prevTo.setDate(prevTo.getDate() - 1);
-      const prevFrom = new Date(prevTo); prevFrom.setDate(prevFrom.getDate() - periodDays);
-      const prevFDate = prevFrom.toISOString().substring(0,10);
-      const prevTDate = prevTo.toISOString().substring(0,10);
+      const comparison = getComparisonRange(new Date(fDate + "T00:00:00"), new Date(tDate + "T00:00:00"));
+      const prevFDate = format(comparison.from, "yyyy-MM-dd");
+      const prevTDate = format(comparison.to, "yyyy-MM-dd");
 
       const [currentRows, prevRows] = await Promise.all([fetchRows(fDate, tDate), fetchRows(prevFDate, prevTDate)]);
 
@@ -158,6 +160,7 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
       setCustomers(segments);
     } catch (error) {
       console.error("[CustomerSegmentation] Error fetching segments:", error);
+      setLoadError(true);
     }
     setLoading(false);
   };
@@ -275,6 +278,8 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
     );
   }
 
+  if (loadError) return <div role="alert" className="border border-destructive/40 rounded-lg p-4 text-sm text-destructive">De rapportgegevens konden niet volledig worden geladen. Wijzig de periode om opnieuw te laden; ontbrekende gegevens zijn niet nul.</div>;
+
   return (
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
       <Card className="glass-card overflow-hidden">
@@ -295,7 +300,7 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
                   )}
                 </CardTitle>
                 <CardDescription>
-                  Klantwaarde en gedragsanalyse {currentYear}
+                  Productievolume per klant (geen omzet) · groei &gt;10%, daling &lt;−10%, anders stabiel. Goud = hoogste 20%, zilver = volgende 30%. Nieuw = geen productie in de vergelijkingsperiode, niet noodzakelijk een nieuwe klant.
                 </CardDescription>
               </div>
               <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -465,9 +470,9 @@ export function CustomerSegmentation({ location, refreshKey = 0, year, dateRange
                                     </span>
                                   )}
                                   <span>•</span>
-                                  <span>{customer.order_count} orders</span>
+                                  <span>{customer.order_count} productieregels</span>
                                   <span>•</span>
-                                  <span>Gem. {formatNumber(customer.avg_order_size, 0)}/order</span>
+                                  <span>Gem. {formatNumber(customer.avg_order_size, 0)}/productieregel</span>
                                 </div>
                               </div>
                               {getTierBadge(customer.tier)}

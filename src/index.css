@@ -2,6 +2,61 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Dense reports: consistent numeric alignment, readable labels and local scrolling. */
+@layer components {
+  .production-reports {
+    font-variant-numeric: tabular-nums;
+  }
+  .production-reports table {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .production-reports th,
+  .production-reports td {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    padding: 0.625rem 0.75rem;
+    vertical-align: top;
+  }
+  .production-reports th {
+    background: hsl(var(--muted));
+    color: hsl(var(--foreground));
+    white-space: nowrap;
+  }
+  .production-reports tbody tr:nth-child(even) {
+    background: hsl(var(--muted) / 0.35);
+  }
+  .production-reports tbody tr:hover {
+    background: hsl(var(--primary) / 0.06);
+  }
+  .production-reports :is(th, td):first-child {
+    min-width: 8rem;
+  }
+  .production-reports :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\]) {
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+  .production-reports .recharts-cartesian-axis-tick text {
+    fill: hsl(var(--muted-foreground));
+  }
+  .production-reports .recharts-legend-wrapper {
+    font-size: 0.75rem;
+  }
+  .production-reports .tracking-wider,
+  .production-reports .tracking-wide {
+    letter-spacing: 0;
+  }
+  @media (max-width: 767px) {
+    .production-reports th,
+    .production-reports td {
+      white-space: nowrap;
+    }
+    .production-reports [role="tablist"] {
+      max-width: 100%;
+    }
+  }
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */

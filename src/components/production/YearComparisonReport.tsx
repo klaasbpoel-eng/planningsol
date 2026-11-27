@@ -1,3 +1,6 @@
+import { reportChange } from "@/lib/reportPresentation";
+import { calculatePercentageChange } from "@/lib/productionMetrics";
+import { normalizeDatum } from "@/lib/utils";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -120,6 +123,7 @@ interface MonthlyCustomerCylinderData {
 export const YearComparisonReport = React.memo(function YearComparisonReport({ location = "all", hideDigital: externalHideDigital, onHideDigitalChange, hideExternal: externalHideExternal, onHideExternalChange }: YearComparisonReportProps) {
   const showDryIce = location !== "sol_tilburg";
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [ytdMode, setYtdMode] = useState<boolean>(true);
   const [cylinderData, setCylinderData] = useState<MonthlyData[]>([]);
@@ -199,7 +203,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
 
   // Herberekende cylinder totalen op basis van gastype filter
   const filteredCylinderTotals = useMemo(() => {
-    if (selectedGasTypes.length === 0 && !hideDigital) return cylinderTotals;
+    if (selectedGasTypes.length === 0 && !hideDigital && !hideExternal) return cylinderTotals;
     if (!cylinderTotals) return null;
 
     // Bereken totalen alleen voor gefilterde gastypes
@@ -242,7 +246,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
 
   // Herberekende cylinder maanddata op basis van gastype filter
   const filteredCylinderData = useMemo(() => {
-    if (selectedGasTypes.length === 0 && !hideDigital) return cylinderData;
+    if (selectedGasTypes.length === 0 && !hideDigital && !hideExternal) return cylinderData;
 
     // Get active gas type IDs from filtered monthly data
     const activeIds = Object.keys(filteredMonthlyGasTypeData.current[0] || {}).filter(k => k !== 'month' && k !== 'monthName');
@@ -268,7 +272,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
         changePercent
       };
     });
-  }, [cylinderData, filteredMonthlyGasTypeData, selectedGasTypes, hideDigital]);
+  }, [cylinderData, filteredMonthlyGasTypeData, selectedGasTypes, hideDigital, hideExternal]);
 
   // Gefilterde klant data
   const filteredCustomerComparison = useMemo(() => {
@@ -361,7 +365,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   }, []);
 
   const fetchGasTypes = async () => {
-    const { data } = await api.gasTypes.getAll();
+    const data = await api.gasTypes.getAllIncludingInactive();
 
     if (data) {
       setGasTypes(data);
@@ -369,7 +373,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
   };
 
   const fetchCylinderSizes = async () => {
-    const { data } = await api.cylinderSizes.getAll();
+    const data = await api.cylinderSizes.getAll();
 
     if (data) {
       setCylinderSizes(data);
@@ -384,6 +388,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
 
   const fetchYearComparisonData = async () => {
     setLoading(true);
+    setLoadError(false);
 
     const currentYear = selectedYear;
     const previousYear = selectedYear - 1;
@@ -409,7 +414,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           query = query.eq("Locatie", locFilter);
         }
         const { data, error } = await query;
-        if (error) break;
+        if (error) throw error;
         if (!data || data.length === 0) break;
         allRows.push(...data);
         if (data.length < PAGE) break;
@@ -596,6 +601,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       setCylinderSizeComparison(cylinderSizeData);
     } catch (err) {
       console.error("Error fetching year comparison data:", err);
+      setLoadError(true);
     }
 
     setLoading(false);
@@ -903,7 +909,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
 
   const getGrowthHighlights = (data: MonthlyData[]) => {
     // Filter months with data (at least one of the years has values)
-    const validMonths = data.filter(m => m.currentYear > 0 || m.previousYear > 0);
+    const validMonths = data.filter(m => m.previousYear > 0);
 
     if (validMonths.length === 0) {
       return { best: null, worst: null };
@@ -935,6 +941,8 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       </div>
     );
   }
+
+  if (loadError) return <div role="alert" className="border border-destructive/40 rounded-lg p-4 text-sm text-destructive">De rapportgegevens konden niet volledig worden geladen. Wijzig de periode om opnieuw te laden; ontbrekende gegevens zijn niet nul.</div>;
 
   return (
     <div className="space-y-6">
@@ -1115,6 +1123,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
         </div>
       )}
 
+      <p className="text-sm text-muted-foreground">YTD vergelijkt maanden t/m de huidige maand; de lopende maand is nog onvolledig. Een verandering van meer dan 10% is een volumesignaal, geen statistische significantie. Klant-, gas- en grootteanalyses hebben hun eigen selectie.</p>
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Cylinder Totals */}
@@ -1159,7 +1168,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                     {filteredCylinderTotalsByCustomer.change >= 0 ? "+" : ""}{formatNumber(filteredCylinderTotalsByCustomer.change, 0)}
                   </span>
                   <Badge variant={filteredCylinderTotalsByCustomer.changePercent >= 0 ? "default" : "destructive"}>
-                    {filteredCylinderTotalsByCustomer.changePercent >= 0 ? "+" : ""}{filteredCylinderTotalsByCustomer.changePercent.toFixed(1)}%
+                    {reportChange(filteredCylinderTotalsByCustomer.currentYear, filteredCylinderTotalsByCustomer.previousYear)}
                   </Badge>
                 </div>
               </div>
@@ -1199,7 +1208,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                       {filteredDryIceTotals.change >= 0 ? "+" : ""}{formatNumber(filteredDryIceTotals.change, 0)} kg
                     </span>
                     <Badge variant={filteredDryIceTotals.changePercent >= 0 ? "default" : "destructive"}>
-                      {filteredDryIceTotals.changePercent >= 0 ? "+" : ""}{filteredDryIceTotals.changePercent.toFixed(1)}%
+                      {reportChange(filteredDryIceTotals.currentYear, filteredDryIceTotals.previousYear)}
                     </Badge>
                   </div>
                 </div>
@@ -1216,7 +1225,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
       </div>
 
       {/* Cumulative Gas Type Chart */}
-      <CumulativeGasTypeChart />
+      <CumulativeGasTypeChart location={location ?? "all"} hideDigital={hideDigital} hideExternal={hideExternal} />
 
       {/* Growth Highlights Summary */}
       <Card className="glass-card">
@@ -1263,7 +1272,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                         <>
                           <p className="text-lg font-bold">{highlights.best.monthName}</p>
                           <p className={`text-sm ${bestIsNegative ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
-                            {highlights.best.changePercent >= 0 ? "+" : ""}{highlights.best.changePercent.toFixed(1)}%
+                            {reportChange(highlights.best.currentYear, highlights.best.previousYear)}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
                             {formatNumber(highlights.best.currentYear, 0)} vs {formatNumber(highlights.best.previousYear, 0)}
@@ -1283,7 +1292,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                         <>
                           <p className="text-lg font-bold">{highlights.worst.monthName}</p>
                           <p className="text-sm text-red-600 dark:text-red-400">
-                            {highlights.worst.changePercent >= 0 ? "+" : ""}{highlights.worst.changePercent.toFixed(1)}%
+                            {reportChange(highlights.worst.currentYear, highlights.worst.previousYear)}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
                             {formatNumber(highlights.worst.currentYear, 0)} vs {formatNumber(highlights.worst.previousYear, 0)}
@@ -1320,7 +1329,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                           <>
                             <p className="text-lg font-bold">{highlights.best.monthName}</p>
                             <p className={`text-sm ${bestIsNegative ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
-                              {highlights.best.changePercent >= 0 ? "+" : ""}{highlights.best.changePercent.toFixed(1)}%
+                              {reportChange(highlights.best.currentYear, highlights.best.previousYear)}
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
                               {formatNumber(highlights.best.currentYear, 0)} kg vs {formatNumber(highlights.best.previousYear, 0)} kg
@@ -1340,7 +1349,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                           <>
                             <p className="text-lg font-bold">{highlights.worst.monthName}</p>
                             <p className="text-sm text-red-600 dark:text-red-400">
-                              {highlights.worst.changePercent >= 0 ? "+" : ""}{highlights.worst.changePercent.toFixed(1)}%
+                              {reportChange(highlights.worst.currentYear, highlights.worst.previousYear)}
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
                               {formatNumber(highlights.worst.currentYear, 0)} kg vs {formatNumber(highlights.worst.previousYear, 0)} kg
@@ -1379,7 +1388,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           <CardContent>
             {(() => {
               // Filter gas type comparison based on selected gas types and digital filter
-              let filteredGasTypeComparison = gasTypeComparison;
+              let filteredGasTypeComparison = filteredGasTypeData;
               if (hideDigital) {
                 filteredGasTypeComparison = filteredGasTypeComparison.filter(gt => !digitalGasTypeIds.has(gt.gas_type_id));
               }
@@ -1489,7 +1498,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                                 variant={gasType.changePercent >= 0 ? "default" : "destructive"}
                                 className="text-xs"
                               >
-                                {gasType.changePercent >= 0 ? "+" : ""}{gasType.changePercent.toFixed(1)}%
+                                {reportChange(gasType.currentYear, gasType.previousYear)}
                               </Badge>
                             </div>
                           </div>
@@ -1601,7 +1610,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                                 variant={size.changePercent >= 0 ? "default" : "destructive"}
                                 className="text-xs"
                               >
-                                {size.changePercent >= 0 ? "+" : ""}{size.changePercent.toFixed(1)}%
+                                {reportChange(size.currentYear, size.previousYear)}
                               </Badge>
                             </div>
                           </div>
@@ -1737,7 +1746,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                         <div className="flex items-center justify-center gap-1">
                           {getTrendIcon(gasType.changePercent)}
                           <span className={`text-sm font-bold ${getChangeColor(gasType.changePercent)}`}>
-                            {gasType.changePercent >= 0 ? "+" : ""}{gasType.changePercent.toFixed(1)}%
+                            {reportChange(gasType.currentYear, gasType.previousYear)}
                           </span>
                         </div>
                         <div className="text-[10px] text-muted-foreground mt-1">
@@ -1759,7 +1768,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Cylinder className="h-5 w-5 text-orange-500" />
-              Maandelijkse breakdown per gastype
+              Maandoverzicht per gastype
               {selectedGasTypes.length > 0 && (
                 <Badge variant="secondary" className="ml-2">
                   {selectedGasTypes.length} gefilterd
@@ -1792,7 +1801,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                   <div>
                     <h4 className="text-sm font-medium mb-3">{selectedYear}</h4>
                     <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={monthlyGasTypeData.current}>
+                      <BarChart data={filteredMonthlyGasTypeData.current}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis dataKey="monthName" className="text-xs" />
                         <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
@@ -1833,7 +1842,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                   <div>
                     <h4 className="text-sm font-medium mb-3">{selectedYear - 1}</h4>
                     <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={monthlyGasTypeData.previous}>
+                      <BarChart data={filteredMonthlyGasTypeData.previous}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis dataKey="monthName" className="text-xs" />
                         <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} />
@@ -1982,7 +1991,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
         </CardHeader>
         <CardContent>
           {(() => {
-            const activeMonths = filteredCylinderDataByCustomer.filter(m => m.currentYear > 0 || m.previousYear > 0);
+            const activeMonths = filteredCylinderDataByCustomer.filter(m => m.previousYear > 0);
             const avgGrowth = activeMonths.length > 0
               ? parseFloat((activeMonths.reduce((s, m) => s + m.changePercent, 0) / activeMonths.length).toFixed(1))
               : null;
@@ -1991,8 +2000,8 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
             <AreaChart
               data={filteredCylinderDataByCustomer.map((c, i) => ({
                 monthName: c.monthName,
-                cylinders: parseFloat(c.changePercent.toFixed(1)),
-                dryIce: parseFloat((dryIceData[i]?.changePercent || 0).toFixed(1))
+                cylinders: calculatePercentageChange(c.currentYear, c.previousYear),
+                dryIce: calculatePercentageChange(dryIceData[i]?.currentYear ?? 0, dryIceData[i]?.previousYear ?? 0)
               }))}
             >
               <defs>
@@ -2171,7 +2180,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                 onCheckedChange={setHighlightSignificant}
               />
               <Label htmlFor="highlight-significant" className="text-sm cursor-pointer">
-                Markeer significante groei (&gt;10% of &lt;-10%)
+                Markeer volumeverandering groter dan 10%
               </Label>
             </div>
           </div>
@@ -2232,7 +2241,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                       </td>
                       <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(cylinder.previousYear, 0)}</td>
                       <td className={`text-right py-3 px-2 ${getChangeColor(cylinder.changePercent)} ${highlightSignificant && cylinderSignificant ? "font-bold" : ""}`}>
-                        {cylinder.changePercent >= 0 ? "+" : ""}{cylinder.changePercent.toFixed(1)}%
+                        {reportChange(cylinder.currentYear, cylinder.previousYear)}
                       </td>
                       {showDryIce && (
                         <>
@@ -2241,7 +2250,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                           </td>
                           <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(dryIce?.previousYear || 0, 0)}</td>
                           <td className={`text-right py-3 px-2 ${getChangeColor(dryIce?.changePercent || 0)} ${highlightSignificant && dryIceSignificant ? "font-bold" : ""}`}>
-                            {(dryIce?.changePercent || 0) >= 0 ? "+" : ""}{(dryIce?.changePercent || 0).toFixed(1)}%
+                            {reportChange(dryIce?.currentYear ?? 0, dryIce?.previousYear ?? 0)}
                           </td>
                         </>
                       )}
@@ -2254,14 +2263,14 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                   <td className="text-right py-3 px-2">{formatNumber(filteredCylinderTotalsByCustomer?.currentYear || 0, 0)}</td>
                   <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(filteredCylinderTotalsByCustomer?.previousYear || 0, 0)}</td>
                   <td className={`text-right py-3 px-2 ${getChangeColor(filteredCylinderTotalsByCustomer?.changePercent || 0)}`}>
-                    {(filteredCylinderTotalsByCustomer?.changePercent || 0) >= 0 ? "+" : ""}{(filteredCylinderTotalsByCustomer?.changePercent || 0).toFixed(1)}%
+                    {reportChange(filteredCylinderTotalsByCustomer?.currentYear ?? 0, filteredCylinderTotalsByCustomer?.previousYear ?? 0)}
                   </td>
                   {showDryIce && (
                     <>
                       <td className="text-right py-3 px-2">{formatNumber(filteredDryIceTotals?.currentYear || 0, 0)}</td>
                       <td className="text-right py-3 px-2 text-muted-foreground">{formatNumber(filteredDryIceTotals?.previousYear || 0, 0)}</td>
                       <td className={`text-right py-3 px-2 ${getChangeColor(filteredDryIceTotals?.changePercent || 0)}`}>
-                        {(filteredDryIceTotals?.changePercent || 0) >= 0 ? "+" : ""}{(filteredDryIceTotals?.changePercent || 0).toFixed(1)}%
+                        {reportChange(filteredDryIceTotals?.currentYear ?? 0, filteredDryIceTotals?.previousYear ?? 0)}
                       </td>
                     </>
                   )}
@@ -2320,7 +2329,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                     return b.currentDryIce - a.currentDryIce;
                   case "total":
                   default:
-                    return (b.currentCylinders + b.currentDryIce) - (a.currentCylinders + a.currentDryIce);
+                    return b.currentCylinders - a.currentCylinders;
                 }
               });
 
@@ -2429,7 +2438,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                                 {customer.previousCylinders.toLocaleString()}
                               </td>
                               <td className={`text-right py-3 px-2 ${getChangeColor(customer.cylinderChangePercent)}`}>
-                                {customer.cylinderChangePercent >= 0 ? "+" : ""}{customer.cylinderChangePercent.toFixed(1)}%
+                                {reportChange(customer.currentCylinders, customer.previousCylinders)}
                                 {cylinderSignificant && (
                                   <span className="ml-1">
                                     {customer.cylinderChangePercent > 0 ?
@@ -2448,7 +2457,7 @@ export const YearComparisonReport = React.memo(function YearComparisonReport({ l
                                     {customer.previousDryIce.toLocaleString()}
                                   </td>
                                   <td className={`text-right py-3 px-2 ${getChangeColor(customer.dryIceChangePercent)}`}>
-                                    {customer.dryIceChangePercent >= 0 ? "+" : ""}{customer.dryIceChangePercent.toFixed(1)}%
+                                    {reportChange(customer.currentDryIce, customer.previousDryIce)}
                                     {dryIceSignificant && (
                                       <span className="ml-1">
                                         {customer.dryIceChangePercent > 0 ?

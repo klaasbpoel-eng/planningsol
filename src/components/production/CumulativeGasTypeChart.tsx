@@ -1,3 +1,6 @@
+import { splitSeriesName, reportChange } from "@/lib/reportPresentation";
+import { buildExcludedProductNames } from "@/lib/gasTypeUtils";
+import { Button } from "@/components/ui/button";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -5,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown, Minus, Trophy } from "lucide-react";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, normalizeDatum } from "@/lib/utils";
 import { getGasColor } from "@/constants/gasColors";
 import { supabase } from "@/integrations/supabase/client";
 import { mapProductionLocation } from "@/lib/productionMetrics";
@@ -87,6 +90,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
   const fetchBothYearsData = async () => {
     setLoading(true);
 
+    const excludedNames = await buildExcludedProductNames(hideDigital, hideExternal);
     const locationParam = location !== "all" ? location : null;
 
     const fetchAllRowsForYear = async (year: number): Promise<any[]> => {
@@ -110,14 +114,14 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
         if (data.length < PAGE) break;
         from += PAGE;
       }
-      return allRows;
+      return allRows.filter(row => !excludedNames.has(row.Product));
     };
 
     const computeMonthlyCylinderTotalsByGasType = (rows: any[]): { month: number; gas_type_name: string; gas_type_color: string; total_cylinders: number }[] => {
       const map = new Map<string, { month: number; gas_type_name: string; gas_type_color: string; total_cylinders: number }>();
       rows.forEach((r: any) => {
         const raw: string = r.Datum || "";
-        const iso = raw.includes("T") ? raw.substring(0, 10) : raw.split("-").reverse().join("-");
+        const iso = normalizeDatum(raw);
         const month = parseInt(iso.substring(5, 7));
         if (!month || isNaN(month)) return;
         const gas_type_name = r.Product || "Onbekend";
@@ -158,7 +162,8 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
           });
         }
 
-        const gasType = gasTypeMap.get(id)!;
+        const gasType = gasTypeMap.get(id);
+        if (!gasType) return;
         gasType.months[item.month - 1] = Number(item.total_cylinders) || 0;
       });
 
@@ -188,6 +193,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
     }
 
     setAllGasTypes(filteredTypes);
+    setSelectedGasTypes(previous => previous.filter(id => filteredTypes.some(type => type.id === id)));
 
     setYearData([
       { year: selectedYear1, gasTypes: year1Data },
@@ -251,7 +257,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
   const cumulativeChartData = useMemo(() => {
     const chartData: CumulativeChartData[] = [];
 
-    for (let m = 0; m < 12; m++) {
+    for (let m = 0; m < (ytdMode ? currentMonth + 1 : 12); m++) {
       const entry: CumulativeChartData = {
         month: m + 1,
         monthName: MONTH_NAMES[m]
@@ -276,7 +282,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
     }
 
     return chartData;
-  }, [yearData, selectedGasTypes]);
+  }, [yearData, selectedGasTypes, ytdMode, currentMonth]);
 
   const toggleGasType = useCallback((gasTypeId: string) => {
     setSelectedGasTypes(prev => {
@@ -356,21 +362,11 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
               Cilinders per gastype — jaarvergelijking
             </CardTitle>
             <CardDescription>
-              Cumulatieve productie per maand — vergelijk twee jaren
+              Cumulatief = som vanaf januari. YTD omvat maanden t/m de huidige maand; deze maand kan nog onvolledig zijn. Grafiek en tabel gebruiken dezelfde afkapmaand.
             </CardDescription>
           </div>
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => setYtdMode(v => !v)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                ytdMode
-                  ? 'bg-orange-500 text-white border-orange-500'
-                  : 'bg-background border-border text-muted-foreground hover:border-orange-400'
-              }`}
-              title={ytdMode ? `Vergelijkt t/m ${MONTH_NAMES[currentMonth]} voor beide jaren` : 'Vergelijkt volledige jaren'}
-            >
-              YTD {ytdMode ? `(t/m ${MONTH_NAMES[currentMonth]})` : ''}
-            </button>
+            <Button variant={ytdMode ? "default" : "outline"} size="sm" aria-pressed={ytdMode} onClick={() => setYtdMode(v => !v)}>{ytdMode ? `YTD t/m ${MONTH_NAMES[currentMonth]}` : "Volledige jaren"}</Button>
             <div className="flex items-center gap-2">
               <Label className="text-sm text-muted-foreground">Jaar 1:</Label>
               <Select value={selectedYear1.toString()} onValueChange={(v) => setSelectedYear1(parseInt(v))}>
@@ -529,8 +525,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
                       <Minus className="h-3 w-3" />
                     )}
                     <span>
-                      {item.percentChange > 0 ? '+' : ''}
-                      {item.percentChange.toFixed(1)}%
+                      {reportChange(item.total1, item.total2)}
                     </span>
                   </div>
                 </div>
@@ -574,7 +569,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
                   fontSize: "13px"
                 }}
                 formatter={(value: number, name: string) => {
-                  const [gasTypeId, year] = name.split('_');
+                  const [gasTypeId, year] = splitSeriesName(name);
                   const info = getGasTypeInfo(gasTypeId);
                   return [formatNumber(value, 0), `${info?.name || gasTypeId} (${year})`];
                 }}
@@ -582,7 +577,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
               />
               <Legend
                 formatter={(value) => {
-                  const [gasTypeId, year] = value.split('_');
+                  const [gasTypeId, year] = splitSeriesName(value);
                   const info = getGasTypeInfo(gasTypeId);
                   return `${info?.name || gasTypeId} (${year})`;
                 }}
@@ -641,7 +636,7 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
                 <tr className="border-b">
                   <th className="text-left py-2 px-2 font-medium">Gastype</th>
                   <th className="text-left py-2 px-2 font-medium">Jaar</th>
-                  {MONTH_NAMES.map(month => (
+                  {MONTH_NAMES.slice(0, ytdMode ? currentMonth + 1 : 12).map(month => (
                     <th key={month} className="text-right py-2 px-1 font-medium text-xs">{month}</th>
                   ))}
                 </tr>
@@ -672,9 +667,9 @@ export const CumulativeGasTypeChart = React.memo(function CumulativeGasTypeChart
                         <td className="py-2 px-2 text-muted-foreground">
                           {yd.year}
                         </td>
-                        {cumulativeValues.map((value, i) => (
+                        {cumulativeValues.slice(0, ytdMode ? currentMonth + 1 : 12).map((value, i) => (
                           <td key={i} className="text-right py-2 px-1 text-xs">
-                            {value > 0 ? formatNumber(value, 0) : "-"}
+                            {formatNumber(value, 0)}
                           </td>
                         ))}
                       </tr>

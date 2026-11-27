@@ -8,7 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { TrendingUp, TrendingDown, Users, Flame, Container, ChevronDown, ChevronUp, ArrowUpDown, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn, formatNumber, normalizeDatum } from "@/lib/utils";
-import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
+import { buildExcludedProductNames } from "@/lib/gasTypeUtils";
 import { mapProductionLocation } from "@/lib/productionMetrics";
 import { normalizeKlant } from "@/lib/customerNormalize";
 import { format, subYears, differenceInCalendarDays } from "date-fns";
@@ -22,6 +22,7 @@ interface YoYInsightsProps {
   dateRange?: { from: Date; to: Date };
   year?: number;
   hideDigital?: boolean;
+  hideExternal?: boolean;
   hasDigitalTypes?: boolean;
 }
 
@@ -83,9 +84,11 @@ export function YoYInsights({
   dateRange,
   year,
   hideDigital = false,
+  hideExternal = false,
   hasDigitalTypes = false,
 }: YoYInsightsProps) {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [rowsCurrent, setRowsCurrent] = useState<Row[]>([]);
   const [rowsPrevious, setRowsPrevious] = useState<Row[]>([]);
   const [isExpanded, setIsExpanded] = useState(true);
@@ -130,10 +133,11 @@ export function YoYInsights({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError(false);
     (async () => {
       try {
         const locationParam = location === "all" ? null : location;
-        const digitalNames = hideDigital ? await buildDigitalProductNames() : new Set<string>();
+        const digitalNames = await buildExcludedProductNames(hideDigital, hideExternal);
 
         // Load gas_packages mapping for bundle expansion
         const { data: pkgRows } = await (supabase as any)
@@ -203,6 +207,7 @@ export function YoYInsights({
         setRowsPrevious(expand(prev));
       } catch (e) {
         console.error("[YoYInsights] fetch error", e);
+      setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -211,7 +216,7 @@ export function YoYInsights({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location, refreshKey, fromDate, toDate, hideDigital]);
+  }, [location, refreshKey, fromDate, toDate, hideDigital, hideExternal]);
 
   // Aggregations
   const agg = useMemo(() => {
@@ -416,7 +421,7 @@ export function YoYInsights({
               <div className="min-w-0">
                 <CardTitle className="text-lg flex items-center gap-2 flex-wrap">
                   <ArrowUpDown className="h-5 w-5 text-primary" />
-                  YoY Vergelijking
+                  Jaar-op-jaar analyse
                   <Badge variant="outline" className="text-xs">
                     {periodLabel} vs {prevPeriodLabel}
                   </Badge>
@@ -430,7 +435,7 @@ export function YoYInsights({
                   )}
                 </CardTitle>
                 <CardDescription>
-                  Verschillen t.o.v. dezelfde periode vorig jaar — op klant, gassoort en capaciteit
+                  Verschillen t.o.v. dezelfde periode vorig jaar — aantallen omgerekend naar losse cilinders (bundels × cilinders per pakket). Daardoor kan het totaal afwijken van het dashboard.
                 </CardDescription>
               </div>
               <div className="flex items-center gap-3 shrink-0">
@@ -501,7 +506,7 @@ export function YoYInsights({
                         />
                       </div>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <span>Min:</span>
+                        <span>Min. cilinders:</span>
                         <Input
                           type="number"
                           value={minVol}

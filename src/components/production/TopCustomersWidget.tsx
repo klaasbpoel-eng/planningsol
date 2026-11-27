@@ -9,9 +9,10 @@ import { FadeIn } from "@/components/ui/fade-in";
 import { CustomerListSkeleton } from "@/components/ui/skeletons";
 import { format, differenceInDays, subDays } from "date-fns";
 import { nl } from "date-fns/locale";
-import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
+import { buildExcludedProductNames } from "@/lib/gasTypeUtils";
 import { normalizeKlant } from "@/lib/customerNormalize";
-import { mapProductionLocation } from "@/lib/productionMetrics";
+import { reportChange } from "@/lib/reportPresentation";
+import { getComparisonRange, mapProductionLocation } from "@/lib/productionMetrics";
 
 interface CustomerData {
   customer_id: string | null;
@@ -38,6 +39,7 @@ interface TopCustomersWidgetProps {
   location?: ProductionLocation;
   dateRange?: DateRange;
   hideDigital?: boolean;
+  hideExternal?: boolean;
 }
 
 export const TopCustomersWidget = React.memo(function TopCustomersWidget({
@@ -46,6 +48,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
   location = "all",
   dateRange,
   hideDigital = false,
+  hideExternal = false,
 }: TopCustomersWidgetProps) {
   const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +56,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
 
   useEffect(() => {
     fetchTopCustomers();
-  }, [refreshKey, location, dateRange, hideDigital]);
+  }, [refreshKey, location, dateRange, hideDigital, hideExternal]);
 
   const fetchTopCustomers = useCallback(async (retryCount = 0) => {
     setLoading(true);
@@ -96,6 +99,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
         const { data } = await (supabase.from("Productie" as never) as any)
           .select("Datum,Locatie,Product,Aantal,Klant")
           .eq("Jaar", year)
+          .order("id")
           .range(from, from + PAGE - 1);
         if (!data || data.length === 0) break;
         allRows.push(...data);
@@ -180,7 +184,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
 
     const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const locationFilter = location === "all" ? null : location;
-    const digitalNames = hideDigital ? await buildDigitalProductNames() : new Set<string>();
+    const digitalNames = await buildExcludedProductNames(hideDigital, hideExternal);
 
     const [current, previous] = await Promise.all([
       fetchProductieByCustomer(fmt(currYearStart), fmt(now), locationFilter, digitalNames),
@@ -194,14 +198,12 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
     const fromDate = format(range.from, "yyyy-MM-dd");
     const toDate = format(range.to, "yyyy-MM-dd");
 
-    const periodLength = differenceInDays(range.to, range.from);
-    const prevTo = subDays(range.from, 1);
-    const prevFrom = subDays(prevTo, periodLength);
-    const prevFromDate = format(prevFrom, "yyyy-MM-dd");
-    const prevToDate = format(prevTo, "yyyy-MM-dd");
+    const comparison = getComparisonRange(range.from, range.to);
+    const prevFromDate = format(comparison.from, "yyyy-MM-dd");
+    const prevToDate = format(comparison.to, "yyyy-MM-dd");
 
     const locationFilter = location === "all" ? null : location;
-    const digitalNames = hideDigital ? await buildDigitalProductNames() : new Set<string>();
+    const digitalNames = await buildExcludedProductNames(hideDigital, hideExternal);
 
     const [current, previous] = await Promise.all([
       fetchProductieByCustomer(fromDate, toDate, locationFilter, digitalNames),
@@ -256,6 +258,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
+          <p className="text-sm text-muted-foreground">Gerangschikt op cilinders · verschil t.o.v. {dateRange ? getComparisonRange(dateRange.from, dateRange.to).label : "dezelfde periode vorig jaar"}.</p>
           {error ? (
             <div className="text-center py-4 space-y-2">
               <p className="text-sm text-destructive">{error}</p>
@@ -279,7 +282,7 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
                     #{index + 1}
                   </span>
                   <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{customer.customer_name}</p>
+                    <p className="font-medium text-sm break-words">{customer.customer_name}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{formatNumber(customer.total_cylinders, 0)} cil.</span>
                       {customer.total_dry_ice_kg > 0 && (
@@ -293,12 +296,12 @@ export const TopCustomersWidget = React.memo(function TopCustomersWidget({
                 </div>
                 <div className="flex flex-col items-end gap-0.5">
                   <div className="flex items-center gap-1">
-                  {getTrendIcon(customer.changePercent)}
+                  {customer.previousCylinders > 0 ? getTrendIcon(customer.changePercent) : <Minus className="h-3 w-3 text-muted-foreground" />}
                   <Badge
-                    variant={customer.changePercent >= 0 ? "default" : "destructive"}
+                    variant={customer.previousCylinders === 0 ? "outline" : customer.changePercent >= 0 ? "default" : "destructive"}
                     className="text-xs"
                   >
-                    {customer.changePercent >= 999 ? ">+999%" : customer.changePercent <= -999 ? "<-999%" : `${customer.changePercent >= 0 ? "+" : ""}${customer.changePercent.toFixed(0)}%`}
+                    {reportChange(customer.total_cylinders, customer.previousCylinders)}
                   </Badge>
                   </div>
                   {customer.previousCylinders > 0 && (

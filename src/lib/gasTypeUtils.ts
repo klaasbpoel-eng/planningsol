@@ -16,3 +16,12 @@ export async function buildDigitalProductNames(): Promise<Set<string>> {
     return new Set<string>();
   }
 }
+
+/** Fetch metadata for both exclusion filters; never treat a failed lookup as an empty filter. */
+export async function buildExcludedProductNames(hideDigital: boolean, hideExternal: boolean): Promise<Set<string>> {
+  if (!hideDigital && !hideExternal) return new Set();
+  const types = await api.gasTypes.getAllIncludingInactive();
+  return new Set((types || [])
+    .filter(type => (hideDigital && type.is_digital) || (hideExternal && (type as typeof type & { is_external?: boolean }).is_external))
+    .map(type => String(type.name)));
+}

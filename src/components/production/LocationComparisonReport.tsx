@@ -57,13 +57,15 @@ interface GasTypeLocationData {
 
 interface LocationComparisonReportProps {
   hideDigital?: boolean;
+  hideExternal?: boolean;
   onHideDigitalChange?: (value: boolean) => void;
 }
 
-export const LocationComparisonReport = React.memo(function LocationComparisonReport({ hideDigital: externalHideDigital, onHideDigitalChange }: LocationComparisonReportProps) {
+export const LocationComparisonReport = React.memo(function LocationComparisonReport({ hideDigital: externalHideDigital, onHideDigitalChange, hideExternal = false }: LocationComparisonReportProps) {
   const hideDigital = externalHideDigital ?? false;
   const setHideDigital = (val: boolean) => onHideDigitalChange?.(val);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [exporting, setExporting] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -137,10 +139,11 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
 
   useEffect(() => {
     fetchData();
-  }, [selectedYear, hideDigital, ytdMode]);
+  }, [selectedYear, hideDigital, hideExternal, ytdMode]);
 
   const fetchData = async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       // Helper: paginate Productie table for a given year and location
       const PAGE = 1000;
@@ -157,7 +160,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
             .eq("Locatie", locFilter)
             .order("id", { ascending: true })
             .range(from, from + PAGE - 1);
-          if (error) break;
+          if (error) throw error;
           if (!data || data.length === 0) break;
           allRows.push(...data);
           if (data.length < PAGE) break;
@@ -170,7 +173,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
       const getRowMonth = (row: any): number | null => {
         const raw = row.Datum;
         if (!raw) return null;
-        const iso = raw.includes("T") ? raw.substring(0, 10) : raw;
+        const iso = normalizeDatum(raw);
         if (!iso || iso.length < 7) return null;
         return parseInt(iso.substring(5, 7));
       };
@@ -186,7 +189,9 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
       ]);
 
       const cutoffMonthDay = `${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
+      const excludedNames = new Set((gasTypes || []).filter((type: any) => (hideDigital && type.is_digital) || (hideExternal && type.is_external)).map((type: any) => type.name));
       const throughYtdDay = (rows: any[], year: number) => rows.filter(row => {
+        if (excludedNames.has(row.Product)) return false;
         if (!ytdMode) return true;
         const iso = normalizeDatum(row.Datum);
         return iso !== "" && iso <= `${year}-${cutoffMonthDay}`;
@@ -315,6 +320,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
       setGasTypeData(gasData);
     } catch (error) {
       console.error("Error fetching location comparison data:", error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -421,6 +427,8 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
       </div>
     );
   }
+
+  if (loadError) return <div role="alert" className="border border-destructive/40 rounded-lg p-4 text-sm text-destructive">De rapportgegevens konden niet volledig worden geladen. Wijzig de periode om opnieuw te laden; ontbrekende gegevens zijn niet nul.</div>;
 
   return (
     <div ref={reportRef} className="space-y-6 bg-background p-1">
@@ -532,11 +540,11 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
             <Card className={`shadow-sm border-orange-500/30 ${leader === "emmen" ? "ring-2 ring-orange-500/40" : ""} relative overflow-hidden`}>
               {leader === "emmen" ? (
                 <div className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
-                  <TrendingUp className="h-2.5 w-2.5" /> Leider
+                  <TrendingUp className="h-2.5 w-2.5" /> Hoogste volume
                 </div>
               ) : leader === "tie" && filteredEmmenTotal > 0 ? (
                 <div className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded flex items-center gap-1">
-                  <Minus className="h-2.5 w-2.5" /> Gelijk spel
+                  <Minus className="h-2.5 w-2.5" /> Gelijk volume
                 </div>
               ) : null}
               <CardContent className="pt-4 pb-3">
@@ -564,11 +572,11 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
             <Card className={`shadow-sm border-blue-500/30 ${leader === "tilburg" ? "ring-2 ring-blue-500/40" : ""} relative overflow-hidden`}>
               {leader === "tilburg" ? (
                 <div className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide text-blue-500 bg-blue-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
-                  <TrendingUp className="h-2.5 w-2.5" /> Leider
+                  <TrendingUp className="h-2.5 w-2.5" /> Hoogste volume
                 </div>
               ) : leader === "tie" && filteredTilburgTotal > 0 ? (
                 <div className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded flex items-center gap-1">
-                  <Minus className="h-2.5 w-2.5" /> Gelijk spel
+                  <Minus className="h-2.5 w-2.5" /> Gelijk volume
                 </div>
               ) : null}
               <CardContent className="pt-4 pb-3">
@@ -625,8 +633,9 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
         );
       })()}
 
+      <p className="text-sm text-muted-foreground">Locatie-aandeel gaat over geregistreerde aantallen, niet capaciteit, omzet of efficiëntie. Beide locaties kunnen een ander productassortiment hebben.</p>
       {/* Digital vs Physical Summary */}
-      {hasDigitalTypes && digitalPhysicalSplit.total > 0 && (
+      {hasDigitalTypes && !hideDigital && digitalPhysicalSplit.total > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Card className="shadow-sm border-orange-500/20">
             <CardContent className="pt-4 pb-3">
@@ -668,7 +677,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">Cilinders per maand</CardTitle>
           <CardDescription>
-            {ytdMode ? `YTD t/m ${MONTH_NAMES[todayMonth - 1]} ${selectedYear}` : `Maandelijkse vergelijking ${selectedYear}`}
+            {ytdMode ? `YTD t/m ${new Date().getDate()} ${MONTH_NAMES[todayMonth - 1]} ${selectedYear}` : `Maandelijkse vergelijking ${selectedYear}`}
             {showComparison && ` — vergeleken met ${selectedYear - 1}`}
           </CardDescription>
         </CardHeader>
@@ -712,7 +721,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
 
           {/* Monthly Table */}
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Locatie</th>
@@ -820,7 +829,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">Cumulatief verloop</CardTitle>
           <CardDescription>
-            {ytdMode ? `YTD t/m ${MONTH_NAMES[todayMonth - 1]} ${selectedYear}` : `Lopend totaal cilinders per locatie — ${selectedYear}`}
+            {ytdMode ? `YTD t/m ${new Date().getDate()} ${MONTH_NAMES[todayMonth - 1]} ${selectedYear}` : `Lopend totaal cilinders per locatie — ${selectedYear}`}
             {showComparison && ` — vergeleken met ${selectedYear - 1}`}
           </CardDescription>
         </CardHeader>
@@ -873,7 +882,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
       {/* Gas Type Distribution per Location */}
       <Card className="shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium">Gastype verdeling per locatie</CardTitle>
+          <CardTitle className="text-base font-medium">Gastypeverdeling per locatie</CardTitle>
           <CardDescription>
             Cilinders per gastype — Emmen vs Tilburg ({periodLabel(selectedYear, ytdMode, todayMonth, MONTH_NAMES)})
             {showComparison && ` — vergeleken met ${selectedYear - 1}`}
@@ -889,8 +898,8 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
                   <YAxis
                     dataKey="gas_type_name"
                     type="category"
-                    width={120}
-                    className="text-[11px]"
+                    width={200}
+                    className="text-sm"
                     tickLine={false}
                     axisLine={false}
                     interval={0}
@@ -959,7 +968,7 @@ export const LocationComparisonReport = React.memo(function LocationComparisonRe
 
               {/* Gas type table */}
               <div className="mt-4 overflow-x-auto">
-                <table className="w-full text-xs">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Gastype</th>

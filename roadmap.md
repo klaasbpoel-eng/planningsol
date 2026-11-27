@@ -1,5 +1,10 @@
 # Roadmap
 
+- [x] Alle rapportage-opties controleren op leesbaarheid, periode-/filtercontext en interpretatie van cijfers.
+- [x] Rapportages verbeteren met duidelijke eenheden, vergelijkingsbasis, gegevensstatus en leesbare tabellen/grafieken.
+- [x] Rapportageregels testen en beschikbare schermen met testgegevens controleren (215 tests; desktop en telefoon).
+- [ ] Rapportages met echte gegevens controleren: aparte externe accountomgeving laat de beschikbare testsessie niet inloggen.
+
 - [x] Analyseer navigatie, kernschermen, mobiel gebruik, toegankelijkheid en visuele samenhang.
 - [x] Fase 1: centraliseer navigatie, voeg mobiele snelacties en een directe beheerroute toe.
 - [x] Fase 2: vereenvoudig mobiele productiebediening en schermhiërarchie.

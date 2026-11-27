@@ -162,7 +162,9 @@ interface ProductionReportsProps {
 }
 
 import { getGasColor } from "@/constants/gasColors";
-import { getComparisonRange, isYearToDateRange, mapProductionLocation } from "@/lib/productionMetrics";
+import { ReportReadingGuide } from "./ReportReadingGuide";
+import { calendarYearProgress, reportChange } from "@/lib/reportPresentation";
+import { calculatePercentageChange, getComparisonRange, isYearToDateRange, mapProductionLocation } from "@/lib/productionMetrics";
 
 export function ProductionReports({
   refreshKey = 0,
@@ -176,6 +178,8 @@ export function ProductionReports({
   onHideExternalChange
 }: ProductionReportsProps) {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [showDataTable, setShowDataTable] = useState(false);
 
   // Server-side aggregated data
   const [dailyProduction, setDailyProduction] = useState<DailyProductionData[]>([]);
@@ -236,6 +240,7 @@ export function ProductionReports({
 
   const fetchReportData = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const fromDate = format(dateRange.from, "yyyy-MM-dd");
       const toDate = format(dateRange.to, "yyyy-MM-dd");
@@ -255,9 +260,10 @@ export function ProductionReports({
         for (const year of years) {
           const PAGE = 1000;
           // Get total row count for this year first, then load all pages in parallel
-          const { count } = await (supabase.from("Productie" as never) as any)
+          const { count, error: countError } = await (supabase.from("Productie" as never) as any)
             .select("*", { count: "exact", head: true })
             .eq("Jaar", year);
+          if (countError) throw countError;
           const totalRows = count || 0;
           if (totalRows === 0) continue;
           const numPages = Math.ceil(totalRows / PAGE);
@@ -270,7 +276,8 @@ export function ProductionReports({
                 .range(i * PAGE, (i + 1) * PAGE - 1)
             )
           );
-          for (const { data } of pageResults) {
+          for (const { data, error } of pageResults) {
+            if (error) throw error;
             if (data) allRows.push(...data);
           }
         }
@@ -289,11 +296,10 @@ export function ProductionReports({
 
       const getDryIce = async (f: string, t: string) => {
         if (isTilburg) return [{ total_kg: 0, total_orders: 0, completed_orders: 0, pending_orders: 0, cancelled_orders: 0 }];
-        try { return await api.reports.getDryIceEfficiency(f, t, null); }
-        catch { return [{ total_kg: 0, total_orders: 0, completed_orders: 0, pending_orders: 0, cancelled_orders: 0 }]; }
+        return await api.reports.getDryIceEfficiency(f, t, "sol_emmen");
       };
 
-      const [currentRows, prevRows, dryIceData, prevDryIceData, gasTypesData] = await Promise.all([
+      const [rawCurrentRows, rawPrevRows, dryIceData, prevDryIceData, gasTypesData] = await Promise.all([
         fetchRows(fromDate, toDate),
         fetchRows(prevFromDate, prevToDate),
         getDryIce(fromDate, toDate),
@@ -301,6 +307,15 @@ export function ProductionReports({
         api.gasTypes.getAllIncludingInactive(),
       ]);
       const gasTypeMap = new Map<string, any>(gasTypesData?.map(gt => [gt.name, gt]) || []);
+
+      const includeRow = (row: any) => {
+        const meta = gasTypeMap.get(row.Product);
+        return (!hideDigital || !meta?.is_digital) && (!hideExternal || !meta?.is_external);
+      };
+      const currentRows = rawCurrentRows.filter(includeRow);
+      const prevRows = rawPrevRows.filter(includeRow);
+      setHasDigitalTypes(rawCurrentRows.some(row => gasTypeMap.get(row.Product)?.is_digital));
+      setHasExternalTypes(rawCurrentRows.some(row => gasTypeMap.get(row.Product)?.is_external));
 
       // Build EfficiencyData from Productie rows (no status in Productie, all = completed)
       const buildEfficiency = (rows: any[]): EfficiencyData => {
@@ -393,8 +408,8 @@ export function ProductionReports({
       });
       setGasTypeDistributionData(currentDistribution);
       setPreviousGasTypeDistributionData(previousDistribution);
-      setHasDigitalTypes(hasDigital);
-      setHasExternalTypes(hasExternal);
+
+
 
       // Category distribution grouped by Capaciteit (cylinder size)
       const catMap = new Map<string, number>();
@@ -424,17 +439,15 @@ export function ProductionReports({
       setDryIceOrders([]);
     } catch (error) {
       console.error("[ProductionReports] Error fetching report data:", error);
+      setLoadError("De rapportcijfers konden niet volledig worden geladen. Probeer opnieuw; ontbrekende gegevens zijn niet nul.");
     } finally {
       setLoading(false);
     }
   };
 
   // Helper function to calculate trend percentage
-  const calculateTrend = (current: number, previous: number): number | null => {
-    if (previous === 0) return null;
-    const pct = Math.round(((current - previous) / previous) * 100);
-    return Math.max(-500, Math.min(500, pct));
-  };
+  const calculateTrend = calculatePercentageChange;
+  const comparisonRange = getComparisonRange(dateRange.from, dateRange.to);
 
   const setPresetRange = (preset: string) => {
     const now = new Date();
@@ -565,7 +578,7 @@ export function ProductionReports({
       const periodStartIso = format(dateRange.from, "yyyy-MM-dd");
       const calOffset = differenceInDays(new Date(d.date), new Date(periodStartIso));
       const cumPrev = calOffset >= 0 && calOffset < prevPrefix.length ? prevPrefix[calOffset] : 0;
-      const targetRamp = yearTarget > 0 ? Math.round((yearTarget / 365) * (i + 1)) : undefined;
+      const targetRamp = yearTarget > 0 ? Math.round(yearTarget * calendarYearProgress(new Date(d.date + "T00:00:00")).fraction) : undefined;
       return { ...d, cylinders: cumCyl, prevCylinders: cumPrev, targetRamp };
     });
   }, [ordersPerDay, cumulativeChart, isYtdMode, dateRange.from, location, prevDailyByOffset]);
@@ -580,7 +593,7 @@ export function ProductionReports({
     let filtered = gasTypeDistributionData;
     if (hideDigital) filtered = filtered.filter(item => !item.is_digital);
     if (hideExternal) filtered = filtered.filter(item => !item.is_external);
-    
+
     return filtered.map(item => {
       const name = item.gas_type_name || "";
       const color = getGasColor(name, item.gas_type_color || "#8b5cf6");
@@ -613,7 +626,7 @@ export function ProductionReports({
     return gasCategoryDistributionData.map(item => ({
       name: item.category_name,
       value: Number(item.total_cylinders) || 0,
-      color: "#8b5cf6" // Default color for categories (purple)
+      color: "hsl(var(--primary))"
     }));
   }, [gasCategoryDistributionData]);
 
@@ -631,7 +644,7 @@ export function ProductionReports({
     const rest = sorted.slice(MAX_DISTRIBUTION_ITEMS);
     const otherValue = rest.reduce((sum, item) => sum + item.value, 0);
     if (otherValue > 0) {
-      top.push({ name: `Overige (${rest.length})`, value: otherValue, color: "#9ca3af" });
+      top.push({ name: `Overige (${rest.length})`, value: otherValue, color: "hsl(var(--muted-foreground))" });
     }
     return top;
   }, [distributionView, gasTypeDistribution, gasCategoryDistribution, showAllDistribution]);
@@ -735,13 +748,13 @@ export function ProductionReports({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="production-reports space-y-5">
       {/* Compact Toolbar */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-card/60 backdrop-blur-md border rounded-lg p-2 shadow-sm sticky top-0 z-10">
         <div className="flex flex-wrap items-center gap-2">
           {/* Periode preset dropdown */}
           <Select value={getActivePreset() || "custom"} onValueChange={(val) => val !== "custom" && setPresetRange(val)}>
-            <SelectTrigger className="w-36 h-9">
+            <SelectTrigger className="w-52 h-9">
               <SelectValue placeholder="Kies periode" />
             </SelectTrigger>
             <SelectContent>
@@ -749,9 +762,9 @@ export function ProductionReports({
               <SelectItem value="mtd">Maand t/m vandaag</SelectItem>
               <SelectItem value="month">Deze maand</SelectItem>
               <SelectItem value="last-month">Vorige maand</SelectItem>
-              <SelectItem value="quarter">Kwartaal</SelectItem>
+              <SelectItem value="quarter">Laatste 3 maanden</SelectItem>
               <SelectItem value="last-year">Vorig jaar</SelectItem>
-              <SelectItem value="this-year">Dit jaar</SelectItem>
+              <SelectItem value="this-year">Jaar t/m vandaag</SelectItem>
               <SelectItem value="full-year">Heel jaar</SelectItem>
               {getActivePreset() === "" && <SelectItem value="custom">Aangepast</SelectItem>}
             </SelectContent>
@@ -814,7 +827,7 @@ export function ProductionReports({
               {hideExternal ? "Toon extern" : "Verberg extern"}
             </Button>
           )}
-          <ReportExportButtons
+          {activeTab === "overview" && <ReportExportButtons
             tableData={activeExportData}
             chartElementId={activeTab === "overview" ? "production-chart" : undefined}
             chartTitle={activeTab === "overview" ? "Productie Grafiek" : undefined}
@@ -822,26 +835,33 @@ export function ProductionReports({
               dateRange: { from: dateRange.from, to: dateRange.to },
               location: location === "all" ? "Alle locaties" : location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg",
             }}
-          />
+          />}
         </div>
       </div>
 
+      {loadError && <div role="alert" className="border border-destructive/40 bg-destructive/5 p-4 rounded-lg space-y-2"><p className="text-destructive">{loadError}</p><Button variant="outline" onClick={fetchReportData}>Opnieuw proberen</Button></div>}
+      {!loadError && <>
+      <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+        <span><span className="font-medium text-foreground">Samenvatting:</span> {format(dateRange.from, "d MMM yyyy", { locale: nl })} – {format(dateRange.to, "d MMM yyyy", { locale: nl })} · {location === "all" ? "Alle locaties" : location === "sol_emmen" ? "SOL Emmen" : "SOL Tilburg"}</span>
+        <span><span className="font-medium text-foreground">Verschil t.o.v.:</span> {format(comparisonRange.from, "d MMM yyyy", { locale: nl })} – {format(comparisonRange.to, "d MMM yyyy", { locale: nl })} ({comparisonRange.label})</span>
+        {(hideDigital || hideExternal) && <Badge variant="secondary">{[hideDigital && "Zonder digitaal", hideExternal && "Zonder extern"].filter(Boolean).join(" · ")}</Badge>}
+      </div>
       {/* Digital vs Physical split */}
-      {hasDigitalTypes && digitalPhysicalSplit.total > 0 && (
+      {hasDigitalTypes && !hideDigital && digitalPhysicalSplit.total > 0 && (
         <div className="grid grid-cols-2 gap-3">
           <StatCard
             value={formatNumber(digitalPhysicalSplit.physical, 0)}
             label={`Fysieke cilinders (${digitalPhysicalSplit.physicalPercent}%)`}
-            icon={<Cylinder className="h-4 w-4 text-orange-500" />}
-            iconBgColor="bg-orange-500/10"
-            className="border-orange-500/20 shadow-sm"
+            icon={<Cylinder className="h-4 w-4 text-accent" />}
+            iconBgColor="bg-accent/10"
+            className="border-accent/20 shadow-sm"
           />
           <StatCard
             value={formatNumber(digitalPhysicalSplit.digital, 0)}
             label={`Digitale cilinders (${digitalPhysicalSplit.digitalPercent}%)`}
-            icon={<Sparkles className="h-4 w-4 text-sky-500" />}
-            iconBgColor="bg-sky-500/10"
-            className="border-sky-500/20 shadow-sm"
+            icon={<Sparkles className="h-4 w-4 text-primary" />}
+            iconBgColor="bg-primary/10"
+            className="border-primary/20 shadow-sm"
           />
         </div>
       )}
@@ -862,19 +882,19 @@ export function ProductionReports({
         const cylinderTrendMeaningful = cylinderTrend !== null && Math.abs(cylinderTrend) >= 5;
         const cylinderTrendColor = !cylinderTrendMeaningful
           ? "text-muted-foreground"
-          : cylinderTrend! > 0
+          : (cylinderTrend ?? 0) > 0
             ? "text-success"
             : "text-destructive";
         const dryIceTrend = calculateTrend(dryIceStats.totalKg, previousPeriodStats.totalDryIce);
         const dryIceTrendMeaningful = dryIceTrend !== null && Math.abs(dryIceTrend) >= 5;
         const dryIceTrendColor = !dryIceTrendMeaningful
           ? "text-muted-foreground"
-          : dryIceTrend! > 0
+          : (dryIceTrend ?? 0) > 0
             ? "text-success"
             : "text-destructive";
         const formatTrendDisplay = (t: number | null) => {
-          if (t === null) return "—";
-          return `${t > 0 ? "+" : ""}${t}%`;
+          if (t === null) return "Geen basis";
+          return `${t > 0 ? "+" : ""}${formatNumber(t, 1)}%`;
         };
 
         return (
@@ -883,12 +903,12 @@ export function ProductionReports({
             showDryIce ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
           )}>
             {/* Cilinders Hero */}
-            <Card className="border-orange-500/20 shadow-sm overflow-hidden hover-lift">
+            <Card className="border-accent/20 shadow-sm overflow-hidden hover-lift">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="flex items-center gap-2.5">
-                    <div className="p-2.5 rounded-xl bg-orange-500/10">
-                      <Cylinder className="h-5 w-5 text-orange-500" />
+                    <div className="p-2.5 rounded-xl bg-accent/10">
+                      <Cylinder className="h-5 w-5 text-accent" />
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
@@ -901,7 +921,7 @@ export function ProductionReports({
                        title={cylinderTrend === null ? "Geen vergelijkbare basis in vorige periode" : "vs. vorige periode"}>
                     {!cylinderTrendMeaningful ? (
                       <Minus className="h-3.5 w-3.5" />
-                    ) : cylinderTrend! > 0 ? (
+                    ) : (cylinderTrend ?? 0) > 0 ? (
                       <TrendingUp className="h-3.5 w-3.5" />
                     ) : (
                       <TrendingDown className="h-3.5 w-3.5" />
@@ -909,35 +929,21 @@ export function ProductionReports({
                     <span>{formatTrendDisplay(cylinderTrend)}</span>
                   </div>
                 </div>
-                <div className="mt-3 space-y-1">
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>{formatNumber(cylinderStats.total, 0)} orders</span>
-                    <span>
-                      <span className="text-green-500 font-medium">{formatNumber(cylinderStats.completed, 0)}</span> voltooid
-                      {cylinderStats.pending > 0 && <> · <span className="text-yellow-500 font-medium">{formatNumber(cylinderStats.pending, 0)}</span> gepland</>}
-                    </span>
-                  </div>
-                  {cylinderStats.total > 0 && (
-                    <div className="flex h-1.5 rounded-full overflow-hidden bg-muted/40">
-                      <div className="bg-green-500/80 transition-all" style={{ width: `${(cylinderStats.completed / cylinderStats.total) * 100}%` }} />
-                      <div className="bg-yellow-500/70 transition-all" style={{ width: `${(cylinderStats.pending / cylinderStats.total) * 100}%` }} />
-                    </div>
-                  )}
-                </div>
+                <div className="mt-3 text-sm text-muted-foreground">{formatNumber(cylinderStats.total, 0)} {cylinderStats.total === 1 ? "productieregel" : "productieregels"} · geregistreerd volume</div>
               </CardContent>
             </Card>
 
             {/* Droogijs Hero */}
             {showDryIce && (
-              <Card className="border-cyan-500/20 shadow-sm overflow-hidden hover-lift">
+              <Card className="border-dryice/20 shadow-sm overflow-hidden hover-lift">
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex items-center gap-2.5">
-                      <div className="p-2.5 rounded-xl bg-cyan-500/10">
-                        <Snowflake className="h-5 w-5 text-cyan-500" />
+                      <div className="p-2.5 rounded-xl bg-dryice/10">
+                        <Snowflake className="h-5 w-5 text-dryice" />
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Droogijs</p>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Droogijs · ordervolume</p>
                         <p className="text-3xl font-bold leading-tight">{formatNumber(dryIceStats.totalKg, 0)} <span className="text-base text-muted-foreground font-normal">kg</span></p>
                       </div>
                     </div>
@@ -945,7 +951,7 @@ export function ProductionReports({
                          title={dryIceTrend === null ? "Geen vergelijkbare basis in vorige periode" : "vs. vorige periode"}>
                       {!dryIceTrendMeaningful ? (
                         <Minus className="h-3.5 w-3.5" />
-                      ) : dryIceTrend! > 0 ? (
+                      ) : (dryIceTrend ?? 0) > 0 ? (
                         <TrendingUp className="h-3.5 w-3.5" />
                       ) : (
                         <TrendingDown className="h-3.5 w-3.5" />
@@ -957,14 +963,14 @@ export function ProductionReports({
                     <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                       <span>{formatNumber(dryIceStats.total, 0)} orders</span>
                       <span>
-                        <span className="text-green-500 font-medium">{formatNumber(dryIceStats.completed, 0)}</span> voltooid
-                        {dryIceStats.pending > 0 && <> · <span className="text-yellow-500 font-medium">{formatNumber(dryIceStats.pending, 0)}</span> gepland</>}
+                        <span className="text-success font-medium">{formatNumber(dryIceStats.completed, 0)}</span> voltooid
+                        {dryIceStats.pending > 0 && <> · <span className="text-warning font-medium">{formatNumber(dryIceStats.pending, 0)}</span> gepland</>}
                       </span>
                     </div>
                     {dryIceStats.total > 0 && (
                       <div className="flex h-1.5 rounded-full overflow-hidden bg-muted/40">
-                        <div className="bg-green-500/80 transition-all" style={{ width: `${(dryIceStats.completed / dryIceStats.total) * 100}%` }} />
-                        <div className="bg-yellow-500/70 transition-all" style={{ width: `${(dryIceStats.pending / dryIceStats.total) * 100}%` }} />
+                        <div className="bg-success/80 transition-all" style={{ width: `${(dryIceStats.completed / dryIceStats.total) * 100}%` }} />
+                        <div className="bg-warning/70 transition-all" style={{ width: `${(dryIceStats.pending / dryIceStats.total) * 100}%` }} />
                       </div>
                     )}
                   </div>
@@ -981,19 +987,19 @@ export function ProductionReports({
         const emmenPct = total > 0 ? Math.round((locationSplit.emmen / total) * 100) : 0;
         const tilburgPct = total > 0 ? 100 - emmenPct : 0;
         return (
-          <div className="flex items-center gap-3 px-1 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-3 px-1 text-sm text-muted-foreground">
             <span className="shrink-0 font-medium">Verdeling locaties:</span>
             <div className="flex-1 flex items-center h-2 rounded-full overflow-hidden bg-muted/30">
-              <div className="h-full bg-orange-500/70 transition-all" style={{ width: `${emmenPct}%` }} />
-              <div className="h-full bg-blue-500/70 transition-all" style={{ width: `${tilburgPct}%` }} />
+              <div className="h-full bg-accent/70 transition-all" style={{ width: `${emmenPct}%` }} />
+              <div className="h-full bg-primary/70 transition-all" style={{ width: `${tilburgPct}%` }} />
             </div>
-            <span className="shrink-0 flex items-center gap-3">
+            <span className="flex flex-wrap items-center gap-3">
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-orange-500/80 shrink-0" />
+                <span className="w-2 h-2 rounded-full bg-accent/80 shrink-0" />
                 Emmen {formatNumber(locationSplit.emmen, 0)} ({emmenPct}%)
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-blue-500/80 shrink-0" />
+                <span className="w-2 h-2 rounded-full bg-primary/80 shrink-0" />
                 Tilburg {formatNumber(locationSplit.tilburg, 0)} ({tilburgPct}%)
               </span>
             </span>
@@ -1005,7 +1011,7 @@ export function ProductionReports({
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex flex-col md:flex-row gap-4 items-start">
           {/* Sidebar navigation */}
-          <TabsList className="flex md:flex-col h-auto w-full md:w-44 bg-card border shadow-sm rounded-xl p-1.5 gap-0.5 overflow-x-auto md:overflow-x-visible scrollbar-none md:shrink-0 md:sticky md:top-[4.5rem]">
+          <TabsList className="flex justify-start md:flex-col h-auto w-full md:w-44 bg-card border shadow-sm rounded-xl p-1.5 gap-0.5 overflow-x-auto md:overflow-x-visible scrollbar-none md:shrink-0 md:sticky md:top-[4.5rem]">
             <TabsTrigger value="overview" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
               <BarChart3 className="h-4 w-4 shrink-0" />
               Dashboard
@@ -1016,11 +1022,11 @@ export function ProductionReports({
             </TabsTrigger>
             <TabsTrigger value="insights" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
               <Sparkles className="h-4 w-4 shrink-0" />
-              Insights
+              Jaaranalyse
             </TabsTrigger>
             <TabsTrigger value="cylinders" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
               <Cylinder className="h-4 w-4 shrink-0" />
-              Cilinders
+              Cilinderanalyse
             </TabsTrigger>
             <TabsTrigger value="locations" className="text-sm gap-2 justify-start w-auto md:w-full px-3 py-2 shrink-0">
               <Building2 className="h-4 w-4 shrink-0" />
@@ -1033,24 +1039,26 @@ export function ProductionReports({
           </TabsList>
 
           {/* Content area */}
-          <div className="flex-1 min-w-0 w-full">
+          <div className="flex-1 min-w-0 w-full space-y-4">
+        <ReportReadingGuide section={activeTab} />
         <TabsContent value="overview" className="mt-0 space-y-4">
           {/* Dashboard Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             {/* Main Chart - Spans 2 cols */}
-            <Card className="lg:col-span-2 shadow-sm" id="production-chart">
+            <Card className="xl:col-span-2 shadow-sm" id="production-chart">
               <CardHeader className="pb-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <CardTitle className="text-base font-medium">Productie per dag</CardTitle>
+                    <CardTitle className="text-base font-medium">{cumulativeChart ? "Cumulatieve productie" : "Productie per dag"}</CardTitle>
                     {isYtdMode && (
                       <Badge variant="outline" className="text-[10px] h-5 text-primary border-primary/40">YTD</Badge>
                     )}
                     {cumulativeChart && (
-                      <Badge variant="outline" className="text-[10px] h-5 text-amber-600 border-amber-400/40">Cumulatief</Badge>
+                      <Badge variant="outline" className="text-[10px] h-5 text-warning border-warning/40">Cumulatief</Badge>
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
+                    <Button variant={showDataTable ? "default" : "outline"} size="sm" aria-pressed={showDataTable} onClick={() => setShowDataTable(!showDataTable)}>Tabel</Button>
                     <Button
                       variant={showPrevYear ? "default" : "outline"}
                       size="sm"
@@ -1058,7 +1066,7 @@ export function ProductionReports({
                       onClick={() => setShowPrevYear(!showPrevYear)}
                     >
                       <TrendingUp className="h-3 w-3" />
-                      Vorig jaar
+                      {isYtdMode ? "Vorig jaar" : "Vorige periode"}
                     </Button>
                     <Button
                       variant={cumulativeChart ? "default" : "outline"}
@@ -1082,26 +1090,28 @@ export function ProductionReports({
                 </div>
               </CardHeader>
               <CardContent>
-                {ordersPerDay.length > 0 ? (
+                {ordersPerDay.length > 0 && showDataTable ? (
+                  <div className="max-h-[400px] overflow-auto"><table className="w-full text-sm"><caption className="text-left pb-3 text-muted-foreground">{cumulativeChart ? "Cumulatief" : "Per dag"} · cilinders · {comparisonRange.label}</caption><thead className="sticky top-0 bg-card"><tr><th className="text-left p-3">Datum</th><th className="text-right p-3">Cilinders</th>{showPrevYear && <><th className="text-right p-3">Vergelijkingsperiode</th><th className="text-right p-3">Verschil (%)</th></>}</tr></thead><tbody>{chartData.map(row => <tr key={row.date} className="border-b"><td className="p-3">{format(new Date(row.date + "T00:00:00"), "d MMM yyyy", { locale: nl })}</td><td className="text-right p-3 tabular-nums">{formatNumber(row.cylinders, 0)}</td>{showPrevYear && <><td className="text-right p-3 tabular-nums">{formatNumber(row.prevCylinders, 0)}</td><td className="text-right p-3 tabular-nums">{reportChange(row.cylinders, row.prevCylinders)}</td></>}</tr>)}</tbody></table></div>
+                ) : ordersPerDay.length > 0 ? (
                   <ResponsiveContainer width="100%" height={300}>
                     <ComposedChart data={chartData}>
                       <defs>
                         <linearGradient id="gradientCylinders" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#f97316" stopOpacity={0.3} />
-                          <stop offset="100%" stopColor="#f97316" stopOpacity={0.02} />
+                          <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity={0.02} />
                         </linearGradient>
                         <linearGradient id="gradientDryIce" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.3} />
-                          <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.02} />
+                          <stop offset="0%" stopColor="hsl(var(--dryice))" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="hsl(var(--dryice))" stopOpacity={0.02} />
                         </linearGradient>
                         <linearGradient id="gradientPrevYear" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.25} />
-                          <stop offset="100%" stopColor="#94a3b8" stopOpacity={0.02} />
+                          <stop offset="0%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.25} />
+                          <stop offset="100%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.02} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                       <XAxis dataKey="displayDate" className="text-xs" tickLine={false} axisLine={false} />
-                      <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} tickLine={false} axisLine={false} domain={[(dataMin: number) => Math.max(0, Math.floor(dataMin * 0.85)), 'auto']} />
+                      <YAxis className="text-xs" tickFormatter={(value) => formatNumber(value, 0)} tickLine={false} axisLine={false} domain={[0, "auto"]} width={76} />
                       {/* Weekend shading */}
                       {chartData.map((item, idx) => {
                         const d = new Date(item.date);
@@ -1121,6 +1131,7 @@ export function ProductionReports({
                         return null;
                       })}
                       <Tooltip
+                        formatter={(value: number, name: string) => [`${formatNumber(value, 0)} cilinders`, name]}
                         contentStyle={{ borderRadius: "10px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", backgroundColor: "hsl(var(--background))", padding: "10px 14px", fontSize: "13px" }}
                         labelStyle={{ fontWeight: 600, marginBottom: 4, color: "hsl(var(--foreground))" }}
                         itemStyle={{ padding: "2px 0" }}
@@ -1128,18 +1139,18 @@ export function ProductionReports({
                       <Legend />
                       {/* Prev year ghost area */}
                       {showPrevYear && (productionChartView === "both" || productionChartView === "cylinders") && (
-                        <Area type="monotone" dataKey="prevCylinders" name={`Vorig jaar cilinders`} stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 2" fill="url(#gradientPrevYear)" dot={false} activeDot={{ r: 3 }} />
+                        <Area type="monotone" dataKey="prevCylinders" name={isYtdMode ? "Cilinders vorig jaar" : "Cilinders vorige periode"} stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} strokeDasharray="4 2" fill="url(#gradientPrevYear)" dot={false} activeDot={{ r: 3 }} />
                       )}
                       {/* Current year areas */}
                       {(productionChartView === "both" || productionChartView === "cylinders") && (
-                        <Area type="monotone" dataKey="cylinders" name="Cilinders" stroke="#f97316" strokeWidth={2} fill="url(#gradientCylinders)" dot={false} activeDot={{ r: 4, strokeWidth: 2 }} />
+                        <Area type="monotone" dataKey="cylinders" name="Cilinders" stroke="hsl(var(--accent))" strokeWidth={2} fill="url(#gradientCylinders)" dot={false} activeDot={{ r: 4, strokeWidth: 2 }} />
                       )}
                       {(productionChartView === "both" || productionChartView === "dryIce") && hasDryIceData && (
-                        <Area type="monotone" dataKey="dryIce" name="Droogijs" stroke="#06b6d4" strokeWidth={2} fill="url(#gradientDryIce)" dot={false} activeDot={{ r: 4, strokeWidth: 2 }} />
+                        <Area type="monotone" dataKey="dryIce" name="Droogijs" stroke="hsl(var(--dryice))" strokeWidth={2} fill="url(#gradientDryIce)" dot={false} activeDot={{ r: 4, strokeWidth: 2 }} />
                       )}
                       {/* Target ramp line (cumulative mode only) */}
                       {cumulativeChart && chartData.some(d => d.targetRamp !== undefined) && (
-                        <Area type="linear" dataKey="targetRamp" name="Doelstelling" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="5 3" fill="none" dot={false} activeDot={false} legendType="plainline" />
+                        <Area type="linear" dataKey="targetRamp" name="Doelstelling" stroke="hsl(var(--warning))" strokeWidth={1.5} strokeDasharray="5 3" fill="none" dot={false} activeDot={false} legendType="plainline" />
                       )}
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -1156,7 +1167,7 @@ export function ProductionReports({
 
             {/* Distribution Chart - Spans 1 col */}
             <Card className="shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardHeader className="flex flex-col items-start gap-2 pb-2">
                 <CardTitle className="text-base font-medium">Verdeling</CardTitle>
                 <div className="flex items-center gap-2">
                   {hasDigitalTypes && distributionView === "type" && (
@@ -1170,29 +1181,23 @@ export function ProductionReports({
                     </Button>
                   )}
                   <ToggleGroup type="single" value={distributionView} onValueChange={(v) => v && setDistributionView(v as any)} size="sm">
-                    <ToggleGroupItem value="type" size="sm" className="h-7 text-xs">Type</ToggleGroupItem>
-                    <ToggleGroupItem value="category" size="sm" className="h-7 text-xs">Cat</ToggleGroupItem>
+                    <ToggleGroupItem value="type" size="sm" className="h-7 text-xs">Gastype</ToggleGroupItem>
+                    <ToggleGroupItem value="category" size="sm" className="h-7 text-xs">Inhoud (L)</ToggleGroupItem>
                   </ToggleGroup>
                 </div>
               </CardHeader>
               <CardContent>
                 {currentDistributionData.length > 0 ? (
                   <>
-                  <ResponsiveContainer width="100%" height={Math.max(280, currentDistributionData.length * 32)}>
-                    <BarChart data={currentDistributionData} layout="vertical" margin={{ left: 10, right: 50 }}>
-                      <XAxis type="number" hide />
-                      <YAxis dataKey="name" type="category" width={110} className="text-[11px]" tickLine={false} axisLine={false} interval={0} />
-                      <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: "10px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", backgroundColor: "hsl(var(--background))", padding: "10px 14px", fontSize: "13px" }} />
-                      <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={18}>
-                        {currentDistributionData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                        <LabelList dataKey="value" position="right" className="text-[11px] font-medium fill-foreground" formatter={(v: number) => formatNumber(v, 0)} />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <div className="space-y-3 py-2">
+                    {currentDistributionData.map(entry => {
+                      const total = currentDistributionData.reduce((sum, item) => sum + item.value, 0);
+                      const share = total > 0 ? entry.value / total * 100 : 0;
+                      return <div key={entry.name} className="space-y-1.5"><div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 text-sm"><span className="break-words">{entry.name}</span><span className="tabular-nums font-medium">{formatNumber(entry.value, 0)} <span className="text-muted-foreground font-normal">({formatNumber(share, 1)}%)</span></span></div><div className="h-2 bg-muted rounded overflow-hidden"><div className="h-full bg-primary" style={{ width: `${share}%` }} /></div></div>;
+                    })}
+                  </div>
                   {(distributionView === "type" ? gasTypeDistribution : gasCategoryDistribution).length > MAX_DISTRIBUTION_ITEMS && (
-                    <button
+                    <Button variant="outline" size="sm"
                       onClick={() => setShowAllDistribution(!showAllDistribution)}
                       className="flex items-center gap-1 mx-auto mt-2 text-xs text-primary hover:text-primary/80 font-medium border border-primary/30 rounded-md px-3 py-1.5 hover:bg-primary/5 transition-colors"
                       type="button"
@@ -1202,7 +1207,7 @@ export function ProductionReports({
                       ) : (
                         <><ChevronDown className="h-3 w-3" />Toon alle {(distributionView === "type" ? gasTypeDistribution : gasCategoryDistribution).length} types</>
                       )}
-                    </button>
+                    </Button>
                   )}
                   </>
                 ) : (
@@ -1215,13 +1220,14 @@ export function ProductionReports({
             </Card>
 
             {/* Top 5 Customers widget */}
-            <div className="lg:col-span-3">
+            <div className="xl:col-span-3">
               <Suspense fallback={<ChartLoadingFallback />}>
                 <TopCustomersWidget
                   refreshKey={refreshKey}
                   location={location}
                   dateRange={dateRange}
                   hideDigital={hideDigital}
+                  hideExternal={hideExternal}
                 />
               </Suspense>
             </div>
@@ -1252,9 +1258,9 @@ export function ProductionReports({
           </div>
           <Suspense fallback={<ChartLoadingFallback />}>
             {productieView === "monthly" ? (
-              <MonthlyReport hideDigital={hideDigital} />
+              <MonthlyReport hideDigital={hideDigital} hideExternal={hideExternal} />
             ) : (
-              <YearlyReport hideDigital={hideDigital} />
+              <YearlyReport hideDigital={hideDigital} hideExternal={hideExternal} />
             )}
           </Suspense>
         </TabsContent>
@@ -1267,6 +1273,7 @@ export function ProductionReports({
               refreshKey={refreshKey}
               dateRange={dateRange}
               hideDigital={hideDigital}
+              hideExternal={hideExternal}
               hasDigitalTypes={hasDigitalTypes}
             />
           </Suspense>
@@ -1277,6 +1284,7 @@ export function ProductionReports({
               refreshKey={refreshKey}
               dateRange={dateRange}
               hideDigital={hideDigital}
+              hideExternal={hideExternal}
               hasDigitalTypes={hasDigitalTypes}
             />
           </Suspense>
@@ -1287,11 +1295,13 @@ export function ProductionReports({
             <CumulativeGasTypeChart
               location={location === "all" ? undefined : location}
               hideDigital={hideDigital}
+              hideExternal={hideExternal}
               hasDigitalTypes={hasDigitalTypes}
             />
             <CumulativeCylinderSizeChart
               location={location === "all" ? undefined : location}
               hideDigital={hideDigital}
+              hideExternal={hideExternal}
               hasDigitalTypes={hasDigitalTypes}
             />
             <ProductionHeatMap
@@ -1299,6 +1309,7 @@ export function ProductionReports({
               refreshKey={refreshKey}
               dateRange={dateRange}
               hideDigital={hideDigital}
+              hideExternal={hideExternal}
               hasDigitalTypes={hasDigitalTypes}
             />
           </Suspense>
@@ -1307,19 +1318,20 @@ export function ProductionReports({
 
         <TabsContent value="locations" className="mt-0">
           <Suspense fallback={<ChartLoadingFallback />}>
-            <LocationComparisonReport hideDigital={hideDigital} onHideDigitalChange={setHideDigital} />
+            <LocationComparisonReport hideDigital={hideDigital} onHideDigitalChange={setHideDigital} hideExternal={hideExternal} />
           </Suspense>
         </TabsContent>
 
         <TabsContent value="comparison" className="mt-0">
           <Suspense fallback={<ChartLoadingFallback />}>
-            <YearComparisonReport location={location === "all" ? null : location} hideDigital={hideDigital} onHideDigitalChange={setHideDigital} />
+            <YearComparisonReport location={location} hideDigital={hideDigital} onHideDigitalChange={setHideDigital} hideExternal={hideExternal} onHideExternalChange={setHideExternal} />
           </Suspense>
         </TabsContent>
 
           </div>
         </div>
       </Tabs>
+      </>}
     </div>
   );
 }

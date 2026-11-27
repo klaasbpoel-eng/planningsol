@@ -9,3 +9,4 @@
 - Create employee login accounts through the separate non-persisting sign-up client in `src/lib/employeeAccountClient.ts` (linking logic in `employeeAccounts.ts`), because no admin key for the external auth project is available and the admin must stay signed in.
 - Store order-picking status in a separate `PlanningRamsesPicks` table (one row per picked PlanningRamses line), because PlanningRamses is imported from Ramses and must stay untouched.
 - Mark the region a print button prints with the `print-area` class; the global print CSS hides everything else on the page.
+- Keep report interpretation helpers in reportPresentation and scope readability CSS to production-reports; distinguish imported production lines from orders and label independent report periods so unrelated pages and data sources remain unchanged.

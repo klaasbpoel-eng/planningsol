@@ -28,7 +28,8 @@ import {
 import { api } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { formatNumber, normalizeDatum } from "@/lib/utils";
-import { buildDigitalProductNames } from "@/lib/gasTypeUtils";
+import { buildExcludedProductNames } from "@/lib/gasTypeUtils";
+import { calendarYearProgress, reportChange, targetProgress } from "@/lib/reportPresentation";
 import { mapProductionLocation } from "@/lib/productionMetrics";
 import { toast } from "sonner";
 import { exportToExcel, exportToPDF } from "@/lib/export-utils";
@@ -102,7 +103,7 @@ const DEFAULT_TOGGLES: SectionToggles = {
 const TOGGLE_CONFIG: { key: keyof SectionToggles; label: string; icon: React.ReactNode }[] = [
   { key: "cylinders", label: "Cilinders", icon: <Cylinder className="h-3 w-3" /> },
   { key: "monthly", label: "Maandoverzicht", icon: <BarChart3 className="h-3 w-3" /> },
-  { key: "avgPerOrder", label: "Gem. per order", icon: <BarChart3 className="h-3 w-3" /> },
+  { key: "avgPerOrder", label: "Gem. per productieregel", icon: <BarChart3 className="h-3 w-3" /> },
   { key: "gasTypes", label: "Gassoorten", icon: <BarChart3 className="h-3 w-3" /> },
   { key: "sizeDistribution", label: "Grootteverdeling", icon: <Ruler className="h-3 w-3" /> },
   { key: "dryIce", label: "Droogijs", icon: <Snowflake className="h-3 w-3" /> },
@@ -123,7 +124,7 @@ const loadToggles = (): SectionToggles => {
   return DEFAULT_TOGGLES;
 };
 
-export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean }) {
+export function YearlyReport({ hideDigital = false, hideExternal = false }: { hideDigital?: boolean; hideExternal?: boolean }) {
   const currentYear = new Date().getFullYear();
   const today = new Date();
   const todayMMDD = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -136,6 +137,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
   const [toggles, setToggles] = useState<SectionToggles>(loadToggles);
   const [showSettings, setShowSettings] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   const [emmenData, setEmmenData] = useState<YearLocationKPI | null>(null);
@@ -175,7 +177,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
       const years: number[] = [];
       for (let y = currentYear - 4; y <= currentYear; y++) years.push(y);
       try {
-        const digitalNames = hideDigital ? await buildDigitalProductNames() : new Set<string>();
+        const digitalNames = await buildExcludedProductNames(hideDigital, hideExternal);
         const filterDigital = (rows: any[]) =>
           digitalNames.size > 0 ? rows.filter((r: any) => !digitalNames.has(r.Product)) : rows;
         const results = await Promise.all(
@@ -194,13 +196,14 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
         setMultiYearData(results);
       } catch (err) {
         console.error("Error loading multi-year trend:", err);
+      setLoadError(true);
       } finally {
         setTrendLoading(false);
       }
     };
     loadTrend();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hideDigital]);
+  }, [hideDigital, hideExternal]);
 
   const yearOptions = useMemo(() => {
     const options = [];
@@ -268,7 +271,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
       preloadedRows ? Promise.resolve(locFilter(preloadedRows)) : fetchProductieForPeriod(from, to, location),
       isTilburg
         ? Promise.resolve([{ total_kg: 0, total_orders: 0 }])
-        : api.reports.getDryIceEfficiency(from, to, location).catch(() => [{ total_kg: 0, total_orders: 0 }]),
+        : api.reports.getDryIceEfficiency(from, to, location),
     ]);
 
     const rows = digitalNames.size > 0
@@ -286,7 +289,8 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
       if (!iso) continue;
       const month = parseInt(iso.substring(5, 7));
       if (month >= 1 && month <= 12) {
-        const entry = monthlyMap.get(month)!;
+        const entry = monthlyMap.get(month);
+        if (!entry) continue;
         entry.cylinders += Number(row.Aantal) || 0;
         entry.orders += 1;
       }
@@ -306,7 +310,6 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
     }
     const topCustomers = Array.from(custMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
       .map(([name, cylinders]) => ({ name, cylinders }));
     const allCustomerNames = Array.from(custMap.keys());
 
@@ -318,7 +321,6 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
     }
     const gasTypeDistribution = Array.from(typeMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
       .map(([name, count]) => ({ name, color: "#3b82f6", count }));
 
     // Size distribution
@@ -352,8 +354,9 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+    setLoadError(false);
       try {
-        const digitalNames = hideDigital ? await buildDigitalProductNames() : new Set<string>();
+        const digitalNames = await buildExcludedProductNames(hideDigital, hideExternal);
         const [emmen, tilburg, prevEmmen, prevTilburg] = await Promise.all([
           fetchLocationData("sol_emmen", "SOL Emmen", fromDate, toDate, digitalNames),
           fetchLocationData("sol_tilburg", "SOL Tilburg", fromDate, toDate, digitalNames),
@@ -366,12 +369,13 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
         setPrevTilburgData(prevTilburg);
       } catch (err) {
         console.error("Error loading yearly report:", err);
+      setLoadError(true);
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [fromDate, toDate, prevFromDate, prevToDate, hideDigital]);
+  }, [fromDate, toDate, prevFromDate, prevToDate, hideDigital, hideExternal]);
 
   const totalData = useMemo((): YearLocationKPI | null => {
     if (!emmenData || !tilburgData) return null;
@@ -454,18 +458,14 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
     };
   }, [prevEmmenData, prevTilburgData]);
 
-  const daysElapsed = useMemo(() => {
-    if (!ytdMode || parseInt(selectedYear) !== currentYear) return 365;
-    const start = new Date(currentYear, 0, 1);
-    return Math.max(1, Math.floor((today.getTime() - start.getTime()) / 86400000));
-  }, [ytdMode, selectedYear]);
+  const { elapsedDays: daysElapsed, totalDays: daysInYear } = calendarYearProgress(today);
 
   const forecast = useMemo(() => {
     if (!ytdMode || parseInt(selectedYear) !== currentYear || !totalData || !emmenData || !tilburgData) return null;
     return {
-      total: Math.round((totalData.totalCylinders / daysElapsed) * 365),
-      emmen: Math.round((emmenData.totalCylinders / daysElapsed) * 365),
-      tilburg: Math.round((tilburgData.totalCylinders / daysElapsed) * 365),
+      total: Math.round((totalData.totalCylinders / daysElapsed) * daysInYear),
+      emmen: Math.round((emmenData.totalCylinders / daysElapsed) * daysInYear),
+      tilburg: Math.round((tilburgData.totalCylinders / daysElapsed) * daysInYear),
     };
   }, [ytdMode, selectedYear, totalData, emmenData, tilburgData, daysElapsed]);
 
@@ -476,6 +476,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
 
   const TrendBadge = ({ current, previous, label }: { current: number; previous: number; label?: string }) => {
     const trend = calcTrend(current, previous);
+    if (previous === 0) return <span className="text-xs text-muted-foreground" title="Geen volume in de vergelijkingsperiode">Geen basis</span>;
     const tooltipText = `${label ? label + ": " : ""}${formatNumber(previous, 0)} → ${formatNumber(current, 0)}`;
     const badge =
       trend === 0 ? (
@@ -515,7 +516,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
       if (toggles.cylinders) {
         row.cilinder_orders = loc.cylinderOrders;
         row.totaal_cilinders = loc.totalCylinders;
-        row.trend_cilinders = loc.prev ? `${calcTrend(loc.totalCylinders, loc.prev.totalCylinders)}%` : "–";
+        row.trend_cilinders = loc.prev ? reportChange(loc.totalCylinders, loc.prev.totalCylinders) : "–";
       }
       if (toggles.avgPerOrder) row.gem_per_order = loc.avgCylindersPerOrder;
       if (toggles.monthly) {
@@ -549,11 +550,11 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
       { header: "Jaar", key: "jaar", width: 8 },
     ];
     if (toggles.cylinders) {
-      cols.push({ header: "Cil. Orders", key: "cilinder_orders", width: 12 });
+      cols.push({ header: "Productieregels", key: "cilinder_orders", width: 12 });
       cols.push({ header: "Totaal Cil.", key: "totaal_cilinders", width: 12 });
       cols.push({ header: "Trend (jr)", key: "trend_cilinders", width: 10 });
     }
-    if (toggles.avgPerOrder) cols.push({ header: "Gem./Order", key: "gem_per_order", width: 12 });
+    if (toggles.avgPerOrder) cols.push({ header: "Gem./regel", key: "gem_per_order", width: 12 });
     if (toggles.monthly) {
       MONTH_LABELS.forEach((lbl) => {
         cols.push({ header: lbl.charAt(0).toUpperCase() + lbl.slice(1), key: `${lbl}_cilinders`, width: 8 });
@@ -580,12 +581,12 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
 
   const exportData = {
     title: `Jaarrapport ${selectedYear}`,
-    subtitle: "Productie overzicht per locatie",
+    subtitle: `${fromDate} t/m ${toDate} | vergelijking ${prevFromDate} t/m ${prevToDate}${hideDigital ? " | zonder digitaal" : ""}${hideExternal ? " | zonder extern" : ""}`,
     columns: buildExportColumns(),
     rows: buildExportRows(),
     dateRange: {
       from: new Date(parseInt(selectedYear), 0, 1),
-      to: new Date(parseInt(selectedYear), 11, 31),
+      to: new Date(toDate + "T00:00:00"),
     },
   };
 
@@ -620,8 +621,8 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
     targets: { emmen: number; tilburg: number };
     cumulativeMode: boolean;
   }) => {
-    const totalGas = data.gasTypeDistribution.reduce((sum, g) => sum + g.count, 0);
-    const prevTotalGas = prevData?.gasTypeDistribution.reduce((sum, g) => sum + g.count, 0) ?? 0;
+    const totalGas = data.totalCylinders;
+    const prevTotalGas = prevData?.totalCylinders ?? 0;
 
     // Yearly target for this location
     const yearTarget = data.location === "sol_emmen" ? (colTargets.emmen || 0)
@@ -678,7 +679,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
               </div>
               <div className="bg-muted/30 rounded-lg p-2.5">
                 <div className="text-lg font-bold">{formatNumber(data.cylinderOrders, 0)}</div>
-                <div className="text-[11px] text-muted-foreground">Orders</div>
+                <div className="text-[11px] text-muted-foreground">Productieregels</div>
                 {prevData && <TrendBadge current={data.cylinderOrders} previous={prevData.cylinderOrders} />}
               </div>
             </div>
@@ -752,7 +753,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
                           ) : (
                             <>
                               <p>{formatNumber(m.cylinders, 0)} cilinders</p>
-                              <p className="text-muted-foreground">{m.orders} orders</p>
+                              <p className="text-muted-foreground">{m.orders} productieregels</p>
                               {prevM && prevM.cylinders > 0 && (
                                 <p className="text-muted-foreground/80">
                                   {prevYear}: {formatNumber(prevM.cylinders, 0)}
@@ -802,11 +803,11 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
           <div className="space-y-2">
             <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
               <BarChart3 className="h-3 w-3" />
-              Gem. cilinders per order
+              Gem. cilinders per productieregel
             </div>
             <div className="bg-muted/30 rounded-lg p-2.5">
-              <div className="text-lg font-bold">{data.avgCylindersPerOrder}</div>
-              <div className="text-[11px] text-muted-foreground">cilinders/order</div>
+              <div className="text-lg font-bold">{formatNumber(data.avgCylindersPerOrder, 1)}</div>
+              <div className="text-[11px] text-muted-foreground">cilinders/productieregel</div>
               {prevData && <TrendBadge current={data.avgCylindersPerOrder} previous={prevData.avgCylindersPerOrder} />}
             </div>
           </div>
@@ -891,7 +892,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
                 <div className="text-lg font-bold">
                   {formatNumber(data.totalDryIceKg, 0)} <span className="text-xs font-normal">kg</span>
                 </div>
-                <div className="text-[11px] text-muted-foreground">Geproduceerd</div>
+                <div className="text-[11px] text-muted-foreground">Ordervolume (incl. gepland)</div>
               </div>
               <div className="bg-muted/30 rounded-lg p-2.5">
                 <div className="text-lg font-bold">{formatNumber(data.dryIceOrders, 0)}</div>
@@ -910,7 +911,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
             </div>
             <div className="space-y-1">
               {data.topCustomers.length > 0 ? (
-                data.topCustomers.map((c, i) => {
+                data.topCustomers.slice(0, 5).map((c, i) => {
                   const isNew = prevData ? !prevData.allCustomerNames.includes(c.name) : false;
                   return (
                   <div
@@ -1012,6 +1013,8 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
     );
   }
 
+  if (loadError) return <div role="alert" className="border border-destructive/40 rounded-lg p-4 text-sm text-destructive">De rapportgegevens konden niet volledig worden geladen. Wijzig de periode om opnieuw te laden; ontbrekende gegevens zijn niet nul.</div>;
+
   return (
     <Card>
       <CardHeader className="pb-4">
@@ -1027,7 +1030,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
                 : `Volledig jaar ${selectedYear} — vergelijking t.o.v. ${prevYear}`}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Select value={selectedYear} onValueChange={setSelectedYear}>
               <SelectTrigger className="w-[110px] h-9 text-sm">
                 <SelectValue />
@@ -1143,13 +1146,13 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
       <CardContent className="space-y-6">
         {emmenData && tilburgData && totalData ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="border rounded-lg p-4 border-blue-500/20">
+            <div className="min-w-0 md:pr-4">
               <LocationColumn data={emmenData} prevData={prevEmmenData} color="text-blue-500" targets={targets} cumulativeMode={cumulativeMode} />
             </div>
-            <div className="border rounded-lg p-4 border-sky-400/20">
+            <div className="min-w-0 md:border-l md:px-4">
               <LocationColumn data={tilburgData} prevData={prevTilburgData} color="text-sky-400" targets={targets} cumulativeMode={cumulativeMode} />
             </div>
-            <div className="border rounded-lg p-4 border-primary/20 bg-primary/[0.02]">
+            <div className="min-w-0 md:border-l md:pl-4">
               <LocationColumn data={totalData} prevData={prevTotalData} color="text-primary" targets={targets} cumulativeMode={cumulativeMode} />
             </div>
           </div>
@@ -1159,7 +1162,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
 
         {/* Jaarprognose — only shown when YTD + current year */}
         {forecast && (
-          <div className="border rounded-lg p-4 border-primary/20 bg-primary/[0.02]">
+          <div className="min-w-0 md:border-l md:pl-4">
             <div className="flex items-center gap-2 mb-3">
               <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                 <TrendingUp className="h-3 w-3" />
@@ -1169,7 +1172,8 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
                 op basis van {daysElapsed} dagen
               </Badge>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <p className="text-sm text-muted-foreground mb-3">Lineaire schatting op kalenderdagen; geen rekening met seizoen, werkdagen of toekomstige orders. Geen gerealiseerd jaartotaal.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <div className="text-[11px] text-blue-500 font-medium mb-0.5">SOL Emmen</div>
                 <div className="text-xl font-bold">~{formatNumber(forecast.emmen, 0)}</div>
@@ -1195,7 +1199,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                 <Target className="h-3 w-3" />
-                Doelstellingen {selectedYear}
+                Doelstellingen {selectedYear} · alleen in deze browser
               </div>
               <Button
                 variant="ghost"
@@ -1255,7 +1259,8 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
                 ]
                   .filter((r) => r.target > 0)
                   .map(({ label, colorBar, colorText, current, target }) => {
-                    const pct = Math.min(100, Math.round((current / target) * 100));
+                    const progress = targetProgress(current, target);
+                    const pct = Math.round(progress?.percentage ?? 0);
                     return (
                       <div key={label}>
                         <div className="flex justify-between text-xs mb-1">
@@ -1266,7 +1271,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
                           </span>
                         </div>
                         <div className="w-full bg-muted/50 rounded-full h-2">
-                          <div className={`h-2 rounded-full transition-all ${colorBar}`} style={{ width: `${pct}%` }} />
+                          <div className={`h-2 rounded-full transition-all ${colorBar}`} style={{ width: `${progress?.barPercentage ?? 0}%` }} />
                         </div>
                       </div>
                     );
@@ -1281,7 +1286,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
           <div className="border rounded-lg p-4">
             <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-4">
               <TrendingUp className="h-3 w-3" />
-              Meerjaarse trend — cilinders per jaar
+              Meerjaarse trend — cilinders per jaar (lopend jaar onvolledig)
             </div>
             {trendLoading ? (
               <div className="flex items-center justify-center py-8">
@@ -1295,7 +1300,7 @@ export function YearlyReport({ hideDigital = false }: { hideDigital?: boolean })
                     const emmenW = (point.emmen / maxTotal) * 100;
                     const tilburgW = (point.tilburg / maxTotal) * 100;
                     const prevPoint = multiYearData[i - 1];
-                    const trend = prevPoint && prevPoint.total > 0
+                    const trend = point.year !== currentYear && prevPoint && prevPoint.total > 0
                       ? Math.round(((point.total - prevPoint.total) / prevPoint.total) * 100)
                       : null;
                     const isCurrentYear = point.year === currentYear;

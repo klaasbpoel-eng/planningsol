@@ -1,3 +1,6 @@
+import { splitSeriesName, reportChange } from "@/lib/reportPresentation";
+import { buildExcludedProductNames } from "@/lib/gasTypeUtils";
+import { Button } from "@/components/ui/button";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -5,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Loader2, Cylinder, LineChart as LineChartIcon, TrendingUp, TrendingDown, Minus, Trophy, Ruler } from "lucide-react";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, normalizeDatum } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { mapProductionLocation } from "@/lib/productionMetrics";
 import {
@@ -104,6 +107,7 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
   const fetchBothYearsData = async () => {
     setLoading(true);
 
+    const excludedNames = await buildExcludedProductNames(hideDigital, hideExternal);
     const locationParam = location !== "all" ? location : null;
 
     const fetchAllRowsForYear = async (year: number): Promise<any[]> => {
@@ -127,14 +131,14 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
         if (data.length < PAGE) break;
         from += PAGE;
       }
-      return allRows;
+      return allRows.filter(row => !excludedNames.has(row.Product));
     };
 
     const computeMonthlyCylinderTotalsBySize = (rows: any[]): { month: number; cylinder_size: string; capacityLiters: number | null; total_cylinders: number }[] => {
       const map = new Map<string, { month: number; cylinder_size: string; capacityLiters: number | null; total_cylinders: number }>();
       rows.forEach((r: any) => {
         const raw: string = r.Datum || "";
-        const iso = raw.includes("T") ? raw.substring(0, 10) : raw.split("-").reverse().join("-");
+        const iso = normalizeDatum(raw);
         const month = parseInt(iso.substring(5, 7));
         if (!month || isNaN(month)) return;
         const cap = r.Capaciteit;
@@ -172,7 +176,8 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
           });
         }
 
-        const size = sizeMap.get(item.cylinder_size)!;
+        const size = sizeMap.get(item.cylinder_size);
+        if (!size) return;
         size.months[item.month - 1] = Number(item.total_cylinders) || 0;
       });
 
@@ -371,7 +376,7 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
               )}
             </CardTitle>
             <CardDescription>
-              Cumulatieve productie per maand — vergelijk twee jaren
+              Cumulatieve geregistreerde aantallen vanaf januari · vergelijking van volledige jaren. Een lopend jaar is onvolledig; de lijn na de huidige maand is geen prognose.
             </CardDescription>
           </div>
           <div className="flex items-center gap-4">
@@ -547,8 +552,7 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
                       <Minus className="h-3 w-3" />
                     )}
                     <span>
-                      {item.percentChange > 0 ? '+' : ''}
-                      {item.percentChange.toFixed(1)}%
+                      {reportChange(item.total1, item.total2)}
                     </span>
                   </div>
                 </div>
@@ -586,7 +590,7 @@ export const CumulativeCylinderSizeChart = React.memo(function CumulativeCylinde
                   fontSize: "13px"
                 }}
                 formatter={(value: number, name: string) => {
-                  const [sizeName, year] = name.split('_');
+                  const [sizeName, year] = splitSeriesName(name);
                   return [formatNumber(value, 0), `${sizeName} (${year})`];
                 }}
               />
