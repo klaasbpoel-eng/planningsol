@@ -328,6 +328,15 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
     setPage(0);
   };
 
+  /** All list values straight from the table, so customers added after the page loaded are found too. */
+  const loadAllListRows = async (): Promise<Record<string, unknown>[]> => {
+    const listKeys = visibleColumns.filter((c) => c.list).map((c) => c.key);
+    if (listKeys.length === 0) return [];
+    const select = listKeys.map((k) => (/^[A-Za-z_][A-Za-z0-9_]*$/.test(k) ? k : `"${k}"`)).join(",");
+    const { data, error: listError } = await (supabase as any).from(TABLE_NAME).select(select).limit(10000);
+    return listError || !Array.isArray(data) ? [] : data;
+  };
+
   const askAi = async () => {
     const question = aiQuestion.trim();
     if (!question || !columns) return;
@@ -341,7 +350,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
         samples: sampleValues(visibleColumns, rows, extra),
         today: format(new Date(), "yyyy-MM-dd"),
       });
-      const { rules, skipped } = planToRules(visibleColumns, plan, knownListItems(visibleColumns, rows, extra));
+      const { rules, skipped } = planToRules(visibleColumns, plan, knownListItems(visibleColumns, [...rows, ...(await loadAllListRows())], extra));
       setAiRules(rules);
       setAiExplanation(
         rules.length === 0
