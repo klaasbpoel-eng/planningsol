@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayOf, groupByDriver, parseAantal, pickDefaultDay, totalsByArticle, type PlanningLine } from "./orderPicking";
+import { dayOf, latestImportOnly, groupByDriver, parseAantal, pickDefaultDay, totalsByArticle, type PlanningLine } from "./orderPicking";
 
 const line = (id: string, o: Partial<PlanningLine>): PlanningLine => ({ id, Datum: "2026-11-30T00:00:00+00:00", Klant: "A", Artikelnummer: "1", Omschrijving: "X", Aantal: "1", Chauffeur: "Chauffeur 1", ...o });
 
@@ -37,5 +37,16 @@ describe("orderPicking", () => {
     );
     expect(totals[0]).toMatchObject({ artikelnummer: "250300", aantal: 14, pickedAantal: 8, lines: 2 });
     expect(totals[1].aantal).toBe(1);
+  });
+
+  it("toont per dag alleen de laatste keer inlezen", () => {
+    const oud = "2026-11-27T09:42:06.880674+00:00";
+    const nieuw = "2026-11-27T13:26:04.730922+00:00";
+    const kept = latestImportOnly([
+      line("oud", { created_at: oud }),
+      line("nieuw", { created_at: nieuw }),
+      line("anderedag", { Datum: "2026-12-01T00:00:00+00:00", created_at: oud }),
+    ]);
+    expect(kept.map((l) => l.id)).toEqual(["nieuw", "anderedag"]);
   });
 });

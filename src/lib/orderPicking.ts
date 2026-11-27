@@ -8,6 +8,7 @@ export interface PlanningLine {
   Omschrijving: string | null;
   Aantal: string | number | null;
   Chauffeur: string | null;
+  created_at?: string | null;
 }
 
 export interface CustomerGroup { klant: string; lines: PlanningLine[]; picked: number; total: number }
@@ -84,4 +85,24 @@ export function totalsByArticle(lines: PlanningLine[], picked: Set<string>): Art
     map.set(key, t);
   }
   return [...map.values()].sort((a, b) => b.aantal - a.aantal || cmp(a.omschrijving, b.omschrijving));
+}
+
+/**
+ * Keeps per day only the lines of the most recent import (newest created_at),
+ * because a re-import of PlanningRamses adds the day again instead of replacing it.
+ */
+export function latestImportOnly(lines: PlanningLine[]): PlanningLine[] {
+  const latest = new Map<string, number>();
+  for (const l of lines) {
+    const d = dayOf(l.Datum);
+    const t = l.created_at ? Date.parse(l.created_at) : NaN;
+    if (!d || Number.isNaN(t)) continue;
+    latest.set(d, Math.max(latest.get(d) ?? -Infinity, t));
+  }
+  return lines.filter((l) => {
+    const d = dayOf(l.Datum);
+    const t = l.created_at ? Date.parse(l.created_at) : NaN;
+    if (!d || Number.isNaN(t) || !latest.has(d)) return true;
+    return t === latest.get(d);
+  });
 }

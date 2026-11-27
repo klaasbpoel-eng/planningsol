@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { dayOf, groupByDriver, localDay, pickDefaultDay, totalsByArticle, type PlanningLine } from "@/lib/orderPicking";
+import { dayOf, latestImportOnly, groupByDriver, localDay, pickDefaultDay, totalsByArticle, type PlanningLine } from "@/lib/orderPicking";
 
 const PLANNING_TABLE = "PlanningRamses";
 const PICKS_TABLE = "PlanningRamsesPicks";
@@ -41,9 +41,9 @@ function OrderPickingContent({ userEmail, userId, role, isAdmin }: { userEmail?:
     queryKey: ["planning-ramses"],
     refetchInterval: 60_000,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from(PLANNING_TABLE).select("id,Datum,Klant,Artikelnummer,Omschrijving,Aantal,Chauffeur").order("Datum").limit(5000);
+      const { data, error } = await (supabase as any).from(PLANNING_TABLE).select("id,Datum,Klant,Artikelnummer,Omschrijving,Aantal,Chauffeur,created_at").order("Datum").limit(5000);
       if (error) throw error;
-      return (data ?? []) as PlanningLine[];
+      return latestImportOnly((data ?? []) as PlanningLine[]);
     },
   });
 
