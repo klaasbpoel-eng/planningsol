@@ -6,10 +6,11 @@ import { getPermissionsForRole } from "@/hooks/useUserPermissions";
 import type { ProtectedRouteChildProps } from "@/components/auth/ProtectedRoute";
 
 // Two rows on one day and one row on the next day: the day is the group, the time of day is not shown.
+// The `type` column holds Ramses cylinder texts: the (Leeg) marker and the UN-number line must not reach the screen.
 const ROWS = vi.hoisted(() => [
-  { id: 1, dt_dn: "2026-11-03T10:45:02", code: "A1", created_at: "2026-11-27T13:26:08.691118+00:00" },
-  { id: 2, dt_dn: "2026-11-03T11:51:00", code: "A2", created_at: "2026-11-27T13:26:08.691118+00:00" },
-  { id: 3, dt_dn: "2026-11-04T09:15:00", code: "A3", created_at: "2026-11-27T13:26:08.691118+00:00" },
+  { id: 1, dt_dn: "2026-11-03T10:45:02", code: "A1", type: "Bundles Stikstof industrieel(Leeg)\nUN 1066 Stikstof, samengeperst, 2.2 (E)", created_at: "2026-11-27T13:26:08.691118+00:00" },
+  { id: 2, dt_dn: "2026-11-03T11:51:00", code: "A2", type: "Cylinders 300bar Act integrated Zuurstof medisch(Leeg)", created_at: "2026-11-27T13:26:08.691118+00:00" },
+  { id: 3, dt_dn: "2026-11-04T09:15:00", code: "A3", type: "Cilinder pallets", created_at: "2026-11-27T13:26:08.691118+00:00" },
 ]);
 
 // Column filters the page sends to the database, recorded so tests can read them back.
@@ -145,7 +146,7 @@ describe("tijdgroepen op de Ramses-correctiespagina", () => {
     expect(screen.getByRole("button", { name: "Sorteer op Code" })).toBeInTheDocument();
     for (const code of ["A1", "A2", "A3"]) {
       const row = screen.getByText(code).closest("tr") as HTMLTableRowElement;
-      expect(row.querySelectorAll("td")).toHaveLength(1);
+      expect(row.querySelectorAll("td")).toHaveLength(2);
     }
     // ...but the date is still there, in the header of each time group.
     expect(screen.getByRole("button", { name: "Klap tijdgroep 03-11-2026" })).toBeInTheDocument();
@@ -194,6 +195,28 @@ describe("tijdgroepen op de Ramses-correctiespagina", () => {
       expect(el.className).not.toMatch(/bg-(primary|accent)/);
       expect(el.className).not.toMatch(/border-l-(primary|accent)/);
     }
+  });
+
+  it("toont geen (Leeg) en geen UN-nummer omschrijving in de tabel", async () => {
+    await openPage();
+    expect(screen.getByText("Bundles Stikstof industrieel")).toBeInTheDocument();
+    expect(screen.getByText("Cylinders 300bar Act integrated Zuurstof medisch")).toBeInTheDocument();
+    expect(screen.getByText("Cilinder pallets")).toBeInTheDocument();
+    expect(screen.queryByText(/\(Leeg\)/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/UN 1066/)).not.toBeInTheDocument();
+  });
+
+  it("kiest ook in de waardelijst zonder (Leeg) en zonder UN-nummer", async () => {
+    await openPage();
+    fireEvent.click(screen.getByRole("combobox", { name: /Kolom kiezen om op te filteren/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "Type" }));
+    // Let the column list finish closing first; it hands focus back to its own button.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    fireEvent.click(screen.getByRole("button", { name: "Waarden kiezen" }));
+
+    expect(await screen.findByRole("option", { name: /Bundles Stikstof industrieel/ })).toBeInTheDocument();
+    expect(screen.queryByText(/\(Leeg\)/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/UN 1066/)).not.toBeInTheDocument();
   });
 });
 

@@ -1,5 +1,5 @@
 /** Turns the filter plan that Lovable AI made from a plain-language request into database conditions. */
-import { buildValueFilter, formatCellValue, parseListValue, type ColumnFilter, type DataColumn } from "@/lib/dataTable";
+import { buildValueFilter, cleanDisplayText, formatCellValue, parseListValue, type ColumnFilter, type DataColumn } from "@/lib/dataTable";
 
 export type AiOperator = "contains" | "equals" | "one_of" | "gt" | "gte" | "lt" | "lte";
 
@@ -42,7 +42,7 @@ function validDate(text: string): boolean {
 }
 
 const showValue = (column: DataColumn, value: string) =>
-  column.kind === "number" ? formatCellValue(Number(value), "number") : column.kind === "date" ? formatCellValue(value, "date") : `"${value}"`;
+  column.kind === "number" ? formatCellValue(Number(value), "number") : column.kind === "date" ? formatCellValue(value, "date") : `"${cleanDisplayText(value)}"`;
 
 function words(column: DataColumn, op: "gt" | "gte" | "lt" | "lte"): string {
   if (column.kind === "date") return { gt: "na", gte: "vanaf", lt: "vóór", lte: "tot en met" }[op];
@@ -68,7 +68,7 @@ function toRule(column: DataColumn, filter: AiPlanFilter, known: string[] = []):
   if (!value) return null;
 
   if (filter.operator === "contains") {
-    const text = clean(value);
+    const text = clean(cleanDisplayText(value));
     if (column.kind !== "text" || !text) return null;
     if (column.list === "array") {
       // Real lists cannot be searched with "contains": use the known items that contain the text.
@@ -106,7 +106,7 @@ function toRule(column: DataColumn, filter: AiPlanFilter, known: string[] = []):
       }
       return { description: `${name} is ${showValue(column, value)}`, filters: [{ key: column.key, op: "eq", value }] };
     }
-    const text = clean(value);
+    const text = clean(cleanDisplayText(value));
     if (!text) return null;
     if (column.list === "array") return { description: `${name} is "${text}"`, filters: [{ key: column.key, op: "cs", value: JSON.stringify([text]) }] };
     // Same text, any capitals.

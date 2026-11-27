@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, humanizeColumnName, quoteColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
+import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, cleanDisplayText, collectDistinctValues, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, humanizeColumnName, quoteColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
 import { buildPeriodFilter, periodRange } from "./dataTable";
 
 describe("humanizeColumnName", () => {

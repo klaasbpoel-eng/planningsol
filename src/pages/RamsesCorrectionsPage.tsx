@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { knownListItems, planToRules, sampleValues, type AiRule } from "@/lib/aiFilters";
 import { requestFilterPlan } from "@/lib/aiFilterClient";
-import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, buildPeriodFilter, PERIOD_PRESETS, type PeriodPreset, parseListValue, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
+import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, cleanDisplayText, collectDistinctValues, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, buildPeriodFilter, PERIOD_PRESETS, type PeriodPreset, parseListValue, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
 
 const TABLE_NAME = "RamsesCorrecties";
 const PAGE_SIZES = [25, 50, 100];
@@ -244,7 +244,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
       entries.push({ key: filterColumn, term: filterTerm.trim(), values: pickedValues });
     return entries.map((e) => {
       const label = visibleColumns.find((c) => c.key === e.key)?.label ?? e.key;
-      const parts = [...(e.term ? [`"${e.term}"`] : []), ...e.values];
+      const parts = [...(e.term ? [`"${e.term}"`] : []), ...e.values.map(cleanDisplayText)];
       const text = parts.length > 2 ? `${parts.slice(0, 2).join(", ")} +${parts.length - 2}` : parts.join(", ");
       return { key: e.key, label, text };
     });
@@ -425,7 +425,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
             <div className="flex flex-wrap gap-1">
               {parseListValue(row[col.key])!.filter(Boolean).map((item, i) => (
                 <span key={i} className="rounded-md border border-border bg-background/60 px-1.5 py-0.5 text-xs">
-                  {item}
+                  {cleanDisplayText(item)}
                 </span>
               ))}
             </div>

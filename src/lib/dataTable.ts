@@ -166,11 +166,29 @@ export function timestampGroupParity(
 
 const numberFormat = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 3 });
 
+/** A line that only names the UN number of a gas, e.g. `UN 1066 Stikstof, samengeperst, 2.2 (E)`. */
+const UN_NUMBER_LINE = /^\s*UN\s?\d{3,4}\b/i;
+/** The `(Leeg)` marker Ramses puts behind a cylinder type. */
+const LEEG_MARKER = /\s*\(\s*leeg\s*\)/gi;
+
+/**
+ * Text as shown on screen: the `(Leeg)` marker and the line with the UN-number description are dropped,
+ * because the user does not need them. Stored values and every filter keep using the full text, so
+ * searching and ticking still match what is in the database.
+ */
+export function cleanDisplayText(value: string): string {
+  const withoutUnLines = value
+    .split(/\r?\n/)
+    .filter((line) => !UN_NUMBER_LINE.test(line))
+    .join(" ");
+  return withoutUnLines.replace(LEEG_MARKER, "").replace(/\s+/g, " ").trim();
+}
+
 /** Dutch display value: dot for thousands, comma for decimals, dd-mm-jjjj dates. */
 export function formatCellValue(value: unknown, kind: ColumnKind): string {
   if (value === null || value === undefined || value === "") return "—";
   const items = Array.isArray(value) || kind === "text" ? parseListValue(value) : null;
-  if (items) return items.filter(Boolean).join(", ") || "—";
+  if (items) return items.map((item) => cleanDisplayText(item)).filter(Boolean).join(", ") || "—";
   if (kind === "number" && typeof value === "number") return numberFormat.format(value);
   if (kind === "boolean" || typeof value === "boolean") return value ? "Ja" : "Nee";
   if (kind === "date" && typeof value === "string") {
@@ -185,7 +203,7 @@ export function formatCellValue(value: unknown, kind: ColumnKind): string {
     });
   }
   if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
+  return cleanDisplayText(String(value)) || "—";
 }
 
 /**
