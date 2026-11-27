@@ -44,7 +44,7 @@ describe("eigen rollen", () => {
   it("verbergt gekozen menu-onderdelen en lege groepen", () => {
     const groups = filterNavigationForRole(getNavigationGroups(false), { ...planner, hiddenMenuItems: ["pgs", "toolbox", "barcode"] });
     expect(groups.map((g) => g.id)).toEqual(["planning", "aanvragen"]);
-    expect(groups[0].items.map((i) => i.id)).toEqual(["kalender", "productie"]);
+    expect(groups[0].items.map((i) => i.id)).toEqual(["kalender", "productie", "orderpicken"]);
   });
 
   it("toont de naam van de eigen rol, anders die van de standaardrol", () => {

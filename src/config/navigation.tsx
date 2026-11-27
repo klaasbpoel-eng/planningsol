@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   Truck,
+  PackageCheck,
   Users,
   CalendarRange,
   type LucideIcon,
@@ -58,6 +59,7 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
     items: [
       { id: "kalender", path: "/kalender", label: "Kalender", icon: CalendarDays, keywords: ["agenda", "planning", "datum"] },
       { id: "productie", path: "/productie", label: "Productie", icon: Factory, keywords: ["productie", "gas", "droogijs", "cilinders"] },
+      { id: "orderpicken", path: "/orderpicken", label: "Orderpicken", icon: PackageCheck, keywords: ["picken", "orders", "chauffeur", "ramses", "picklijst", "klaarzetten"] },
       { id: "barcode", path: "/barcode", label: "Barcodegenerator", icon: ScanBarcode, keywords: ["scan", "label", "sticker", "barcode"] },
     ],
   },

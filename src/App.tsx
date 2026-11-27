@@ -19,6 +19,7 @@ import SqlSyncTasksPage from "./pages/SqlSyncTasksPage";
 import AdminPage from "./pages/AdminPage";
 import RamsesCorrectionsPage from "./pages/RamsesCorrectionsPage";
 import RolesPage from "./pages/RolesPage";
+import OrderPickingPage from "./pages/OrderPickingPage";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => (
               <Route path="/pgs-register" element={<SafetyStoragePage />} />
               <Route path="/sync-instellingen" element={<SqlSyncTasksPage />} />
               <Route path="/ramses-correcties" element={<RamsesCorrectionsPage />} />
+              <Route path="/orderpicken" element={<OrderPickingPage />} />
               <Route path="/rollen" element={<RolesPage />} />
               <Route path="/admin" element={<AdminPage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
