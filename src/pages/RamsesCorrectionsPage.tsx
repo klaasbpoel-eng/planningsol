@@ -203,6 +203,11 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const baseColumns = useMemo(() => columns ?? deriveColumns(rows), [columns, rows]);
   const visibleColumns = useMemo(() => applyColumnLabels(baseColumns, columnLabels), [baseColumns, columnLabels]);
   const timestampKey = useMemo(() => findTimestampColumn(visibleColumns), [visibleColumns]);
+  // The column used for grouping is not repeated as a table column: its value is already in every group header.
+  const tableColumns = useMemo(
+    () => (timestampKey ? visibleColumns.filter((col) => col.key !== timestampKey) : visibleColumns),
+    [visibleColumns, timestampKey],
+  );
   const groups = useMemo(() => {
     if (!timestampKey) return null;
     const kind = visibleColumns.find((c) => c.key === timestampKey)?.kind ?? "text";
@@ -236,6 +241,18 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
       return null;
     });
   };
+
+  // The grouping column has no header in the table, so sorting on it lives next to the group count.
+  const toggleDateSort = () => {
+    if (!timestampKey) return;
+    setPage(0);
+    setSort((current) =>
+      current?.key === timestampKey && !current.ascending
+        ? { key: timestampKey, ascending: true }
+        : { key: timestampKey, ascending: false },
+    );
+  };
+  const dateSortAscending = !!sort && sort.key === timestampKey && sort.ascending;
 
   const toggleGroup = (label: string) =>
     setCollapsedGroups((current) => (current.includes(label) ? current.filter((l) => l !== label) : [...current, label]));
@@ -327,7 +344,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
 
   const renderRow = (row: DataRow, index: number) => (
     <TableRow key={String(row.id ?? index)} className={loading ? "opacity-60" : ""}>
-      {visibleColumns.map((col) => (
+      {tableColumns.map((col) => (
         <TableCell
           key={col.key}
           className={`whitespace-nowrap ${col.kind === "number" ? "text-right tabular-nums" : ""}`}
@@ -353,7 +370,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
     const count = group.indexes.length;
     return (
       <TableRow key={`groep-${group.label}-${group.indexes[0]}`} className="bg-muted/50 hover:bg-muted/50">
-        <TableCell colSpan={Math.max(visibleColumns.length, 1)} className="p-0">
+        <TableCell colSpan={Math.max(tableColumns.length, 1)} className="p-0">
           <button
             type="button"
             onClick={() => toggleGroup(group.label)}
@@ -619,12 +636,23 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
             </div>
           ) : (
             <>
-              {groups && groups.length > 1 && (
+              {groups && groups.length > 0 && (
                 <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
                   <span>
-                    {groups.length.toLocaleString("nl-NL")} tijdgroepen op deze pagina
+                    {groups.length.toLocaleString("nl-NL")}{" "}
+                    {groups.length === 1 ? "tijdgroep" : "tijdgroepen"} op deze pagina
                   </span>
                   <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={toggleDateSort}
+                      aria-label="Sorteer op datum"
+                    >
+                      {dateSortAscending ? <ArrowUp className="mr-1 h-3.5 w-3.5" /> : <ArrowDown className="mr-1 h-3.5 w-3.5" />}
+                      {dateSortAscending ? "Oudste eerst" : "Nieuwste eerst"}
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -650,7 +678,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
-                    {visibleColumns.map((col) => {
+                    {tableColumns.map((col) => {
                       const active = sort?.key === col.key;
                       const Icon = !active ? ArrowUpDown : sort.ascending ? ArrowUp : ArrowDown;
                       return (
@@ -673,14 +701,14 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                   {loading && rows.length === 0 ? (
                     Array.from({ length: 8 }).map((_, i) => (
                       <TableRow key={i}>
-                        <TableCell colSpan={Math.max(visibleColumns.length, 1)}>
+                        <TableCell colSpan={Math.max(tableColumns.length, 1)}>
                           <Skeleton className="h-5 w-full" />
                         </TableCell>
                       </TableRow>
                     ))
                   ) : rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={Math.max(visibleColumns.length, 1)} className="h-24 text-center text-muted-foreground">
+                      <TableCell colSpan={Math.max(tableColumns.length, 1)} className="h-24 text-center text-muted-foreground">
                         {anyFilter ? "Geen correcties gevonden voor deze filter." : "Er zijn (nog) geen correcties zichtbaar."}
                       </TableCell>
                     </TableRow>

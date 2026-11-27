@@ -47,9 +47,16 @@ vi.mock("@/components/auth/ProtectedRoute", () => ({
     }),
 }));
 
+// Sort calls the page sends to the database, recorded so tests can read them back.
+const ORDER_CALLS = vi.hoisted(() => [] as string[][]);
+
 vi.mock("@/integrations/supabase/client", () => {
   const query: Record<string, unknown> = {};
-  for (const method of ["select", "order", "eq", "or"]) query[method] = () => query;
+  for (const method of ["select", "eq", "or"]) query[method] = () => query;
+  query.order = (column: string, options: { ascending?: boolean }) => {
+    ORDER_CALLS.push([column, String(options?.ascending)]);
+    return query;
+  };
   query.filter = (column: string, op: string, value: unknown) => {
     FILTER_CALLS.push([column, op, String(value)]);
     return query;
@@ -118,6 +125,33 @@ describe("tijdgroepen op de Ramses-correctiespagina", () => {
     expect(screen.getByText("A3")).toBeInTheDocument();
   });
 
+  it("laat de datumkolom weg in de tabel, maar houdt de tijdgroepen", async () => {
+    await openPage();
+    // The grouping column is no longer a column of its own...
+    expect(screen.queryByRole("button", { name: /Sorteer op (Tijdstip|Dt dn)/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sorteer op Code" })).toBeInTheDocument();
+    for (const code of ["A1", "A2", "A3"]) {
+      const row = screen.getByText(code).closest("tr") as HTMLTableRowElement;
+      expect(row.querySelectorAll("td")).toHaveLength(1);
+    }
+    // ...but the date is still there, in the header of each time group.
+    expect(screen.getByRole("button", { name: "Klap tijdgroep 03-11-2026, 10:45" })).toBeInTheDocument();
+    expect(screen.getByText("2 regels")).toBeInTheDocument();
+  });
+
+  it("sorteert op datum via de knop bij de tijdgroepen", async () => {
+    await openPage();
+    expect(screen.getByText("Nieuwste eerst")).toBeInTheDocument();
+
+    ORDER_CALLS.length = 0;
+    fireEvent.click(screen.getByRole("button", { name: "Sorteer op datum" }));
+    await waitFor(() => expect(ORDER_CALLS).toContainEqual(["dt_dn", "false"]));
+
+    fireEvent.click(screen.getByRole("button", { name: "Sorteer op datum" }));
+    await waitFor(() => expect(ORDER_CALLS).toContainEqual(["dt_dn", "true"]));
+    expect(screen.getByText("Oudste eerst")).toBeInTheDocument();
+  });
+
   it("geeft regels en tijdgroepskoppen geen kleurverschil", async () => {
     await openPage();
     const rows = ["A1", "A2", "A3"].map(
@@ -136,10 +170,11 @@ describe("tijdgroepen op de Ramses-correctiespagina", () => {
 });
 
 describe("kolomnamen op de Ramses-correctiespagina", () => {
-  it("gebruikt de opgeslagen kolomnamen in de tabelkop", async () => {
+  it("gebruikt de opgeslagen kolomnamen bij het filteren", async () => {
     await openPage();
-    expect(screen.getByRole("button", { name: "Sorteer op Tijdstip" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Sorteer op Dt dn" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("combobox", { name: /Kolom kiezen om op te filteren/ }));
+    expect(await screen.findByRole("option", { name: "Tijdstip" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Dt dn" })).not.toBeInTheDocument();
   });
 
   it("leest een kolomnaam uit de backend en slaat een nieuwe naam daar op", async () => {
@@ -157,7 +192,8 @@ describe("kolomnamen op de Ramses-correctiespagina", () => {
     expect(key).toBe("column_labels_RamsesCorrecties");
     expect(JSON.parse(value)).toEqual({ dt_dn: "Datumcorrectie" });
     expect(description).toContain("RamsesCorrecties");
-    expect(screen.getByRole("button", { name: "Sorteer op Datumcorrectie" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("combobox", { name: /Kolom kiezen om op te filteren/ }));
+    expect(await screen.findByRole("option", { name: "Datumcorrectie" })).toBeInTheDocument();
   });
 
   it("zet alle kolomnamen terug naar de automatische namen", async () => {
@@ -167,7 +203,8 @@ describe("kolomnamen op de Ramses-correctiespagina", () => {
 
     await waitFor(() => expect(SETTINGS.upsert).toHaveBeenCalledWith("column_labels_RamsesCorrecties", "{}", expect.any(String)));
     fireEvent.click(screen.getByRole("button", { name: "Sluiten" }));
-    expect(screen.getByRole("button", { name: "Sorteer op Dt dn" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("combobox", { name: /Kolom kiezen om op te filteren/ }));
+    expect(await screen.findByRole("option", { name: "Dt dn" })).toBeInTheDocument();
   });
 });
 
