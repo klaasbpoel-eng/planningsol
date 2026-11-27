@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { planToRules, sampleValues, type AiRule } from "@/lib/aiFilters";
 import { requestFilterPlan } from "@/lib/aiFilterClient";
-import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, parseListValue, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
+import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, buildPeriodFilter, PERIOD_PRESETS, type PeriodPreset, parseListValue, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
 
 const TABLE_NAME = "RamsesCorrecties";
 const PAGE_SIZES = [25, 50, 100];
@@ -75,6 +75,9 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const [filterTerm, setFilterTerm] = useState("");
   // Values ticked in the list for the picked column, and the lists already read per column.
   const [pickedValues, setPickedValues] = useState<string[]>([]);
+  // Filters on other columns stay active while a new column is picked.
+  const [savedFilters, setSavedFilters] = useState<Record<string, { term: string; values: string[] }>>({});
+  const [period, setPeriod] = useState<PeriodPreset | null>(null);
   const [valueLists, setValueLists] = useState<Record<string, { values: DistinctValue[]; partial: boolean }>>({});
   const [valuesOpen, setValuesOpen] = useState(false);
   const [valuesLoading, setValuesLoading] = useState(false);
@@ -121,9 +124,17 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   }, [filterInput]);
 
   const activeFilterColumn = useMemo(() => (columns ?? []).find((col) => col.key === filterColumn), [columns, filterColumn]);
-  const columnFilters = useMemo(
-    () => [...buildColumnFilters(activeFilterColumn, filterTerm), ...buildValueFilter(activeFilterColumn, pickedValues)],
-    [activeFilterColumn, filterTerm, pickedValues],
+  const columnFilters = useMemo(() => {
+    const result = [...buildColumnFilters(activeFilterColumn, filterTerm), ...buildValueFilter(activeFilterColumn, pickedValues)];
+    for (const [key, saved] of Object.entries(savedFilters)) {
+      const col = (columns ?? []).find((c) => c.key === key);
+      result.push(...buildColumnFilters(col, saved.term), ...buildValueFilter(col, saved.values));
+    }
+    return result;
+  }, [activeFilterColumn, filterTerm, pickedValues, savedFilters, columns]);
+  const periodFilters = useMemo(
+    () => buildPeriodFilter(columns ? findTimestampColumn(columns) : null, period, new Date()),
+    [columns, period],
   );
   const valuesPickable = canPickValues(activeFilterColumn);
   const valueList = activeFilterColumn ? valueLists[activeFilterColumn.key] : undefined;
@@ -175,10 +186,11 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
       };
       for (const rule of aiRules) for (const f of rule.filters) apply(f);
       for (const columnFilter of columnFilters) apply(columnFilter);
+      for (const periodFilter of periodFilters) apply(periodFilter);
       if (sort) query = query.order(sort.key, { ascending: sort.ascending, nullsFirst: false });
       return query;
     },
-    [columns, search, sort, columnFilters, aiRules],
+    [columns, search, sort, columnFilters, aiRules, periodFilters],
   );
 
   const load = useCallback(async () => {
@@ -222,7 +234,53 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const firstRow = total === 0 ? 0 : page * pageSize + 1;
   const lastRow = Math.min(total, (page + 1) * pageSize);
 
-  const anyFilter = search.trim() !== "" || filterTerm.trim() !== "" || pickedValues.length > 0 || aiRules.length > 0;
+  const anyFilter =
+    search.trim() !== "" || filterTerm.trim() !== "" || pickedValues.length > 0 || aiRules.length > 0 ||
+    Object.keys(savedFilters).length > 0 || period !== null;
+  // Every active column filter as a removable chip, the one being edited included.
+  const filterChips = useMemo(() => {
+    const entries: { key: string; term: string; values: string[] }[] = Object.entries(savedFilters).map(([key, f]) => ({ key, ...f }));
+    if (filterColumn !== "none" && (filterTerm.trim() !== "" || pickedValues.length > 0))
+      entries.push({ key: filterColumn, term: filterTerm.trim(), values: pickedValues });
+    return entries.map((e) => {
+      const label = visibleColumns.find((c) => c.key === e.key)?.label ?? e.key;
+      const parts = [...(e.term ? [`"${e.term}"`] : []), ...e.values];
+      const text = parts.length > 2 ? `${parts.slice(0, 2).join(", ")} +${parts.length - 2}` : parts.join(", ");
+      return { key: e.key, label, text };
+    });
+  }, [savedFilters, filterColumn, filterTerm, pickedValues, visibleColumns]);
+
+  // Switching column keeps the current filter and opens the saved one of the new column for editing.
+  const switchFilterColumn = (value: string) => {
+    setSavedFilters((current) => {
+      const next = { ...current };
+      if (filterColumn !== "none" && (filterInput.trim() !== "" || pickedValues.length > 0))
+        next[filterColumn] = { term: filterInput.trim(), values: pickedValues };
+      const target = next[value];
+      delete next[value];
+      setFilterInput(target?.term ?? "");
+      setFilterTerm(target?.term ?? "");
+      setPickedValues(target?.values ?? []);
+      return next;
+    });
+    setFilterColumn(value);
+    setPage(0);
+  };
+
+  const removeFilterChip = (key: string) => {
+    if (key === filterColumn) {
+      setFilterInput("");
+      setFilterTerm("");
+      setPickedValues([]);
+    } else {
+      setSavedFilters((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+    }
+    setPage(0);
+  };
   // What the value box expects depends on the kind of the picked column.
   const filterPlaceholder =
     activeFilterColumn?.kind === "number"
@@ -265,6 +323,8 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
     setFilterInput("");
     setFilterTerm("");
     setPickedValues([]);
+    setSavedFilters({});
+    setPeriod(null);
     setPage(0);
   };
 
@@ -521,21 +581,17 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
             </span>
             <SearchableSelect
               options={[
-                { value: "none", label: "Alle kolommen" },
+                { value: "none", label: "Kies een kolom" },
                 ...visibleColumns.map((col) => ({ value: col.key, label: col.label })),
               ]}
               value={filterColumn}
-              onValueChange={(value) => {
-                setFilterColumn(value);
-                setPickedValues([]);
-                setPage(0);
-              }}
+              onValueChange={switchFilterColumn}
               placeholder="Kies een kolom"
               searchPlaceholder="Zoek een kolom…"
               className="w-full sm:w-60"
               disabled={!columns}
               ariaLabel={`Kolom kiezen om op te filteren, nu: ${
-                visibleColumns.find((col) => col.key === filterColumn)?.label ?? "Alle kolommen"
+                visibleColumns.find((col) => col.key === filterColumn)?.label ?? "geen"
               }`}
             />
             <Input
@@ -625,13 +681,58 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                 </PopoverContent>
               </Popover>
             )}
-            {(filterColumn !== "none" || filterInput !== "") && (
+            {(filterColumn !== "none" || filterInput !== "" || filterChips.length > 0 || period !== null) && (
               <Button variant="ghost" size="sm" onClick={clearFilter}>
                 Filter wissen
               </Button>
             )}
             {filterInvalid && <p className="w-full text-xs text-muted-foreground">{filterHint}</p>}
           </div>
+          {timestampKey && (
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Periode">
+              <span className="text-sm text-muted-foreground">Periode</span>
+              {PERIOD_PRESETS.map((preset) => (
+                <Button
+                  key={preset.id}
+                  size="sm"
+                  variant={period === preset.id ? "default" : "outline"}
+                  aria-pressed={period === preset.id}
+                  className="h-8 rounded-full"
+                  onClick={() => {
+                    setPeriod((current) => (current === preset.id ? null : preset.id));
+                    setPage(0);
+                  }}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
+          )}
+          {filterChips.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2" aria-label="Actieve filters">
+              <span className="text-sm text-muted-foreground">Actieve filters</span>
+              {filterChips.map((chip) => (
+                <span
+                  key={chip.key}
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm ${
+                    chip.key === filterColumn ? "border-primary bg-primary/10" : "bg-muted"
+                  }`}
+                >
+                  <button type="button" className="hover:underline" onClick={() => chip.key !== filterColumn && switchFilterColumn(chip.key)}>
+                    <span className="font-medium">{chip.label}:</span> {chip.text}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Filter op ${chip.label} verwijderen`}
+                    className="rounded-full p-0.5 hover:bg-background"
+                    onClick={() => removeFilterChip(chip.key)}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           {error ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm">
               <p className="font-medium text-destructive">De correcties konden niet worden geladen.</p>

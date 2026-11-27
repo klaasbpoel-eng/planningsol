@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, collectDistinctValues, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, humanizeColumnName, quoteColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
+import { buildPeriodFilter, periodRange } from "./dataTable";
 
 describe("humanizeColumnName", () => {
   it("maakt leesbare kolomnamen", () => {
@@ -295,5 +296,25 @@ _d("lijstkolommen (Klant, Debiteurnummer)", () => {
     _e(_cdv(rows, klant).map((v) => [v.value, v.count])).toEqual([["AZG Post Groningen 1", 1], ["UMCG", 2]]);
     _e(_bvf(deb, ["206091"])).toEqual([{ key: "Debiteurnummer", op: "or", value: 'Debiteurnummer.cs.["206091"]' }]);
     _e(_bvf(klant, ["UMCG"])[0].value).toBe('Klant.ilike.*"UMCG"*');
+  });
+});
+
+describe("periodRange", () => {
+  const now = new Date(2026, 10, 27); // vrijdag 27-11-2026
+  it("deze week loopt van maandag tot en met zondag", () => {
+    expect(periodRange("week", now)).toEqual({ from: "2026-11-23", to: "2026-11-30" });
+    expect(periodRange("week", new Date(2026, 10, 29))).toEqual({ from: "2026-11-23", to: "2026-11-30" });
+  });
+  it("maand, vorige maand en jaar", () => {
+    expect(periodRange("maand", now)).toEqual({ from: "2026-11-01", to: "2026-12-01" });
+    expect(periodRange("vorige-maand", new Date(2026, 0, 5))).toEqual({ from: "2025-12-01", to: "2026-01-01" });
+    expect(periodRange("jaar", now)).toEqual({ from: "2026-01-01", to: "2027-01-01" });
+  });
+  it("maakt een van-tot filter op de datumkolom", () => {
+    expect(buildPeriodFilter("Datum", "maand", now)).toEqual([
+      { key: "Datum", op: "gte", value: "2026-11-01" },
+      { key: "Datum", op: "lt", value: "2026-12-01" },
+    ]);
+    expect(buildPeriodFilter("Datum", null, now)).toEqual([]);
   });
 });

@@ -394,3 +394,38 @@ export function rowsToCsv(columns: DataColumn[], rows: DataRow[]): string {
   );
   return [header, ...body].join("\r\n");
 }
+
+export type PeriodPreset = "week" | "maand" | "vorige-maand" | "jaar";
+
+export const PERIOD_PRESETS: { id: PeriodPreset; label: string }[] = [
+  { id: "week", label: "Deze week" },
+  { id: "maand", label: "Deze maand" },
+  { id: "vorige-maand", label: "Vorige maand" },
+  { id: "jaar", label: "Dit jaar" },
+];
+
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** Start (inclusive) and end (exclusive) day of a period preset; weeks start on Monday (ISO 8601). */
+export function periodRange(preset: PeriodPreset, now: Date): { from: string; to: string } {
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  if (preset === "week") {
+    const start = new Date(y, m, now.getDate() - ((now.getDay() + 6) % 7));
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+    return { from: ymd(start), to: ymd(end) };
+  }
+  if (preset === "maand") return { from: ymd(new Date(y, m, 1)), to: ymd(new Date(y, m + 1, 1)) };
+  if (preset === "vorige-maand") return { from: ymd(new Date(y, m - 1, 1)), to: ymd(new Date(y, m, 1)) };
+  return { from: ymd(new Date(y, 0, 1)), to: ymd(new Date(y + 1, 0, 1)) };
+}
+
+/** Conditions that keep rows whose date column falls inside the preset period. */
+export function buildPeriodFilter(key: string | null, preset: PeriodPreset | null, now: Date): ColumnFilter[] {
+  if (!key || !preset) return [];
+  const { from, to } = periodRange(preset, now);
+  return [
+    { key, op: "gte", value: from },
+    { key, op: "lt", value: to },
+  ];
+}

@@ -313,3 +313,33 @@ describe("zoeken in gewone taal op de Ramses-correctiespagina", () => {
     expect(await screen.findByText("Het AI-tegoed is op.")).toBeInTheDocument();
   });
 });
+
+describe("meerdere filters en periode op de Ramses-correctiespagina", () => {
+  it("houdt het filter op een kolom actief als je een andere kolom kiest", async () => {
+    await openPage();
+    fireEvent.click(screen.getByRole("combobox", { name: /Kolom kiezen om op te filteren/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "Code" }));
+    fireEvent.change(screen.getByLabelText("Filterwaarde"), { target: { value: "a1" } });
+    await waitFor(() => expect(FILTER_CALLS).toContainEqual(["code", "ilike", "*a1*"]), { timeout: 3000 });
+
+    await new Promise((r) => setTimeout(r, 50));
+    fireEvent.click(screen.getByRole("combobox", { name: /Kolom kiezen om op te filteren/ }));
+    const tijdstip = await screen.findByRole("option", { name: "Tijdstip" });
+    FILTER_CALLS.length = 0;
+    fireEvent.click(tijdstip);
+    expect(screen.getByRole("button", { name: "Filter op Code verwijderen" })).toBeInTheDocument();
+    await waitFor(() => expect(FILTER_CALLS).toContainEqual(["code", "ilike", "*a1*"]), { timeout: 3000 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Filter op Code verwijderen" }));
+    expect(screen.queryByRole("button", { name: "Filter op Code verwijderen" })).not.toBeInTheDocument();
+  });
+
+  it("filtert met een periodeknop op de datumkolom", async () => {
+    await openPage();
+    FILTER_CALLS.length = 0;
+    fireEvent.click(screen.getByRole("button", { name: "Dit jaar" }));
+    const year = new Date().getFullYear();
+    await waitFor(() => expect(FILTER_CALLS).toContainEqual(["dt_dn", "gte", `${year}-01-01`]));
+    expect(FILTER_CALLS).toContainEqual(["dt_dn", "lt", `${year + 1}-01-01`]);
+  });
+});
