@@ -117,6 +117,22 @@ describe("tijdgroepen op de Ramses-correctiespagina", () => {
     expect(screen.getByText("A1")).toBeInTheDocument();
     expect(screen.getByText("A3")).toBeInTheDocument();
   });
+
+  it("geeft regels en tijdgroepskoppen geen kleurverschil", async () => {
+    await openPage();
+    const rows = ["A1", "A2", "A3"].map(
+      (code) => screen.getByText(code).closest("tr") as HTMLTableRowElement,
+    );
+    const headers = ["03-11-2026, 10:45", "03-11-2026, 11:51"].map(
+      (time) => groupHeader(time).closest("tr") as HTMLTableRowElement,
+    );
+    expect(rows).toHaveLength(3);
+    expect(headers).toHaveLength(2);
+    for (const el of [...rows, ...headers]) {
+      expect(el.className).not.toMatch(/bg-(primary|accent)/);
+      expect(el.className).not.toMatch(/border-l-(primary|accent)/);
+    }
+  });
 });
 
 describe("kolomnamen op de Ramses-correctiespagina", () => {
