@@ -59,6 +59,7 @@ const PAIRED_CODE_COLUMNS: { name: string; code: string }[] = [
 
 /** Column with the codes belonging to a name column, or null when this column has no codes of its own. */
 export function findCodeColumn(columns: DataColumn[], nameColumn: DataColumn): DataColumn | null {
+  if (!nameColumn.list) return null;
   const pair = PAIRED_CODE_COLUMNS.find((p) => p.name === normalizeKey(nameColumn.key));
   if (!pair) return null;
   return columns.find((c) => normalizeKey(c.key) === pair.code) ?? null;
