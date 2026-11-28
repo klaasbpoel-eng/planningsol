@@ -143,13 +143,12 @@ export function EmployeeList() {
 
     setDeleting(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .delete()
-        .eq("id", employeeToDelete.id);
+      const { error } = await (supabase as any).rpc("delete_employee_and_auth_user", {
+        p_profile_id: employeeToDelete.id,
+      });
 
       if (error) throw error;
-      toast.success("Medewerker verwijderd");
+      toast.success("Medewerker en gekoppeld inlogaccount verwijderd");
       fetchEmployees();
     } catch (error: any) {
       toast.error(error.message);
@@ -355,7 +354,7 @@ export function EmployeeList() {
             <AlertDialogTitle>Medewerker Verwijderen</AlertDialogTitle>
             <AlertDialogDescription>
               Weet u zeker dat u {employeeToDelete?.full_name || employeeToDelete?.email} wilt verwijderen? 
-              Dit verwijdert ook alle gekoppelde verlofaanvragen en saldi. Deze actie kan niet ongedaan worden gemaakt.
+              Dit verwijdert ook het gekoppelde inlogaccount en alle verlofaanvragen en saldi. Deze actie kan niet ongedaan worden gemaakt.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
