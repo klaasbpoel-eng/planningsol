@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Filter, ListChecks, Loader2, Pencil, RefreshCw, Search, Sparkles, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Filter, GripVertical, ListChecks, Loader2, Pencil, RefreshCw, Search, Sparkles, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -28,10 +28,11 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { knownListItems, planToRules, sampleValues, type AiRule } from "@/lib/aiFilters";
 import { requestFilterPlan } from "@/lib/aiFilterClient";
-import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, cleanDisplayText, collectDistinctValues, findCodeColumn, listItemsWithCodes, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, buildPeriodFilter, PERIOD_PRESETS, type PeriodPreset, parseListValue, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
+import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, cleanDisplayText, collectDistinctValues, findCodeColumn, listItemsWithCodes, applyColumnOrder, moveColumnKey, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, buildPeriodFilter, PERIOD_PRESETS, type PeriodPreset, parseListValue, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
 
 const TABLE_NAME = "RamsesCorrecties";
 const PAGE_SIZES = [25, 50, 100];
+const COLUMN_ORDER_KEY = "ramses-correcties-kolomvolgorde";
 const EXPORT_BATCH = 1000;
 // Rows read to build a tick list of values; enough for the whole table in normal use.
 const VALUE_SCAN_LIMIT = 20000;
@@ -225,10 +226,31 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const visibleColumns = useMemo(() => applyColumnLabels(baseColumns, columnLabels), [baseColumns, columnLabels]);
   const timestampKey = useMemo(() => findTimestampColumn(visibleColumns), [visibleColumns]);
   // The column used for grouping is not repeated as a table column: its value is already in every group header.
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(COLUMN_ORDER_KEY) ?? "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [dragKey, setDragKey] = useState<string | null>(null);
   const tableColumns = useMemo(
-    () => (timestampKey ? visibleColumns.filter((col) => col.key !== timestampKey) : visibleColumns),
-    [visibleColumns, timestampKey],
+    () =>
+      applyColumnOrder(
+        timestampKey ? visibleColumns.filter((col) => col.key !== timestampKey) : visibleColumns,
+        columnOrder,
+      ),
+    [visibleColumns, timestampKey, columnOrder],
   );
+  const saveColumnOrder = (order: string[]) => {
+    setColumnOrder(order);
+    if (order.length) localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(order));
+    else localStorage.removeItem(COLUMN_ORDER_KEY);
+  };
+  const dropColumn = (target: string) => {
+    if (dragKey) saveColumnOrder(moveColumnKey(tableColumns.map((c) => c.key), dragKey, target));
+    setDragKey(null);
+  };
   // Codes shown in front of list items: the customer column reads "206091 UMCG" using the customer-number column.
   const codeColumns = useMemo(
     () => new Map(visibleColumns.map((col) => [col.key, findCodeColumn(visibleColumns, col)])),
@@ -538,6 +560,11 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
               <Pencil className="mr-2 h-4 w-4" />
               Kolomnamen
             </Button>
+            {columnOrder.length > 0 && (
+              <Button variant="outline" onClick={() => saveColumnOrder([])}>
+                Volgorde herstellen
+              </Button>
+            )}
             <Button variant="outline" onClick={load} disabled={loading}>
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Vernieuwen
@@ -812,7 +839,23 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                       const active = sort?.key === col.key;
                       const Icon = !active ? ArrowUpDown : sort.ascending ? ArrowUp : ArrowDown;
                       return (
-                        <TableHead key={col.key} className={`whitespace-nowrap ${col.kind === "number" ? "text-right" : ""}`}>
+                        <TableHead
+                          key={col.key}
+                          draggable
+                          onDragStart={(e) => {
+                            setDragKey(col.key);
+                            e.dataTransfer.effectAllowed = "move";
+                          }}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            dropColumn(col.key);
+                          }}
+                          onDragEnd={() => setDragKey(null)}
+                          title="Sleep om de kolom te verplaatsen"
+                          className={`cursor-grab whitespace-nowrap ${col.kind === "number" ? "text-right" : ""} ${dragKey === col.key ? "opacity-50" : ""}`}
+                        >
+                          <GripVertical className="mr-1 inline h-3.5 w-3.5 opacity-40" aria-hidden />
                           <button
                             type="button"
                             onClick={() => toggleSort(col.key)}

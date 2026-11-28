@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, cleanDisplayText, collectDistinctValues, deriveColumns, findCodeColumn, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, humanizeColumnName, labelWithCode, listItemsWithCodes, quoteColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
 import { buildPeriodFilter, periodRange } from "./dataTable";
 import type { DataColumn } from "./dataTable";
+import { applyColumnOrder, moveColumnKey } from "./dataTable";
 
 describe("klantnummer vóór de klantnaam", () => {
   const rows = [
@@ -367,5 +368,16 @@ describe("debiteurnummer bij losse klantkolommen", () => {
     expect(findCodeColumn(cols, cols[0])).toBeNull();
     expect(findCodeColumn(cols, cols[2])).toBeNull();
     expect(row.Klant).toBe("UMCG");
+  });
+});
+
+describe("kolommen verschuiven", () => {
+  it("schuift een kolom naar de plek van een andere", () => {
+    expect(moveColumnKey(["a", "b", "c"], "c", "a")).toEqual(["c", "a", "b"]);
+    expect(moveColumnKey(["a", "b", "c"], "a", "c")).toEqual(["b", "c", "a"]);
+  });
+  it("zet onbekende nieuwe kolommen achteraan", () => {
+    const cols = [{ key: "a" }, { key: "b" }, { key: "nieuw" }];
+    expect(applyColumnOrder(cols, ["b", "a"]).map((c) => c.key)).toEqual(["b", "a", "nieuw"]);
   });
 });

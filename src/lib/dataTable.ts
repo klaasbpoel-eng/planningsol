@@ -480,3 +480,23 @@ export function buildPeriodFilter(key: string | null, preset: PeriodPreset | nul
     { key, op: "lt", value: to },
   ];
 }
+
+/** Columns in the user's saved order; columns missing from the order keep their place at the end. */
+export function applyColumnOrder<T extends { key: string }>(columns: T[], order: string[]): T[] {
+  const pos = new Map(order.map((k, i) => [k, i]));
+  return columns
+    .map((col, i) => ({ col, i }))
+    .sort((a, b) => (pos.get(a.col.key) ?? order.length + a.i) - (pos.get(b.col.key) ?? order.length + b.i))
+    .map((x) => x.col);
+}
+
+/** Key order after dropping column `from` on the place of column `to`. */
+export function moveColumnKey(keys: string[], from: string, to: string): string[] {
+  const start = keys.indexOf(from);
+  const end = keys.indexOf(to);
+  if (start < 0 || end < 0 || start === end) return keys;
+  const next = [...keys];
+  next.splice(start, 1);
+  next.splice(end, 0, from);
+  return next;
+}
