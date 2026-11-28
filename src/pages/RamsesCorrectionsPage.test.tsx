@@ -193,22 +193,6 @@ describe("tijdgroepen op de Ramses-correctiespagina", () => {
     expect(screen.getByText("Oudste eerst")).toBeInTheDocument();
   });
 
-  it("geeft regels en tijdgroepskoppen geen kleurverschil", async () => {
-    await openPage();
-    const rows = ["A1", "A2", "A3"].map(
-      (code) => screen.getByText(code).closest("tr") as HTMLTableRowElement,
-    );
-    const headers = ["03-11-2026", "04-11-2026"].map(
-      (time) => groupHeader(time).closest("tr") as HTMLTableRowElement,
-    );
-    expect(rows).toHaveLength(3);
-    expect(headers).toHaveLength(2);
-    for (const el of [...rows, ...headers]) {
-      expect(el.className).not.toMatch(/bg-(primary|accent)/);
-      expect(el.className).not.toMatch(/border-l-(primary|accent)/);
-    }
-  });
-
   it("toont geen (Leeg) en geen UN-nummer omschrijving in de tabel", async () => {
     await openPage();
     expect(screen.getByText("Bundles Stikstof industrieel")).toBeInTheDocument();

@@ -501,7 +501,10 @@ function RamsesCorrectionsContent({ userId, userEmail, role }: { userId: string;
   };
 
   const renderRow = (row: DataRow, index: number) => (
-    <TableRow key={String(row.id ?? index)} className={loading ? "opacity-60" : ""}>
+    <TableRow
+      key={String(row.id ?? index)}
+      className={`${index % 2 === 0 ? "bg-background/30" : "bg-muted/25"} hover:bg-primary/5 ${loading ? "opacity-60" : ""}`}
+    >
       {tableColumns.map((col) => (
         <TableCell
           key={col.key}
@@ -531,18 +534,21 @@ function RamsesCorrectionsContent({ userId, userEmail, role }: { userId: string;
     const open = !collapsed.has(group.label);
     const count = group.indexes.length;
     return (
-      <TableRow key={`groep-${group.label}-${group.indexes[0]}`} className="bg-muted/50 hover:bg-muted/50">
+      <TableRow
+        key={`groep-${group.label}-${group.indexes[0]}`}
+        className="border-y border-primary/20 bg-primary/10 hover:bg-primary/15"
+      >
         <TableCell colSpan={Math.max(tableColumns.length, 1)} className="p-0">
           <button
             type="button"
             onClick={() => toggleGroup(group.label)}
             aria-expanded={open}
             aria-label={`${open ? "Klap" : "Open"} tijdgroep ${group.empty ? "zonder tijdstip" : group.label}`}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-foreground hover:text-primary"
           >
-            <ChevronRight className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
-            <span className="whitespace-nowrap">{group.empty ? "Zonder tijdstip" : group.label}</span>
-            <span className="whitespace-nowrap text-muted-foreground/70">
+            <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-primary transition-transform ${open ? "rotate-90" : ""}`} />
+            <span className="whitespace-nowrap font-semibold text-primary">{group.empty ? "Zonder tijdstip" : group.label}</span>
+            <span className="whitespace-nowrap text-muted-foreground">
               {count.toLocaleString("nl-NL")} {correctieWord(count)}
             </span>
           </button>
@@ -904,7 +910,7 @@ function RamsesCorrectionsContent({ userId, userEmail, role }: { userId: string;
                           }}
                           onDragEnd={() => setDragKey(null)}
                           title="Sleep om de kolom te verplaatsen"
-                          className={`cursor-grab whitespace-nowrap ${col.kind === "number" ? "text-right" : ""} ${dragKey === col.key ? "opacity-50" : ""}`}
+                          className={`cursor-grab whitespace-nowrap ${active ? "bg-primary/15 text-primary" : "bg-muted/60"} ${col.kind === "number" ? "text-right" : ""} ${dragKey === col.key ? "opacity-50" : ""}`}
                         >
                           <GripVertical className="mr-1 inline h-3.5 w-3.5 opacity-40" aria-hidden />
                           <button

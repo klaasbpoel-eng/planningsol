@@ -20,3 +20,4 @@
 - [x] Rollen: databaseregels (SQL) leveren zodat eigen rollen ook in de echte database beperkt blijven.
 - [x] Beheer: inlogaccount aanmaken voor medewerkers (vanuit Medewerkers).
 - [x] Ramses-correcties: persoonlijke kolomvolgorde per account in de database opslaan en op elk apparaat laden.
+- [x] Ramses-correcties: rustige kleurcontrasten voor regels, tijdgroepen en actieve sortering.
