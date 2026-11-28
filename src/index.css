@@ -665,3 +665,6 @@ All colors MUST be HSL.
     border-color: #ddd !important;
   }
 }
+/* Vulplanning leesbaarheid */
+.fill-planning table td, .fill-planning table th { font-variant-numeric: tabular-nums; }
+.fill-planning table tbody tr:nth-child(even) { background-color: hsl(var(--muted) / 0.25); }
