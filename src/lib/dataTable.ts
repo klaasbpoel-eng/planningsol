@@ -45,18 +45,20 @@ const HIDDEN_COLUMNS = new Set(["id", "createdat"]);
 /** Keys (lowercase, letters and digits only) that stay text even when every value is a number,
  * because they are codes or identifiers, not quantities (RamsesCorrecties uses `Nr dn num`
  * and `OTHER_NR_DN_NUM`). */
-const TEXT_ONLY_COLUMNS = new Set(["nrdnnum", "othernrdnnum"]);
+const TEXT_ONLY_COLUMNS = new Set(["nrdnnum", "othernrdnnum", "debiteurnummer", "debiteurnummer2"]);
 
 const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 /** List columns whose items are shown with a code in front of the name. Both columns hold one item per
  * customer in the same order, so item i of the code column belongs to item i of the name column
  * (RamsesCorrecties: `Klant` with `Debiteurnummer`). */
-const PAIRED_CODE_COLUMNS: { name: string; code: string }[] = [{ name: "klant", code: "debiteurnummer" }];
+const PAIRED_CODE_COLUMNS: { name: string; code: string }[] = [
+  { name: "klant", code: "debiteurnummer" },
+  { name: "klant2", code: "debiteurnummer2" },
+];
 
 /** Column with the codes belonging to a name column, or null when this column has no codes of its own. */
 export function findCodeColumn(columns: DataColumn[], nameColumn: DataColumn): DataColumn | null {
-  if (!nameColumn.list) return null;
   const pair = PAIRED_CODE_COLUMNS.find((p) => p.name === normalizeKey(nameColumn.key));
   if (!pair) return null;
   return columns.find((c) => normalizeKey(c.key) === pair.code) ?? null;
@@ -71,8 +73,10 @@ export function labelWithCode(name: string, code?: string | null): string {
 
 /** Display text per list item, with the code from the same position in front of it. */
 export function listItemsWithCodes(row: DataRow, nameColumn: DataColumn, codeColumn: DataColumn | null): string[] {
-  const items = parseListValue(row[nameColumn.key]) ?? [];
-  const codes = codeColumn ? parseListValue(row[codeColumn.key]) ?? [] : [];
+  const asList = (v: unknown): string[] =>
+    parseListValue(v) ?? (v === null || v === undefined || v === "" ? [] : [String(v)]);
+  const items = asList(row[nameColumn.key]);
+  const codes = codeColumn ? asList(row[codeColumn.key]) : [];
   return items.map((item, i) => labelWithCode(item, codes[i]));
 }
 

@@ -353,3 +353,17 @@ describe("periodRange", () => {
     expect(buildPeriodFilter("Datum", null, now)).toEqual([]);
   });
 });
+
+describe("debiteurnummer bij losse klantkolommen", () => {
+  it("zet het nummer vóór de naam in Klant en Klant 2", () => {
+    const cols = [
+      { key: "Klant", label: "Klant", kind: "text" },
+      { key: "Debiteurnummer", label: "Debiteurnummer", kind: "text" },
+      { key: "Klant 2", label: "Klant 2", kind: "text" },
+      { key: "Debiteurnummer 2", label: "Debiteurnummer 2", kind: "text" },
+    ] as DataColumn[];
+    const row = { Klant: "UMCG", Debiteurnummer: "206091", "Klant 2": "AZG Post Groningen 1", "Debiteurnummer 2": "215184" };
+    expect(listItemsWithCodes(row, cols[0], findCodeColumn(cols, cols[0]))).toEqual(["206091 UMCG"]);
+    expect(listItemsWithCodes(row, cols[2], findCodeColumn(cols, cols[2]))).toEqual(["215184 AZG Post Groningen 1"]);
+  });
+});

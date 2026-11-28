@@ -444,6 +444,8 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                   </span>
                 ))}
             </div>
+          ) : codeColumns.get(col.key) && row[col.key] ? (
+            listItemsWithCodes(row, col, codeColumns.get(col.key) ?? null)[0] || formatCellValue(row[col.key], col.kind)
           ) : (
             formatCellValue(row[col.key], col.kind)
           )}
