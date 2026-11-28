@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format, differenceInDays } from "date-fns";
+import { nl } from "date-fns/locale";
 import { Calendar, Check, X, Clock, User, Loader2, Plus, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -142,6 +143,17 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "approved":
+        return "Goedgekeurd";
+      case "rejected":
+        return "Afgewezen";
+      default:
+        return "In behandeling";
+    }
+  };
+
   const getTypeStyles = (type: string) => {
     switch (type) {
       case "vacation":
@@ -244,11 +256,11 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                       <div className="flex items-center gap-2 text-sm text-foreground">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                         <span className="font-medium">
-                          {format(new Date(request.start_date), "MMM d")} 
+                          {format(new Date(request.start_date), "d MMM", { locale: nl })} 
                           {request.start_date !== request.end_date && 
-                            ` — ${format(new Date(request.end_date), "MMM d, yyyy")}`}
+                            ` — ${format(new Date(request.end_date), "d MMM yyyy", { locale: nl })}`}
                           {request.start_date === request.end_date && 
-                            `, ${format(new Date(request.start_date), "yyyy")}`}
+                            ` ${format(new Date(request.start_date), "yyyy")}`}
                         </span>
                         <span className="text-muted-foreground">
                           ({days} dag{days !== 1 ? 'en' : ''})
@@ -344,19 +356,19 @@ export function AdminRequestList({ requests, onUpdate }: AdminRequestListProps) 
                         <Badge variant="outline" className={cn("font-medium", getTypeStyles(request.type))}>
                           {getTypeLabel(request.type)}
                         </Badge>
-                        <Badge variant="outline" className={cn("capitalize", getStatusStyles(request.status))}>
-                          {request.status}
+                        <Badge variant="outline" className={cn("font-medium", getStatusStyles(request.status))}>
+                          {getStatusLabel(request.status)}
                         </Badge>
                       </div>
                       
                       <div className="flex items-center gap-2 text-sm text-foreground">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                         <span>
-                          {format(new Date(request.start_date), "MMM d")} 
+                          {format(new Date(request.start_date), "d MMM", { locale: nl })} 
                           {request.start_date !== request.end_date && 
-                            ` — ${format(new Date(request.end_date), "MMM d, yyyy")}`}
+                            ` — ${format(new Date(request.end_date), "d MMM yyyy", { locale: nl })}`}
                           {request.start_date === request.end_date && 
-                            `, ${format(new Date(request.start_date), "yyyy")}`}
+                            ` ${format(new Date(request.start_date), "yyyy")}`}
                         </span>
                         <span className="text-muted-foreground">
                           ({days} dag{days !== 1 ? 'en' : ''})

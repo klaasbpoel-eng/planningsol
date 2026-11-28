@@ -31,7 +31,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         try {
             const [requestsRes, profilesRes] = await Promise.all([
                 supabase.from("time_off_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
-                supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_approved", false),
+                supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_approved", false).not("user_id", "is", null),
             ]);
             setBadges({
                 requests: requestsRes.count || 0,

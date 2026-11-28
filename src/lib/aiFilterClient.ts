@@ -1,9 +1,10 @@
 /** Asks Lovable AI (through the app's server function) to turn a plain-language request into a filter plan. */
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_FUNCTIONS_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import type { AiFilterPlan } from "@/lib/aiFilters";
 import type { DataColumn } from "@/lib/dataTable";
 
-const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ramses-filter-ai`;
+const FUNCTION_URL = `${SUPABASE_FUNCTIONS_URL ?? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`}/ramses-filter-ai`;
+const API_KEY = SUPABASE_PUBLISHABLE_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 export async function requestFilterPlan(input: {
   question: string;
@@ -20,7 +21,7 @@ export async function requestFilterPlan(input: {
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      apikey: API_KEY,
     },
     body: JSON.stringify({
       question: input.question,

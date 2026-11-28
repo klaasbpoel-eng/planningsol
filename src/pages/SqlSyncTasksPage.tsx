@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
+import { nl } from "date-fns/locale";
 import { PlusCircle, Database, CheckCircle2, XCircle, Pencil, Trash2, ArrowRightLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,23 @@ export default function SqlSyncTasksPage() {
     );
 }
 
+function mapCloudRowToTask(row: any): SqlSyncTask {
+    const q = row.query_data || {};
+    return {
+        id: row.query_id,
+        name: row.name || q.name || "Naamloos",
+        source_query: q.query || "",
+        destination_table: row.target_table || q.targetTable || "",
+        primary_key_column: q.primaryKey || "",
+        interval_minutes: Number(q.intervalMinutes || 0),
+        hard_sync: Boolean(q.hardSync),
+        is_active: q.enabled !== false,
+        updated_at: row.updated_at,
+        last_sync_time: q.lastSyncTime || row.updated_at,
+        raw_query_data: q,
+    };
+}
+
 function SqlSyncTasksContent({ userEmail, role }: { userEmail?: string; role: AppRole }) {
     const [tasks, setTasks] = useState<SqlSyncTask[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -42,12 +60,12 @@ function SqlSyncTasksContent({ userEmail, role }: { userEmail?: string; role: Ap
         try {
             setIsLoading(true);
             const { data, error } = await (supabase as any)
-                .from("sql_sync_tasks")
+                .from("sql_sync_saved_queries")
                 .select("*")
-                .order("created_at", { ascending: false });
+                .order("name", { ascending: true });
 
             if (error) throw error;
-            setTasks(data || []);
+            setTasks((data || []).map(mapCloudRowToTask));
         } catch (error: any) {
             toast({
                 title: "Fout bij ophalen",
@@ -72,7 +90,10 @@ function SqlSyncTasksContent({ userEmail, role }: { userEmail?: string; role: Ap
         if (!confirm(`Weet je zeker dat je de taak "${name}" wilt verwijderen?`)) return;
 
         try {
-            const { error } = await (supabase as any).from("sql_sync_tasks").delete().eq("id", id);
+            const { error } = await (supabase as any)
+                .from("sql_sync_saved_queries")
+                .delete()
+                .eq("query_id", id);
             if (error) throw error;
 
             toast({
@@ -89,18 +110,31 @@ function SqlSyncTasksContent({ userEmail, role }: { userEmail?: string; role: Ap
         }
     };
 
-    const handleToggleActive = async (id: string, currentStatus: boolean) => {
+    const handleToggleActive = async (task: SqlSyncTask) => {
+        if (!task.id) return;
+        const nextActive = !task.is_active;
         try {
+            const updatedQueryData = {
+                ...(task.raw_query_data || {}),
+                id: task.id,
+                name: task.name,
+                query: task.source_query,
+                targetTable: task.destination_table,
+                enabled: nextActive,
+            };
             const { error } = await (supabase as any)
-                .from("sql_sync_tasks")
-                .update({ is_active: !currentStatus })
-                .eq("id", id);
+                .from("sql_sync_saved_queries")
+                .update({
+                    query_data: updatedQueryData,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("query_id", task.id);
 
             if (error) throw error;
 
             toast({
                 title: "Status geüpdatet",
-                description: `Taak is nu ${!currentStatus ? 'actief' : 'gepauzeerd'}.`,
+                description: `Taak "${task.name}" is nu ${nextActive ? "actief" : "gepauzeerd"}.`,
             });
             fetchTasks();
         } catch (error: any) {
@@ -118,7 +152,7 @@ function SqlSyncTasksContent({ userEmail, role }: { userEmail?: string; role: Ap
             role={role}
             isAdmin
             title="Synchronisatie"
-            description="Beheer de synchronisatie tussen de lokale MS SQL Server en de database."
+            description="Beheer de synchronisatie tussen de lokale MS SQL Server en Supabase (gekoppeld aan de SQL Sync app)."
             titleIcon={<Database className="h-6 w-6 text-primary" />}
         >
             <div className="flex w-full">
@@ -128,7 +162,7 @@ function SqlSyncTasksContent({ userEmail, role }: { userEmail?: string; role: Ap
                             <div>
                                 <h2 className="text-2xl font-bold tracking-tight">Sync Taken</h2>
                                 <p className="text-muted-foreground">
-                                    Beheer de synchronisatie instellingen tussen je lokale MS SQL Server en Supabase.
+                                    Overzicht van alle actieve queries uit de SQL Sync desktop-app (`sql_sync_saved_queries`).
                                 </p>
                             </div>
                             <Button onClick={() => handleOpenForm()}>
@@ -139,9 +173,9 @@ function SqlSyncTasksContent({ userEmail, role }: { userEmail?: string; role: Ap
 
                         <Card>
                             <CardHeader>
-                                <CardTitle>Geconfigureerde Queries</CardTitle>
+                                <CardTitle>Geconfigureerde Queries ({tasks.length})</CardTitle>
                                 <CardDescription>
-                                    Een overzicht van alle ingestelde overdrachten via de data pump.
+                                    Wijzigingen hier worden automatisch overgenomen door de SQL Sync app.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -151,21 +185,22 @@ function SqlSyncTasksContent({ userEmail, role }: { userEmail?: string; role: Ap
                                             <TableRow>
                                                 <TableHead>Naam</TableHead>
                                                 <TableHead>Doeltabel</TableHead>
+                                                <TableHead>Schema / Modus</TableHead>
                                                 <TableHead>Status</TableHead>
-                                                <TableHead>Laatste Sync</TableHead>
+                                                <TableHead>Laatst bijgewerkt</TableHead>
                                                 <TableHead className="text-right">Acties</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {isLoading ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={5} className="text-center h-24">
+                                                    <TableCell colSpan={6} className="text-center h-24">
                                                         Laden...
                                                     </TableCell>
                                                 </TableRow>
                                             ) : tasks.length === 0 ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
+                                                    <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
                                                         Geen taken gevonden. Maak je eerste sync taak aan.
                                                     </TableCell>
                                                 </TableRow>
@@ -173,21 +208,29 @@ function SqlSyncTasksContent({ userEmail, role }: { userEmail?: string; role: Ap
                                                 tasks.map((task) => (
                                                     <TableRow key={task.id}>
                                                         <TableCell className="font-medium">
-                                                            <div className="flex items-center gap-2">
-                                                                {task.name}
+                                                            {task.name}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                                                <ArrowRightLeft className="h-3 w-3" />
+                                                                {task.destination_table}
                                                             </div>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <div className="flex items-center gap-1 text-sm text-gray-500">
-                                                                <ArrowRightLeft className="h-3 w-3" />
-                                                                {task.destination_table}
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                <Badge variant="outline">
+                                                                    {task.interval_minutes > 0 ? `Elke ${task.interval_minutes} min` : "Handmatig"}
+                                                                </Badge>
+                                                                {task.hard_sync && (
+                                                                    <Badge variant="secondary">Hard Sync</Badge>
+                                                                )}
                                                             </div>
                                                         </TableCell>
                                                         <TableCell>
                                                             <Badge
                                                                 variant={task.is_active ? "default" : "secondary"}
                                                                 className="cursor-pointer"
-                                                                onClick={() => handleToggleActive(task.id!, task.is_active)}
+                                                                onClick={() => handleToggleActive(task)}
                                                             >
                                                                 {task.is_active ? (
                                                                     <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Actief</span>
@@ -196,9 +239,9 @@ function SqlSyncTasksContent({ userEmail, role }: { userEmail?: string; role: Ap
                                                                 )}
                                                             </Badge>
                                                         </TableCell>
-                                                        <TableCell className="text-sm text-gray-500">
-                                                            {task.last_sync_time
-                                                                ? format(new Date(task.last_sync_time), "dd MMM yyyy HH:mm")
+                                                        <TableCell className="text-sm text-muted-foreground">
+                                                            {task.updated_at
+                                                                ? format(new Date(task.updated_at), "d MMM yyyy HH:mm", { locale: nl })
                                                                 : "Nog nooit"}
                                                         </TableCell>
                                                         <TableCell className="text-right">
@@ -212,7 +255,7 @@ function SqlSyncTasksContent({ userEmail, role }: { userEmail?: string; role: Ap
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
-                                                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                                                 onClick={() => handleDelete(task.id!, task.name)}
                                                             >
                                                                 <Trash2 className="h-4 w-4" />

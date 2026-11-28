@@ -44,7 +44,7 @@ export function DatabaseBackupRestore() {
   const callRestore = async (body: Record<string, unknown>) => {
     const headers = await getAuthHeaders();
     const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/restore-database`,
+      `${SUPABASE_FUNCTIONS_URL}/restore-database`,
       { method: "POST", headers, body: JSON.stringify(body) }
     );
     if (!response.ok) {
@@ -59,7 +59,7 @@ export function DatabaseBackupRestore() {
     try {
       const headers = await getAuthHeaders();
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/backup-database`,
+        `${SUPABASE_FUNCTIONS_URL}/backup-database`,
         { method: "POST", headers }
       );
       if (!response.ok) {

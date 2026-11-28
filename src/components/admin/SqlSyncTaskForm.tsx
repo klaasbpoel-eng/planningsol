@@ -29,14 +29,17 @@ const formSchema = z.object({
     name: z.string().min(2, "Vul een naam in van minstens 2 karakters."),
     source_query: z.string().min(10, "De SQL query is te kort."),
     destination_table: z.string().min(2, "Vul de juiste doeltabel in."),
-    primary_key_column: z.string().min(1, "Primary key is verplicht voor updates."),
+    primary_key_column: z.string().optional().default(""),
+    interval_minutes: z.coerce.number().min(0, "Gebruik 0 voor handmatig of een aantal minuten.").default(0),
+    hard_sync: z.boolean().default(false),
     is_active: z.boolean().default(true),
 });
 
 export type SqlSyncTask = z.infer<typeof formSchema> & {
     id?: string;
-    created_at?: string;
+    updated_at?: string;
     last_sync_time?: string;
+    raw_query_data?: Record<string, unknown>;
 };
 
 interface SqlSyncTaskFormProps {
@@ -55,7 +58,9 @@ export function SqlSyncTaskForm({ open, onOpenChange, onSuccess, task }: SqlSync
             name: "",
             source_query: "SELECT *\nFROM MijnTabel\nWHERE Datum >= GETDATE()-30",
             destination_table: "",
-            primary_key_column: "ID",
+            primary_key_column: "",
+            interval_minutes: 0,
+            hard_sync: false,
             is_active: true,
         },
     });
@@ -66,7 +71,9 @@ export function SqlSyncTaskForm({ open, onOpenChange, onSuccess, task }: SqlSync
                 name: task.name,
                 source_query: task.source_query,
                 destination_table: task.destination_table,
-                primary_key_column: task.primary_key_column,
+                primary_key_column: task.primary_key_column || "",
+                interval_minutes: task.interval_minutes ?? 0,
+                hard_sync: task.hard_sync ?? false,
                 is_active: task.is_active,
             });
         } else if (!open) {
@@ -74,7 +81,9 @@ export function SqlSyncTaskForm({ open, onOpenChange, onSuccess, task }: SqlSync
                 name: "",
                 source_query: "SELECT *\nFROM MijnTabel\nWHERE Datum >= GETDATE()-30",
                 destination_table: "",
-                primary_key_column: "ID",
+                primary_key_column: "",
+                interval_minutes: 0,
+                hard_sync: false,
                 is_active: true,
             });
         }
@@ -82,24 +91,39 @@ export function SqlSyncTaskForm({ open, onOpenChange, onSuccess, task }: SqlSync
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
-            if (task?.id) {
-                // Edit existing
-                const { error } = await (supabase as any)
-                    .from("sql_sync_tasks")
-                    .update(values)
-                    .eq("id", task.id);
+            const queryId = task?.id || `job-${Date.now()}`;
+            const mergedQueryData = {
+                ...(task?.raw_query_data || {}),
+                id: queryId,
+                name: values.name.trim(),
+                query: values.source_query,
+                targetTable: values.destination_table.trim(),
+                primaryKey: values.primary_key_column?.trim() || undefined,
+                intervalMinutes: values.interval_minutes || 0,
+                hardSync: values.hard_sync,
+                enabled: values.is_active,
+            };
 
-                if (error) throw error;
-                toast({ title: "Bijgewerkt", description: "Configuratie is opgeslagen." });
-            } else {
-                // Create new
-                const { error } = await (supabase as any)
-                    .from("sql_sync_tasks")
-                    .insert([values]);
+            const payload = {
+                query_id: queryId,
+                name: values.name.trim(),
+                target_table: values.destination_table.trim(),
+                query_data: mergedQueryData,
+                updated_at: new Date().toISOString(),
+            };
 
-                if (error) throw error;
-                toast({ title: "Toegevoegd", description: "Nieuwe sync taak is aangemaakt." });
-            }
+            const { error } = await (supabase as any)
+                .from("sql_sync_saved_queries")
+                .upsert(payload, { onConflict: "query_id" });
+
+            if (error) throw error;
+
+            toast({
+                title: task?.id ? "Bijgewerkt" : "Toegevoegd",
+                description: task?.id
+                    ? "Sync-configuratie opgeslagen (wordt gesynchroniseerd met de SQL Sync app)."
+                    : "Nieuwe sync taak aangemaakt.",
+            });
 
             onSuccess();
             onOpenChange(false);
@@ -114,11 +138,11 @@ export function SqlSyncTaskForm({ open, onOpenChange, onSuccess, task }: SqlSync
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{task ? "Taak bewerken" : "Nieuwe Sync Taak"}</DialogTitle>
                     <DialogDescription>
-                        Definieer welke data vanuit lokale SQL server naar Supabase gepompt moet worden.
+                        Definieer welke data vanuit de lokale MS SQL Server naar Supabase gesynchroniseerd wordt. Wijzigingen worden direct gedeeld met de SQL Sync desktop-app.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -129,9 +153,9 @@ export function SqlSyncTaskForm({ open, onOpenChange, onSuccess, task }: SqlSync
                             name="name"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Unieke Naam</FormLabel>
+                                    <FormLabel>Naam</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="bijv. Artikelen Sync PIM" {...field} />
+                                        <Input placeholder="bijv. RamsesCorrecties" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -147,17 +171,17 @@ export function SqlSyncTaskForm({ open, onOpenChange, onSuccess, task }: SqlSync
                                     <FormControl>
                                         <Textarea
                                             placeholder="SELECT * FROM dbo.MijnTabel"
-                                            className="font-mono text-sm h-32"
+                                            className="font-mono text-xs h-40"
                                             {...field}
                                         />
                                     </FormControl>
-                                    <FormDescription>De query die wordt uitgevoerd op de externe SQL Server.</FormDescription>
+                                    <FormDescription>De query die wordt uitgevoerd op de externe MS SQL Server.</FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <FormField
                                 control={form.control}
                                 name="destination_table"
@@ -165,9 +189,8 @@ export function SqlSyncTaskForm({ open, onOpenChange, onSuccess, task }: SqlSync
                                     <FormItem>
                                         <FormLabel>Doeltabel (Supabase)</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="bijv. sync_articles" {...field} />
+                                            <Input placeholder="bijv. Voorraad" {...field} />
                                         </FormControl>
-                                        <FormDescription>Tabelnaam exact zoals deze in de cloud bestaat.</FormDescription>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -178,37 +201,74 @@ export function SqlSyncTaskForm({ open, onOpenChange, onSuccess, task }: SqlSync
                                 name="primary_key_column"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Unieke ID Kolom (Doel)</FormLabel>
+                                        <FormLabel>Primary Key (optioneel)</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="bijv. ArtikelNr" {...field} />
+                                            <Input placeholder="bijv. id" {...field} />
                                         </FormControl>
-                                        <FormDescription>Wordt gebruikt voor 'upserts' (voorkomt dubbele).</FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="interval_minutes"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Interval (minuten)</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" min={0} placeholder="0 = handmatig" {...field} />
+                                        </FormControl>
+                                        <FormDescription>0 = alleen handmatig</FormDescription>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
                         </div>
 
-                        <FormField
-                            control={form.control}
-                            name="is_active"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                                    <FormControl>
-                                        <Checkbox
-                                            checked={field.value}
-                                            onCheckedChange={field.onChange}
-                                        />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                        <FormLabel>Direct Activeren</FormLabel>
-                                        <FormDescription>
-                                            Zolang deze gepauzeerd staat, slaat de cronjob dit over.
-                                        </FormDescription>
-                                    </div>
-                                </FormItem>
-                            )}
-                        />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <FormField
+                                control={form.control}
+                                name="is_active"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3">
+                                        <FormControl>
+                                            <Checkbox
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                        </FormControl>
+                                        <div className="space-y-1 leading-none">
+                                            <FormLabel>Actief</FormLabel>
+                                            <FormDescription>
+                                                Automatisch meenemen in geplande syncs.
+                                            </FormDescription>
+                                        </div>
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="hard_sync"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3">
+                                        <FormControl>
+                                            <Checkbox
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                        </FormControl>
+                                        <div className="space-y-1 leading-none">
+                                            <FormLabel>Hard Sync (tabel leegmaken)</FormLabel>
+                                            <FormDescription>
+                                                Vervangt alle rijen in de doeltabel bij elke sync.
+                                            </FormDescription>
+                                        </div>
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
 
                         <div className="flex justify-end gap-3 pt-4">
                             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
