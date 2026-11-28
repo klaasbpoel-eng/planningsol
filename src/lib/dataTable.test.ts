@@ -1,6 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, cleanDisplayText, collectDistinctValues, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, humanizeColumnName, quoteColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
+import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, cleanDisplayText, collectDistinctValues, deriveColumns, findCodeColumn, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, humanizeColumnName, labelWithCode, listItemsWithCodes, quoteColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
 import { buildPeriodFilter, periodRange } from "./dataTable";
+
+describe("klantnummer vóór de klantnaam", () => {
+  const rows = [
+    { Klant: ["UMCG", "AZG Post Groningen 1"], Debiteurnummer: ["206091", "215184"] },
+    { Klant: ["Heliomare locatie De Alk"], Debiteurnummer: [] },
+  ];
+  const cols = deriveColumns(rows);
+  const klant = cols.find((c) => c.key === "Klant")!;
+  const nummer = cols.find((c) => c.key === "Debiteurnummer")!;
+
+  it("vindt de nummerkolom bij de klantkolom, en andersom niet", () => {
+    expect(findCodeColumn(cols, klant)?.key).toBe("Debiteurnummer");
+    expect(findCodeColumn(cols, nummer)).toBeNull();
+  });
+
+  it("zet het nummer van dezelfde positie vóór de naam", () => {
+    expect(listItemsWithCodes(rows[0], klant, nummer)).toEqual(["206091 UMCG", "215184 AZG Post Groningen 1"]);
+    // No number known: the name stays on its own.
+    expect(listItemsWithCodes(rows[1], klant, nummer)).toEqual(["Heliomare locatie De Alk"]);
+    expect(labelWithCode("UMCG", null)).toBe("UMCG");
+    expect(labelWithCode("UMCG", "  ")).toBe("UMCG");
+  });
+
+  it("toont het nummer in de waardelijst, terwijl de waarde de naam blijft", () => {
+    const labels = Object.fromEntries(collectDistinctValues(rows, klant, nummer).map((v) => [v.value, v.label]));
+    expect(labels).toEqual({
+      UMCG: "206091 UMCG",
+      "AZG Post Groningen 1": "215184 AZG Post Groningen 1",
+      "Heliomare locatie De Alk": "Heliomare locatie De Alk",
+    });
+    // Without the number column the list reads as before.
+    const plain = Object.fromEntries(collectDistinctValues(rows, klant).map((v) => [v.value, v.label]));
+    expect(plain.UMCG).toBe("UMCG");
+  });
+});
 
 describe("humanizeColumnName", () => {
   it("maakt leesbare kolomnamen", () => {

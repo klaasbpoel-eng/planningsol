@@ -49,6 +49,33 @@ const TEXT_ONLY_COLUMNS = new Set(["nrdnnum", "othernrdnnum"]);
 
 const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
 
+/** List columns whose items are shown with a code in front of the name. Both columns hold one item per
+ * customer in the same order, so item i of the code column belongs to item i of the name column
+ * (RamsesCorrecties: `Klant` with `Debiteurnummer`). */
+const PAIRED_CODE_COLUMNS: { name: string; code: string }[] = [{ name: "klant", code: "debiteurnummer" }];
+
+/** Column with the codes belonging to a name column, or null when this column has no codes of its own. */
+export function findCodeColumn(columns: DataColumn[], nameColumn: DataColumn): DataColumn | null {
+  if (!nameColumn.list) return null;
+  const pair = PAIRED_CODE_COLUMNS.find((p) => p.name === normalizeKey(nameColumn.key));
+  if (!pair) return null;
+  return columns.find((c) => normalizeKey(c.key) === pair.code) ?? null;
+}
+
+/** "206091 UMCG": the code in front of the name, the name alone when there is no code. */
+export function labelWithCode(name: string, code?: string | null): string {
+  const clean = cleanDisplayText(name);
+  const number = code?.trim() ?? "";
+  return number ? `${number} ${clean}`.trim() : clean;
+}
+
+/** Display text per list item, with the code from the same position in front of it. */
+export function listItemsWithCodes(row: DataRow, nameColumn: DataColumn, codeColumn: DataColumn | null): string[] {
+  const items = parseListValue(row[nameColumn.key]) ?? [];
+  const codes = codeColumn ? parseListValue(row[codeColumn.key]) ?? [] : [];
+  return items.map((item, i) => labelWithCode(item, codes[i]));
+}
+
 /** Turns `ArtikelCode`, `artikel_code` or `artikelCode` into "Artikel code". */
 export function humanizeColumnName(key: string): string {
   const words = key
@@ -340,32 +367,33 @@ export function canPickValues(column: DataColumn | undefined): boolean {
   return column?.kind === "text" || column?.kind === "number";
 }
 
-/** Every filled value in a column once, with its count; numbers in numeric order, text alphabetically. */
-export function collectDistinctValues(rows: DataRow[], column: DataColumn): DistinctValue[] {
-  const counts = new Map<string, { raw: unknown; count: number }>();
+/**
+ * Every filled value in a column once, with how often it occurs; numbers in numeric order, text alphabetically.
+ * `codeColumn` adds the code of the same position in front of every list item, so a customer list reads
+ * "206091 UMCG" while the value that is asked for stays the plain name.
+ */
+export function collectDistinctValues(rows: DataRow[], column: DataColumn, codeColumn?: DataColumn | null): DistinctValue[] {
+  const counts = new Map<string, { raw: unknown; count: number; label: string }>();
   for (const row of rows) {
     const raw = row[column.key];
     if (raw === null || raw === undefined || raw === "") continue;
     if (column.list) {
-      for (const item of parseListValue(raw) ?? []) {
-        if (!item) continue;
+      const items = parseListValue(raw) ?? [];
+      const codes = codeColumn ? parseListValue(row[codeColumn.key]) ?? [] : [];
+      items.forEach((item, i) => {
+        if (!item) return;
         const entry = counts.get(item);
         if (entry) entry.count += 1;
-        else counts.set(item, { raw: item, count: 1 });
-      }
+        else counts.set(item, { raw: item, count: 1, label: labelWithCode(item, codes[i]) });
+      });
       continue;
     }
     const value = typeof raw === "object" ? JSON.stringify(raw) : String(raw);
     const entry = counts.get(value);
     if (entry) entry.count += 1;
-    else counts.set(value, { raw, count: 1 });
+    else counts.set(value, { raw, count: 1, label: formatCellValue(raw, column.kind) });
   }
-  const list = [...counts.entries()].map(([value, { raw, count }]) => ({
-    value,
-    label: formatCellValue(raw, column.kind),
-    count,
-    raw,
-  }));
+  const list = [...counts.entries()].map(([value, { raw, count, label }]) => ({ value, label, count, raw }));
   list.sort((a, b) =>
     typeof a.raw === "number" && typeof b.raw === "number"
       ? a.raw - b.raw

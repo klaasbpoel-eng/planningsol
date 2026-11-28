@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { knownListItems, planToRules, sampleValues, type AiRule } from "@/lib/aiFilters";
 import { requestFilterPlan } from "@/lib/aiFilterClient";
-import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, cleanDisplayText, collectDistinctValues, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, buildPeriodFilter, PERIOD_PRESETS, type PeriodPreset, parseListValue, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
+import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, cleanDisplayText, collectDistinctValues, findCodeColumn, listItemsWithCodes, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, buildPeriodFilter, PERIOD_PRESETS, type PeriodPreset, parseListValue, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
 
 const TABLE_NAME = "RamsesCorrecties";
 const PAGE_SIZES = [25, 50, 100];
@@ -146,6 +146,9 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
       setValuesLoading(true);
       setValuesError(null);
       try {
+        // The codes belonging to this column are read along with it, so the tick list shows "206091 UMCG".
+        const codeColumn = findCodeColumn(columns ?? [], column);
+        const select = [column.key, ...(codeColumn ? [codeColumn.key] : [])].map(quoteColumnName).join(",");
         const all: DataRow[] = [];
         let partial = false;
         for (let from = 0; ; from += EXPORT_BATCH) {
@@ -155,20 +158,23 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
           }
           const { data, error: queryError } = await (supabase as any)
             .from(TABLE_NAME)
-            .select(quoteColumnName(column.key))
+            .select(select)
             .range(from, from + EXPORT_BATCH - 1);
           if (queryError) throw queryError;
           all.push(...((data ?? []) as DataRow[]));
           if (!data || data.length < EXPORT_BATCH) break;
         }
-        setValueLists((current) => ({ ...current, [column.key]: { values: collectDistinctValues(all, column), partial } }));
+        setValueLists((current) => ({
+          ...current,
+          [column.key]: { values: collectDistinctValues(all, column, codeColumn), partial },
+        }));
       } catch (e: any) {
         setValuesError(e.message ?? "Onbekende fout");
       } finally {
         setValuesLoading(false);
       }
     },
-    [valueLists],
+    [valueLists, columns],
   );
 
   const togglePickedValue = (value: string) => {
@@ -223,6 +229,11 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
     () => (timestampKey ? visibleColumns.filter((col) => col.key !== timestampKey) : visibleColumns),
     [visibleColumns, timestampKey],
   );
+  // Codes shown in front of list items: the customer column reads "206091 UMCG" using the customer-number column.
+  const codeColumns = useMemo(
+    () => new Map(visibleColumns.map((col) => [col.key, findCodeColumn(visibleColumns, col)])),
+    [visibleColumns],
+  );
   const groups = useMemo(() => {
     if (!timestampKey) return null;
     const kind = visibleColumns.find((c) => c.key === timestampKey)?.kind ?? "text";
@@ -244,11 +255,13 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
       entries.push({ key: filterColumn, term: filterTerm.trim(), values: pickedValues });
     return entries.map((e) => {
       const label = visibleColumns.find((c) => c.key === e.key)?.label ?? e.key;
-      const parts = [...(e.term ? [`"${e.term}"`] : []), ...e.values.map(cleanDisplayText)];
+      // A ticked customer is shown the way the tick list showed it, so the chip keeps the number in front of the name.
+      const shown = (value: string) => valueLists[e.key]?.values.find((v) => v.value === value)?.label ?? cleanDisplayText(value);
+      const parts = [...(e.term ? [`"${e.term}"`] : []), ...e.values.map(shown)];
       const text = parts.length > 2 ? `${parts.slice(0, 2).join(", ")} +${parts.length - 2}` : parts.join(", ");
       return { key: e.key, label, text };
     });
-  }, [savedFilters, filterColumn, filterTerm, pickedValues, visibleColumns]);
+  }, [savedFilters, filterColumn, filterTerm, pickedValues, visibleColumns, valueLists]);
 
   // Switching column keeps the current filter and opens the saved one of the new column for editing.
   const switchFilterColumn = (value: string) => {
@@ -423,11 +436,13 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
         >
           {col.list && parseListValue(row[col.key])?.some(Boolean) ? (
             <div className="flex flex-wrap gap-1">
-              {parseListValue(row[col.key])!.filter(Boolean).map((item, i) => (
-                <span key={i} className="rounded-md border border-border bg-background/60 px-1.5 py-0.5 text-xs">
-                  {cleanDisplayText(item)}
-                </span>
-              ))}
+              {listItemsWithCodes(row, col, codeColumns.get(col.key) ?? null)
+                .filter(Boolean)
+                .map((item, i) => (
+                  <span key={i} className="rounded-md border border-border bg-background/60 px-1.5 py-0.5 text-xs">
+                    {item}
+                  </span>
+                ))}
             </div>
           ) : (
             formatCellValue(row[col.key], col.kind)
