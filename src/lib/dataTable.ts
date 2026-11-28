@@ -11,6 +11,8 @@ export interface DataColumn {
   /** Set when every value is a list (e.g. `["UMCG","AZG"]`): "array" when the database sends real arrays
    * (jsonb/array column), "text" when it sends the list as JSON text. Kind stays "text". */
   list?: "array" | "text";
+  /** Unit shown behind a number on screen, e.g. " L" for liters. Never stored, never exported. */
+  unit?: string;
 }
 
 /** Items of a list value (real array or JSON text like `["a","b"]`); null when the value is not a list. */
@@ -46,6 +48,10 @@ const HIDDEN_COLUMNS = new Set(["id", "createdat"]);
  * because they are codes or identifiers, not quantities (RamsesCorrecties uses `Nr dn num`
  * and `OTHER_NR_DN_NUM`). */
 const TEXT_ONLY_COLUMNS = new Set(["nrdnnum", "othernrdnnum", "debiteurnummer", "debiteurnummer2"]);
+
+/** Keys (lowercase, letters and digits only) whose numbers are a quantity with a fixed unit, shown on
+ * screen so the reader knows what the number means (RamsesCorrecties: `Capaciteit` is waterinhoud in liters). */
+const COLUMN_UNITS: Record<string, string> = { capaciteit: " L" };
 
 const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -116,6 +122,8 @@ export function deriveColumns(rows: DataRow[]): DataColumn[] {
       kind: list || TEXT_ONLY_COLUMNS.has(normalizeKey(key)) ? "text" : detectKind(values),
     };
     if (list) column.list = list;
+    const unit = COLUMN_UNITS[normalizeKey(key)];
+    if (unit && column.kind === "number") column.unit = unit;
     return column;
   });
 }
@@ -217,11 +225,12 @@ export function cleanDisplayText(value: string): string {
 }
 
 /** Dutch display value: dot for thousands, comma for decimals, dd-mm-jjjj dates. */
-export function formatCellValue(value: unknown, kind: ColumnKind): string {
+export function formatCellValue(value: unknown, kind: ColumnKind, unit?: string): string {
   if (value === null || value === undefined || value === "") return "—";
   const items = Array.isArray(value) || kind === "text" ? parseListValue(value) : null;
   if (items) return items.map((item) => cleanDisplayText(item)).filter(Boolean).join(", ") || "—";
-  if (kind === "number" && typeof value === "number") return numberFormat.format(value);
+  if (kind === "number" && typeof value === "number")
+    return `${numberFormat.format(value)}${unit ?? ""}`;
   if (kind === "boolean" || typeof value === "boolean") return value ? "Ja" : "Nee";
   if (kind === "date" && typeof value === "string") {
     const hasTime = /[T ]\d{2}:\d{2}/.test(value);
@@ -236,6 +245,11 @@ export function formatCellValue(value: unknown, kind: ColumnKind): string {
   }
   if (typeof value === "object") return JSON.stringify(value);
   return cleanDisplayText(String(value)) || "—";
+}
+
+/** Display value of a whole column: the column's own unit (e.g. " L") is added when it has one. */
+export function formatColumnValue(column: DataColumn, value: unknown): string {
+  return formatCellValue(value, column.kind, column.unit);
 }
 
 /**
@@ -396,7 +410,7 @@ export function collectDistinctValues(rows: DataRow[], column: DataColumn, codeC
     const value = typeof raw === "object" ? JSON.stringify(raw) : String(raw);
     const entry = counts.get(value);
     if (entry) entry.count += 1;
-    else counts.set(value, { raw, count: 1, label: formatCellValue(raw, column.kind) });
+    else counts.set(value, { raw, count: 1, label: formatCellValue(raw, column.kind, column.unit) });
   }
   const list = [...counts.entries()].map(([value, { raw, count, label }]) => ({ value, label, count, raw }));
   list.sort((a, b) =>

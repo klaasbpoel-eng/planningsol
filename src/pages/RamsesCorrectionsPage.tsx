@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { knownListItems, planToRules, sampleValues, type AiRule } from "@/lib/aiFilters";
 import { requestFilterPlan } from "@/lib/aiFilterClient";
-import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, cleanDisplayText, collectDistinctValues, findCodeColumn, listItemsWithCodes, applyColumnOrder, moveColumnKey, type DistinctValue, deriveColumns, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, buildPeriodFilter, PERIOD_PRESETS, type PeriodPreset, parseListValue, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
+import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, cleanDisplayText, collectDistinctValues, findCodeColumn, listItemsWithCodes, applyColumnOrder, moveColumnKey, type DistinctValue, deriveColumns, findTimestampColumn, formatColumnValue, formatDateOnlyValue, groupRowsByTimestamp, buildPeriodFilter, PERIOD_PRESETS, type PeriodPreset, parseListValue, quoteColumnName, rowsToCsv, type DataColumn, type DataRow, type TimestampGroup } from "@/lib/dataTable";
 
 const TABLE_NAME = "RamsesCorrecties";
 const PAGE_SIZES = [25, 50, 100];
@@ -467,9 +467,9 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                 ))}
             </div>
           ) : codeColumns.get(col.key) && row[col.key] ? (
-            listItemsWithCodes(row, col, codeColumns.get(col.key) ?? null)[0] || formatCellValue(row[col.key], col.kind)
+            listItemsWithCodes(row, col, codeColumns.get(col.key) ?? null)[0] || formatColumnValue(col, row[col.key])
           ) : (
-            formatCellValue(row[col.key], col.kind)
+            formatColumnValue(col, row[col.key])
           )}
         </TableCell>
       ))}

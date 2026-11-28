@@ -8,10 +8,11 @@ import type { ProtectedRouteChildProps } from "@/components/auth/ProtectedRoute"
 // Two rows on one day and one row on the next day: the day is the group, the time of day is not shown.
 // The `type` column holds Ramses cylinder texts: the (Leeg) marker and the UN-number line must not reach the screen.
 // Klant and Debiteurnummer hold one item per customer in the same order: the number is shown in front of the name.
+// Capaciteit is the water volume in liters: cylinders and bundles show it with " L", pallets have none.
 const ROWS = vi.hoisted(() => [
-  { id: 1, dt_dn: "2026-11-03T10:45:02", code: "A1", type: "Bundles Stikstof industrieel(Leeg)\nUN 1066 Stikstof, samengeperst, 2.2 (E)", Klant: ["UMCG", "AZG Post Groningen 1"], Debiteurnummer: ["206091", "215184"], created_at: "2026-11-27T13:26:08.691118+00:00" },
-  { id: 2, dt_dn: "2026-11-03T11:51:00", code: "A2", type: "Cylinders 300bar Act integrated Zuurstof medisch(Leeg)", Klant: ["UMCG"], Debiteurnummer: ["206091"], created_at: "2026-11-27T13:26:08.691118+00:00" },
-  { id: 3, dt_dn: "2026-11-04T09:15:00", code: "A3", type: "Cilinder pallets", Klant: ["Heliomare locatie De Alk"], Debiteurnummer: [], created_at: "2026-11-27T13:26:08.691118+00:00" },
+  { id: 1, dt_dn: "2026-11-03T10:45:02", code: "A1", type: "Bundles Stikstof industrieel(Leeg)\nUN 1066 Stikstof, samengeperst, 2.2 (E)", Capaciteit: 800, Klant: ["UMCG", "AZG Post Groningen 1"], Debiteurnummer: ["206091", "215184"], created_at: "2026-11-27T13:26:08.691118+00:00" },
+  { id: 2, dt_dn: "2026-11-03T11:51:00", code: "A2", type: "Cylinders 300bar Act integrated Zuurstof medisch(Leeg)", Capaciteit: 2, Klant: ["UMCG"], Debiteurnummer: ["206091"], created_at: "2026-11-27T13:26:08.691118+00:00" },
+  { id: 3, dt_dn: "2026-11-04T09:15:00", code: "A3", type: "Cilinder pallets", Capaciteit: null, Klant: ["Heliomare locatie De Alk"], Debiteurnummer: [], created_at: "2026-11-27T13:26:08.691118+00:00" },
 ]);
 
 // Column filters the page sends to the database, recorded so tests can read them back.
@@ -149,7 +150,7 @@ describe("tijdgroepen op de Ramses-correctiespagina", () => {
     expect(screen.getByRole("button", { name: "Sorteer op Code" })).toBeInTheDocument();
     for (const code of ["A1", "A2", "A3"]) {
       const row = screen.getByText(code).closest("tr") as HTMLTableRowElement;
-      expect(row.querySelectorAll("td")).toHaveLength(4);
+      expect(row.querySelectorAll("td")).toHaveLength(5);
     }
     // ...but the date is still there, in the header of each time group.
     expect(screen.getByRole("button", { name: "Klap tijdgroep 03-11-2026" })).toBeInTheDocument();
@@ -392,5 +393,32 @@ describe("meerdere filters en periode op de Ramses-correctiespagina", () => {
     const year = new Date().getFullYear();
     await waitFor(() => expect(FILTER_CALLS).toContainEqual(["dt_dn", "gte", `${year}-01-01`]));
     expect(FILTER_CALLS).toContainEqual(["dt_dn", "lt", `${year + 1}-01-01`]);
+  });
+});
+
+describe("capaciteit in liters", () => {
+  it("zet L achter de capaciteit van cilinders en bundels", async () => {
+    await openPage();
+    expect(screen.getByText("800 L")).toBeInTheDocument();
+    expect(screen.getByText("2 L")).toBeInTheDocument();
+    // A pallet has no capacity: no number with a unit appears in its row.
+    const palletRow = screen.getByText("Cilinder pallets").closest("tr") as HTMLTableRowElement;
+    expect(palletRow.textContent).not.toMatch(/\d\s*L/);
+  });
+
+  it("kiest de capaciteit met liter, terwijl er op het getal gefilterd wordt", async () => {
+    await openPage();
+    fireEvent.click(screen.getByRole("combobox", { name: /Kolom kiezen om op te filteren/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "Capaciteit" }));
+    // Let the column list finish closing first; it hands focus back to its own button.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    fireEvent.click(screen.getByRole("button", { name: "Waarden kiezen" }));
+
+    FILTER_CALLS.length = 0;
+    fireEvent.click(await screen.findByRole("option", { name: /^2 L/ }));
+    await waitFor(() => expect(FILTER_CALLS).toContainEqual(["Capaciteit", "in", "(2)"]));
+
+    const chip = screen.getByRole("button", { name: "Filter op Capaciteit verwijderen" }).closest("span") as HTMLElement;
+    expect(chip.textContent).toContain("2 L");
   });
 });

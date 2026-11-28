@@ -42,7 +42,7 @@ function validDate(text: string): boolean {
 }
 
 const showValue = (column: DataColumn, value: string) =>
-  column.kind === "number" ? formatCellValue(Number(value), "number") : column.kind === "date" ? formatCellValue(value, "date") : `"${cleanDisplayText(value)}"`;
+  column.kind === "number" ? formatCellValue(Number(value), "number", column.unit) : column.kind === "date" ? formatCellValue(value, "date") : `"${cleanDisplayText(value)}"`;
 
 function words(column: DataColumn, op: "gt" | "gte" | "lt" | "lte"): string {
   if (column.kind === "date") return { gt: "na", gte: "vanaf", lt: "vóór", lte: "tot en met" }[op];

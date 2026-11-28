@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, cleanDisplayText, collectDistinctValues, deriveColumns, findCodeColumn, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, humanizeColumnName, labelWithCode, listItemsWithCodes, quoteColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
+import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, cleanDisplayText, collectDistinctValues, deriveColumns, findCodeColumn, findTimestampColumn, formatCellValue, formatColumnValue, formatDateOnlyValue, groupRowsByTimestamp, humanizeColumnName, labelWithCode, listItemsWithCodes, quoteColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
 import { buildPeriodFilter, periodRange } from "./dataTable";
 import type { DataColumn } from "./dataTable";
 import { applyColumnOrder, moveColumnKey } from "./dataTable";
@@ -83,6 +83,36 @@ describe("deriveColumns", () => {
     expect(other?.kind).toBe("text");
     expect(formatCellValue(1234567, other!.kind)).toBe("1234567");
     expect(cols.find((c) => c.key === "Capaciteit")?.kind).toBe("number");
+  });
+});
+
+describe("capaciteit in liters", () => {
+  const rows = [
+    { Capaciteit: 2, Aantal: 5 },
+    { Capaciteit: 800, Aantal: 1 },
+    { Capaciteit: null, Aantal: 2 },
+  ];
+  const cols = deriveColumns(rows);
+  const cap = cols.find((c) => c.key === "Capaciteit")!;
+  const aantal = cols.find((c) => c.key === "Aantal")!;
+
+  it("zet L achter een capaciteit, maar achter een aantal niet", () => {
+    expect(cap.unit).toBe(" L");
+    expect(formatColumnValue(cap, 2)).toBe("2 L");
+    expect(formatColumnValue(cap, 800)).toBe("800 L");
+    expect(formatColumnValue(cap, null)).toBe("—");
+    expect(aantal.unit).toBeUndefined();
+    expect(formatColumnValue(aantal, 5)).toBe("5");
+  });
+
+  it("toont de liter in de waardelijst, terwijl de waarde het getal blijft", () => {
+    const values = collectDistinctValues(rows, cap);
+    expect(values.map((v) => v.label)).toEqual(["2 L", "800 L"]);
+    expect(values.map((v) => v.value)).toEqual(["2", "800"]);
+  });
+
+  it("zet de liter niet in de export", () => {
+    expect(rowsToCsv(cols, rows)).toContain("2;5");
   });
 });
 
