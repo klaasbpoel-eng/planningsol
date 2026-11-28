@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { columnOrderKey, parseColumnOrder } from "@/lib/columnOrderPreferences";
 import { Navigate } from "react-router-dom";
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Filter, GripVertical, ListChecks, Loader2, Pencil, RefreshCw, Search, Sparkles, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,13 +45,13 @@ export default function RamsesCorrectionsPage() {
   return (
     <ProtectedRoute>
       {({ user, role, isAdmin }) =>
-        isAdmin ? <RamsesCorrectionsContent userEmail={user.email} role={role} /> : <Navigate to="/" replace />
+        isAdmin ? <RamsesCorrectionsContent userId={user.id} userEmail={user.email} role={role} /> : <Navigate to="/" replace />
       }
     </ProtectedRoute>
   );
 }
 
-function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; role: AppRole }) {
+function RamsesCorrectionsContent({ userId, userEmail, role }: { userId: string; userEmail?: string; role: AppRole }) {
   const { toast } = useToast();
   const [columns, setColumns] = useState<DataColumn[] | null>(null);
   const [rows, setRows] = useState<DataRow[]>([]);
@@ -226,14 +227,45 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
   const visibleColumns = useMemo(() => applyColumnLabels(baseColumns, columnLabels), [baseColumns, columnLabels]);
   const timestampKey = useMemo(() => findTimestampColumn(visibleColumns), [visibleColumns]);
   // The column used for grouping is not repeated as a table column: its value is already in every group header.
-  const [columnOrder, setColumnOrder] = useState<string[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(COLUMN_ORDER_KEY) ?? "[]");
-    } catch {
-      return [];
-    }
-  });
+  const [columnOrder, setColumnOrder] = useState<string[]>([]);
+  const [columnOrderLoaded, setColumnOrderLoaded] = useState(false);
+  const [savingColumnOrder, setSavingColumnOrder] = useState(false);
   const [dragKey, setDragKey] = useState<string | null>(null);
+
+  // One setting per account: the database order wins on every browser and device.
+  useEffect(() => {
+    let cancelled = false;
+    setColumnOrderLoaded(false);
+    (async () => {
+      try {
+        const key = columnOrderKey(TABLE_NAME, userId);
+        const stored = await api.appSettings.getByKey(key);
+        const databaseOrder = parseColumnOrder(stored?.value);
+        // Move an order made before database storage existed only when no setting exists yet.
+        const legacyOrder = stored == null ? parseColumnOrder(localStorage.getItem(COLUMN_ORDER_KEY)) : [];
+        const nextOrder = databaseOrder.length > 0 ? databaseOrder : legacyOrder;
+        if (stored == null && legacyOrder.length > 0) {
+          await api.appSettings.upsert(key, JSON.stringify(legacyOrder), `Persoonlijke kolomvolgorde voor ${TABLE_NAME}`);
+        }
+        if (!cancelled) setColumnOrder(nextOrder);
+        localStorage.removeItem(COLUMN_ORDER_KEY);
+      } catch {
+        if (!cancelled) {
+          toast({
+            title: "Kolomvolgorde niet geladen",
+            description: "De standaardvolgorde wordt gebruikt. Vernieuw de pagina om het opnieuw te proberen.",
+            variant: "destructive",
+          });
+        }
+      } finally {
+        if (!cancelled) setColumnOrderLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, toast]);
+
   const tableColumns = useMemo(
     () =>
       applyColumnOrder(
@@ -242,13 +274,32 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
       ),
     [visibleColumns, timestampKey, columnOrder],
   );
-  const saveColumnOrder = (order: string[]) => {
+  const saveColumnOrder = async (order: string[]) => {
+    const previousOrder = columnOrder;
     setColumnOrder(order);
-    if (order.length) localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(order));
-    else localStorage.removeItem(COLUMN_ORDER_KEY);
+    setSavingColumnOrder(true);
+    try {
+      await api.appSettings.upsert(
+        columnOrderKey(TABLE_NAME, userId),
+        JSON.stringify(order),
+        `Persoonlijke kolomvolgorde voor ${TABLE_NAME}`,
+      );
+      localStorage.removeItem(COLUMN_ORDER_KEY);
+    } catch (e: any) {
+      setColumnOrder(previousOrder);
+      toast({
+        title: "Kolomvolgorde niet opgeslagen",
+        description: e.message ?? "Probeer het opnieuw.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingColumnOrder(false);
+    }
   };
   const dropColumn = (target: string) => {
-    if (dragKey) saveColumnOrder(moveColumnKey(tableColumns.map((c) => c.key), dragKey, target));
+    if (dragKey && columnOrderLoaded && !savingColumnOrder) {
+      void saveColumnOrder(moveColumnKey(tableColumns.map((c) => c.key), dragKey, target));
+    }
     setDragKey(null);
   };
   // Codes shown in front of list items: the customer column reads "206091 UMCG" using the customer-number column.
@@ -561,8 +612,8 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
               Kolomnamen
             </Button>
             {columnOrder.length > 0 && (
-              <Button variant="outline" onClick={() => saveColumnOrder([])}>
-                Volgorde herstellen
+              <Button variant="outline" onClick={() => void saveColumnOrder([])} disabled={savingColumnOrder}>
+                {savingColumnOrder ? "Volgorde opslaan…" : "Volgorde herstellen"}
               </Button>
             )}
             <Button variant="outline" onClick={load} disabled={loading}>
@@ -841,7 +892,7 @@ function RamsesCorrectionsContent({ userEmail, role }: { userEmail?: string; rol
                       return (
                         <TableHead
                           key={col.key}
-                          draggable
+                          draggable={columnOrderLoaded && !savingColumnOrder}
                           onDragStart={(e) => {
                             setDragKey(col.key);
                             e.dataTransfer.effectAllowed = "move";

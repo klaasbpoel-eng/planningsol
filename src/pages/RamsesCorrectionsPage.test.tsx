@@ -21,9 +21,17 @@ const FILTER_CALLS = vi.hoisted(() => [] as string[][]);
 // Stored column names, as they live in the backend settings table.
 const SETTINGS = vi.hoisted(() => ({
   stored: '{"dt_dn":"Tijdstip"}',
-  getByKey: vi.fn(async () => ({ value: SETTINGS.stored, description: null })),
-  upsert: vi.fn(async (_key: string, value: string, _description?: string) => ({
-    key: "column_labels_RamsesCorrecties",
+  orderValues: {} as Record<string, string>,
+  toast: vi.fn(),
+  getByKey: vi.fn(async (key: string) => {
+    if (key.startsWith("column_order_")) {
+      const value = SETTINGS.orderValues[key];
+      return value === undefined ? null : { value, description: null };
+    }
+    return { value: SETTINGS.stored, description: null };
+  }),
+  upsert: vi.fn(async (key: string, value: string, _description?: string) => ({
+    key,
     value,
   })),
 }));
@@ -80,7 +88,7 @@ vi.mock("@/components/layout/PageLayout", () => ({
   ),
 }));
 
-vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
+vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: SETTINGS.toast }) }));
 
 import RamsesCorrectionsPage from "./RamsesCorrectionsPage";
 
@@ -420,5 +428,56 @@ describe("capaciteit in liters", () => {
 
     const chip = screen.getByRole("button", { name: "Filter op Capaciteit verwijderen" }).closest("span") as HTMLElement;
     expect(chip.textContent).toContain("2 L");
+  });
+});
+
+describe("persoonlijke kolomvolgorde in de database", () => {
+  const settingsKey = "column_order_RamsesCorrecties_u1";
+  const header = (label: string) => screen.getByRole("button", { name: `Sorteer op ${label}` }).closest("th") as HTMLElement;
+
+  it("leest de volgorde van dit account uit de database", async () => {
+    SETTINGS.orderValues[settingsKey] = JSON.stringify(["type", "code"]);
+    try {
+      await openPage();
+      await waitFor(() => expect(document.querySelector("thead th")).toHaveTextContent("Type"));
+      const headers = [...document.querySelectorAll("thead th")];
+      expect(headers[0]).toHaveTextContent("Type");
+      expect(headers[1]).toHaveTextContent("Code");
+      expect(SETTINGS.getByKey).toHaveBeenCalledWith(settingsKey);
+    } finally {
+      delete SETTINGS.orderValues[settingsKey];
+    }
+  });
+
+  it("slaat de nieuwe volgorde na het slepen op onder dit account", async () => {
+    await openPage();
+    const typeHeader = header("Type");
+    const codeHeader = header("Code");
+    await waitFor(() => expect(typeHeader).toHaveAttribute("draggable", "true"));
+    SETTINGS.upsert.mockClear();
+
+    fireEvent.dragStart(typeHeader, { dataTransfer: { effectAllowed: "" } });
+    fireEvent.drop(codeHeader, { dataTransfer: {} });
+
+    await waitFor(() =>
+      expect(SETTINGS.upsert).toHaveBeenCalledWith(
+        settingsKey,
+        JSON.stringify(["type", "code", "Capaciteit", "Klant", "Debiteurnummer"]),
+        expect.stringContaining("RamsesCorrecties"),
+      ),
+    );
+  });
+
+  it("slaat ook het herstellen van de standaardvolgorde in de database op", async () => {
+    SETTINGS.orderValues[settingsKey] = JSON.stringify(["type", "code"]);
+    try {
+      await openPage();
+      const restore = await screen.findByRole("button", { name: "Volgorde herstellen" });
+      SETTINGS.upsert.mockClear();
+      fireEvent.click(restore);
+      await waitFor(() => expect(SETTINGS.upsert).toHaveBeenCalledWith(settingsKey, "[]", expect.any(String)));
+    } finally {
+      delete SETTINGS.orderValues[settingsKey];
+    }
   });
 });
