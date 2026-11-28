@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildColumnFilters, buildSearchFilter, buildValueFilter, canPickValues, cleanDisplayText, collectDistinctValues, deriveColumns, findCodeColumn, findTimestampColumn, formatCellValue, formatDateOnlyValue, groupRowsByTimestamp, humanizeColumnName, labelWithCode, listItemsWithCodes, quoteColumnName, rowsToCsv, timestampGroupParity } from "./dataTable";
 import { buildPeriodFilter, periodRange } from "./dataTable";
+import type { DataColumn } from "./dataTable";
 
 describe("klantnummer vóór de klantnaam", () => {
   const rows = [
