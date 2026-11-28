@@ -19,3 +19,4 @@
 - [x] Rollen: extra rechten (rapporten bekijken, aanvragen/correcties goedkeuren, klanten beheren) en echt toegepast in de schermen.
 - [x] Rollen: databaseregels (SQL) leveren zodat eigen rollen ook in de echte database beperkt blijven.
 - [x] Beheer: inlogaccount aanmaken voor medewerkers (vanuit Medewerkers).
+- [x] Ramses-correcties: persoonlijke kolomvolgorde per account in de database opslaan en op elk apparaat laden.
